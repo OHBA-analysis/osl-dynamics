@@ -310,16 +310,16 @@ def apply_to_lists(list_of_lists, func, check_empty=True):
             [
                 [
                     func(inner_list) if np.any(inner_list) else 0
-                    for inner_list in subject_list
+                    for inner_list in array_list
                 ]
-                for subject_list in list_of_lists
+                for array_list in list_of_lists
             ],
         )
 
     return np.array(
         [
-            [func(inner_list) for inner_list in subject_list]
-            for subject_list in list_of_lists
+            [func(inner_list) for inner_list in array_list]
+            for array_list in list_of_lists
         ],
     )
 

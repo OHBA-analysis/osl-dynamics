@@ -1,4 +1,4 @@
-"""Example script for training SE-HMM on simulated multi-subject HMM-MVN data.
+"""Example script for training HIVE on HMM simulated data.
 
 - Should achieve a dice score close to 1.
 """
@@ -10,7 +10,7 @@ import numpy as np
 
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
-from osl_dynamics.models.sehmm import Config, Model
+from osl_dynamics.models.hive import Config, Model
 from osl_dynamics.utils import plotting
 
 # Directory for plots
@@ -24,9 +24,9 @@ config = Config(
     n_states=5,
     n_channels=20,
     sequence_length=200,
-    n_subjects=100,
-    subject_embeddings_dim=2,
-    mode_embeddings_dim=2,
+    n_sessions=100,
+    embeddings_dim=2,
+    spatial_embeddings_dim=2,
     dev_n_layers=5,
     dev_n_units=32,
     dev_activation="tanh",
@@ -47,18 +47,18 @@ config = Config(
 )
 
 # Simulate data
-sim = simulation.MSubj_HMM_MVN(
+sim = simulation.MSess_HMM_MVN(
     n_samples=3000,
     trans_prob="sequence",
-    subject_means="zero",
-    subject_covariances="random",
+    session_means="zero",
+    session_covariances="random",
     n_states=config.n_states,
     n_channels=config.n_channels,
     n_covariances_act=5,
-    n_subjects=config.n_subjects,
-    n_subject_embedding_dim=config.subject_embeddings_dim,
-    n_mode_embedding_dim=config.mode_embeddings_dim,
-    subject_embedding_scale=0.002,
+    n_sessions=config.n_sessions,
+    embeddings_dim=config.embeddings_dim,
+    spatial_embeddings_dim=config.spatial_embeddings_dim,
+    embeddings_scale=0.002,
     n_groups=3,
     between_group_scale=0.2,
     stay_prob=0.9,
@@ -77,11 +77,13 @@ model.summary()
 # Set regularizers
 model.set_regularizers(training_data)
 
-# Set initializer for subject-specific deviation parameters
+# Set initializer for session-specific deviation parameters
 model.set_dev_parameters_initializer(training_data)
 
 # Model initialization
-model.random_state_time_course_initialization(training_data, n_epochs=3, n_init=5, take=1)
+model.random_state_time_course_initialization(
+    training_data, n_epochs=3, n_init=5, take=1
+)
 
 # Full model training
 print("Training model")
@@ -122,39 +124,39 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
 print("Fractional occupancies (Inferred):", modes.fractional_occupancies(inf_stc))
 
-sim_subject_embeddings = sim.subject_embeddings
-inf_subject_embeddings = model.get_subject_embeddings()
-inf_subject_embeddings -= np.mean(inf_subject_embeddings, axis=0)
-inf_subject_embeddings /= np.std(inf_subject_embeddings, axis=0)
+sim_embeddings = sim.embeddings
+inf_embeddings = model.get_embeddings()
+inf_embeddings -= np.mean(inf_embeddings, axis=0)
+inf_embeddings /= np.std(inf_embeddings, axis=0)
 group_masks = [sim.assigned_groups == i for i in range(sim.n_groups)]
 
 fig, axes = plotting.create_figure(1, 2, figsize=(10, 5))
 plotting.plot_scatter(
-    [sim_subject_embeddings[group_mask, 0] for group_mask in group_masks],
-    [sim_subject_embeddings[group_mask, 1] for group_mask in group_masks],
+    [sim_embeddings[group_mask, 0] for group_mask in group_masks],
+    [sim_embeddings[group_mask, 1] for group_mask in group_masks],
     x_label="dim_1",
     y_label="dim_2",
     annotate=[
-        np.array([str(i) for i in range(config.n_subjects)])[group_mask]
+        np.array([str(i) for i in range(config.n_sessions)])[group_mask]
         for group_mask in group_masks
     ],
     ax=axes[0],
 )
 
 plotting.plot_scatter(
-    [inf_subject_embeddings[group_mask, 0] for group_mask in group_masks],
-    [inf_subject_embeddings[group_mask, 1] for group_mask in group_masks],
+    [inf_embeddings[group_mask, 0] for group_mask in group_masks],
+    [inf_embeddings[group_mask, 1] for group_mask in group_masks],
     x_label="dim_1",
     y_label="dim_2",
     annotate=[
-        np.array([str(i) for i in range(config.n_subjects)])[group_mask]
+        np.array([str(i) for i in range(config.n_sessions)])[group_mask]
         for group_mask in group_masks
     ],
     ax=axes[1],
 )
 axes[0].set_title("Simulation")
 axes[1].set_title("Inferred")
-plotting.save(fig, filename="figures/subject_embeddings.png")
+plotting.save(fig, filename="figures/embeddings.png")
 
 # Delete temporary directory
 training_data.delete_dir()

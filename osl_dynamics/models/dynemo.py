@@ -448,10 +448,10 @@ class Model(VariationalInferenceModelBase):
 
         return int(n_params)
 
-    def subject_fine_tuning(
+    def fine_tuning(
         self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
     ):
-        """Fine tuning the model for each subject.
+        """Fine tuning the model for each session.
 
         Here, we train the inference RNN and observation model with the model
         RNN fixed held fixed at the group-level.
@@ -472,13 +472,13 @@ class Model(VariationalInferenceModelBase):
         Returns
         -------
         alpha : list of np.ndarray
-            Subject specific mixing coefficients.
+            Session-specific mixing coefficients.
             Each element has shape (n_samples, n_modes).
         means : np.ndarray
-            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
+            Session-specific means. Shape is (n_sessions, n_modes, n_channels).
         covariances : np.ndarray
-            Subject specific covariances.
-            Shape is (n_subjects, n_modes, n_channels, n_channels).
+            Session-specific covariances.
+            Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
         # Save the group level model
         os.makedirs(store_dir, exist_ok=True)
@@ -495,16 +495,16 @@ class Model(VariationalInferenceModelBase):
         # Layers to fix (i.e. make non-trainable)
         fixed_layers = ["mod_rnn", "mod_mu", "mod_sigma"]
 
-        # Fine tune on individual subjects
+        # Fine tune on sessions
         alpha = []
         means = []
         covariances = []
         with self.set_trainable(fixed_layers, False), set_logging_level(
             _logger, logging.WARNING
         ):
-            for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
-                # Train on this subject
-                with training_data.set_keep(subject):
+            for i in trange(training_data.n_sessions, desc="Fine tuning"):
+                # Train on this session
+                with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
                     a = self.get_alpha(
                         training_data,
@@ -535,9 +535,8 @@ class Model(VariationalInferenceModelBase):
         n_epochs=None,
         learning_rate=None,
         store_dir="tmp",
-        **kwargs,
     ):
-        """Dual estimation to get the subject-specific observation model
+        """Dual estimation to get the session-specific observation model
         parameters.
 
         Here, we train the observation model parameters (mode means and
@@ -560,10 +559,10 @@ class Model(VariationalInferenceModelBase):
         Returns
         -------
         means : np.ndarray
-            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
+            Session-specific means. Shape is (n_sessions, n_modes, n_channels).
         covariances : np.ndarray
-            Subject specific covariances.
-            Shape is (n_subjects, n_modes, n_channels, n_channels).
+            Session-specific covariances.
+            Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
         # Save the group level model
         os.makedirs(store_dir, exist_ok=True)
@@ -587,13 +586,13 @@ class Model(VariationalInferenceModelBase):
             "alpha",
         ]
 
-        # Dual estimation on individual subjects
+        # Dual estimation on sessions
         means = []
         covariances = []
         with self.set_trainable(fixed_layers, False):
-            for subject in trange(training_data.n_arrays, desc="Dual estimation"):
-                # Train on this subject
-                with training_data.set_keep(subject):
+            for i in trange(training_data.n_sessions, desc="Dual estimation"):
+                # Train on this session
+                with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
 
                 # Get inferred parameters

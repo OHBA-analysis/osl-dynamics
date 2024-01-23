@@ -25,18 +25,18 @@ config = Config(
     learn_trans_prob=True,
 )
 
-sim = simulation.MSubj_HMM_MVN(
+sim = simulation.MSess_HMM_MVN(
     n_samples=3000,
     trans_prob="sequence",
-    subject_means="zero",
-    subject_covariances="random",
+    session_means="zero",
+    session_covariances="random",
     n_states=config.n_states,
     n_channels=config.n_channels,
     n_covariances_act=2,
-    n_subjects=100,
-    n_subject_embedding_dim=2,
-    n_mode_embedding_dim=2,
-    subject_embedding_scale=0.001,
+    n_sessions=100,
+    embeddings_dim=2,
+    spatial_embeddings_dim=2,
+    embeddings_scale=0.001,
     n_groups=3,
     between_group_scale=0.2,
     stay_prob=0.9,
@@ -44,8 +44,8 @@ sim = simulation.MSubj_HMM_MVN(
 )
 sim.standardize()
 
-# Plot the subject embeddings
-sim_se = sim.subject_embeddings
+# Plot the embeddings
+sim_se = sim.embeddings
 assigned_groups = sim.assigned_groups
 group_masks = [assigned_groups == i for i in range(sim.n_groups)]
 plotting.plot_scatter(
@@ -54,10 +54,10 @@ plotting.plot_scatter(
     x_label="dim_1",
     y_label="dim_2",
     annotate=[
-        np.array([str(i) for i in range(sim.n_subjects)])[group_mask]
+        np.array([str(i) for i in range(sim.n_sessions)])[group_mask]
         for group_mask in group_masks
     ],
-    filename="figures/sim_subject_embeddings.png",
+    filename="figures/sim_embeddings.png",
 )
 training_data = data.Data([tc for tc in sim.time_series])
 
@@ -74,7 +74,7 @@ kernel = fk.get_kernel_matrix(training_data)
 # 5-fold cross validation
 scores = []
 kf = KFold(5, shuffle=True, random_state=234)
-for train_index, validation_index in kf.split(range(sim.n_subjects)):
+for train_index, validation_index in kf.split(range(sim.n_sessions)):
     kernel_train = kernel[train_index][:, train_index]
     labels_train = assigned_groups[train_index]
     kernel_validation = kernel[validation_index][:, train_index]

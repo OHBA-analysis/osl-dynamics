@@ -113,7 +113,7 @@ def set_dev_parameters_initializer(
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
     training_dataset : osl_dynamics.data.Data
         The training dataset.
     learn_means : bool
@@ -169,20 +169,18 @@ def set_dev_parameters_initializer(
         covs_beta_layer.tensor_initializer = RandomWeightInitializer(covs_beta, 0.1)
 
 
-def set_subject_embeddings_initializer(model, subject_embeddings):
-    """Set the subject embeddings initializer.
+def set_embeddings_initializer(model, embeddings):
+    """Set the embeddings initializer.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
-    subject_embeddings : np.ndarray
-        The subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
+        The model. * must be :code:`hive` or :code:`dive`.
+    embeddings : np.ndarray
+        The embeddings. Shape is (n_sessions, embeddings_dim).
     """
-    subject_embeddings_layer = model.get_layer("subject_embeddings")
-    subject_embeddings_layer.embeddings_initializer = WeightInitializer(
-        subject_embeddings
-    )
+    embeddings_layer = model.get_layer("embeddings")
+    embeddings_layer.embeddings_initializer = WeightInitializer(embeddings)
 
 
 def set_means_regularizer(model, training_dataset, layer_name="means"):
@@ -325,106 +323,106 @@ def set_fcs_regularizer(model, training_dataset, epsilon):
     )
 
 
-def get_subject_embeddings(model):
-    """Get the subject embeddings.
+def get_embeddings(model):
+    """Get the embeddings.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
 
     Returns
     -------
-    subject_embeddings : np.ndarray
-        The subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
+    embeddings : np.ndarray
+        The embeddings. Shape is (n_sessions, embeddings_dim).
     """
-    subject_embeddings_layer = model.get_layer("subject_embeddings")
-    n_subjects = subject_embeddings_layer.input_dim
-    return subject_embeddings_layer(np.arange(n_subjects)).numpy()
+    embeddings_layer = model.get_layer("embeddings")
+    n_sessions = embeddings_layer.input_dim
+    return embeddings_layer(np.arange(n_sessions)).numpy()
 
 
-def get_means_mode_embeddings(model):
-    """Get the means mode embeddings.
+def get_means_spatial_embeddings(model):
+    """Get the means spatial embeddings.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
 
     Returns
     -------
-    means_mode_embeddings : np.ndarray
-        The means mode embeddings. Shape is (n_modes, mode_embeddings_dim).
+    means_spatial_embeddings : np.ndarray
+        The means spatial embeddings. Shape is (n_states, spatial_embeddings_dim).
     """
     group_means = get_observation_model_parameter(model, "group_means")
-    means_mode_embeddings_layer = model.get_layer("means_mode_embeddings")
-    means_mode_embeddings = means_mode_embeddings_layer(group_means)
-    return means_mode_embeddings.numpy()
+    means_spatial_embeddings_layer = model.get_layer("means_spatial_embeddings")
+    means_spatial_embeddings = means_spatial_embeddings_layer(group_means)
+    return means_spatial_embeddings.numpy()
 
 
-def get_covs_mode_embeddings(model):
-    """Get the covariances mode embeddings.
+def get_covs_spatial_embeddings(model):
+    """Get the covariances spatial embeddings.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
 
     Returns
     -------
-    covs_mode_embeddings : np.ndarray
-        The covariances mode embeddings.
-        Shape is (n_modes, mode_embeddings_dim).
+    covs_spatial_embeddings : np.ndarray
+        The covariances spatial embeddings.
+        Shape is (n_states, spatial_embeddings_dim).
     """
     cholesky_bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
     group_covs = get_observation_model_parameter(model, "group_covs")
-    covs_mode_embeddings_layer = model.get_layer("covs_mode_embeddings")
-    covs_mode_embeddings = covs_mode_embeddings_layer(
+    covs_spatial_embeddings_layer = model.get_layer("covs_spatial_embeddings")
+    covs_spatial_embeddings = covs_spatial_embeddings_layer(
         cholesky_bijector.inverse(group_covs)
     )
-    return covs_mode_embeddings.numpy()
+    return covs_spatial_embeddings.numpy()
 
 
-def get_mode_embeddings(model, map):
-    """Wrapper for getting the mode embeddings for the means and covariances."""
+def get_spatial_embeddings(model, map):
+    """Wrapper for getting the spatial embeddings for the means and covariances."""
     if map == "means":
-        return get_means_mode_embeddings(model)
+        return get_means_spatial_embeddings(model)
     elif map == "covs":
-        return get_covs_mode_embeddings(model)
+        return get_covs_spatial_embeddings(model)
     else:
         raise ValueError("map must be either 'means' or 'covs'")
 
 
-def get_concatenated_embeddings(model, map, subject_embeddings=None):
+def get_concatenated_embeddings(model, map, embeddings=None):
     """Get the concatenated embeddings.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
     map : str
         The map to use. Either :code:`"means"` or :code:`"covs"`.
-    subject_embeddings : np.ndarray, optional
-        Input subject embeddings. If :code:`None`, they are retrieved from
-        the model. Shape is (n_subjects, subject_embeddings_dim).
+    embeddings : np.ndarray, optional
+        Input embeddings. If :code:`None`, they are retrieved from
+        the model. Shape is (n_sessions, embeddings_dim).
 
     Returns
     -------
     concat_embeddings : np.ndarray
-        The concatenated embeddings. Shape is (n_subjects, n_modes,
-        subject_embeddings_dim + mode_embeddings_dim).
+        The concatenated embeddings. Shape is (n_sessions, n_states,
+        embeddings_dim + spatial_embeddings_dim).
     """
-    if subject_embeddings is None:
-        subject_embeddings = get_subject_embeddings(model)
+    if embeddings is None:
+        embeddings = get_embeddings(model)
     if map == "means":
-        mode_embeddings = get_means_mode_embeddings(model)
+        spatial_embeddings = get_means_spatial_embeddings(model)
         concat_embeddings_layer = model.get_layer("means_concat_embeddings")
     elif map == "covs":
-        mode_embeddings = get_covs_mode_embeddings(model)
+        spatial_embeddings = get_covs_spatial_embeddings(model)
         concat_embeddings_layer = model.get_layer("covs_concat_embeddings")
     else:
         raise ValueError("map must be either 'means' or 'covs'")
-    concat_embeddings = concat_embeddings_layer([subject_embeddings, mode_embeddings])
+    concat_embeddings = concat_embeddings_layer([embeddings, spatial_embeddings])
     return concat_embeddings.numpy()
 
 
@@ -434,16 +432,16 @@ def get_means_dev_mag_parameters(model):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
 
     Returns
     -------
     means_dev_mag_inf_alpha : np.ndarray
         The means deviation magnitude alpha parameters.
-        Shape is (n_subjects, n_modes, 1).
+        Shape is (n_sessions, n_states, 1).
     means_dev_mag_inf_beta : np.ndarray
         The means deviation magnitude beta parameters.
-        Shape is (n_subjects, n_modes, 1).
+        Shape is (n_sessions, n_states, 1).
     """
     means_dev_mag_inf_alpha_input_layer = model.get_layer(
         "means_dev_mag_inf_alpha_input"
@@ -468,16 +466,16 @@ def get_covs_dev_mag_parameters(model):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
 
     Returns
     -------
     covs_dev_mag_inf_alpha : np.ndarray
         The covariances deviation magnitude alpha parameters.
-        Shape is (n_subjects, n_modes, 1).
+        Shape is (n_sessions, n_states, 1).
     covs_dev_mag_inf_beta : np.ndarray
         The covariances deviation magnitude beta parameters.
-        Shape is (n_subjects, n_modes, 1).
+        Shape is (n_sessions, n_states, 1).
     """
     covs_dev_mag_inf_alpha_input_layer = model.get_layer("covs_dev_mag_inf_alpha_input")
     covs_dev_mag_inf_alpha_layer = model.get_layer("covs_dev_mag_inf_alpha")
@@ -509,14 +507,14 @@ def get_dev_mag(model, map):
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
     map : str
         The map. Must be either :code:`'means'` or :code:`'covs'`.
 
     Returns
     -------
     dev_mag : np.ndarray
-        The deviance magnitude. Shape is (n_subjects, n_modes, 1).
+        The deviance magnitude. Shape is (n_sessions, n_states, 1).
     """
     if map == "means":
         alpha, beta = get_means_dev_mag_parameters(model)
@@ -526,36 +524,36 @@ def get_dev_mag(model, map):
         dev_mag_layer = model.get_layer("covs_dev_mag")
     else:
         raise ValueError("map must be either 'means' or 'covs'")
-    n_subjects = alpha.shape[0]
-    dev_mag = dev_mag_layer([alpha, beta, np.arange(n_subjects)[:, None]])
+    n_sessions = alpha.shape[0]
+    dev_mag = dev_mag_layer([alpha, beta, np.arange(n_sessions)[:, None]])
     return dev_mag.numpy()
 
 
-def get_dev_map(model, map, subject_embeddings=None):
+def get_dev_map(model, map, embeddings=None):
     """Get the deviance map.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
     map : str
         The map to use. Either :code:`"means"` or :code:`"covs"`.
-    subject_embeddings : np.ndarray, optional
-        Input subject embeddings. If :code:`None`, they are retrieved from
-        the model. Shape is (n_subjects, subject_embeddings_dim).
+    embeddings : np.ndarray, optional
+        Input embeddings. If :code:`None`, they are retrieved from
+        the model. Shape is (n_sessions, embeddings_dim).
 
     Returns
     -------
     dev_map : np.ndarray
         The deviance map.
-        If :code:`map="means"`, shape is (n_subjects, n_modes, n_channels).
-        If :code:`map="covs"`, shape is (n_subjects, n_modes,
+        If :code:`map="means"`, shape is (n_sessions, n_states, n_channels).
+        If :code:`map="covs"`, shape is (n_sessions, n_states,
         n_channels * (n_channels + 1) // 2).
     """
     concat_embeddings = get_concatenated_embeddings(
         model,
         map,
-        subject_embeddings,
+        embeddings,
     )
     if map == "means":
         dev_decoder_layer = model.get_layer("means_dev_decoder")
@@ -573,71 +571,64 @@ def get_dev_map(model, map, subject_embeddings=None):
     return norm_dev_map.numpy()
 
 
-def get_subject_dev(
+def get_session_dev(
     model,
     learn_means,
     learn_covariances,
-    subject_embeddings=None,
+    embeddings=None,
     n_neighbours=2,
 ):
-    """Get the subject deviation.
+    """Get the session deviation.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
     learn_means : bool
         Whether the mean is learnt.
     learn_covariances : bool
         Whether the covariances are learnt.
-    subject_embeddings : np.ndarray, optional
-        Input subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
-        If :code:`None`, then the subject embeddings are retrieved from the
-        model.
+    embeddings : np.ndarray, optional
+        Input embeddings. Shape is (n_sessions, embeddings_dim).
+        If :code:`None`, then the embeddings are retrieved from the model.
     n_neighbours : int, optional
-        The number of nearest neighbours if :code:`subject_embedding` is not
+        The number of nearest neighbours if :code:`embedding` is not
         :code:`None`.
 
     Returns
     -------
     means_dev : np.ndarray
-        The means deviation. Shape is (n_subjects, n_modes, n_channels).
+        The means deviation. Shape is (n_sessions, n_states, n_channels).
     covs_dev : np.ndarray
         The covariances deviation.
-        Shape is (n_subjects, n_modes, n_channels * (n_channels + 1) // 2).
+        Shape is (n_sessions, n_states, n_channels * (n_channels + 1) // 2).
     """
     means_dev_layer = model.get_layer("means_dev")
     covs_dev_layer = model.get_layer("covs_dev")
 
-    if subject_embeddings is not None:
-        nearest_neighbours = get_nearest_neighbours(
-            model, subject_embeddings, n_neighbours
-        )
+    if embeddings is not None:
+        nearest_neighbours = get_nearest_neighbours(model, embeddings, n_neighbours)
 
     if learn_means:
         means_dev_mag = get_dev_mag(model, "means")
-        if subject_embeddings is not None:
+        if embeddings is not None:
             means_dev_mag = np.mean(
                 tf.gather(means_dev_mag, nearest_neighbours, axis=0),
                 axis=1,
             )
-        means_dev_map = get_dev_map(
-            model=model, map="means", subject_embeddings=subject_embeddings
-        )
+        means_dev_map = get_dev_map(model=model, map="means", embeddings=embeddings)
         means_dev = means_dev_layer([means_dev_mag, means_dev_map])
     else:
         means_dev = means_dev_layer(1)
 
     if learn_covariances:
         covs_dev_mag = get_dev_mag(model, "covs")
-        if subject_embeddings is not None:
+        if embeddings is not None:
             covs_dev_mag = np.mean(
                 tf.gather(covs_dev_mag, nearest_neighbours, axis=0),
                 axis=1,
             )
-        covs_dev_map = get_dev_map(
-            model=model, map="covs", subject_embeddings=subject_embeddings
-        )
+        covs_dev_map = get_dev_map(model=model, map="covs", embeddings=embeddings)
         covs_dev = covs_dev_layer([covs_dev_mag, covs_dev_map])
     else:
         covs_dev = covs_dev_layer(1)
@@ -645,61 +636,61 @@ def get_subject_dev(
     return means_dev.numpy(), covs_dev.numpy()
 
 
-def get_subject_means_covariances(
+def get_session_means_covariances(
     model,
     learn_means,
     learn_covariances,
-    subject_embeddings=None,
+    embeddings=None,
     n_neighbours=2,
 ):
-    """Get the subject means and covariances.
+    """Get the session means and covariances.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
+        The model. * must be :code:`hive` or :code:`dive`.
     learn_means : bool
         Whether the mean is learnt.
     learn_covariances : bool
         Whether the covariances are learnt.
-    subject_embeddings : np.ndarray, optional
-        Input subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
-        If None, then the subject embeddings are retrieved from the model.
+    embeddings : np.ndarray, optional
+        Input embeddings. Shape is (n_sessions, embeddings_dim).
+        If None, then the embeddings are retrieved from the model.
     n_neighbours : int, optional
-        The number of nearest neighbours if :code:`subject_embedding` is not
+        The number of nearest neighbours if :code:`+embedding` is not
         :code:`None`.
 
     Returns
     -------
     mu : np.ndarray
-        The subject_means. Shape is (n_subjects, n_modes, n_channels).
+        The session means. Shape is (n_sessions, n_states, n_channels).
     D : np.ndarray
-        The subject_covariances.
-        Shape is (n_subjects, n_modes, n_channels, n_channels).
+        The session covariances.
+        Shape is (n_sessions, n_states, n_channels, n_channels).
     """
     group_means = get_observation_model_parameter(model, "group_means")
     group_covs = get_observation_model_parameter(model, "group_covs")
-    means_dev, covs_dev = get_subject_dev(
-        model, learn_means, learn_covariances, subject_embeddings, n_neighbours
+    means_dev, covs_dev = get_session_dev(
+        model, learn_means, learn_covariances, embeddings, n_neighbours
     )
 
-    subject_means_layer = model.get_layer("subject_means")
-    subject_covs_layer = model.get_layer("subject_covs")
+    session_means_layer = model.get_layer("session_means")
+    session_covs_layer = model.get_layer("session_covs")
 
-    mu = subject_means_layer([group_means, means_dev])
-    D = subject_covs_layer([group_covs, covs_dev])
+    mu = session_means_layer([group_means, means_dev])
+    D = session_covs_layer([group_covs, covs_dev])
     return mu.numpy(), D.numpy()
 
 
-def get_nearest_neighbours(model, subject_embeddings, n_neighbours):
-    """Get the indices of the nearest neighours in the subject embedding space.
+def get_nearest_neighbours(model, embeddings, n_neighbours):
+    """Get the indices of the nearest neighours in the embedding space.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`sehmm` or :code:`sedynemo`.
-    subject_embeddings : np.ndarray
-        Input subject embeddings. Shape is (n_subjects, subject_embeddings_dim).
+        The model. * must be :code:`hive` or :code:`dive`.
+    embeddings : np.ndarray
+        Input embeddings. Shape is (n_sessions, embeddings_dim).
     n_neighbours : int
         The number of nearest neighbours.
 
@@ -707,12 +698,11 @@ def get_nearest_neighbours(model, subject_embeddings, n_neighbours):
     -------
     nearest_neighbours : np.ndarray
         The indices of the nearest neighbours.
-        Shape is (n_subjects, n_neighbours).
+        Shape is (n_sessions, n_neighbours).
     """
-    model_subject_embeddings = get_subject_embeddings(model)
+    model_embeddings = get_embeddings(model)
     distances = np.linalg.norm(
-        np.expand_dims(subject_embeddings, axis=1)
-        - np.expand_dims(model_subject_embeddings, axis=0),
+        np.expand_dims(embeddings, axis=1) - np.expand_dims(model_embeddings, axis=0),
         axis=-1,
     )
 

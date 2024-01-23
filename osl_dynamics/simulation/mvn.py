@@ -363,39 +363,39 @@ class MDyn_MVN(MVN):
         return inst_covs.astype(np.float32)
 
 
-class MSubj_MVN(MVN):
+class MSess_MVN(MVN):
     """Class that generates data from a multivariate normal distribution for
-    multiple subjects.
+    multiple sessions.
 
     Parameters
     ----------
-    subject_means : np.ndarray or str
-        Subject mean vector for each mode for each subject, shape should be
-        (n_subjects, n_modes, n_channels). Either a numpy array or
+    session_means : np.ndarray or str
+        Mean vector for each mode for each session, shape should be
+        (n_sessions, n_modes, n_channels). Either a numpy array or
         :code:`'zero'` or :code:`'random'`.
-    subject_covariances : np.ndarray or str
-        Subject covariance matrix for each mode for each subject, shape should
-        be (n_subjects, n_modes, n_channels, n_channels). Either a numpy array
-        or :code:`'random'`.
+    session_covariances : np.ndarray or str
+        Covariance matrix for each mode for each session, shape should
+        be (n_sessions, n_modes, n_channels, n_channels). Either a numpy
+        array or :code:`'random'`.
     n_modes : int, optional
         Number of modes.
     n_channels : int, optional
         Number of channels.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_subjects : int, optional
-        Number of subjects.
-    n_subject_embedding_dim : int, optional
-        Dimension of subject embeddings.
-    n_mode_embedding_dim : int, optional
-        Dimension of mode embeddings.
-    subject_embedding_scale : float, optional
-        Standard deviation when generating subject embeddings with a normal
+    n_sessions : int, optional
+        Number of sessions.
+    embeddings_dim : int, optional
+        Dimension of embeddings.
+    spatial_embeddings_dim : int, optional
+        Dimension of spatial embeddings.
+    embeddings_scale : float, optional
+        Standard deviation when generating embeddings with a normal
         distribution.
     n_groups : int, optional
-        Number of groups of subjects when generating subject embeddings.
+        Number of groups when generating embeddings.
     between_group_scale : float, optional
-        Standard deviation when generating centroids of groups of subject
+        Standard deviation when generating centroids of groups of
         embeddings.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
@@ -405,15 +405,15 @@ class MSubj_MVN(MVN):
 
     def __init__(
         self,
-        subject_means,
-        subject_covariances,
+        session_means,
+        session_covariances,
         n_modes=None,
         n_channels=None,
         n_covariances_act=1,
-        n_subjects=None,
-        n_subject_embedding_dim=None,
-        n_mode_embedding_dim=None,
-        subject_embedding_scale=None,
+        n_sessions=None,
+        embeddings_dim=None,
+        spatial_embeddings_dim=None,
+        embeddings_scale=None,
         n_groups=None,
         between_group_scale=None,
         observation_error=0.0,
@@ -422,158 +422,158 @@ class MSubj_MVN(MVN):
         self._rng = np.random.default_rng(random_seed)
         self.n_covariances_act = n_covariances_act
         self.observation_error = observation_error
-        self.n_subject_embedding_dim = n_subject_embedding_dim
-        self.n_mode_embedding_dim = n_mode_embedding_dim
-        self.subject_embedding_scale = subject_embedding_scale
+        self.embeddings_dim = embeddings_dim
+        self.spatial_embeddings_dim = spatial_embeddings_dim
+        self.embeddings_scale = embeddings_scale
         self.n_groups = n_groups
         self.between_group_scale = between_group_scale
 
-        # Both the subject means and covariances were passed as numpy arrays
-        if isinstance(subject_means, np.ndarray) and isinstance(
-            subject_covariances, np.ndarray
+        # Both the session means and covariances were passed as numpy arrays
+        if isinstance(session_means, np.ndarray) and isinstance(
+            session_covariances, np.ndarray
         ):
-            if subject_means.ndim != 3:
+            if session_means.ndim != 3:
                 raise ValueError(
-                    "subject_means must have shape (n_subjects, n_modes, n_channels)."
+                    "session_means must have shape (n_sessions, n_modes, n_channels)."
                 )
-            if subject_covariances.ndim != 4:
+            if session_covariances.ndim != 4:
                 raise ValueError(
-                    "subject_covariances must have shape "
-                    "(n_subjects, n_modes, n_channels, n_channels)."
+                    "session_covariances must have shape "
+                    "(n_sessions, n_modes, n_channels, n_channels)."
                 )
-            if subject_means.shape[0] != subject_covariances.shape[0]:
+            if session_means.shape[0] != session_covariances.shape[0]:
                 raise ValueError(
-                    "subject_means and subject_covariances have a different  "
-                    "number of subjects."
+                    "session_means and session_covariances have a different  "
+                    "number of arrays."
                 )
-            if subject_means.shape[1] != subject_covariances.shape[1]:
+            if session_means.shape[1] != session_covariances.shape[1]:
                 raise ValueError(
-                    "subject_means and subject_covariances have a different "
+                    "session_means and session_covariances have a different "
                     "number of modes."
                 )
-            if subject_means.shape[2] != subject_covariances.shape[2]:
+            if session_means.shape[2] != session_covariances.shape[2]:
                 raise ValueError(
-                    "subject_means and subject_covariances have a different "
+                    "session_means and session_covariances have a different "
                     "number of channels."
                 )
-            self.n_subjects = subject_means.shape[0]
-            self.n_modes = subject_means.shape[1]
-            self.n_channels = subject_means.shape[2]
+            self.n_sessions = session_means.shape[0]
+            self.n_modes = session_means.shape[1]
+            self.n_channels = session_means.shape[2]
             self.n_groups = None
             self.group_centroids = None
             self.between_group_scale = None
-            self.n_subject_embedding_dim = None
-            self.n_mode_embedding_dim = None
-            self.subject_embedding_scale = None
+            self.embeddings_dim = None
+            self.spatial_embeddings_dim = None
+            self.embeddings_scale = None
 
             self.group_means = None
-            self.subject_means = subject_means
+            self.session_means = session_means
 
             self.group_covariances = None
-            self.subject_covariances = subject_covariances
+            self.session_covariances = session_covariances
 
-        # Only the subject means were passed as a numpy array
-        elif isinstance(subject_means, np.ndarray) and not isinstance(
-            subject_covariances, np.ndarray
+        # Only the session means were passed as a numpy array
+        elif isinstance(session_means, np.ndarray) and not isinstance(
+            session_covariances, np.ndarray
         ):
-            self.n_subjects = subject_means.shape[0]
-            self.n_modes = subject_means.shape[1]
-            self.n_channels = subject_means.shape[2]
+            self.n_sessions = session_means.shape[0]
+            self.n_modes = session_means.shape[1]
+            self.n_channels = session_means.shape[2]
 
-            self.validate_subject_embedding_parameters()
-            self.create_subject_embeddings()
+            self.validate_embedding_parameters()
+            self.create_embeddings()
 
             self.group_means = None
-            self.subject_means = subject_means
+            self.session_means = session_means
 
-            self.group_covariances = super().create_covariances(subject_covariances)
-            self.subject_covariances = self.create_subject_covariances()
+            self.group_covariances = super().create_covariances(session_covariances)
+            self.session_covariances = self.create_session_covariances()
 
-        # Only the subject covariances were passed as a numpy array
-        elif not isinstance(subject_means, np.ndarray) and isinstance(
-            subject_covariances, np.ndarray
+        # Only the session covariances were passed as a numpy array
+        elif not isinstance(session_means, np.ndarray) and isinstance(
+            session_covariances, np.ndarray
         ):
-            self.n_subjects = subject_covariances.shape[0]
-            self.n_modes = subject_covariances.shape[1]
-            self.n_channels = subject_covariances.shape[2]
+            self.n_sessions = session_covariances.shape[0]
+            self.n_modes = session_covariances.shape[1]
+            self.n_channels = session_covariances.shape[2]
 
-            self.validate_subject_embedding_parameters()
-            self.create_subject_embeddings()
+            self.validate_embedding_parameters()
+            self.create_embeddings()
 
-            self.group_means = super().create_means(subject_means)
-            self.subject_means = self.create_subject_means(subject_means)
+            self.group_means = super().create_means(session_means)
+            self.session_means = self.create_session_means(session_means)
 
             self.group_covariances = None
-            self.subject_covariances = subject_covariances
+            self.session_covariances = session_covariances
 
-        # Neither subject means or nor covariances were passed as numpy arrays
-        elif not isinstance(subject_means, np.ndarray) and not isinstance(
-            subject_covariances, np.ndarray
+        # Neither session means or nor covariances were passed as numpy arrays
+        elif not isinstance(session_means, np.ndarray) and not isinstance(
+            session_covariances, np.ndarray
         ):
-            if n_subjects is None or n_modes is None or n_channels is None:
+            if n_sessions is None or n_modes is None or n_channels is None:
                 raise ValueError(
-                    "If we are generating subject means and covariances, "
-                    "n_subjects, n_modes, n_channels must be passed."
+                    "If we are generating array means and covariances, "
+                    "n_sessions, n_modes, n_channels must be passed."
                 )
 
-            self.n_subjects = n_subjects
+            self.n_sessions = n_sessions
             self.n_modes = n_modes
             self.n_channels = n_channels
 
-            self.validate_subject_embedding_parameters()
-            self.create_subject_embeddings()
+            self.validate_embedding_parameters()
+            self.create_embeddings()
 
-            self.group_means = super().create_means(subject_means)
-            self.subject_means = self.create_subject_means(subject_means)
+            self.group_means = super().create_means(session_means)
+            self.session_means = self.create_session_means(session_means)
 
-            self.group_covariances = super().create_covariances(subject_covariances)
-            self.subject_covariances = self.create_subject_covariances()
+            self.group_covariances = super().create_covariances(session_covariances)
+            self.session_covariances = self.create_session_covariances()
 
-    def validate_subject_embedding_parameters(self):
-        if self.n_subject_embedding_dim is None:
+    def validate_embedding_parameters(self):
+        if self.embeddings_dim is None:
             raise ValueError(
-                "Subject means or covariances not passed, please pass "
-                "'n_subject_embedding_dim'."
+                "Session means or covariances not passed, please pass "
+                "'embeddings_dim'."
             )
-        if self.n_mode_embedding_dim is None:
+        if self.spatial_embeddings_dim is None:
             raise ValueError(
-                "Subject means or covariances not passed, please pass "
-                "'n_mode_embedding_dim'."
+                "Session means or covariances not passed, please pass "
+                "'spatial_embeddings_dim'."
             )
-        if self.subject_embedding_scale is None:
+        if self.embeddings_scale is None:
             raise ValueError(
-                "Subject means or covariances not passed, please pass "
-                "'subject_embedding_scale'."
+                "Session means or covariances not passed, please pass "
+                "'embeddings_scale'."
             )
         if self.n_groups is None:
             raise ValueError(
-                "Subject means or covariances not passed, please pass 'n_groups'."
+                "Session means or covariances not passed, please pass 'n_groups'."
             )
         if self.between_group_scale is None:
             raise ValueError(
-                "Subject means or covariances not passed, please pass "
+                "Session means or covariances not passed, please pass "
                 "'between_group_scale'."
             )
 
-    def create_subject_embeddings(self):
-        # Assign groups to subjects
-        assigned_groups = self._rng.choice(self.n_groups, self.n_subjects)
+    def create_embeddings(self):
+        # Assign groups to sessions
+        assigned_groups = self._rng.choice(self.n_groups, self.n_sessions)
         self.group_centroids = self._rng.normal(
             scale=self.between_group_scale,
-            size=[self.n_groups, self.n_subject_embedding_dim],
+            size=[self.n_groups, self.embeddings_dim],
         )
 
-        subject_embeddings = np.zeros([self.n_subjects, self.n_subject_embedding_dim])
+        embeddings = np.zeros([self.n_sessions, self.embeddings_dim])
         for i in range(self.n_groups):
             group_mask = assigned_groups == i
-            subject_embeddings[group_mask] = self._rng.multivariate_normal(
+            embeddings[group_mask] = self._rng.multivariate_normal(
                 mean=self.group_centroids[i],
-                cov=self.subject_embedding_scale * np.eye(self.n_subject_embedding_dim),
+                cov=self.embeddings_scale * np.eye(self.embeddings_dim),
                 size=[np.sum(group_mask)],
             )
 
         self.assigned_groups = assigned_groups
-        self.subject_embeddings = subject_embeddings
+        self.embeddings = embeddings
 
     def create_linear_transform(self, input_dim, output_dim, scale=0.1):
         linear_transform = self._rng.normal(
@@ -584,36 +584,36 @@ class MSubj_MVN(MVN):
             np.sum(np.square(linear_transform), axis=-1, keepdims=True)
         )
 
-    def create_subject_means_deviations(self):
-        means_mode_embeddings_lienar_transform = self.create_linear_transform(
-            self.n_channels, self.n_mode_embedding_dim
+    def create_session_means_deviations(self):
+        means_spatial_embeddings_lienar_transform = self.create_linear_transform(
+            self.n_channels, self.spatial_embeddings_dim
         )
-        self.means_mode_embeddings = (
-            means_mode_embeddings_lienar_transform @ self.group_means.T
+        self.means_spatial_embeddings = (
+            means_spatial_embeddings_lienar_transform @ self.group_means.T
         ).T
 
         # Match the shapes for concatenation
-        concat_subject_embeddings = np.broadcast_to(
-            self.subject_embeddings[:, None, :],
+        concat_array_embeddings = np.broadcast_to(
+            self.embeddings[:, None, :],
             (
-                self.n_subjects,
+                self.n_sessions,
                 self.n_modes,
-                self.n_subject_embedding_dim,
+                self.embeddings_dim,
             ),
         )
-        concat_means_mode_embeddings = np.broadcast_to(
-            self.means_mode_embeddings[None, :, :],
+        concat_means_spatial_embeddings = np.broadcast_to(
+            self.means_spatial_embeddings[None, :, :],
             (
-                self.n_subjects,
+                self.n_sessions,
                 self.n_modes,
-                self.n_mode_embedding_dim,
+                self.spatial_embeddings_dim,
             ),
         )
         self.means_concat_embeddings = np.concatenate(
-            [concat_subject_embeddings, concat_means_mode_embeddings], axis=-1
+            [concat_array_embeddings, concat_means_spatial_embeddings], axis=-1
         )
         means_linear_transform = self.create_linear_transform(
-            self.n_subject_embedding_dim + self.n_mode_embedding_dim,
+            self.embeddings_dim + self.spatial_embeddings_dim,
             self.n_channels,
         )
         self.means_deviations = np.squeeze(
@@ -621,41 +621,41 @@ class MSubj_MVN(MVN):
             @ self.means_concat_embeddings[..., None]
         )
 
-    def create_subject_covariances_deviations(self):
-        covariances_mode_embeddings_linear_transform = self.create_linear_transform(
-            self.n_channels * (self.n_channels + 1) // 2, self.n_mode_embedding_dim
+    def create_session_covariances_deviations(self):
+        covariances_spatial_embeddings_linear_transform = self.create_linear_transform(
+            self.n_channels * (self.n_channels + 1) // 2, self.spatial_embeddings_dim
         )
         group_cholesky_covariances = np.linalg.cholesky(self.group_covariances)
         m, n = np.tril_indices(self.n_channels)
         flattened_group_cholesky_covariances = group_cholesky_covariances[:, m, n]
-        self.covariances_mode_embeddings = (
-            covariances_mode_embeddings_linear_transform
+        self.covariances_spatial_embeddings = (
+            covariances_spatial_embeddings_linear_transform
             @ flattened_group_cholesky_covariances.T
         ).T
 
         # Match the shapes for concatenation
-        concat_subject_embeddings = np.broadcast_to(
-            self.subject_embeddings[:, None, :],
+        concat_array_embeddings = np.broadcast_to(
+            self.embeddings[:, None, :],
             (
-                self.n_subjects,
+                self.n_sessions,
                 self.n_modes,
-                self.n_subject_embedding_dim,
+                self.embeddings_dim,
             ),
         )
-        concat_covarainces_mode_embeddings = np.broadcast_to(
-            self.covariances_mode_embeddings[None, :, :],
+        concat_covarainces_spatial_embeddings = np.broadcast_to(
+            self.covariances_spatial_embeddings[None, :, :],
             (
-                self.n_subjects,
+                self.n_sessions,
                 self.n_modes,
-                self.n_mode_embedding_dim,
+                self.spatial_embeddings_dim,
             ),
         )
         self.covariances_concat_embeddings = np.concatenate(
-            [concat_subject_embeddings, concat_covarainces_mode_embeddings],
+            [concat_array_embeddings, concat_covarainces_spatial_embeddings],
             axis=-1,
         )
         covariances_linear_transform = self.create_linear_transform(
-            self.n_subject_embedding_dim + self.n_mode_embedding_dim,
+            self.embeddings_dim + self.spatial_embeddings_dim,
             self.n_channels * (self.n_channels + 1) // 2,
         )
         self.flattened_covariances_cholesky_deviations = np.squeeze(
@@ -663,50 +663,50 @@ class MSubj_MVN(MVN):
             @ self.covariances_concat_embeddings[..., None]
         )
 
-    def create_subject_means(self, option):
+    def create_session_means(self, option):
         if option == "zero":
-            subject_means = np.zeros([self.n_subjects, self.n_modes, self.n_channels])
+            session_means = np.zeros([self.n_sessions, self.n_modes, self.n_channels])
         else:
-            self.create_subject_means_deviations()
-            subject_means = self.group_means[None, ...] + self.means_deviations
-        return subject_means
+            self.create_session_means_deviations()
+            session_means = self.group_means[None, ...] + self.means_deviations
+        return session_means
 
-    def create_subject_covariances(self, eps=1e-6):
-        self.create_subject_covariances_deviations()
+    def create_session_covariances(self, eps=1e-6):
+        self.create_session_covariances_deviations()
         group_cholesky_covariances = np.linalg.cholesky(self.group_covariances)
         m, n = np.tril_indices(self.n_channels)
         flattened_group_cholesky_covariances = group_cholesky_covariances[:, m, n]
-        flattened_subject_cholesky_covariances = (
+        flattened_session_cholesky_covariances = (
             flattened_group_cholesky_covariances[None, ...]
             + self.flattened_covariances_cholesky_deviations
         )
 
-        subject_cholesky_covariances = np.zeros(
-            [self.n_subjects, self.n_modes, self.n_channels, self.n_channels]
+        session_cholesky_covariances = np.zeros(
+            [self.n_sessions, self.n_modes, self.n_channels, self.n_channels]
         )
-        for i in range(self.n_subjects):
+        for i in range(self.n_sessions):
             for j in range(self.n_modes):
-                subject_cholesky_covariances[
+                session_cholesky_covariances[
                     i, j, m, n
-                ] = flattened_subject_cholesky_covariances[i, j]
+                ] = flattened_session_cholesky_covariances[i, j]
 
-        subject_covariances = subject_cholesky_covariances @ np.transpose(
-            subject_cholesky_covariances, (0, 1, 3, 2)
+        session_covariances = session_cholesky_covariances @ np.transpose(
+            session_cholesky_covariances, (0, 1, 3, 2)
         )
 
         # A small value to add to the diagonal to ensure the covariances
         # are invertible
-        subject_covariances += eps * np.eye(self.n_channels)
+        session_covariances += eps * np.eye(self.n_channels)
 
-        return subject_covariances
+        return session_covariances
 
-    def simulate_subject_data(self, subject, mode_time_course):
-        """Simulate single subject data.
+    def simulate_session_data(self, session, mode_time_course):
+        """Simulate single session data.
 
         Parameters
         ----------
-        subject : int
-            Subject number.
+        session : int
+            Session number.
         mode_time_course : np.ndarray
             Mode time course. Shape is (n_samples, n_modes).
 
@@ -722,9 +722,9 @@ class MSubj_MVN(MVN):
         # Loop through all unique combinations of modes
         for alpha in np.unique(mode_time_course, axis=0):
             # Mean and covariance for this combination of modes
-            mu = np.sum(self.subject_means[subject] * alpha[:, None], axis=0)
+            mu = np.sum(self.session_means[session] * alpha[:, None], axis=0)
             sigma = np.sum(
-                self.subject_covariances[subject] * alpha[:, None, None], axis=0
+                self.session_covariances[session] * alpha[:, None, None], axis=0
             )
 
             # Generate data for the time points that this combination of
@@ -742,20 +742,20 @@ class MSubj_MVN(MVN):
 
         return data.astype(np.float32)
 
-    def get_subject_instantaneous_covariances(self, subject, mode_time_course):
-        """Get ground truth covariances at each time point for a particular subject.
+    def get_session_instantaneous_covariances(self, session, mode_time_course):
+        """Get ground truth covariances at each time point for a particular session.
 
         Parameters
         ----------
-        subject : int
-            Subject number.
+        session : int
+            Session number.
         mode_time_course : np.ndarray
             Mode time course. Shape is (n_samples, n_modes).
 
         Returns
         -------
         inst_covs : np.ndarray
-            Instantaneous covariances for a subject.
+            Instantaneous covariances for an session.
             Shape is (n_samples, n_channels, n_channels).
         """
         # Initialise array to hold data
@@ -766,52 +766,52 @@ class MSubj_MVN(MVN):
         for alpha in np.unique(mode_time_course, axis=0):
             # Covariance for this combination of modes
             sigma = np.sum(
-                self.subject_covariances[subject] * alpha[:, None, None], axis=0
+                self.session_covariances[session] * alpha[:, None, None], axis=0
             )
             inst_covs[np.all(mode_time_course == alpha, axis=1)] = sigma
 
         return inst_covs.astype(np.float32)
 
     def get_instantaneous_covariances(self, mode_time_courses):
-        """Get ground truth covariance at each time point for each subject.
+        """Get ground truth covariance at each time point for each session.
 
         Parameters
         ----------
         mode_time_courses : np.ndarray
             Mode time courses.
-            Shape is (n_subjects, n_samples, n_modes).
+            Shape is (n_sessions, n_samples, n_modes).
 
         Returns
         -------
         inst_covs : np.ndarray
             Instantaneous covariances.
-            Shape is (n_subjects, n_samples, n_channels, n_channels).
+            Shape is (n_sessions, n_samples, n_channels, n_channels).
         """
         inst_covs = []
-        for subject in range(self.n_subjects):
+        for session in range(self.n_sessions):
             inst_covs.append(
-                self.get_subject_instantaneous_covariances(
-                    subject, mode_time_courses[subject]
+                self.get_session_instantaneous_covariances(
+                    session, mode_time_courses[session]
                 )
             )
         return np.array(inst_covs)
 
-    def simulate_multi_subject_data(self, mode_time_courses):
+    def simulate_multi_session_data(self, mode_time_courses):
         """Simulates data.
 
         Parameters
         ----------
         mode_time_courses : np.ndarray
-            It contains n_subjects time courses.
-            Shape is (n_subjects, n_samples, n_modes).
+            It contains n_sessions time courses.
+            Shape is (n_sessions, n_samples, n_modes).
 
         Returns
         -------
         data : np.ndarray
-            Simulated data for subjects.
-            Shape is (n_subjects, n_samples, n_channels).
+            Simulated data for sessions.
+            Shape is (n_sessions, n_samples, n_channels).
         """
         data = []
-        for subject in range(self.n_subjects):
-            data.append(self.simulate_subject_data(subject, mode_time_courses[subject]))
+        for session in range(self.n_sessions):
+            data.append(self.simulate_session_data(session, mode_time_courses[session]))
         return np.array(data)

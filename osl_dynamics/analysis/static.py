@@ -27,7 +27,7 @@ def functional_connectivity(data, conn_type="corr"):
     Parameters
     ----------
     data : np.ndarray
-        Time series data. Shape must be (n_subjects, n_samples, n_channels)
+        Time series data. Shape must be (n_sessions, n_samples, n_channels)
         or (n_samples, n_channels).
     conn_type : str, optional
         What metric should we use? :code:`"corr"` (Pearson correlation) or
@@ -36,7 +36,7 @@ def functional_connectivity(data, conn_type="corr"):
     Returns
     -------
     fc : np.ndarray
-        Functional connectivity. Shape is (n_subjects, n_channels, n_channels)
+        Functional connectivity. Shape is (n_sessions, n_channels, n_channels)
         or (n_channels, n_channels).
     """
     if conn_type not in ["corr", "cov"]:
@@ -75,7 +75,7 @@ def welch_spectra(
     Parameters
     ----------
     data : np.ndarray or list
-        Time series data. Must have shape (n_subjects, n_samples,
+        Time series data. Must have shape (n_sessions, n_samples,
         n_channels) or (n_samples, n_channels).
     sampling_frequency : float
         Sampling frequency in Hz.
@@ -92,10 +92,10 @@ def welch_spectra(
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
-        Should we return the weights for subject-specific spectra?
+        Should we return the weights for session-specific spectra?
         This is useful for calculating a group average.
     keepdims : bool, optional
-        Should we enforce a (n_subject, n_states, ...) array is returned
+        Should we enforce a (n_sessions, ...) array is returned
         for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
         dimension of length 1.
     n_jobs : int, optional
@@ -106,16 +106,15 @@ def welch_spectra(
     f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra for each subject and state. Shape is (n_subjects,
-        n_states, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
+        Power spectra. Shape is (n_sessions, n_channels, n_freq).
+        Any axis of length 1 is removed if :code:`keepdims=False`.
     coh : np.ndarray
-        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
-        n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
+        Coherences. Shape is (n_sessions, n_channels, n_channels, n_freq).
+        Any axis of length 1 is removed if :code:`keepdims=False`.
+        Only returned is :code:`calc_coh=True`.
     w : np.ndarray
-        Weighting for subject-specific spectra. Only returned if
-        :code:`return_weights=True`. Shape is (n_subjects,).
+        Weighting for session-specific spectra. Only returned if
+        :code:`return_weights=True`. Shape is (n_sessions,).
     """
     return spectral.welch_spectra(
         data=data,
@@ -154,7 +153,7 @@ def multitaper_spectra(
     Parameters
     ----------
     data : np.ndarray or list
-        Time series data. Must have shape (n_subjects, n_samples,
+        Time series data. Must have shape (n_sessions, n_samples,
         n_channels) or (n_samples, n_channels).
     sampling_frequency : float
         Sampling frequency in Hz.
@@ -171,10 +170,10 @@ def multitaper_spectra(
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
-        Should we return the weights for subject-specific PSDs?
+        Should we return the weights for session-specific PSDs?
         Useful for calculating the group average PSD.
     keepdims : bool, optional
-        Should we enforce a (n_subject, n_states, ...) array is returned for
+        Should we enforce a (n_sessions, n_states, ...) array is returned for
         :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimension
         of length 1.
     n_jobs : int, optional
@@ -185,16 +184,15 @@ def multitaper_spectra(
     f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra for each subject and state. Shape is (n_subjects,
-        n_states, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
+        Power spectra. Shape is (n_sessions, n_channels, n_freq).
+        Any axis of length 1 is removed if :code:`keepdims=False`.
     coh : np.ndarray
-        Coherences for each state. Shape is (n_subjects, n_states, n_channels,
-        n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
+        Coherences. Shape is (n_sessions, n_channels, n_channels, n_freq).
+        Any axis of length 1 is removed if :code:`keepdims=False`.
+        Only returned is :code:`calc_coh=True`.
     w : np.ndarray
-        Weighting for subject-specific spectra. Only returned if
-        :code:`return_weights=True`. Shape is (n_subjects,).
+        Weighting for session-specific spectra. Only returned if
+        :code:`return_weights=True`. Shape is (n_sessions,).
     """
     return spectral.multitaper_spectra(
         data=data,

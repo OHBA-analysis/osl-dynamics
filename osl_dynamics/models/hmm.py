@@ -490,7 +490,7 @@ class Model(ModelBase):
         Parameters
         ----------
         B : np.ndarray
-            Probability of individual data points, under observation model for
+            Probability of array data points, under observation model for
             each state. Shape is (n_states, n_samples).
         Pi_0 : np.ndarray
             Initial state probabilities. Shape is (n_states,).
@@ -1191,9 +1191,9 @@ class Model(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for
-            each subject.
+            each session.
         concatenate : bool, optional
-            Should we concatenate alpha for each subject?
+            Should we concatenate alpha for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha` and
@@ -1204,7 +1204,7 @@ class Model(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            State probabilities with shape (n_subjects, n_samples, n_states)
+            State probabilities with shape (n_sessions, n_samples, n_states)
             or (n_samples, n_states).
         """
         if remove_edge_effects:
@@ -1312,13 +1312,13 @@ class Model(ModelBase):
         )
         return bic
 
-    def subject_fine_tuning(
+    def fine_tuning(
         self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
     ):
-        """Fine tuning the model for each subject.
+        """Fine tuning the model for each session.
 
         Here, we estimate the posterior distribution (state probabilities)
-        and observation model using the data from a single subject with the
+        and observation model using the data from a single session with the
         group-level transition probability matrix held fixed.
 
         Parameters
@@ -1337,13 +1337,13 @@ class Model(ModelBase):
         Returns
         -------
         alpha : list of np.ndarray
-            Subject specific mixing coefficients.
+            Session-specific mixing coefficients.
             Each element has shape (n_samples, n_modes).
         means : np.ndarray
-            Subject specific means. Shape is (n_subjects, n_modes, n_channels).
+            Session-specific means. Shape is (n_sessions, n_modes, n_channels).
         covariances : np.ndarray
-            Subject specific covariances.
-            Shape is (n_subjects, n_modes, n_channels, n_channels).
+            Session-specific covariances.
+            Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
         # Save group-level model parameters
         os.makedirs(store_dir, exist_ok=True)
@@ -1360,14 +1360,14 @@ class Model(ModelBase):
         # Reset the optimiser
         self.compile()
 
-        # Fine tune the model for each subject
+        # Fine tune the model for each session
         alpha = []
         means = []
         covariances = []
         with set_logging_level(_logger, logging.WARNING):
-            for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
-                # Train on this subject
-                with training_data.set_keep(subject):
+            for i in trange(training_data.n_sessions, desc="Fine tuning"):
+                # Train on this session
+                with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
                     a = self.get_alpha(training_data, concatenate=True)
 
@@ -1389,10 +1389,10 @@ class Model(ModelBase):
         return alpha, np.array(means), np.array(covariances)
 
     def dual_estimation(self, training_data, alpha=None, n_jobs=1):
-        """Dual estimation to get subject-specific observation model parameters.
+        """Dual estimation to get session-specific observation model parameters.
 
-        Here, we estimate the state means and covariances for individual
-        subjects with the posterior distribution of the states held fixed.
+        Here, we estimate the state means and covariances for sessions
+        with the posterior distribution of the states held fixed.
 
         Parameters
         ----------
@@ -1400,17 +1400,17 @@ class Model(ModelBase):
             Prepared training data object.
         alpha : list of np.ndarray, optional
             Posterior distribution of the states. Shape is
-            (n_subjects, n_samples, n_states).
+            (n_sessions, n_samples, n_states).
         n_jobs : int, optional
             Number of jobs to run in parallel.
 
         Returns
         -------
         means : np.ndarray
-            Subject specific means. Shape is (n_subjects, n_states, n_channels).
+            Session-specific means. Shape is (n_sessions, n_states, n_channels).
         covariances : np.ndarray
-            Subject specific covariances.
-            Shape is (n_subjects, n_states, n_channels, n_channels).
+            Session-specific covariances.
+            Shape is (n_sessions, n_states, n_channels, n_channels).
         """
         if alpha is None:
             # Get the posterior
@@ -1420,11 +1420,13 @@ class Model(ModelBase):
         if isinstance(alpha, np.ndarray):
             alpha = [alpha]
 
-        # Get the subject-specific data
+        # Get the session-specific data
         data = training_data.time_series(prepared=True, concatenate=False)
 
         if len(alpha) != len(data):
-            raise ValueError("len(alpha) and training_data.n_arrays must be the same.")
+            raise ValueError(
+                "len(alpha) and training_data.n_sessions must be the same."
+            )
 
         # Make sure the data and alpha have the same number of samples
         data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
@@ -1432,23 +1434,23 @@ class Model(ModelBase):
         n_states = self.config.n_states
         n_channels = self.config.n_channels
 
-        # Helper function for dual estimation for a single subject
+        # Helper function for dual estimation for a single session
         def _single_dual_estimation(a, x):
             sum_a = np.sum(a, axis=0)
             if self.config.learn_means:
-                subject_means = np.empty((n_states, n_channels))
+                session_means = np.empty((n_states, n_channels))
                 for state in range(n_states):
-                    subject_means[state] = (
+                    session_means[state] = (
                         np.sum(x * a[:, state, None], axis=0) / sum_a[state]
                     )
             else:
-                subject_means = self.get_means()
+                session_means = self.get_means()
 
             if self.config.learn_covariances:
-                subject_covariances = np.empty((n_states, n_channels, n_channels))
+                session_covariances = np.empty((n_states, n_channels, n_channels))
                 for state in range(n_states):
-                    diff = x - subject_means[state]
-                    subject_covariances[state] = (
+                    diff = x - session_means[state]
+                    session_covariances[state] = (
                         np.sum(
                             diff[:, :, None]
                             * diff[:, None, :]
@@ -1457,15 +1459,15 @@ class Model(ModelBase):
                         )
                         / sum_a[state]
                     )
-                    subject_covariances[
+                    session_covariances[
                         state
                     ] += self.config.covariances_epsilon * np.eye(
                         self.config.n_channels
                     )
             else:
-                subject_covariances = self.get_covariances()
+                session_covariances = self.get_covariances()
 
-            return subject_means, subject_covariances
+            return session_means, session_covariances
 
         # Setup keyword arguments to pass to the helper function
         kwargs = []

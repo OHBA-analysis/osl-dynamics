@@ -378,7 +378,7 @@ def tinda(
         Time courses of shape (n_samples, n_states) define intervals from will
         use the same time courses to compute density of when :code:`density_of`
         is :code:`None`. Can be a list of time courses (e.g. state time courses
-        for each subject).
+        for each individual).
     density_of : array_like, optional
         Time course of shape (n_samples, n_states) to compute density of if
         :code:`None` (default), density is computed for all columns of tc.
@@ -411,8 +411,8 @@ def tinda(
         courses (i.e., :code:`density_of`). If :code:`density_of` is
         :code:`None`, :code:`n_density_states` is the same as
         :code:`n_interval_states`. If tc is a list of time courses (e.g., state
-        time courses for multiple subjects), then an extra dimension is appended
-        for the subjects.
+        time courses for multiple individuals), then an extra dimension is appended
+        for the individuals.
     fo_sum : array_like
         Same as :code:`fo_density`, but with time-in-state sums instead of
         densities.
@@ -435,7 +435,7 @@ def tinda(
     """
     if isinstance(
         tc, list
-    ):  # list of time courses (e.g., subjects' HMM state time courses)
+    ):  # list of time courses (e.g., individuals' HMM state time courses)
         if density_of is None:
             fo_density_tmp, fo_sum_tmp, stats = zip(
                 *[
@@ -562,7 +562,7 @@ def optimise_sequence(fo_density, metric_to_use=0):
     ----------
     fo_density : array_like
         Time-in-state densities array of shape (n_interval_states,
-        n_density_states, 2, n_subjects).
+        n_density_states, 2, n_sessions).
     metric : int, optional
         Metric to use for optimisation:
 
@@ -570,7 +570,7 @@ def optimise_sequence(fo_density, metric_to_use=0):
         - :code:`1`: proportional FO asymmetry (i.e. asymmetry as a proportion
           of a baseline - which time spend in the state).
         - :code:`2`: proportional FO asymmetry using global baseline FO, rather
-          than a subject-specific baseline.
+          than a individual-specific baseline.
 
     Returns
     -------
@@ -660,7 +660,7 @@ def plot_cycle(
         rotation).
     fo_density : array_like
         Time-in-state densities array of shape (n_interval_states,
-        n_density_states, 2, (n_interval_ranges,) n_subjects).
+        n_density_states, 2, (n_interval_ranges,) n_sessions).
     edges : array_like
         Array of zeros and ones indicating whether the connection should be
         plotted.
