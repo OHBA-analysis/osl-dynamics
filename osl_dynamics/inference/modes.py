@@ -619,7 +619,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
 
     # Number of runs and length of each session's data
     n_runs = len(alpha)
-    n_array_samples = [a.shape[0] for a in alpha[0]]
+    n_session_samples = [a.shape[0] for a in alpha[0]]
 
     # Use the largest number of states as the number of clusters to find
     if n_clusters is None:
@@ -653,7 +653,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     average_alpha = np.array(average_alpha, dtype=np.float32).T
 
     # Split average alphas back into session-specific time courses
-    average_alpha = np.split(average_alpha, np.cumsum(n_array_samples[:-1]))
+    average_alpha = np.split(average_alpha, np.cumsum(n_session_samples[:-1]))
 
     if return_cluster_info:
         # Create a dictionary containing the clustering info

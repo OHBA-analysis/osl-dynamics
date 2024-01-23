@@ -1214,7 +1214,7 @@ class Data:
 
         tfrecord_paths = (
             f"{self.store_dir}"
-            "/dataset_{array:0{v}d}-of-{n_array:0{v}d}"
+            "/dataset_{array:0{v}d}-of-{n_session:0{v}d}"
             f".{self._identifier}.tfrecord"
         )
 
@@ -1230,7 +1230,7 @@ class Data:
         for i in self.keep:
             filepath = tfrecord_paths.format(
                 array=i,
-                n_array=self.n_sessions - 1,
+                n_session=self.n_sessions - 1,
                 v=len(str(self.n_sessions - 1)),
             )
             tfrecord_filenames.append(filepath)
