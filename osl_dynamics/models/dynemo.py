@@ -225,7 +225,7 @@ class Model(VariationalInferenceModelBase):
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(self.config)
+        self.model = self._model_structure()
 
     def get_means(self):
         """Get the mode means.
@@ -610,80 +610,20 @@ class Model(VariationalInferenceModelBase):
 
         return np.array(means), np.array(covariances)
 
-
-def _model_structure(config):
-    # Layer for input
-    inputs = layers.Input(
-        shape=(config.sequence_length, config.n_channels), name="data"
-    )
-
-    # Static loss scaling factor
-    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-        name="static_loss_scaling_factor"
-    )
-    static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
-
-    # Inference RNN:
-    # - Learns q(theta) ~ N(theta | inf_mu, inf_sigma), where
-    #     - inf_mu    ~ affine(RNN(inputs_<=t))
-    #     - inf_sigma ~ softplus(RNN(inputs_<=t))
-
-    # Definition of layers
-    data_drop_layer = layers.Dropout(config.inference_dropout, name="data_drop")
-    inf_rnn_layer = InferenceRNNLayer(
-        config.inference_rnn,
-        config.inference_normalization,
-        config.inference_activation,
-        config.inference_n_layers,
-        config.inference_n_units,
-        config.inference_dropout,
-        config.inference_regularizer,
-        name="inf_rnn",
-    )
-    inf_mu_layer = layers.Dense(config.n_modes, name="inf_mu")
-    inf_sigma_layer = layers.Dense(
-        config.n_modes, activation="softplus", name="inf_sigma"
-    )
-    theta_layer = SampleNormalDistributionLayer(
-        config.theta_std_epsilon,
-        name="theta",
-    )
-    theta_norm_layer = NormalizationLayer(
-        config.theta_normalization,
-        name="theta_norm",
-    )
-    alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="alpha",
-    )
-
-    # Data flow
-    data_drop = data_drop_layer(inputs)
-    inf_rnn = inf_rnn_layer(data_drop)
-    inf_mu = inf_mu_layer(inf_rnn)
-    inf_sigma = inf_sigma_layer(inf_rnn)
-    theta = theta_layer([inf_mu, inf_sigma])
-    theta_norm = theta_norm_layer(theta)
-    alpha = alpha_layer(theta_norm)
-
-    # Observation model:
-    # - We use a multivariate normal with a mean vector and covariance matrix
-    #   for each mode as the observation model.
-    # - We calculate the likelihood of generating the training data with alpha
-    #   and the observation model.
-
-    # Definition of layers
-    means_layer = VectorsLayer(
-        config.n_modes,
-        config.n_channels,
-        config.learn_means,
-        config.initial_means,
-        config.means_regularizer,
-        name="means",
-    )
-    if config.diagonal_covariances:
-        covs_layer = DiagonalMatricesLayer(
+    def _select_covariance_layer(self):
+        """Select the covariance layer based on the config."""
+        config = self.config
+        if config.diagonal_covariances:
+            return DiagonalMatricesLayer(
+                config.n_modes,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        return CovarianceMatricesLayer(
             config.n_modes,
             config.n_channels,
             config.learn_covariances,
@@ -692,69 +632,135 @@ def _model_structure(config):
             config.covariances_regularizer,
             name="covs",
         )
-    else:
-        covs_layer = CovarianceMatricesLayer(
+
+    def _model_structure(self):
+        """Build the model structure."""
+        config = self.config
+
+        # Layer for input
+        inputs = layers.Input(
+            shape=(config.sequence_length, config.n_channels), name="data"
+        )
+
+        # Static loss scaling factor
+        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+            name="static_loss_scaling_factor"
+        )
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
+
+        # Inference RNN:
+        # - Learns q(theta) ~ N(theta | inf_mu, inf_sigma), where
+        #     - inf_mu    ~ affine(RNN(inputs_<=t))
+        #     - inf_sigma ~ softplus(RNN(inputs_<=t))
+
+        # Definition of layers
+        data_drop_layer = layers.Dropout(config.inference_dropout, name="data_drop")
+        inf_rnn_layer = InferenceRNNLayer(
+            config.inference_rnn,
+            config.inference_normalization,
+            config.inference_activation,
+            config.inference_n_layers,
+            config.inference_n_units,
+            config.inference_dropout,
+            config.inference_regularizer,
+            name="inf_rnn",
+        )
+        inf_mu_layer = layers.Dense(config.n_modes, name="inf_mu")
+        inf_sigma_layer = layers.Dense(
+            config.n_modes, activation="softplus", name="inf_sigma"
+        )
+        theta_layer = SampleNormalDistributionLayer(
+            config.theta_std_epsilon,
+            name="theta",
+        )
+        theta_norm_layer = NormalizationLayer(
+            config.theta_normalization,
+            name="theta_norm",
+        )
+        alpha_layer = SoftmaxLayer(
+            config.initial_alpha_temperature,
+            config.learn_alpha_temperature,
+            name="alpha",
+        )
+
+        # Data flow
+        data_drop = data_drop_layer(inputs)
+        inf_rnn = inf_rnn_layer(data_drop)
+        inf_mu = inf_mu_layer(inf_rnn)
+        inf_sigma = inf_sigma_layer(inf_rnn)
+        theta = theta_layer([inf_mu, inf_sigma])
+        theta_norm = theta_norm_layer(theta)
+        alpha = alpha_layer(theta_norm)
+
+        # Observation model:
+        # - We use a multivariate normal with a mean vector and covariance matrix
+        #   for each mode as the observation model.
+        # - We calculate the likelihood of generating the training data with alpha
+        #   and the observation model.
+
+        # Definition of layers
+        means_layer = VectorsLayer(
             config.n_modes,
             config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
+            config.learn_means,
+            config.initial_means,
+            config.means_regularizer,
+            name="means",
         )
-    mix_means_layer = MixVectorsLayer(name="mix_means")
-    mix_covs_layer = MixMatricesLayer(name="mix_covs")
-    ll_loss_layer = LogLikelihoodLossLayer(
-        config.covariances_epsilon,
-        name="ll_loss",
-    )
+        covs_layer = self._select_covariance_layer()
+        mix_means_layer = MixVectorsLayer(name="mix_means")
+        mix_covs_layer = MixMatricesLayer(name="mix_covs")
+        ll_loss_layer = LogLikelihoodLossLayer(
+            config.covariances_epsilon,
+            name="ll_loss",
+        )
 
-    # Data flow
-    mu = means_layer(
-        inputs, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # inputs not used
-    D = covs_layer(
-        inputs, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # inputs not used
-    m = mix_means_layer([alpha, mu])
-    C = mix_covs_layer([alpha, D])
-    ll_loss = ll_loss_layer([inputs, m, C])
+        # Data flow
+        mu = means_layer(
+            inputs, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # inputs not used
+        D = covs_layer(
+            inputs, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # inputs not used
+        m = mix_means_layer([alpha, mu])
+        C = mix_covs_layer([alpha, D])
+        ll_loss = ll_loss_layer([inputs, m, C])
 
-    # Model RNN:
-    # - Learns p(theta_t |theta_<t) ~ N(theta_t | mod_mu, mod_sigma), where
-    #     - mod_mu    ~ affine(RNN(theta_<t))
-    #     - mod_sigma ~ softplus(RNN(theta_<t))
+        # Model RNN:
+        # - Learns p(theta_t |theta_<t) ~ N(theta_t | mod_mu, mod_sigma), where
+        #     - mod_mu    ~ affine(RNN(theta_<t))
+        #     - mod_sigma ~ softplus(RNN(theta_<t))
 
-    # Definition of layers
-    theta_norm_drop_layer = layers.Dropout(
-        config.model_dropout,
-        name="theta_norm_drop",
-    )
-    mod_rnn_layer = ModelRNNLayer(
-        config.model_rnn,
-        config.model_normalization,
-        config.model_activation,
-        config.model_n_layers,
-        config.model_n_units,
-        config.model_dropout,
-        config.model_regularizer,
-        name="mod_rnn",
-    )
-    mod_mu_layer = layers.Dense(config.n_modes, name="mod_mu")
-    mod_sigma_layer = layers.Dense(
-        config.n_modes, activation="softplus", name="mod_sigma"
-    )
-    kl_div_layer = KLDivergenceLayer(config.theta_std_epsilon, name="kl_div")
-    kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
+        # Definition of layers
+        theta_norm_drop_layer = layers.Dropout(
+            config.model_dropout,
+            name="theta_norm_drop",
+        )
+        mod_rnn_layer = ModelRNNLayer(
+            config.model_rnn,
+            config.model_normalization,
+            config.model_activation,
+            config.model_n_layers,
+            config.model_n_units,
+            config.model_dropout,
+            config.model_regularizer,
+            name="mod_rnn",
+        )
+        mod_mu_layer = layers.Dense(config.n_modes, name="mod_mu")
+        mod_sigma_layer = layers.Dense(
+            config.n_modes, activation="softplus", name="mod_sigma"
+        )
+        kl_div_layer = KLDivergenceLayer(config.theta_std_epsilon, name="kl_div")
+        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
-    # Data flow
-    theta_norm_drop = theta_norm_drop_layer(theta_norm)
-    mod_rnn = mod_rnn_layer(theta_norm_drop)
-    mod_mu = mod_mu_layer(mod_rnn)
-    mod_sigma = mod_sigma_layer(mod_rnn)
-    kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
-    kl_loss = kl_loss_layer(kl_div)
+        # Data flow
+        theta_norm_drop = theta_norm_drop_layer(theta_norm)
+        mod_rnn = mod_rnn_layer(theta_norm_drop)
+        mod_mu = mod_mu_layer(mod_rnn)
+        mod_sigma = mod_sigma_layer(mod_rnn)
+        kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
+        kl_loss = kl_loss_layer(kl_div)
 
-    return tf.keras.Model(
-        inputs=inputs, outputs=[ll_loss, kl_loss, theta_norm], name="DyNeMo"
-    )
+        return tf.keras.Model(
+            inputs=inputs, outputs=[ll_loss, kl_loss, theta_norm], name="DyNeMo"
+        )
