@@ -78,18 +78,40 @@ class Config(DynemoConfig):
         It is named n_channels to be consistent with the DyNeMo Config class.
     """
 
-    sampling_frequency: float
+    sampling_frequency: float = None
     damping_limit: float = 40.0
     frequency_limit: tuple[float, float] | None = None
-    learn_amplitude: bool
+    learn_amplitude: bool = None
 
     def __post_init__(self):
         super().__post_init__()
-        if self.frequency_limit is None:
+        if self.frequency_limit is None and self.sampling_frequency is not None:
             self.frequency_limit = (0.1, self.sampling_frequency / 2)
         self.validate_sc_dynemo_params()
 
     def validate_sc_dynemo_params(self):
+        """Validate the parameters of the model.
+
+        Raises
+        ------
+        SamplingFrequencyError
+            If the sampling frequency is not positive.
+        FrequencyLimitError
+            If the frequency limit is not between 0 and the Nyquist frequency.
+        DampingLimitError
+            If the damping limit is not positive.
+        ValueError
+            If any of the parameters are None.
+        """
+        non_optional_params = [
+            self.sampling_frequency,
+            self.learn_amplitude,
+        ]
+
+        if any(param is None for param in non_optional_params):
+            _msg = "Both sampling_frequency and learn_amplitude must be specified."
+            raise ValueError(_msg)
+
         if self.sampling_frequency <= 0:
             raise SamplingFrequencyError(self.sampling_frequency)
 
