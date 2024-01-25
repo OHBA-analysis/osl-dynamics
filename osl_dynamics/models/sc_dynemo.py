@@ -1,5 +1,7 @@
 """Single-channel Dynamic Network Modes (SC-DyNeMo)."""
 
+from dataclasses import dataclass
+
 from osl_dynamics.inference.layers import DampedOscillatorCovarianceMatricesLayer
 from osl_dynamics.models.dynemo import Config as DynemoConfig
 from osl_dynamics.models.dynemo import Model as DynemoModel
@@ -57,6 +59,7 @@ class DampingLimitError(ValueError):
         )
 
 
+@dataclass
 class Config(DynemoConfig):
     """Settings for SC-DyNeMo.
 
