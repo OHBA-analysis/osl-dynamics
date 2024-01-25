@@ -1,6 +1,6 @@
 """Single-channel Dynamic Network Modes (SC-DyNeMo)."""
 
-from osl_dynamics.inference.layers import DampedOscillatorMatricesLayer
+from osl_dynamics.inference.layers import DampedOscillatorCovarianceMatricesLayer
 from osl_dynamics.models.dynemo import Config as DynemoConfig
 from osl_dynamics.models.dynemo import Model as DynemoModel
 
@@ -138,14 +138,14 @@ class Model(DynemoModel):
     config_type = Config
 
     def _select_covariance_layer(self):
-        """Set the covariance layer to a DampedOscillatorMatricesLayer.
+        """Set the covariance layer to a DampedOscillatorCovarianceMatricesLayer.
 
         Returns
         -------
-        DampedOscillatorMatricesLayer
+        DampedOscillatorCovarianceMatricesLayer
             The covariance layer.
         """
-        return DampedOscillatorMatricesLayer(
+        return DampedOscillatorCovarianceMatricesLayer(
             n=self.config.n_modes,
             m=self.config.n_channels,
             sampling_frequency=self.config.sampling_frequency,
@@ -155,3 +155,61 @@ class Model(DynemoModel):
             learn=self.config.learn_covariances,
             name="covs",
         )
+
+    def _cov_layer(self):
+        """Get the covariance layer.
+
+        Returns
+        -------
+        DampedOscillatorMatricesLayer
+            The covariance layer.
+        """
+        return self.model.get_layer("covs")
+
+    def get_frequency(self):
+        """Get the frequencies of the oscillators.
+
+        Returns
+        -------
+        np.ndarray
+            The frequencies of the oscillators.
+        """
+        covs = self._cov_layer()
+        return covs.frequency.numpy()
+
+    def get_damping(self):
+        """Get the damping of the oscillators.
+
+        Returns
+        -------
+        np.ndarray
+            The damping of the oscillators.
+        """
+        covs = self._cov_layer()
+        return covs.damping.numpy()
+
+    def get_amplitude(self):
+        """Get the amplitude of the oscillators.
+
+        Returns
+        -------
+        np.ndarray
+            The amplitude of the oscillators.
+        """
+        covs = self._cov_layer()
+        return covs.amplitude.numpy()
+
+    def get_parameters(self):
+        """Get the parameters of the oscillators.
+
+        Returns
+        -------
+        dict[str, np.ndarray]
+            The parameters of the model.
+            Keys are "frequency", "damping" and "amplitude".
+        """
+        return {
+            "frequency": self.get_frequencies(),
+            "damping": self.get_damping(),
+            "amplitude": self.get_amplitude(),
+        }
