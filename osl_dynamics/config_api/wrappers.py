@@ -1639,7 +1639,7 @@ def plot_group_tde_dynemo_networks(
 def plot_alpha(
     data,
     output_dir,
-    array=0,
+    session=0,
     normalize=False,
     sampling_frequency=None,
     kwargs=None,
@@ -1665,9 +1665,9 @@ def plot_alpha(
         Data object.
     output_dir : str
         Path to output directory.
-    array : int, optional
-        Index for array to plot. If 'all' is passed we create a separate plot
-        for each array.
+    session : int, optional
+        Index for session to plot. If 'all' is passed we create a separate plot
+        for each session.
     normalize : bool, optional
         Should we also plot the alphas normalized using the trace of the
         inferred covariance matrices? Useful if we are plotting the inferred
@@ -1707,13 +1707,13 @@ def plot_alpha(
     kwargs = override_dict_defaults(default_kwargs, kwargs)
     _logger.info(f"Using kwargs: {kwargs}")
 
-    if array == "all":
+    if session == "all":
         for i in range(len(alp)):
             kwargs["filename"] = f"{alphas_dir}/alpha_{i}.png"
             plotting.plot_alpha(alp[i], **kwargs)
     else:
-        kwargs["filename"] = f"{alphas_dir}/alpha_{array}.png"
-        plotting.plot_alpha(alp[array], **kwargs)
+        kwargs["filename"] = f"{alphas_dir}/alpha_{session}.png"
+        plotting.plot_alpha(alp[session], **kwargs)
 
     if normalize:
         from osl_dynamics.inference import modes
@@ -1723,13 +1723,13 @@ def plot_alpha(
         norm_alp = modes.reweight_alphas(alp, covs)
 
         # Plot
-        if array == "all":
+        if session == "all":
             for i in range(len(alp)):
                 kwargs["filename"] = f"{alphas_dir}/norm_alpha_{i}.png"
                 plotting.plot_alpha(norm_alp[i], **kwargs)
         else:
-            kwargs["filename"] = f"{alphas_dir}/norm_alpha_{array}.png"
-            plotting.plot_alpha(norm_alp[array], **kwargs)
+            kwargs["filename"] = f"{alphas_dir}/norm_alpha_{session}.png"
+            plotting.plot_alpha(norm_alp[session], **kwargs)
 
 
 def calc_gmm_alpha(data, output_dir, kwargs=None):
@@ -1783,7 +1783,7 @@ def plot_hmm_network_summary_stats(
 ):
     """Plot HMM summary statistics for networks as violin plots.
 
-    This function will plot the distribution over arrays for the following
+    This function will plot the distribution over sessions for the following
     summary statistics:
 
     - Fractional occupancy.
@@ -1848,7 +1848,7 @@ def plot_hmm_network_summary_stats(
         alp = load(f"{inf_params_dir}/alp.pkl")
         if isinstance(alp, np.ndarray):
             raise ValueError(
-                "We must train on multiple arrays to plot the distribution "
+                "We must train on multiple sessions to plot the distribution "
                 "of summary statistics."
             )
         stc = modes.argmax_time_courses(alp)
@@ -1907,7 +1907,7 @@ def plot_hmm_network_summary_stats(
 def plot_dynemo_network_summary_stats(data, output_dir):
     """Plot DyNeMo summary statistics for networks as violin plots.
 
-    This function will plot the distribution over arrays for the following
+    This function will plot the distribution over sessions for the following
     summary statistics:
 
     - Mean (renormalised) mixing coefficients.
@@ -1944,7 +1944,7 @@ def plot_dynemo_network_summary_stats(data, output_dir):
     alp = load(f"{inf_params_dir}/alp.pkl")
     if isinstance(alp, np.ndarray):
         raise ValueError(
-            "We must train on multiple arrays to plot the distribution "
+            "We must train on multiple sessions to plot the distribution "
             "of summary statistics."
         )
 
@@ -2025,14 +2025,14 @@ def compare_groups_hmm_summary_stats(
     output_dir : str
         Path to output directory.
     group2_indices : np.ndarray or list
-        Indices indicating which arrays belong to the second group.
+        Indices indicating which sessions belong to the second group.
     separate_tests : bool, optional
         Should we perform a maximum statistic permutation test for each summary
         statistic separately?
     covariates : str, optional
         Path to a pickle file containing a :code:`dict` with covariances. Each
         item in the :code:`dict` must be the covariate name and value for each
-        array. The covariates will be loaded with::
+        session. The covariates will be loaded with::
 
             from osl_dynamics.utils.misc import load
             covariates = load("/path/to/file.pkl")
@@ -2147,7 +2147,7 @@ def compare_groups_hmm_summary_stats(
 def plot_burst_summary_stats(data, output_dir, sampling_frequency=None):
     """Plot burst summary statistics as violin plots.
 
-    This function will plot the distribution over arrays for the following
+    This function will plot the distribution over sessions for the following
     summary statistics:
 
     - Mean lifetime (s).
