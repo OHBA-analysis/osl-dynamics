@@ -200,7 +200,7 @@ class Model(DynemoModel):
             The frequencies of the oscillators.
         """
         covs = self._cov_layer()
-        return covs.frequency.numpy()
+        return covs.frequency(1).numpy()
 
     def get_damping(self):
         """Get the damping of the oscillators.
@@ -211,7 +211,7 @@ class Model(DynemoModel):
             The damping of the oscillators.
         """
         covs = self._cov_layer()
-        return covs.damping.numpy()
+        return covs.damping(1).numpy()
 
     def get_amplitude(self):
         """Get the amplitude of the oscillators.
@@ -222,7 +222,7 @@ class Model(DynemoModel):
             The amplitude of the oscillators.
         """
         covs = self._cov_layer()
-        return covs.amplitude.numpy()
+        return covs.amplitude(1).numpy()
 
     def get_parameters(self):
         """Get the parameters of the oscillators.
