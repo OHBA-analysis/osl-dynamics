@@ -134,7 +134,7 @@ class Model(DynemoModel):
     They define the auto-covariance functions of the modes using the equation:
 
     .. math::
-        R_j (\tau) = A_j e^(- \lambda_j \tau)\cos(2 \pi f_j \tau)
+        R_j (\tau) = A_j e^{- \lambda_j \tau}\cos(2 \pi f_j \tau)
 
     where :math:`\lambda_j` is the damping, :math:`f_j` is the frequency and
     :math:`A_j` is the amplitude of the :math:`j`-th oscillator.
