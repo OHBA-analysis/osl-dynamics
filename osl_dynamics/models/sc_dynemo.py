@@ -224,7 +224,7 @@ class Model(DynemoModel):
         covs = self._cov_layer()
         return covs.amplitude(1).numpy()
 
-    def get_parameters(self):
+    def get_oscillator_parameters(self):
         """Get the parameters of the oscillators.
 
         Returns
