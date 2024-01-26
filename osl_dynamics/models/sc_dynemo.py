@@ -181,7 +181,7 @@ class Model(DynemoModel):
             name="covs",
         )
 
-    def _cov_layer(self):
+    def _oscillator_layer(self):
         """Get the covariance layer.
 
         Returns
@@ -189,7 +189,7 @@ class Model(DynemoModel):
         covariance_layer : DampedOscillatorMatricesLayer
             The covariance layer.
         """
-        return self.model.get_layer("covs")
+        return self.model.get_layer("covs").oscillator_layer
 
     def get_frequency(self):
         """Get the frequencies of the oscillators.
@@ -199,7 +199,7 @@ class Model(DynemoModel):
         oscillator_frequencies : np.ndarray
             The frequencies of the oscillators.
         """
-        covs = self._cov_layer()
+        covs = self._oscillator_layer()
         return covs.frequency(1).numpy()
 
     def get_damping(self):
@@ -210,7 +210,7 @@ class Model(DynemoModel):
         oscillator_damping_factors : np.ndarray
             The damping of the oscillators.
         """
-        covs = self._cov_layer()
+        covs = self._oscillator_layer()
         return covs.damping(1).numpy()
 
     def get_amplitude(self):
@@ -221,7 +221,7 @@ class Model(DynemoModel):
         oscillator_amplitudes : np.ndarray
             The amplitude of the oscillators.
         """
-        covs = self._cov_layer()
+        covs = self._oscillator_layer()
         return covs.amplitude(1).numpy()
 
     def get_oscillator_parameters(self):

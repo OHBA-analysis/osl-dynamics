@@ -994,7 +994,7 @@ class DampedOscillatorCovarianceMatricesLayer(layers.Layer):
         **kwargs,
     ):
         super().__init__(**kwargs)
-        self.oscilator_layer = DampedOscillatorLayer(
+        self.oscillator_layer = DampedOscillatorLayer(
             n=n,
             m=m,
             sampling_frequency=sampling_frequency,
