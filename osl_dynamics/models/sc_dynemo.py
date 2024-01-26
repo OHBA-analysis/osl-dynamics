@@ -234,7 +234,7 @@ class Model(DynemoModel):
             Keys are "frequency", "damping" and "amplitude".
         """
         return {
-            "frequency": self.get_frequencies(),
+            "frequency": self.get_frequency(),
             "damping": self.get_damping(),
             "amplitude": self.get_amplitude(),
         }
