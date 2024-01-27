@@ -1004,7 +1004,6 @@ class DampedOscillatorCovarianceMatricesLayer(layers.Layer):
             learn=learn,
         )
 
-
     def call(self, inputs, **kwargs):
         """Retrieve the covariance matrices.
 
