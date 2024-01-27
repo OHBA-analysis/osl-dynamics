@@ -5,58 +5,7 @@ from dataclasses import dataclass
 from osl_dynamics.inference.layers import DampedOscillatorCovarianceMatricesLayer
 from osl_dynamics.models.dynemo import Config as DynemoConfig
 from osl_dynamics.models.dynemo import Model as DynemoModel
-
-
-class SamplingFrequencyError(ValueError):
-    """Raised when the sampling frequency is not positive."""
-
-    def __init__(self, sampling_frequency):
-        """Initialize a SamplingFrequencyError.
-
-        Parameters
-        ----------
-        sampling_frequency : float
-            The sampling frequency.
-        """
-        super().__init__(
-            f"Sampling frequency must be positive, got {sampling_frequency}",
-        )
-
-
-class FrequencyLimitError(ValueError):
-    """Raised when the frequency limit is not between 0 and the Nyquist frequency."""
-
-    def __init__(self, frequency_limit, sampling_frequency):
-        """Initialize a FrequencyLimitError.
-
-        Parameters
-        ----------
-        frequency_limit : tuple[float, float]
-            The frequency limit.
-        sampling_frequency : float
-            The sampling frequency.
-        """
-        super().__init__(
-            f"Frequency limit must be between 0 "
-            f"and the Nyquist frequency ({sampling_frequency / 2}). "
-            f"Got {frequency_limit}.",
-        )
-
-
-class DampingLimitError(ValueError):
-    """Raised when the damping limit is not positive."""
-
-    def __init__(self, damping_limit):
-        """Initialize a DampingLimitError.
-
-        Parameters
-        ----------
-        damping_limit : float
-            The damping limit.
-        """
-        super().__init__(
-            f"Damping limit must be positive, got {damping_limit}",
-        )
+from osl_dynamics.utils import errors
 
 
 @dataclass
@@ -113,13 +62,15 @@ class Config(DynemoConfig):
             raise ValueError(_msg)
 
         if self.sampling_frequency <= 0:
-            raise SamplingFrequencyError(self.sampling_frequency)
+            raise errors.SamplingFrequencyError(self.sampling_frequency)
 
         nyquist_frequency = self.sampling_frequency / 2
         if self.frequency_limit[0] < 0 or self.frequency_limit[1] > nyquist_frequency:
-            raise FrequencyLimitError(self.frequency_limit, self.sampling_frequency)
+            raise errors.FrequencyLimitError(
+                self.frequency_limit, self.sampling_frequency
+            )
         if self.damping_limit <= 0:
-            raise DampingLimitError(self.damping_limit)
+            raise errors.DampingLimitError(self.damping_limit)
 
 
 class Model(DynemoModel):
