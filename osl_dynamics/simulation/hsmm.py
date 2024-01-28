@@ -122,9 +122,9 @@ class HSMM:
                 gamma_sample(shape=self.gamma_shape, scale=self.gamma_scale)
             ).astype(int)
 
-            alpha[
-                current_position : current_position + state_lifetime
-            ] = self.state_vectors[current_state]
+            alpha[current_position : current_position + state_lifetime] = (
+                self.state_vectors[current_state]
+            )
 
             rand = random_sample()
             current_state = np.argmin(
