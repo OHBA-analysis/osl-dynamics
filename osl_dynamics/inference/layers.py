@@ -1010,7 +1010,7 @@ class DampedOscillatorCovarianceMatricesLayer(layers.Layer):
         ----
         The :code:`inputs` passed to this method are not used.
         """
-        oscillator = self.oscilator_layer(inputs, **kwargs)
+        oscillator = self.oscillator_layer(inputs, **kwargs)
         return tf.linalg.LinearOperatorToeplitz(
             row=oscillator,
             col=oscillator,

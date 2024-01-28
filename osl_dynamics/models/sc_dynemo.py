@@ -10,32 +10,32 @@ from osl_dynamics.utils import errors
 
 @dataclass
 class Config(DynemoConfig):
-    """Settings for SC-DyNeMo.
+    """Additional parameters for SC-DyNeMo.
 
     Parameters
     ----------
     sampling_frequency : float
         The sampling frequency of the data (Hz).
-    damping_limit : float, optional
+    oscillator_damping_limit : float, optional
         The damping limit (Hz). If None, it is set to 40.
-    frequency_limit : tuple[float, float], optional
+    oscillator_frequency_limit : tuple[float, float], optional
         The frequency limit (Hz). If None, it is set to (0.1, sampling_frequency / 2).
-    learn_amplitude : bool
+    learn_oscillator_amplitude : bool
         Whether to learn the amplitude. If False, the amplitude is fixed to 1.
-    n_channels: int
-        The number of channels should be the number of embeddings.
-        It is named n_channels to be consistent with the DyNeMo Config class.
     """
 
     sampling_frequency: float = None
-    damping_limit: float = 40.0
-    frequency_limit: tuple[float, float] | None = None
-    learn_amplitude: bool = None
+    oscillator_damping_limit: float = 40.0
+    oscillator_frequency_limit: tuple[float, float] | None = None
+    learn_oscillator_amplitude: bool = None
 
     def __post_init__(self):
         super().__post_init__()
-        if self.frequency_limit is None and self.sampling_frequency is not None:
-            self.frequency_limit = (0.1, self.sampling_frequency / 2)
+        if (
+            self.oscillator_frequency_limit is None
+            and self.sampling_frequency is not None
+        ):
+            self.oscillator_frequency_limit = (0.1, self.sampling_frequency / 2)
         self.validate_sc_dynemo_params()
 
     def validate_sc_dynemo_params(self):
@@ -54,23 +54,26 @@ class Config(DynemoConfig):
         """
         non_optional_params = [
             self.sampling_frequency,
-            self.learn_amplitude,
+            self.learn_oscillator_amplitude,
         ]
 
         if any(param is None for param in non_optional_params):
-            _msg = "Both sampling_frequency and learn_amplitude must be specified."
+            _msg = "Both sampling_frequency and learn_oscillator_amplitude must be specified."
             raise ValueError(_msg)
 
         if self.sampling_frequency <= 0:
             raise errors.SamplingFrequencyError(self.sampling_frequency)
 
         nyquist_frequency = self.sampling_frequency / 2
-        if self.frequency_limit[0] < 0 or self.frequency_limit[1] > nyquist_frequency:
+        if (
+            self.oscillator_frequency_limit[0] < 0
+            or self.oscillator_frequency_limit[1] > nyquist_frequency
+        ):
             raise errors.FrequencyLimitError(
-                self.frequency_limit, self.sampling_frequency
+                self.oscillator_frequency_limit, self.sampling_frequency
             )
-        if self.damping_limit <= 0:
-            raise errors.DampingLimitError(self.damping_limit)
+        if self.oscillator_damping_limit <= 0:
+            raise errors.DampingLimitError(self.oscillator_damping_limit)
 
 
 class Model(DynemoModel):
@@ -125,9 +128,9 @@ class Model(DynemoModel):
             n=self.config.n_modes,
             m=self.config.n_channels,
             sampling_frequency=self.config.sampling_frequency,
-            damping_limit=self.config.damping_limit,
-            frequency_limit=self.config.frequency_limit,
-            learn_amplitude=self.config.learn_amplitude,
+            damping_limit=self.config.oscillator_damping_limit,
+            frequency_limit=self.config.oscillator_frequency_limit,
+            learn_amplitude=self.config.learn_oscillator_amplitude,
             learn=self.config.learn_covariances,
             name="covs",
         )
