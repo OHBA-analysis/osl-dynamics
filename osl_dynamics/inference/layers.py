@@ -913,17 +913,14 @@ class DampedOscillatorLayer(layers.Layer):
         self.damping = LearnableTensorLayer(
             shape=(n, 1),
             learn=learn,
-            initializer=None,
-            initial_value=0.5 * tf.ones((n, 1)),
+            initializer=initializers.Constant(0.5),
             name=self.name + "_damping",
         )
 
         self.frequency = LearnableTensorLayer(
             shape=(n, 1),
             learn=learn,
-            initializer=None,
-            initial_value=tf.random.uniform(
-                (n, 1),
+            initializer=initializers.RandomUniform(
                 minval=frequency_limit[0],
                 maxval=frequency_limit[1],
             ),
@@ -933,10 +930,11 @@ class DampedOscillatorLayer(layers.Layer):
         self.amplitude = LearnableTensorLayer(
             shape=(n, 1),
             learn=learn and learn_amplitude,
-            initializer=None,
-            initial_value=tf.ones((n, 1)),
+            initializer=initializers.Constant(1.0),
             name=self.name + "_amplitude",
         )
+
+        self.layers = [self.damping, self.frequency, self.amplitude]
 
     def call(self, inputs, **kwargs):
         """Calculate damped oscillator.
@@ -1002,6 +1000,8 @@ class DampedOscillatorCovarianceMatricesLayer(layers.Layer):
             learn_amplitude=learn_amplitude,
             learn=learn,
         )
+
+        self.layers = [self.oscillator_layer]
 
     def call(self, inputs, **kwargs):
         """Retrieve the covariance matrices.
