@@ -1383,18 +1383,25 @@ class MarkovStateInferenceModelBase(ModelBase):
         """
 
         # Helper functions
-        def _evidence_predict_step(log_smoothing_distribution):
+        def _evidence_predict_step(log_smoothing_distribution=None):
             # Predict step for calculating the evidence
             # p(s_t=j|x_{1:t-1}) = sum_i p(s_t=j|s_{t-1}=i) p(s_{t-1}=i|x_{1:t-1})
             # log_smoothing_distribution.shape = (batch_size, n_states)
-            log_trans_prob = np.expand_dims(np.log(self.get_trans_prob()), axis=0)
-            log_smoothing_distribution = np.expand_dims(
-                log_smoothing_distribution,
-                axis=-1,
-            )
-            log_prediction_distribution = logsumexp(
-                log_trans_prob + log_smoothing_distribution, axis=-2
-            )
+            if log_smoothing_distribution is None:
+                initial_distribution = self.get_initial_distribution()
+                log_prediction_distribution = np.broadcast_to(
+                    np.expand_dims(initial_distribution, axis=0),
+                    (batch_size, self.config.n_states),
+                )
+            else:
+                log_trans_prob = np.expand_dims(np.log(self.get_trans_prob()), axis=0)
+                log_smoothing_distribution = np.expand_dims(
+                    log_smoothing_distribution,
+                    axis=-1,
+                )
+                log_prediction_distribution = logsumexp(
+                    log_trans_prob + log_smoothing_distribution, axis=-2
+                )
             return log_prediction_distribution
 
         def _evidence_update_step(data, log_prediction_distribution):
@@ -1430,18 +1437,12 @@ class MarkovStateInferenceModelBase(ModelBase):
             pb_i = utils.Progbar(self.config.sequence_length)
             batch_size = tf.shape(x)[0]
             batch_evidence = np.zeros(batch_size, dtype=np.float32)
+            log_smoothing_distribution = None
             for t in range(self.config.sequence_length):
                 # Prediction step
-                if t == 0:
-                    initial_distribution = self.get_initial_distribution()
-                    log_prediction_distribution = np.broadcast_to(
-                        np.expand_dims(initial_distribution, axis=0),
-                        (batch_size, self.config.n_states),
-                    )
-                else:
-                    log_prediction_distribution = _evidence_predict_step(
-                        log_smoothing_distribution
-                    )
+                log_prediction_distribution = _evidence_predict_step(
+                    log_smoothing_distribution
+                )
 
                 # Update step
                 (
