@@ -1084,6 +1084,7 @@ class Model(ModelBase):
         evidence : float
             Model evidence.
         """
+
         # Helper functions
         def _evidence_predict_step(log_smoothing_distribution=None):
             """Predict step for calculating the evidence.

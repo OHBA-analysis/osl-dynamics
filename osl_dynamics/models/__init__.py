@@ -1,6 +1,7 @@
 """Implemented models.
 
 """
+
 import yaml
 
 from osl_dynamics.models import (
