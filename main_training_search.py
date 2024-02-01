@@ -29,17 +29,27 @@ if __name__ == '__main__':
     if len(sys.argv) >= 4:
         sub_index = int(sys.argv[3])
 
-    sequence_lengths = [600,400,200,100,50,25]
-    batch_sizes = [1024,512,256,128,64,32]
-    learning_rates = [0.0005,0.001,0.005,0.01]
+    #sequence_lengths = [600,400,200,100,50,25]
+    #batch_sizes = [1024,512,256,128,64,32]
+    #learning_rates = [0.0005,0.001,0.005,0.01]
 
-    sequence_length, batch_size, learning_rate = parse_index(index,sequence_lengths,batch_sizes,learning_rates,training=True)
-    save_dir = f'./results_training_config/sl_{sequence_length}_bs_{batch_size}_lr_{learning_rate}'
+    #sequence_length, batch_size, learning_rate = parse_index(index,sequence_lengths,batch_sizes,learning_rates,training=True)
+    sequence_lengths = [400,400,400,400,200,200,200,200,100,100,100,100]
+    batch_sizes = [256,256,256,256,512,512,512,512,1024,1024,1024,1024]
+    learning_rates = [0.0005,0.001,0.005,0.01,0.0005,0.001,0.005,0.01,0.0005,0.001,0.005,0.01,0.0005,0.001,0.005,0.01]
+
+    sequence_length = sequence_lengths[index]
+    batch_size = batch_sizes[index]
+    learning_rate = learning_rates[index]
+
+
+
+
+    save_dir = f'./results_training_config_202402/sl_{sequence_length}_bs_{batch_size}_lr_{learning_rate}'
 
     print(f'sequence length = {sequence_length}')
     print(f'batch size = {batch_size}')
     print(f'learning rate = {learning_rate}')
-
 
     if mode == 'training':
         prepare_data = PrepareData(data_dir)
@@ -49,8 +59,9 @@ if __name__ == '__main__':
                      sequence_length=sequence_length,
                      batch_size = batch_size,
                      learning_rate = learning_rate,
-                     n_epochs = 2,
-                     learn_means=learn_means)
+                     n_epochs = 40,
+                     learn_means=learn_means
+                     )
     elif mode == 'repeat':
         prepare_data = PrepareData(data_dir)
         subj, dataset = prepare_data.load()
@@ -60,10 +71,10 @@ if __name__ == '__main__':
         print(f'save dir sub is: {save_dir_sub}')
         if not os.path.exists(save_dir_sub):
             # os.rmdir(save_dir_sub)
-            HMM_training(dataset,n_states,n_channels,save_dir,
+            HMM_training(dataset,n_states,n_channels,save_dir_sub,
                          sequence_length=sequence_length,
                          batch_size=batch_size,
                          learning_rate=learning_rate,
-                         n_epochs=30,
+                         n_epochs=40,
                          learn_means=learn_means
                          )
