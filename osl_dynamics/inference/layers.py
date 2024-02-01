@@ -415,6 +415,7 @@ class LearnableTensorLayer(layers.Layer):
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
         /inference/regularizers/index.html>`_.
     constraint : tf.keras.constraints.Constraint, optional
+        Constraint for the tensor. Limits the values the weights can take.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
