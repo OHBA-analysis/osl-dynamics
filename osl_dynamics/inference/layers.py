@@ -414,6 +414,7 @@ class LearnableTensorLayer(layers.Layer):
         Regularizer for the tensor. Must be from `inference.regularizers 
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
         /inference/regularizers/index.html>`_.
+    constraint : tf.keras.constraints.Constraint, optional
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
@@ -425,6 +426,7 @@ class LearnableTensorLayer(layers.Layer):
         initializer=None,
         initial_value=None,
         regularizer=None,
+        constraint=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -463,6 +465,9 @@ class LearnableTensorLayer(layers.Layer):
         # This should be a function of the tensor that returns a float
         self.regularizer = regularizer
 
+        # Constraint for the tensor
+        self.constraint = constraint
+
     def add_regularization(self, tensor, static_loss_scaling_factor):
         # Calculate the regularisation from the tensor
         reg = self.regularizer(tensor)
@@ -480,6 +485,7 @@ class LearnableTensorLayer(layers.Layer):
             dtype=tf.float32,
             initializer=self.tensor_initializer,
             trainable=self.learn,
+            constraint=self.constraint,
         )
         self.built = True
 
