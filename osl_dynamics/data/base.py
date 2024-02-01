@@ -68,18 +68,17 @@ class Data:
         Path to mask file used to source reconstruct the data.
     parcellation_file : str, optional
         Path to parcellation file used to source reconstruct the data.
-    store_dir : str, optional
-        We don't read all the data into memory. Instead we create store them on
-        disk and create memmaps (unless :code:`load_memmaps=False` is passed).
-        This is the directory to save memmaps to. Default is :code:`./tmp`.
     time_axis_first : bool, optional
         Is the input data of shape (n_samples, n_channels)? Default is
         :code:`True`. If your data is in format (n_channels, n_samples), use
         :code:`time_axis_first=False`.
     load_memmaps : bool, optional
-        Should we load the data as memory maps (memmaps)? If :code:`False`, we
-        will load data into memory rather than storing it on disk. By default
-        we will keep the data on disk and use memmaps.
+        Should we load the data as memory maps (memmaps)? If :code:`True`, we
+        will load store the data on disk rather than loading it into memory.
+    store_dir : str, optional
+        If `load_memmaps=True`, then we save data to disk and load it as
+        a memory map. This is the directory to save the memory maps to.
+        Default is :code:`./tmp`.
     buffer_size : int, optional
         Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
         to less random shuffling but will be quicker. Default is 100000.
@@ -100,9 +99,9 @@ class Data:
         sampling_frequency=None,
         mask_file=None,
         parcellation_file=None,
-        store_dir="tmp",
         time_axis_first=True,
-        load_memmaps=True,
+        load_memmaps=False,
+        store_dir="tmp",
         buffer_size=100000,
         use_tfrecord=False,
         n_jobs=1,
