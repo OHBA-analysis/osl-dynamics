@@ -31,8 +31,8 @@ class Data:
     Parameters
     ----------
     inputs : list of str or str or np.ndarray
-        - A path to a directory containing :code:`.npy` files. Each
-          :code:`.npy` file should be a subject or session.
+        - A path to a directory containing :code:`.npy` or :code:`.txt` files. Each
+          :code:`.npy` :code:`txt` file should be a subject or session.
         - A list of paths to :code:`.npy`, :code:`.mat` or :code:`.fif` files.
           Each file should be a subject or session. If a :code:`.fif` file is
           passed is must end with :code:`'raw.fif'` or :code:`'epo.fif'`.
@@ -319,8 +319,8 @@ class Data:
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
 
-    def select(self, channels=None, use_raw=False):
-        """Select channels.
+    def select(self, channels=None, timepoints:list=None, use_raw=False):
+        """Select channels and timepoints
 
         This is an in-place operation.
 
@@ -328,6 +328,8 @@ class Data:
         ----------
         channels : int or list of int, optional
             Channel indices to keep. If None, all channels are retained.
+        timepoints: list, optional
+            [start,end], timepoints[start:end] are kept.
         use_raw : bool, optional
             Should we select channel from the original 'raw' data that
             we loaded?
@@ -360,7 +362,16 @@ class Data:
         # Select channels
         new_arrays = []
         for i in tqdm(range(self.n_arrays), desc="Selecting channels"):
-            array = arrays[i][:, channels]
+            array = arrays[i]
+            if timepoints is None:
+                array = array[:, channels]
+            else:
+                assert len(timepoints) == 2
+                time_start,time_end = timepoints[0], timepoints[1]
+                assert time_start >=0
+                assert time_start <= time_end
+                assert time_end <=len(array)
+                array = array[time_start:time_end,channels]
             if self.load_memmaps:
                 array = misc.array_to_memmap(self.prepared_data_filenames[i], array)
             new_arrays.append(array)

@@ -50,6 +50,11 @@ def test_data_list_nparray():
         for element in data.dataset(sequence_length=3,batch_size=1):
             npt.assert_almost_equal(element['data'].numpy(),np.array([input_2]))
 
+    # Test self.select
+    data.select(channels=[1])
+    npt.assert_almost_equal(data.arrays[0], input_1[:, 1:])
+    npt.assert_almost_equal(data.arrays[1], input_2[:, 1:])
+
 
 
 def test_data_files():
