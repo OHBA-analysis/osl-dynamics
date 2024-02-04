@@ -1,0 +1,55 @@
+header:
+  # We assign a time stamp for each batch training
+  time: 2024-02-02T16:05:00.000Z
+  # Where to save the model training results
+  save_dir: './results_yaml_test/'
+  # where to read the data
+  data_dir: './data/node_timeseries/simulation_202402/sigma_0.1/'
+  # How to prepare your data
+  prepare:
+    select:
+      timepoints:
+        - 0
+        - 1200
+    standardize: {}
+  # where to load the spatial map and spatial surface map
+  spatial_map: './data/spatial_maps/'
+  # Add custom notes, which will also be saved
+  note: "test whether your yaml file works"
+
+# The following variables have lists for batch training
+batch_variable:
+  model:
+    - 'HMM'
+    - 'Dynemo'
+    - 'mDyenmo'
+    - 'SWC'
+  channel: [15,25,50,100]
+  state: [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
+  # Mode can be: train, repeat, split, cross_validation
+  mode:
+    - train
+    - repeat_1
+    - repeat_2
+    - repeat_3
+    - repeat_4
+    - repeat_5
+    - split_1
+    - split_2
+    - split_3
+    - split_4
+    - split_5
+    - cv_1
+    - cv_2
+    - cv_3
+    - cv_4
+    - cv_5
+
+non_batch_variable:
+  learn_means: false
+  learn_covariances: true
+  learn_trans_prob: true
+  z_score_data: false
+  learning_rate: 0.01
+  split_strategy: random
+
