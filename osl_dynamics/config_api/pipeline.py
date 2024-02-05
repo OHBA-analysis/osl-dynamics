@@ -6,6 +6,7 @@ See the documentation `here <https://osl-dynamics.readthedocs.io/en/latest\
 
 import argparse
 import logging
+import json
 import pprint
 from pathlib import Path
 
@@ -120,15 +121,22 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
         _logger.info(f"load_data: {load_data_kwargs}")
         data = wrappers.load_data(**load_data_kwargs)
 
+    # Set keep list, use the original if not found
+    keep_list = config.pop('keep_list',data.keep)
+    if isinstance(keep_list,str):
+        with open(keep_list,'r') as file:
+            keep_list = json.load(file)
+
     # Loop through each item in the config
-    for name, kwargs in config.items():
-        func = find_function(name, extra_funcs)
-        if func is not None:
-            try:
-                _logger.info(f"{name}: {kwargs}")
-                func(data=data, output_dir=output_dir, **kwargs)
-            except Exception as e:
-                _logger.exception(e)
+    with data.set_keep(keep_list):
+        for name, kwargs in config.items():
+            func = find_function(name, extra_funcs)
+            if func is not None:
+                try:
+                    _logger.info(f"{name}: {kwargs}")
+                    func(data=data, output_dir=output_dir, **kwargs)
+                except Exception as e:
+                    _logger.exception(e)
 
     # Delete the temporary directory created by the Data class
     if data is not None:
