@@ -239,11 +239,12 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
         os.makedirs(reproduce_analysis_dir)
 
     if reproducible:
-        if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_4.pdf'):
-    #        reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM', n_channels,n_states, learn_mean=learn_mean,split_strategy='1', dataset=dataset)
+        if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_5.pdf'):
+            reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM', n_channels,n_states, learn_mean=learn_mean,split_strategy='1', dataset=dataset)
             reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='2', dataset=dataset)
-            #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='3', dataset=dataset)
-            #reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4', dataset=dataset)
+            reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='3', dataset=dataset)
+            reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4', dataset=dataset)
+            reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states, learn_mean=learn_mean,split_strategy='5', dataset=dataset)
 
 def HMM_cv_reproduce(dataset_1,dataset_2, save_dir_1:str, save_dir_2:str,n_channels:int, n_states:int,learn_mean=False):
     """
@@ -1242,16 +1243,22 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
             FC_distance = {}
         for N_channel in list_channels:
             for N_state in list_states:
-                data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_fisher_correlation_reorder_split_2.npy')
-                FC_correlation[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
+                FC_correlation[f'ICA_{N_channel}_state_{N_state}'] = []
+                for i in range(5):
+                    data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_fisher_correlation_reorder_split_{i+1}.npy')
+                    FC_correlation[f'ICA_{N_channel}_state_{N_state}'].append(np.mean(np.diagonal(data)))
 
                 if model!= 'SWC':
                     if learn_mean:
-                        data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/means_correlation_reorder_split_2.npy')
-                        mean_correlation[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
-                    data = np.load(
-                        f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_distance_reorder_split_2.npy')
-                    FC_distance[f'ICA_{N_channel}_state_{N_state}'] = np.mean(np.diagonal(data))
+                        mean_correlation[f'ICA_{N_channel}_state_{N_state}'] = []
+                        for i in range(5):
+                            data = np.load(f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/means_correlation_reorder_split_{i+1}.npy')
+                            mean_correlation[f'ICA_{N_channel}_state_{N_state}'].append(np.mean(np.diagonal(data)))
+                    FC_distance[f'ICA_{N_channel}_state_{N_state}'] = []
+                    for i in range(5):
+                        data = np.load(
+                            f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_distance_reorder_split_1.npy')
+                        FC_distance[f'ICA_{N_channel}_state_{N_state}'].append(np.mean(np.diagonal(data)))
         group_comparison_plot(FC_correlation, model, list_channels, list_states, 'Fisher_z_transformed_correlation', save_dir)
         if model != 'SWC':
             group_comparison_plot(FC_distance, model, list_channels, list_states, 'Riemannian_distance',
@@ -1333,6 +1340,7 @@ def group_comparison_plot(metric:dict,model_name:str,list_channels:list,list_sta
     plt.xticks(np.arange(len(channel_keys)) + bar_width * (len(list_states) - 1) / 2,
                [str(N_channels) for N_channels in list_channels], fontsize=15)
     plt.yticks(fontsize=15)
+    plt.autoscale(axis='y',tight=True)
     #plt.legend(prop={'size': 15})
     plt.tight_layout()
     plt.savefig(f'{save_dir}{model_name}_{metric_name}_comparison.jpg')
@@ -1412,11 +1420,11 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n
     Returns
     -------
     """
-    extract_state_statistics(f'{save_dir}split_{split_strategy}_first_half/',model_name)
-    extract_state_statistics(f'{save_dir}split_{split_strategy}_second_half/', model_name)
+    extract_state_statistics(f'{save_dir}split_{split_strategy}/first_half/',model_name)
+    extract_state_statistics(f'{save_dir}split_{split_strategy}/second_half/', model_name)
     if learn_mean:
-        means_1 = np.load(f'{save_dir}split_{split_strategy}_first_half/state_means.npy')
-        means_2 = np.load(f'{save_dir}split_{split_strategy}_second_half/state_means.npy')
+        means_1 = np.load(f'{save_dir}split_{split_strategy}/first_half/state_means.npy')
+        means_2 = np.load(f'{save_dir}split_{split_strategy}/second_half/state_means.npy')
         means_correlation = twopair_vector_correlation(means_1, means_2)
         row_column_indices, means_correlation_reorder = hungarian_pair(means_correlation, distance=False)
         np.save(f'{reproduce_analysis_dir}means_correlation_split_{split_strategy}.npy', means_correlation)
@@ -1433,8 +1441,8 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n
     print(f'split strategy is {split_strategy}')
     print('#################')
     # Work on FCs
-    correlations_1 = np.load(f'{save_dir}split_{split_strategy}_first_half/state_correlations.npy')
-    correlations_2 = np.load(f'{save_dir}split_{split_strategy}_second_half/state_correlations.npy')
+    correlations_1 = np.load(f'{save_dir}split_{split_strategy}/first_half/state_correlations.npy')
+    correlations_2 = np.load(f'{save_dir}split_{split_strategy}/second_half/state_correlations.npy')
 
     FCs_distance = twopair_riemannian_distance(correlations_1,correlations_2)
     FCs_fisher_z_transformed_correlation = twopair_fisher_z_transformed_correlation(correlations_1,correlations_2)
