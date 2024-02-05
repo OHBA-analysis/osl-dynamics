@@ -1,42 +1,42 @@
-save_dir: './results_yaml_test/'
-non_batch_variable:
-  model: 'hmm'
-  n_channels: 25
-  sequence_length: 600
-  learn_means: false
-  learn_covariances: true
-  learn_trans_prob: true
-  learning_rate: 0.01
-  n_epochs: 30
-  split_strategy: random
+header:
   # We assign a time stamp for each batch training
   time: 2024-02-02T16:05:00.000Z
-  # Where to save the model training results
-  # where to read the data
+  # Add custom notes, which will also be saved
+  note: "test whether your yaml file works"
+# where to read the data
+load_data:
   inputs: './data/node_timeseries/simulation_202402/sigma_0.1/'
-  # How to prepare your data
   prepare:
     select:
       timepoints:
         - 0
         - 1200
     standardize: {}
-  # where to load the spatial map and spatial surface map
-  spatial_map: './data/spatial_maps/'
-  # Add custom notes, which will also be saved
-  note: "test whether your yaml file works"
+# Where to save model training results
+save_dir: './results_yaml_test/'
+# where to load the spatial map and spatial surface map
+spatial_map: './data/spatial_maps/'
+non_batch_variable:
+  n_channels: 25
+  sequence_length: 600
+  batch_size: 64
+  learn_means: false
+  learn_covariances: true
+  learn_trans_prob: true
+  learning_rate: 0.01
+  n_epochs: 30
+  split_strategy: random
   init_kwargs:
-    'n_init': 3,
-    'n_epochs': 1
-
-
+    n_init: 10
+    n_epochs: 2
 # The following variables have lists for batch training
 batch_variable:
+  model:
+    - 'hmm'
   n_states: [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
   # Mode can be: train, repeat, split, cross_validation
   mode:
     - train
     - repeat_1
-
 
 

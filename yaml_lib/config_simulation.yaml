@@ -1,8 +1,8 @@
 header:
   # We assign a time stamp for each batch training
-  time: 2024-02-02T16:05:00.000Z
+  time: 2024-02-05T17:00:00.000Z
   # Add custom notes, which will also be saved
-  note: "test whether your yaml file works"
+  note: "Default configuration for simulation data"
 # where to read the data
 load_data:
   inputs: './data/node_timeseries/simulation_202402/sigma_0.1/'
@@ -11,14 +11,14 @@ load_data:
       timepoints:
         - 0
         - 1200
-    standardize: {}
 # Where to save model training results
 save_dir: './results_yaml_test/'
 # where to load the spatial map and spatial surface map
-spatial_map: './data/spatial_maps/'
+spatial_map: './data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d25.ica'
 non_batch_variable:
   n_channels: 25
-  sequence_length: 600
+  sequence_length: 400
+  batch_size: 64
   learn_means: false
   learn_covariances: true
   learn_trans_prob: true
@@ -32,9 +32,6 @@ non_batch_variable:
 batch_variable:
   model:
     - 'hmm'
-    - 'dynemo'
-    - 'mdyenmo'
-    - 'swc'
   n_states: [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
   # Mode can be: train, repeat, split, cross_validation
   mode:
