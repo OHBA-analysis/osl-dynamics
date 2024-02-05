@@ -1,10 +1,19 @@
-header:
+save_dir: './results_yaml_test/'
+non_batch_variable:
+  sequence_length: 600
+  learn_means: false
+  learn_covariances: true
+  learn_trans_prob: true
+  learning_rate: 0.01
+  n_epochs: 30
+  split_strategy: random
+
   # We assign a time stamp for each batch training
   time: 2024-02-02T16:05:00.000Z
   # Where to save the model training results
-  save_dir: './results_yaml_test/'
+
   # where to read the data
-  data_dir: './data/node_timeseries/simulation_202402/sigma_0.1/'
+  inputs: './data/node_timeseries/simulation_202402/sigma_0.1/'
   # How to prepare your data
   prepare:
     select:
@@ -20,12 +29,12 @@ header:
 # The following variables have lists for batch training
 batch_variable:
   model:
-    - 'HMM'
-    - 'Dynemo'
-    - 'mDyenmo'
-    - 'SWC'
-  channel: [15,25,50,100]
-  state: [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
+    - 'hmm'
+    - 'dynemo'
+    - 'mdyenmo'
+    - 'swc'
+  n_channels: [15,25,50,100]
+  n_states: [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
   # Mode can be: train, repeat, split, cross_validation
   mode:
     - train
@@ -45,11 +54,4 @@ batch_variable:
     - cv_4
     - cv_5
 
-non_batch_variable:
-  learn_means: false
-  learn_covariances: true
-  learn_trans_prob: true
-  z_score_data: false
-  learning_rate: 0.01
-  split_strategy: random
 

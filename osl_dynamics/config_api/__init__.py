@@ -61,4 +61,4 @@ Remember you need to activate the :code:`osld` conda environment to use the
 command line interface.
 """
 
-from osl_dynamics.config_api import pipeline, wrappers
+from osl_dynamics.config_api import pipeline, wrappers, batch

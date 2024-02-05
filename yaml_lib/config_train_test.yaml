@@ -1,10 +1,19 @@
-header:
+save_dir: './results_yaml_test/'
+non_batch_variable:
+  model: 'hmm'
+  n_channels: 25
+  sequence_length: 600
+  learn_means: false
+  learn_covariances: true
+  learn_trans_prob: true
+  learning_rate: 0.01
+  n_epochs: 30
+  split_strategy: random
   # We assign a time stamp for each batch training
   time: 2024-02-02T16:05:00.000Z
   # Where to save the model training results
-  save_dir: './results_yaml_test/'
   # where to read the data
-  data_dir: './data/node_timeseries/simulation_202402/sigma_0.1/'
+  inputs: './data/node_timeseries/simulation_202402/sigma_0.1/'
   # How to prepare your data
   prepare:
     select:
@@ -16,6 +25,10 @@ header:
   spatial_map: './data/spatial_maps/'
   # Add custom notes, which will also be saved
   note: "test whether your yaml file works"
+  init_kwargs:
+    'n_init': 3,
+    'n_epochs': 1
+
 
 # The following variables have lists for batch training
 batch_variable:
@@ -25,14 +38,5 @@ batch_variable:
     - train
     - repeat_1
 
-non_batch_variable:
-  model: 'HMM'
-  n_channels: 25
-  sequence_length: 600
-  learn_means: false
-  learn_covariances: true
-  learn_trans_prob: true
-  learning_rate: 0.01
-  n_eposhs: 30
-  split_strategy: random
+
 
