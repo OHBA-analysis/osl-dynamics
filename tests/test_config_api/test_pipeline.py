@@ -67,6 +67,9 @@ def test_run_pipeline_from_file():
                         learning_rate: 0.005
                         n_epochs: 100
                         sequence_length: 100
+                    init_kwargs:
+                        n_init: 10
+                        n_epochs: 2
 
             """
         output_dir = f'{save_dir}split_{i}/'
