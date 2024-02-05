@@ -29,7 +29,7 @@ def validate_inputs(inputs):
     """
     if isinstance(inputs, str):
         if path.isdir(inputs):
-            validated_inputs = list_dir(inputs, keep_ext=_allowed_ext)
+            validated_inputs = sorted(list_dir(inputs, keep_ext=_allowed_ext))
         else:
             validated_inputs = [inputs]
 
