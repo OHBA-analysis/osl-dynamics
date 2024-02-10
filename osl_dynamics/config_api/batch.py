@@ -219,8 +219,8 @@ class BatchTrain:
                 prepare_config['keep_list'] = f'{self.config["save_dir"]}indices_{i+1}.json'
                 with open(f'{temp_save_dir}prepared_config.yaml', 'w') as file:
                     yaml.safe_dump(prepare_config, file, default_flow_style=False)
-                #run_pipeline_from_file(f'{self.config["save_dir"]}prepared_config.yaml',
-                #                      temp_save_dir)
+                run_pipeline_from_file(f'{self.config["save_dir"]}prepared_config.yaml',
+                                      temp_save_dir)
 
 
         elif "cv" in self.config["mode"]:
@@ -235,15 +235,15 @@ class BatchTrain:
             prepare_config['keep_list'] = f'{self.config["save_dir"]}indices_train.json'
             with open(f'{self.config["save_dir"]}prepared_config.yaml', 'w') as file:
                 yaml.safe_dump(prepare_config, file, default_flow_style=False)
-            #run_pipeline_from_file(f'{self.config["save_dir"]}prepared_config.yaml',
-            #                       self.config['save_dir'])
+            run_pipeline_from_file(f'{self.config["save_dir"]}prepared_config.yaml',
+                                   self.config['save_dir'])
 
 
         else:
             with open(f'{self.config["save_dir"]}prepared_config.yaml', 'w') as file:
                 yaml.safe_dump(prepare_config, file, default_flow_style=False)
-            #run_pipeline_from_file(f'{self.config["save_dir"]}prepared_config.yaml',
-            #                       self.config["save_dir"])
+            run_pipeline_from_file(f'{self.config["save_dir"]}prepared_config.yaml',
+                                   self.config["save_dir"])
 
 
     def select_indice(self,ratio=0.5):
