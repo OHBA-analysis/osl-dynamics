@@ -13,7 +13,7 @@ load_data:
         - 1200
     standardize: {}
 # Where to save model training results
-save_dir: './results_yaml_test/'
+save_dir: './results_HCP_yaml/'
 # where to load the spatial map and spatial surface map
 spatial_map: './data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d25.ica'
 non_batch_variable:
@@ -23,7 +23,7 @@ non_batch_variable:
   learn_means: false
   learn_covariances: true
   learn_trans_prob: true
-  learning_rate: 0.01
+  learning_rate: 0.001
   n_epochs: 30
   split_strategy: random
   init_kwargs:
@@ -33,7 +33,7 @@ non_batch_variable:
 batch_variable:
   model:
     - 'hmm'
-  n_states: [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]
+  n_states: [2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36]
   # Mode can be: train, repeat, split, cross_validation
   mode:
     - train

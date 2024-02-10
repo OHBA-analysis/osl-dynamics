@@ -2,17 +2,17 @@ header:
   # We assign a time stamp for each batch training
   time: 2024-02-05T17:00:00.000Z
   # Add custom notes, which will also be saved
-  note: "Default configuration for simulation data"
+  note: "Configuration for simulation data,sigm a =0"
 # where to read the data
 load_data:
-  inputs: './data/node_timeseries/simulation_202402/sigma_0.1/'
+  inputs: './data/node_timeseries/simulation_202402/sigma_0/'
   prepare:
     select:
       timepoints:
         - 0
         - 1200
 # Where to save model training results
-save_dir: './results_yaml_test/'
+save_dir: './results_simulation_yaml/sigma_0/'
 # where to load the spatial map and spatial surface map
 spatial_map: './data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d25.ica'
 non_batch_variable:
