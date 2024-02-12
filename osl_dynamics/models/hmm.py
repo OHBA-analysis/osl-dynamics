@@ -1152,7 +1152,7 @@ class Model(ModelBase):
 
             if return_components:
                 log_likelihoods.append(log_likelihood / batch_size)
-                entropies.append(entroopy / batch_size)
+                entropies.append(entropy / batch_size)
                 priors.append(prior / batch_size)
 
         # Return average over batches
