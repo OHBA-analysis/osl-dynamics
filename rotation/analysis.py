@@ -237,7 +237,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
     reproduce_analysis_dir = f'{save_dir}reproduce_analysis/'
     if not os.path.exists(reproduce_analysis_dir):
         os.makedirs(reproduce_analysis_dir)
-
+    '''
     if reproducible:
         if not os.path.isfile(f'{reproduce_analysis_dir}FCs_distance_plot_split_5.pdf'):
             reproduce_analysis(save_dir,reproduce_analysis_dir,'HMM', n_channels,n_states, learn_mean=learn_mean,split_strategy='1', dataset=dataset)
@@ -245,7 +245,7 @@ def HMM_analysis(dataset:osl_dynamics.data.Data, save_dir:str,
             reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels,n_states,learn_mean=learn_mean,split_strategy='3', dataset=dataset)
             reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states,learn_mean=learn_mean,split_strategy='4', dataset=dataset)
             reproduce_analysis(save_dir, reproduce_analysis_dir, 'HMM', n_channels, n_states, learn_mean=learn_mean,split_strategy='5', dataset=dataset)
-
+    '''
 def HMM_cv_reproduce(dataset_1,dataset_2, save_dir_1:str, save_dir_2:str,n_channels:int, n_states:int,learn_mean=False):
     """
     Conducting cross validation
@@ -656,21 +656,38 @@ def calculate_metrics(model,dataset,save_dir):
     from osl_dynamics.models import load
 
     if not os.path.isfile(f'{save_dir}metrics.json'):
-        free_energy = model.free_energy(dataset)
-        #evidence = model.evidence(dataset)
-        metrics = {'free_energy':free_energy.tolist(),}#'evidence':evidence}
+        free_energy,log_likelihood, entropy,prior = model.free_energy(dataset,return_components=True)
+        evidence = model.evidence(dataset)
+        metrics = {'free_energy':float(free_energy),
+                   'log_likelihood':float(log_likelihood),
+                   'entropy':float(entropy),
+                   'prior':float(prior),
+                   'evidence':float(evidence),
+                   }
         with open(f'{save_dir}metrics.json', "w") as json_file:
             # Use json.dump to write the data to the file
             json.dump(metrics, json_file)
     if not os.path.isfile(f'{save_dir}metrics_repeat.json'):
         free_energy_list = []
+        evidence_list = []
+        log_likelihood_list, entropy_list, prior_list = [], [], []
         # We repeat the model for five times
         for i in range(1,6):
             if os.path.exists(f'{save_dir}repeat_{i}'):
                 repeat_model = load(f'{save_dir}repeat_{i}/')
-                free_energy_list.append(float(repeat_model.free_energy(dataset)))
+                free_energy, log_likelihood, entropy, prior = repeat_model.free_energy(dataset,return_components=True)
+                evidence = repeat_model.evidence(dataset)
+                free_energy_list.append(float(free_energy))
+                log_likelihood_list.append(float(log_likelihood))
+                entropy_list.append(float(entropy))
+                prior_list.append(float(prior))
+                evidence_list.append(float(evidence))
         with open(f'{save_dir}metrics_repeat.json',"w") as json_file:
-            json.dump({'free_energy':free_energy_list},json_file)
+            json.dump({'free_energy':free_energy_list,
+                       'log_likelihood':log_likelihood_list,
+                       'entropy':entropy_list,
+                       'prior':prior_list,
+                       'evidence':evidence_list},json_file)
 
 
 
@@ -1257,7 +1274,7 @@ def comparison_analysis(models:list,list_channels:list,list_states:list,result_d
                     FC_distance[f'ICA_{N_channel}_state_{N_state}'] = []
                     for i in range(5):
                         data = np.load(
-                            f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_distance_reorder_split_1.npy')
+                            f'{result_dir}{model}_ICA_{N_channel}_state_{N_state}/reproduce_analysis/FCs_distance_reorder_split_{i+1}.npy')
                         FC_distance[f'ICA_{N_channel}_state_{N_state}'].append(np.mean(np.diagonal(data)))
         group_comparison_plot(FC_correlation, model, list_channels, list_states, 'Fisher_z_transformed_correlation', save_dir)
         if model != 'SWC':
@@ -1326,21 +1343,25 @@ def group_comparison_plot(metric:dict,model_name:str,list_channels:list,list_sta
     bar_width = 0.15
     colors = plt.cm.viridis(np.linspace(0, 1, len(list_states)))
 
+    lower_bound, upper_bound = 1000000., 0.
     for i, N_states in enumerate(list_states):
         channel_keys = [f'ICA_{N_channels}_state_{N_states}' for N_channels in list_channels]
         values = [metric[key] for key in channel_keys]
         means =  [np.mean(vals) for vals in values]
+        lower_bound = min(lower_bound,np.min(np.array(means)) * 0.9)
+        upper_bound = max(upper_bound,np.max(np.array(means)) * 1.01)
         stds = [np.std(vals) for vals in values]
         plt.bar(np.arange(len(channel_keys)) + i * bar_width, means, bar_width, label=f'N_states = {N_states}',
                 yerr=stds,color=colors[i])
 
     plt.xlabel('N_channels', fontsize=15)
     plt.ylabel(metric_name, fontsize=15)
+    plt.ylim(lower_bound, upper_bound)
     plt.title(f'Comparison of {metric_name} by N_channels and N_states', fontsize=20)
     plt.xticks(np.arange(len(channel_keys)) + bar_width * (len(list_states) - 1) / 2,
                [str(N_channels) for N_channels in list_channels], fontsize=15)
     plt.yticks(fontsize=15)
-    plt.autoscale(axis='y',tight=True)
+    #plt.autoscale(axis='y',tight=True)
     #plt.legend(prop={'size': 15})
     plt.tight_layout()
     plt.savefig(f'{save_dir}{model_name}_{metric_name}_comparison.jpg')
@@ -1467,6 +1488,11 @@ def reproduce_analysis(save_dir:str, reproduce_analysis_dir:str,model_name:str,n
                            'FCs_fisher_z_correlation', row_column_indices_FCs_Fisher,
                            model_name, n_channels, n_states, split_strategy)
 
+    FCs_distance_first_half = twopair_riemannian_distance(correlations_1, correlations_1)
+    FCs_fisher_z_transformed_correlation_first_half = twopair_fisher_z_transformed_correlation(correlations_1, correlations_1)
+
+    np.save(f'{reproduce_analysis_dir}FCs_distance_split_{split_strategy}_first_half.npy', FCs_distance_first_half)
+    np.save(f'{reproduce_analysis_dir}FCs_fisher_correlation_split_{split_strategy}_first_half.npy', FCs_distance_first_half)
 
 
 def plot_loss_history(save_dir:str,plot_dir:str):
