@@ -1081,7 +1081,7 @@ class Model(ModelBase):
                 self.config.diagonal_covariances,
             )
 
-    def free_energy(self, dataset,means:np.ndarray=None,covariances:np.ndarray=None):
+    def free_energy(self, dataset,means:np.ndarray=None,covariances:np.ndarray=None,return_components:bool=False):
         """Get the variational free energy.
         This method is modified by swimming 13th Dec 2023
         I added two arguments,means and covariances to substitute the means, and covariances in the model
@@ -1101,6 +1101,9 @@ class Model(ModelBase):
             N_states * N_channels to substitute the mean activation. Do not change if none.
         covariances: np.ndarray
             N_states * N_channels * N_channels to substitute the covariance matries. Do not change if none
+        return_components: bool
+            whether the components of free energy, i.e. posterior expected log-likelihood,
+            posterior entropy and posterior expected prior probability should be returned.
         Returns
         -------
         free_energy : float
@@ -1113,6 +1116,8 @@ class Model(ModelBase):
 
         # Calculate variational free energy for each batch
         free_energy = []
+        if return_components:
+            log_likelihoods, entropies, priors = [],[],[]
         for data in dataset:
             x = data["data"]
             batch_size = x.shape[0]
@@ -1145,8 +1150,16 @@ class Model(ModelBase):
             seq_fe = (-log_likelihood + entropy - prior) / batch_size
             free_energy.append(seq_fe)
 
+            if return_components:
+                log_likelihoods.append(log_likelihood / batch_size)
+                entropies.append(entroopy / batch_size)
+                priors.append(prior / batch_size)
+
         # Return average over batches
-        return np.mean(free_energy)
+        if return_components:
+            return  np.mean(free_energy),np.mean(log_likelihoods),np.mean(entropies),np.mean(priors)
+        else:
+            return np.mean(free_energy)
 
     def evidence(self, dataset):
         """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
