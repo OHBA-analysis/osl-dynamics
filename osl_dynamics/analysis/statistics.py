@@ -290,3 +290,91 @@ def group_diff_max_stat_perm(
     group_diff = model.copes[0]
 
     return group_diff, pvalues
+
+
+def paired_diff_max_stat_perm(data, n_perm, metric="tstats", n_jobs=1):
+    """Statistical significant testing for paired differences.
+
+    This function fits a General Linear Model (GLM) with ordinary least squares
+    and performs a sign flip permutations test with the maximum statistic to
+    determine a p-value for paired differences.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Paired differences to compare. This will be the target data for the GLM.
+        Must be shape (n_subjects, features1, features2, ...).
+    n_perm : int
+        Number of permutations.
+    metric : str, optional
+        Metric to use to build the null distribution. Can be :code:`'tstats'` or
+        :code:`'copes'`.
+    n_jobs : int, optional
+        Number of processes to run in parallel.
+
+    Returns
+    -------
+    paired_diff : np.ndarray
+        Paired differences. Shape is (features1, features2, ...).
+    pvalues : np.ndarray
+        P-values for the features. Shape is (features1, features2, ...).
+    """
+    if not isinstance(data, np.ndarray):
+        raise ValueError("data must be a numpy array.")
+
+    ndim = data.ndim
+    if ndim == 1:
+        raise ValueError("data must be 2D or greater.")
+
+    if metric not in ["tstats", "copes"]:
+        raise ValueError("metric must be 'tstats' or 'copes'.")
+
+    # Create GLM Dataset
+    data = glm.data.TrialGLMData(
+        data=data,
+        dim_labels=["subjects"] + [f"features {i}" for i in range(1, ndim)],
+    )
+
+    # Create design matrix
+    DC = glm.design.DesignConfig()
+    DC.add_regressor(name="Group_mean", rtype="Constant")
+    DC.add_contrast(name="Group_mean", values=[1])
+    design = DC.design_from_datainfo(data.info)
+
+    # Fit model and get t-statistics
+    model = glm.fit.OLSModel(design, data)
+
+    # Which dimensions are we pooling over?
+    if ndim == 2:
+        pooled_dims = 1
+    else:
+        pooled_dims = tuple(range(1, ndim))
+
+    # Run permutations and get null distribution
+    perm = glm.permutations.MaxStatPermutation(
+        design,
+        data,
+        contrast_idx=0,
+        nperms=n_perm,
+        metric=metric,
+        tail=0,  # two-sided test
+        pooled_dims=pooled_dims,
+        nprocesses=n_jobs,
+    )
+    null_dist = perm.nulls
+
+    # Get p-values
+    if metric == "tstats":
+        print("Using tstats as metric")
+        tstats = abs(model.tstats[0])
+        percentiles = stats.percentileofscore(null_dist, tstats)
+    elif metric == "copes":
+        print("Using copes as metric")
+        copes = abs(model.copes[0])
+        percentiles = stats.percentileofscore(null_dist, copes)
+    pvalues = 1 - percentiles / 100
+
+    # Get paired differences
+    paired_diff = model.copes[0]
+
+    return paired_diff, pvalues
