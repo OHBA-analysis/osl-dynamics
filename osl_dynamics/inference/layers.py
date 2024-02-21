@@ -385,17 +385,18 @@ class SoftmaxLayer(layers.Layer):
 
     def __init__(self, initial_temperature, learn_temperature, **kwargs):
         super().__init__(**kwargs)
+        self.bijector = tfb.Softplus()
         self.layers = [
             LearnableTensorLayer(
                 shape=(),
                 learn=learn_temperature,
-                initial_value=initial_temperature,
+                initial_value=self.bijector.inverse(initial_temperature),
                 name=self.name + "_kernel",
             )
         ]
 
     def call(self, inputs, **kwargs):
-        temperature = self.layers[0](inputs)
+        temperature = self.bijector(self.layers[0](inputs))
         return activations.softmax(inputs / temperature, axis=-1)
 
 

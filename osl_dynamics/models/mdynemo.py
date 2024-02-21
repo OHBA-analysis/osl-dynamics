@@ -194,6 +194,11 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     fcs_regularizer: tf.keras.regularizers.Regularizer = None
     multiple_dynamics: bool = True
 
+    pca_components: np.ndarray = None
+    learn_temperature: bool = True
+    initial_alpha_temperature: float = 1.0
+    initial_gamma_temperature: float = 1.0
+
     def __post_init__(self):
         self.validate_rnn_parameters()
         self.validate_observation_model_parameters()
@@ -228,6 +233,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
                 self.fcs_epsilon = 1e-6
             else:
                 self.fcs_epsilon = 0.0
+
+        if self.pca_components is None:
+            self.pca_components = np.eye(self.n_channels)
 
     def validate_dimension_parameters(self):
         super().validate_dimension_parameters()
@@ -571,7 +579,7 @@ def _model_structure(config):
     )
     alpha_layer = SoftmaxLayer(
         config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
+        config.learn_temperature,
         name="alpha",
     )
 
@@ -598,8 +606,8 @@ def _model_structure(config):
         config.theta_normalization, name="fc_theta_norm"
     )
     gamma_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
+        config.initial_gamma_temperature,
+        config.learn_temperature,
         name="gamma",
     )
 
@@ -645,6 +653,9 @@ def _model_structure(config):
     mix_stds_layer = MixMatricesLayer(name="mix_stds")
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
     matmul_layer = MatMulLayer(name="cov")
+    pca_means_layer = MatMulLayer(name="pca_means")
+    pca_stds_layer = MatMulLayer(name="pca_stds")
+    pca_fcs_layer = MatMulLayer(name="pca_fcs")
     ll_loss_layer = LogLikelihoodLossLayer(
         np.maximum(config.stds_epsilon, config.fcs_epsilon), name="ll_loss"
     )
@@ -659,6 +670,30 @@ def _model_structure(config):
     D = fcs_layer(
         inputs, static_loss_scaling_factor=static_loss_scaling_factor
     )  # inputs not used
+
+    # multiple with pca components
+    mu = tf.squeeze(
+        pca_means_layer(
+            [
+                tf.expand_dims(tf.transpose(config.pca_components), 0),
+                tf.expand_dims(mu, -1),
+            ]
+        )
+    )
+    E = pca_stds_layer(
+        [
+            tf.expand_dims(tf.transpose(config.pca_components), 0),
+            E,
+            tf.expand_dims(config.pca_components, 0),
+        ]
+    )
+    D = pca_fcs_layer(
+        [
+            tf.expand_dims(tf.transpose(config.pca_components), 0),
+            D,
+            tf.expand_dims(config.pca_components, 0),
+        ]
+    )
 
     m = mix_means_layer([alpha, mu])
     G = mix_stds_layer([alpha, E])
