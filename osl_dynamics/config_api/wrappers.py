@@ -459,13 +459,16 @@ def train_hive(
 
         # Get the inferred parameters
         alpha = model.get_alpha(data)
-        means, covs = model.get_session_means_covariances()
+        means, covs = model.get_means_covariances()
+        session_means, session_covs = model.get_session_means_covariances()
         embeddings = model.get_embeddings()
 
         # Save inferred parameters
         save(f"{inf_params_dir}/alp.pkl", alpha)
         save(f"{inf_params_dir}/means.npy", means)
         save(f"{inf_params_dir}/covs.npy", covs)
+        save(f"{inf_params_dir}/session_means.npy", session_means)
+        save(f"{inf_params_dir}/session_covs.npy", session_covs)
         save(f"{inf_params_dir}/embeddings.npy", embeddings)
 
 
