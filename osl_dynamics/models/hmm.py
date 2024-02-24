@@ -20,6 +20,7 @@ import os.path as op
 import sys
 import warnings
 from dataclasses import dataclass
+from typing import Union
 from pathlib import Path
 
 import numba
@@ -72,19 +73,21 @@ class Config(BaseModelConfig):
         Should we make the mean vectors for each state trainable?
     learn_covariances : bool
         Should we make the covariance matrix for each staet trainable?
-    initial_means : np.ndarray
-        Initialisation for state means.
-    initial_covariances : np.ndarray
+    initial_means : np.ndarray or str
+        Initialisation for state means. String indicated the *.npy directory.
+    initial_covariances : np.ndarray or str
         Initialisation for state covariances. If
         :code:`diagonal_covariances=True` and full matrices are passed,
         the diagonal is extracted.
+        String is the *.npy directory.
     diagonal_covariances : bool
         Should we learn diagonal covariances?
     covariances_epsilon : float
         Error added to state covariances for numerical stability.
 
-    initial_trans_prob : np.ndarray
+    initial_trans_prob : np.ndarray or str
         Initialisation for the transition probability matrix.
+        string works for the :code: 'random'.
     learn_trans_prob : bool
         Should we make the transition probability matrix trainable?
     state_probs_t0: np.ndarray
@@ -126,14 +129,14 @@ class Config(BaseModelConfig):
     # Observation model parameters
     learn_means: bool = None
     learn_covariances: bool = None
-    initial_means: np.ndarray = None
-    initial_covariances: np.ndarray = None
+    initial_means: Union[np.ndarray,str] = None
+    initial_covariances: Union[np.ndarray,str] = None
     diagonal_covariances: bool = False
     covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
-    initial_trans_prob: np.ndarray = None
+    initial_trans_prob: Union[np.ndarray,str] = None
     learn_trans_prob: bool = True
     state_probs_t0: np.ndarray = None
 
@@ -143,6 +146,10 @@ class Config(BaseModelConfig):
     observation_update_decay: float = 0.1
 
     def __post_init__(self):
+        if isinstance(self.initial_means,str):
+            self.initial_means = np.load(self.initial_means)
+        if isinstance(self.initial_covariances,str):
+            self.initial_covariances = np.load(self.initial_covariances)
         self.validate_observation_model_parameters()
         self.validate_trans_prob_parameters()
         self.validate_dimension_parameters()
@@ -160,14 +167,15 @@ class Config(BaseModelConfig):
 
     def validate_trans_prob_parameters(self):
         if self.initial_trans_prob is not None:
-            if (
-                not isinstance(self.initial_trans_prob, np.ndarray)
-                or self.initial_trans_prob.ndim != 2
-            ):
-                raise ValueError("initial_trans_prob must be a 2D numpy array.")
+            if self.initial_trans_prob != 'random':
+                if (
+                    not isinstance(self.initial_trans_prob, np.ndarray)
+                    or self.initial_trans_prob.ndim != 2
+                ):
+                    raise ValueError("initial_trans_prob must be a 2D numpy array or equals 'random'.")
 
-            if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
-                raise ValueError("rows of initial_trans_prob must sum to one.")
+                if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
+                    raise ValueError("rows of initial_trans_prob must sum to one.")
 
 
 class Model(ModelBase):
@@ -971,8 +979,9 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        trans_prob : np.ndarray
+        trans_prob : np.ndarray or str
             State transition probabilities. Shape must be (n_states, n_states).
+            trans_prob can be set as random, where it is sampled randomly.
         """
         if trans_prob is None:
             trans_prob = (
@@ -981,6 +990,12 @@ class Model(ModelBase):
                 / (self.config.n_states - 1)
             )
             np.fill_diagonal(trans_prob, 0.9)
+        elif trans_prob == 'random':
+            trans_prob = np.random.rand(self.config.n_states, self.config.n_states)
+
+            # Divide each row by its sum to ensure rows sum to 1
+            trans_prob /= trans_prob.sum(axis=1, keepdims=True)
+
         self.trans_prob = trans_prob
 
     def set_state_probs_t0(self, state_probs_t0):
