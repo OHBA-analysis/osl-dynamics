@@ -4,9 +4,9 @@
 """
 
 import numpy as np
+from typing import Optional
 
-
-def get_one_hot(values, n_states=None):
+def get_one_hot(values:np.ndarray, n_states: Optional[int] = None) -> np.ndarray:
     """Expand a categorical variable to a series of boolean columns
     (one-hot encoding).
 
@@ -61,7 +61,7 @@ def get_one_hot(values, n_states=None):
     return res.reshape([*list(values.shape), n_states]).astype(int)
 
 
-def cov2corr(cov):
+def cov2corr(cov:np.ndarray)->np.ndarray:
     """Converts batches of covariance matrices into batches of correlation
     matrices.
 
@@ -86,7 +86,7 @@ def cov2corr(cov):
     return cov / normalisation
 
 
-def cov2std(cov):
+def cov2std(cov:np.ndarray) -> np.ndarray:
     """Get the standard deviation of batches of covariance matrices.
 
     Parameters
@@ -104,29 +104,26 @@ def cov2std(cov):
         raise ValueError("input covariances must have more than 1 dimension.")
     return np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
 
-def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
+def stdcor2cov(stds:np.ndarray, corrs:np.ndarray,std_diagonal:Optional[bool]=False) -> np.ndarray:
     """
-    Convert from M standard deviations vectors (N) or diagonal matrices (N*N) and M correlation matrices (N*N)
-    to M covariance matrices
+    Convert batches of standard deviations and correlations into covariances
     Parameters
     ----------
     stds: np.ndarray
-        standard deviation vectors with shape (M, N) or (M,N,N) (diagonal)
+        Standard deviations. Shape is (..., N) or (..., N, N) if std_diagonal=True.
     cors: np.ndarray
-        correlation matrices with shape (M, N, N)
+        Correlation matrices. Shape is (..., N, N).
+    std_diagonal: bool
+        Whether the standard deviation is in the form of diagonal matrices
 
     Returns
     -------
     covariances: np.ndarray
-        covariance matrices with shape (M, N, N)
+        covariance matrices. Shape is (..., N, N)
     """
-
-    if stds.ndim == 2:
-        return (np.expand_dims(stds,-1) @ np.expand_dims(stds,-2)) * corrs
-    elif stds.ndim == 3:
-        return stds @ corrs @ stds
-    else:
-        raise ValueError('Check the dimension of your standard deviation!')
+    if std_diagonal:
+        stds = np.diagonal(stds, axis1=-2, axis2=-1)
+    return corrs * stds[..., None] * stds[..., None, :]
 
 def cov2stdcorr(covs:np.ndarray):
     """

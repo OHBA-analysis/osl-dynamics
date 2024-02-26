@@ -82,14 +82,28 @@ def test_cov2corr():
 
 def test_stdcor2cov():
     from osl_dynamics.array_ops import stdcor2cov
+    # Case 1: One covariance matrix, std is a vector
+    std = np.array([4.0, 2.0])
+    corr = np.array([[1.0, 0.5], [0.5, 1.0]])
+    cov = stdcor2cov(std,corr)
+    npt.assert_equal(cov,np.array([[16.0, 4.0], [4.0, 4.0]]))
 
+    # Case 2: Two covariance matrices, std is two vectors
     stds = np.array([[4.0, 2.0], [10.0, 20.0]])
     corrs = np.array([[[1.0, 0.5], [0.5, 1.0]], [[1.0, -0.2], [-0.2, 1.0]]])
     covs = stdcor2cov(stds,corrs)
     npt.assert_equal(covs,np.array([[[16.0, 4.0], [4.0, 4.0]], [[100.0, -40.0], [-40.0, 400.0]]]))
 
-    stds_diag = np.array([[[4.0,0.0],[0.0,2.0]],[[10.0,0.0],[0.0,20.0]]])
-    covs = stdcor2cov(stds_diag, corrs)
+    # Case 3: One covariance matrix, std is a diagonal matrix
+    std = np.array([[4.0,0.0],[0.0, 2.0]])
+    corr = np.array([[1.0, 0.5], [0.5, 1.0]])
+    cov = stdcor2cov(std, corr,std_diagonal=True)
+    npt.assert_equal(cov, np.array([[16.0, 4.0], [4.0, 4.0]]))
+
+    # Case 4: Two covariance matrices, std is two diagonal matrices
+    stds = np.array([[[4.0,0.0],[0.0,2.0]], [[10.0,0.0],[0.0,20.0]]])
+    corrs = np.array([[[1.0, 0.5], [0.5, 1.0]], [[1.0, -0.2], [-0.2, 1.0]]])
+    covs = stdcor2cov(stds, corrs,std_diagonal=True)
     npt.assert_equal(covs, np.array([[[16.0, 4.0], [4.0, 4.0]], [[100.0, -40.0], [-40.0, 400.0]]]))
 
 def test_cov2stdcorr():
