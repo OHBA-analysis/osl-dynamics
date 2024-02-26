@@ -104,6 +104,55 @@ def cov2std(cov):
         raise ValueError("input covariances must have more than 1 dimension.")
     return np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
 
+def stdcor2cov(stds: np.ndarray, corrs:np.ndarray):
+    """
+    Convert from M standard deviations vectors (N) or diagonal matrices (N*N) and M correlation matrices (N*N)
+    to M covariance matrices
+    Parameters
+    ----------
+    stds: np.ndarray
+        standard deviation vectors with shape (M, N) or (M,N,N) (diagonal)
+    cors: np.ndarray
+        correlation matrices with shape (M, N, N)
+
+    Returns
+    -------
+    covariances: np.ndarray
+        covariance matrices with shape (M, N, N)
+    """
+
+    if stds.ndim == 2:
+        return (np.expand_dims(stds,-1) @ np.expand_dims(stds,-2)) * corrs
+    elif stds.ndim == 3:
+        return stds @ corrs @ stds
+    else:
+        raise ValueError('Check the dimension of your standard deviation!')
+
+def cov2stdcorr(covs:np.ndarray):
+    """
+    Converts batches of covariance matrices into batches of standard deviation vectors
+    and correlation matrices.
+
+    Parameters
+    ----------
+    covs: np.ndarray
+         Covariance matrices. Shape must be (..., N, N).
+
+    Returns
+    -------
+    stds: np.ndarray
+        Standard deviations. Shape is (..., N).
+    corrs: np.ndarray
+        Correlation matrices. Shape is (..., N, N).
+    """
+    # Validation
+    if covs.ndim < 2:
+        raise ValueError("input covariances must have more than 1 dimension.")
+
+    # Extract batches of standard deviations
+    stds = np.sqrt(np.diagonal(covs, axis1=-2, axis2=-1))
+    normalisation = np.expand_dims(stds, -1) @ np.expand_dims(stds, -2)
+    return stds, covs / normalisation
 
 def sliding_window_view(
     x,
