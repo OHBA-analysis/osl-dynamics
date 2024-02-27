@@ -80,30 +80,30 @@ def test_cov2corr():
     corrs = cov2corr(covs)
     npt.assert_equal(corrs, np.array([[[1.0, 0.5], [0.5, 1.0]], [[1.0, -0.2], [-0.2, 1.0]]]))
 
-def test_stdcor2cov():
-    from osl_dynamics.array_ops import stdcor2cov
+def test_stdcorr2cov():
+    from osl_dynamics.array_ops import stdcorr2cov
     # Case 1: One covariance matrix, std is a vector
     std = np.array([4.0, 2.0])
     corr = np.array([[1.0, 0.5], [0.5, 1.0]])
-    cov = stdcor2cov(std,corr)
+    cov = stdcorr2cov(std,corr)
     npt.assert_equal(cov,np.array([[16.0, 4.0], [4.0, 4.0]]))
 
     # Case 2: Two covariance matrices, std is two vectors
     stds = np.array([[4.0, 2.0], [10.0, 20.0]])
     corrs = np.array([[[1.0, 0.5], [0.5, 1.0]], [[1.0, -0.2], [-0.2, 1.0]]])
-    covs = stdcor2cov(stds,corrs)
+    covs = stdcorr2cov(stds,corrs)
     npt.assert_equal(covs,np.array([[[16.0, 4.0], [4.0, 4.0]], [[100.0, -40.0], [-40.0, 400.0]]]))
 
     # Case 3: One covariance matrix, std is a diagonal matrix
     std = np.array([[4.0,0.0],[0.0, 2.0]])
     corr = np.array([[1.0, 0.5], [0.5, 1.0]])
-    cov = stdcor2cov(std, corr,std_diagonal=True)
+    cov = stdcorr2cov(std, corr,std_diagonal=True)
     npt.assert_equal(cov, np.array([[16.0, 4.0], [4.0, 4.0]]))
 
     # Case 4: Two covariance matrices, std is two diagonal matrices
     stds = np.array([[[4.0,0.0],[0.0,2.0]], [[10.0,0.0],[0.0,20.0]]])
     corrs = np.array([[[1.0, 0.5], [0.5, 1.0]], [[1.0, -0.2], [-0.2, 1.0]]])
-    covs = stdcor2cov(stds, corrs,std_diagonal=True)
+    covs = stdcorr2cov(stds, corrs,std_diagonal=True)
     npt.assert_equal(covs, np.array([[[16.0, 4.0], [4.0, 4.0]], [[100.0, -40.0], [-40.0, 400.0]]]))
 
 def test_cov2stdcorr():
@@ -120,3 +120,22 @@ def test_cov2stdcorr():
     stds,corrs = cov2stdcorr(covs)
     npt.assert_equal(stds, np.array([[4.0, 2.0], [10.0, 20.0]]))
     npt.assert_equal(corrs, np.array([[[1.0, 0.5], [0.5, 1.0]], [[1.0, -0.2], [-0.2, 1.0]]]))
+
+def test_check_symmetry():
+    from osl_dynamics.array_ops import check_symmetry
+    # Case 1: One matrix, symmetric
+    matrix = np.array([[1.0,0.0],[0.0,1.0]])
+    npt.assert_equal(check_symmetry(matrix),np.array([True]))
+
+    # Case 2: One matrix, non-symmetric
+    matrix = np.array([[1.0, 0.1], [0.0, 1.0]])
+    npt.assert_equal(check_symmetry(matrix), np.array([False]))
+
+    # Case 3: Two matrices
+    matrix = np.array([[[1.0, 0.1], [0.0, 1.0]],[[1.0,0.0],[0.0,1.0]]])
+    npt.assert_equal(check_symmetry(matrix), np.array([False,True]))
+
+    # Case 4: One matrix, symmetric wrt eps=1e-6
+    matrix = np.array([[1.0, 0.99e-6], [0.0, 1.0]])
+    npt.assert_equal(check_symmetry(matrix,precision=1e-6), np.array([True]))
+    npt.assert_equal(check_symmetry(matrix, precision=1e-7), np.array([False]))

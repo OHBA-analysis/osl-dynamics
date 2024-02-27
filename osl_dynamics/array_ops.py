@@ -4,7 +4,7 @@
 """
 
 import numpy as np
-from typing import Optional
+from typing import Optional, Union, List
 
 def get_one_hot(values:np.ndarray, n_states: Optional[int] = None) -> np.ndarray:
     """Expand a categorical variable to a series of boolean columns
@@ -61,7 +61,7 @@ def get_one_hot(values:np.ndarray, n_states: Optional[int] = None) -> np.ndarray
     return res.reshape([*list(values.shape), n_states]).astype(int)
 
 
-def cov2corr(cov:np.ndarray)->np.ndarray:
+def cov2corr(cov:np.ndarray) -> np.ndarray:
     """Converts batches of covariance matrices into batches of correlation
     matrices.
 
@@ -104,7 +104,7 @@ def cov2std(cov:np.ndarray) -> np.ndarray:
         raise ValueError("input covariances must have more than 1 dimension.")
     return np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
 
-def stdcor2cov(stds:np.ndarray, corrs:np.ndarray,std_diagonal:Optional[bool]=False) -> np.ndarray:
+def stdcorr2cov(stds:np.ndarray, corrs:np.ndarray,std_diagonal:Optional[bool]=False) -> np.ndarray:
     """
     Convert batches of standard deviations and correlations into covariances
     Parameters
@@ -125,7 +125,7 @@ def stdcor2cov(stds:np.ndarray, corrs:np.ndarray,std_diagonal:Optional[bool]=Fal
         stds = np.diagonal(stds, axis1=-2, axis2=-1)
     return corrs * stds[..., None] * stds[..., None, :]
 
-def cov2stdcorr(covs:np.ndarray):
+def cov2stdcorr(covs:np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """
     Converts batches of covariance matrices into batches of standard deviation vectors
     and correlation matrices.
@@ -254,7 +254,7 @@ def validate(array, correct_dimensionality, allow_dimensions, error_message):
     return array
 
 
-def check_symmetry(mat, precision=1e-6):
+def check_symmetry(mat: Union[np.ndarray,List[np.ndarray]], precision:Optional[float]=1e-6) -> np.ndarray:
     """Checks if one or more matrices are symmetric.
 
     Parameters
