@@ -550,8 +550,8 @@ class Data:
             # Use SVD on the covariance to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
-            explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
-            _logger.info(f"Explained variance: {100 * explained_variance:.1f}%")
+            self.explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+            _logger.info(f"Explained variance: {100 * self.explained_variance:.1f}%")
             s = s[:n_pca_components].astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
@@ -695,8 +695,8 @@ class Data:
             # Use SVD on the covariance to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
-            explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
-            _logger.info(f"Explained variance: {100 * explained_variance:.1f}%")
+            self.explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+            _logger.info(f"Explained variance: {100 * self.explained_variance:.1f}%")
             s = s[:n_pca_components].astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
