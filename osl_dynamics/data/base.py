@@ -110,6 +110,7 @@ class Data:
         self.data_field = data_field
         self.picks = picks
         self.reject_by_annotation = reject_by_annotation
+        self.original_sampling_frequency = sampling_frequency
         self.sampling_frequency = sampling_frequency
         self.mask_file = mask_file
         self.parcellation_file = parcellation_file
@@ -223,6 +224,7 @@ class Data:
         sampling_frequency : float
             Sampling frequency in Hz.
         """
+        self.original_sampling_frequency = sampling_frequency
         self.sampling_frequency = sampling_frequency
 
     def set_buffer_size(self, buffer_size):
@@ -457,7 +459,7 @@ class Data:
                 "object."
             )
 
-        if use_raw and hasattr(self, "original_sampling_frequency"):
+        if use_raw:
             sampling_frequency = self.original_sampling_frequency
         else:
             sampling_frequency = self.sampling_frequency
@@ -488,7 +490,6 @@ class Data:
             raise e
 
         # Update sampling_frequency attributes
-        self.original_sampling_frequency = self.sampling_frequency
         self.sampling_frequency = freq
 
         return self
@@ -1413,6 +1414,7 @@ class Data:
             "data_field",
             "picks",
             "reject_by_annotation",
+            "original_sampling_frequency",
             "sampling_frequency",
             "mask_file",
             "parcellation_file",
