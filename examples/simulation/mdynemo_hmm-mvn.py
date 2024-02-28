@@ -27,8 +27,7 @@ config = Config(
     model_n_units=128,
     model_normalization="layer",
     theta_normalization="layer",
-    learn_alpha_temperature=True,
-    initial_alpha_temperature=1.0,
+    learn_temperature=True,
     learn_means=True,
     learn_stds=True,
     learn_fcs=True,
@@ -56,6 +55,11 @@ sim = simulation.MDyn_HMM_MVN(
 )
 sim.standardize()
 training_data = data.Data(sim.time_series)
+
+training_data.prepare(
+    {"pca": {"n_pca_components": config.n_channels}, "standardize": {}}
+)
+config.pca_components = training_data.pca_components
 
 # Build model
 model = Model(config)
@@ -161,3 +165,5 @@ plotting.plot_matrices(
     sim_fcs, main_title="Ground Truth", filename="figures/sim_fcs.png"
 )
 plotting.plot_matrices(inf_fcs, main_title="Inferred", filename="figures/inf_fcs.png")
+
+training_data.delete_dir()
