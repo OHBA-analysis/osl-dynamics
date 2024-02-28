@@ -27,7 +27,6 @@ config = Config(
     model_n_units=128,
     model_normalization="layer",
     theta_normalization="layer",
-    learn_temperature=True,
     learn_means=True,
     learn_stds=True,
     learn_fcs=True,

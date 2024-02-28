@@ -99,12 +99,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Type of normalization to apply to the posterior samples, :code:`theta`.
         Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
         The same parameter is used for the :code:`gamma` time course.
-    learn_alpha_temperature : bool
-        Should we learn the :code:`alpha_temperature`?
-        The same parameter is used for the :code:`gamma` time course.
-    initial_alpha_temperature : float
-        Initial value for :code:`alpha_temperature`.
-        The same parameter is used for the :code:`gamma` time course.
+
 
     learn_means : bool
         Should we make the mean for each mode trainable?
@@ -195,9 +190,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     multiple_dynamics: bool = True
 
     pca_components: np.ndarray = None
-    learn_temperature: bool = True
-    initial_alpha_temperature: float = 1.0
-    initial_gamma_temperature: float = 1.0
 
     def __post_init__(self):
         self.validate_rnn_parameters()
@@ -578,8 +570,8 @@ def _model_structure(config):
         config.theta_normalization, name="mean_theta_norm"
     )
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_temperature,
+        initial_temperature=1.0,
+        learn_temperature=False,
         name="alpha",
     )
 
@@ -606,8 +598,8 @@ def _model_structure(config):
         config.theta_normalization, name="fc_theta_norm"
     )
     gamma_layer = SoftmaxLayer(
-        config.initial_gamma_temperature,
-        config.learn_temperature,
+        initial_temperature=1.0,
+        learn_temperature=False,
         name="gamma",
     )
 
