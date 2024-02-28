@@ -99,12 +99,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Type of normalization to apply to the posterior samples, :code:`theta`.
         Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
         The same parameter is used for the :code:`gamma` time course.
-    learn_alpha_temperature : bool
-        Should we learn the :code:`alpha_temperature`?
-        The same parameter is used for the :code:`gamma` time course.
-    initial_alpha_temperature : float
-        Initial value for :code:`alpha_temperature`.
-        The same parameter is used for the :code:`gamma` time course.
+
 
     learn_means : bool
         Should we make the mean for each mode trainable?
@@ -194,6 +189,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     fcs_regularizer: tf.keras.regularizers.Regularizer = None
     multiple_dynamics: bool = True
 
+    pca_components: np.ndarray = None
+
     def __post_init__(self):
         self.validate_rnn_parameters()
         self.validate_observation_model_parameters()
@@ -228,6 +225,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
                 self.fcs_epsilon = 1e-6
             else:
                 self.fcs_epsilon = 0.0
+
+        if self.pca_components is None:
+            self.pca_components = np.eye(self.n_channels)
+        self.pca_components = self.pca_components.astype(np.float32)
 
     def validate_dimension_parameters(self):
         super().validate_dimension_parameters()
@@ -570,8 +571,8 @@ def _model_structure(config):
         config.theta_normalization, name="mean_theta_norm"
     )
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
+        initial_temperature=1.0,
+        learn_temperature=False,
         name="alpha",
     )
 
@@ -598,8 +599,8 @@ def _model_structure(config):
         config.theta_normalization, name="fc_theta_norm"
     )
     gamma_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
+        initial_temperature=1.0,
+        learn_temperature=False,
         name="gamma",
     )
 
@@ -645,6 +646,9 @@ def _model_structure(config):
     mix_stds_layer = MixMatricesLayer(name="mix_stds")
     mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
     matmul_layer = MatMulLayer(name="cov")
+    pca_means_layer = MatMulLayer(name="pca_means")
+    pca_stds_layer = MatMulLayer(name="pca_stds")
+    pca_fcs_layer = MatMulLayer(name="pca_fcs")
     ll_loss_layer = LogLikelihoodLossLayer(
         np.maximum(config.stds_epsilon, config.fcs_epsilon), name="ll_loss"
     )
@@ -660,9 +664,33 @@ def _model_structure(config):
         inputs, static_loss_scaling_factor=static_loss_scaling_factor
     )  # inputs not used
 
-    m = mix_means_layer([alpha, mu])
-    G = mix_stds_layer([alpha, E])
-    F = mix_fcs_layer([gamma, D])
+    # multiply with pca components
+    pca_mu = tf.squeeze(
+        pca_means_layer(
+            [
+                tf.expand_dims(tf.transpose(config.pca_components), 0),
+                tf.expand_dims(mu, -1),
+            ]
+        )
+    )
+    pca_E = pca_stds_layer(
+        [
+            tf.expand_dims(tf.transpose(config.pca_components), 0),
+            E,
+            tf.expand_dims(config.pca_components, 0),
+        ]
+    )
+    pca_D = pca_fcs_layer(
+        [
+            tf.expand_dims(tf.transpose(config.pca_components), 0),
+            D,
+            tf.expand_dims(config.pca_components, 0),
+        ]
+    )
+
+    m = mix_means_layer([alpha, pca_mu])
+    G = mix_stds_layer([alpha, pca_E])
+    F = mix_fcs_layer([gamma, pca_D])
     C = matmul_layer([G, F, G])
 
     ll_loss = ll_loss_layer([inputs, m, C])

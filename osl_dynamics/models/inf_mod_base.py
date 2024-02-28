@@ -40,7 +40,7 @@ class VariationalInferenceModelConfig:
 
     def validate_alpha_parameters(self):
         if self.initial_alpha_temperature is None:
-            raise ValueError("initial_alpha_temperature must be passed.")
+            self.initial_alpha_temperature = 1.0
 
         if self.initial_alpha_temperature <= 0:
             raise ValueError("initial_alpha_temperature must be greater than zero.")
