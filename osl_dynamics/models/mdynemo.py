@@ -228,6 +228,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
         if self.pca_components is None:
             self.pca_components = np.eye(self.n_channels)
+        self.pca_components = self.pca_components.astype(np.float32)
 
     def validate_dimension_parameters(self):
         super().validate_dimension_parameters()
@@ -663,8 +664,8 @@ def _model_structure(config):
         inputs, static_loss_scaling_factor=static_loss_scaling_factor
     )  # inputs not used
 
-    # multiple with pca components
-    mu = tf.squeeze(
+    # multiply with pca components
+    pca_mu = tf.squeeze(
         pca_means_layer(
             [
                 tf.expand_dims(tf.transpose(config.pca_components), 0),
@@ -672,14 +673,14 @@ def _model_structure(config):
             ]
         )
     )
-    E = pca_stds_layer(
+    pca_E = pca_stds_layer(
         [
             tf.expand_dims(tf.transpose(config.pca_components), 0),
             E,
             tf.expand_dims(config.pca_components, 0),
         ]
     )
-    D = pca_fcs_layer(
+    pca_D = pca_fcs_layer(
         [
             tf.expand_dims(tf.transpose(config.pca_components), 0),
             D,
@@ -687,9 +688,9 @@ def _model_structure(config):
         ]
     )
 
-    m = mix_means_layer([alpha, mu])
-    G = mix_stds_layer([alpha, E])
-    F = mix_fcs_layer([gamma, D])
+    m = mix_means_layer([alpha, pca_mu])
+    G = mix_stds_layer([alpha, pca_E])
+    F = mix_fcs_layer([gamma, pca_D])
     C = matmul_layer([G, F, G])
 
     ll_loss = ll_loss_layer([inputs, m, C])
