@@ -139,3 +139,53 @@ def test_check_symmetry():
     matrix = np.array([[1.0, 0.99e-6], [0.0, 1.0]])
     npt.assert_equal(check_symmetry(matrix,precision=1e-6), np.array([True]))
     npt.assert_equal(check_symmetry(matrix, precision=1e-7), np.array([False]))
+
+def test_ezclump():
+    from osl_dynamics.array_ops import ezclump
+    # Test case 1: No clumps (all False)
+    arr1 = np.array([False, False, False, False, False])
+    expected_result1 = []
+    npt.assert_equal(ezclump(arr1), expected_result1)
+
+    # Test case 2: Single clump of True values
+    arr2 = np.array([False, True, True, True, False])
+    expected_result2 = [slice(1, 4)]
+    npt.assert_equal(ezclump(arr2), expected_result2)
+
+    # Test case 3: Multiple clumps of True values
+    arr3 = np.array([False, True, False, True, True, False, True, False])
+    expected_result3 = [slice(1, 2), slice(3, 5), slice(6, 7)]
+    npt.assert_equal(ezclump(arr3), expected_result3)
+
+    # Test case 4: Clumps at both ends
+    arr4 = np.array([True, False, False, True, True, False, False, True])
+    expected_result4 = [slice(0, 1), slice(3, 5), slice(7, 8)]
+    npt.assert_equal(ezclump(arr4), expected_result4)
+
+    # Test case 5: All True values
+    arr5 = np.array([True, True, True, True, True])
+    expected_result5 = [slice(0, 5)]
+    npt.assert_equal(ezclump(arr5), expected_result5)
+
+def test_slice_length():
+    from osl_dynamics.array_ops import slice_length
+
+    # Test case 1: Slice with positive values
+    s1 = slice(3, 7)
+    expected_length1 = 4
+    npt.assert_equal(slice_length(s1), expected_length1)
+
+    # Test case 2: Slice with negative values
+    s2 = slice(-5, -2)
+    expected_length2 = 3
+    npt.assert_equal(slice_length(s2), expected_length2)
+
+    # Test case 3: Slice with zero-based start
+    s3 = slice(0, 5)
+    expected_length3 = 5
+    npt.assert_equal(slice_length(s3), expected_length3)
+
+    # Test case 4: Empty slice
+    s4 = slice(10, 10)
+    expected_length4 = 0
+    npt.assert_equal(slice_length(s4), expected_length4)
