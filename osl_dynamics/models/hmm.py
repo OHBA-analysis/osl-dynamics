@@ -448,7 +448,12 @@ class Model(ModelBase):
             self.reset()
             training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
 
-            self.set_random_state_time_course_initialization(training_data_subset)
+            try:
+                self.set_random_state_time_course_initialization(training_data_subset)
+            except Exception as e:
+                _logger.warning(f"Initialization {n} failed: {e}, skip to the next initialization.")
+                continue  # Skip to the next iteration if initialization fails
+
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
                 continue
