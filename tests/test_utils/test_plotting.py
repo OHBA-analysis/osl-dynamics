@@ -109,6 +109,60 @@ def test_plot_scatter():
     errors3 = np.random.rand(50) * 0.2  # Example error bars
     plot_scatter([x3], [y3], errors=[errors3], filename='test_plot/scatter_plot/test_plot_scatter_3.png')
 
+def test_plot_gmm():
+    from osl_dynamics.utils.plotting import plot_gmm
+
+    # Create plot_gmm folder if it doesn't exist
+    if not os.path.exists('test_plot/plot_gmm'):
+        os.makedirs('test_plot/plot_gmm')
+    else:
+        # Delete previous files in plot_gmm folder
+        filelist = [f for f in os.listdir('test_plot/plot_gmm')]
+        for f in filelist:
+            os.remove(os.path.join('test_plot/plot_gmm', f))
+
+    # Test case 1: Basic GMM plot
+    data1 = np.random.normal(loc=0, scale=1, size=1000)
+    amplitudes1 = np.array([0.5, 0.5])
+    means1 = np.array([-1, 1])
+    stddevs1 = np.array([1, 1])
+    plot_gmm(
+        data=data1,
+        amplitudes=amplitudes1,
+        means=means1,
+        stddevs=stddevs1,
+        bins=50,
+        legend_loc=1,
+        x_range=None,
+        y_range=None,
+        x_label="X",
+        y_label="Density",
+        title="Gaussian Mixture Model",
+        filename='test_plot/plot_gmm/test_plot_gmm_1.png'
+    )
+
+    # Test case 2: GMM plot with customized style
+    data2 = np.random.normal(loc=0, scale=1, size=1000)
+    amplitudes2 = np.array([0.3, 0.7])
+    means2 = np.array([-1, 1])
+    stddevs2 = np.array([1, 1])
+    fig_kwargs2 = {'figsize': (10, 6)}
+    plot_gmm(
+        data=data2,
+        amplitudes=amplitudes2,
+        means=means2,
+        stddevs=stddevs2,
+        bins=50,
+        legend_loc=1,
+        x_range=None,
+        y_range=None,
+        x_label="X",
+        y_label="Density",
+        title="Customized GMM Plot",
+        fig_kwargs=fig_kwargs2,
+        filename='test_plot/plot_gmm/test_plot_gmm_2.png'
+    )
+
 def test_plot_hist():
     from osl_dynamics.utils.plotting import plot_hist
 
@@ -142,10 +196,200 @@ def test_plot_hist():
 
 
 def test_plot_violin():
+    from osl_dynamics.utils.plotting import plot_violin
+    # Create plot_violin folder if it doesn't exist
+    if not os.path.exists('test_plot/plot_violin'):
+        os.makedirs('test_plot/plot_violin')
+    else:
+        # Delete previous files in plot_violin folder
+        filelist = [f for f in os.listdir('test_plot/plot_violin')]
+        for f in filelist:
+            os.remove(os.path.join('test_plot/plot_violin', f))
 
-    file_path = './test_plot_violin_temp/'
+    # Test case 1: Basic violin plot
+    data1 = [np.random.normal(loc=0, scale=1, size=100) for _ in range(3)]
+    plot_violin(
+        data=data1,
+        x_label="Groups",
+        y_label="Values",
+        title="Violin Plot",
+        filename='test_plot/plot_violin/test_plot_violin_1.png'
+    )
 
-    # Check if the file exists
-    if os.path.exists(file_path):
-        # If it exists, delete the file
-        os.remove(file_path)
+    # Test case 2: Violin plot with customized style
+    data2 = [np.random.normal(loc=0, scale=1, size=100) for _ in range(2)]
+    sns_kwargs2 = {'palette': 'husl'}
+    fig_kwargs2 = {'figsize': (10, 6)}
+    plot_violin(
+        data=data2,
+        x_label="Conditions",
+        y_label="Values",
+        title="Customized Violin Plot",
+        fig_kwargs=fig_kwargs2,
+        sns_kwargs=sns_kwargs2,
+        filename='test_plot/plot_violin/test_plot_violin_2.png'
+    )
+
+def test_plot_time_series():
+    from osl_dynamics.utils.plotting import plot_time_series
+
+    # Create directory if it doesn't exist
+    save_dir = 'test_plot/plot_time_series/'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    else:
+        # Delete previous files in the directory
+        filelist = [f for f in os.listdir(save_dir)]
+        for f in filelist:
+            os.remove(os.path.join(save_dir, f))
+
+    # Generate synthetic time series data
+    n_samples = 1000
+    n_channels = 3
+    time_series = np.random.randn(n_samples, n_channels)
+
+    # Test case 1: Basic plot with default parameters
+    plot_time_series(time_series, filename=os.path.join(save_dir, 'plot_basic.png'))
+
+    # Test case 2: Plot with specified number of samples and y_tick_values
+    n_samples_plot = 500
+    y_tick_values = ['Channel A', 'Channel B', 'Channel C']
+    plot_time_series(time_series, n_samples=n_samples_plot, y_tick_values=y_tick_values,
+                              filename=os.path.join(save_dir, 'plot_samples_ticks.png'))
+
+    # Test case 3: Plot with customized plot appearance
+    plot_kwargs = {'lw': 1.2, 'color': 'red'}
+    plot_time_series(time_series, plot_kwargs=plot_kwargs, filename=os.path.join(save_dir, 'plot_custom.png'))
+
+def test_plot_separate_time_series():
+    from osl_dynamics.utils.plotting import plot_separate_time_series
+
+    # Create directory if it doesn't exist
+    save_dir = 'test_plot/plot_separate_time_series/'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    else:
+        # Delete previous files in the directory
+        filelist = [f for f in os.listdir(save_dir)]
+        for f in filelist:
+            os.remove(os.path.join(save_dir, f))
+
+    # Generate synthetic time series data
+    n_samples = 1000
+    n_lines = 3
+    time_series1 = np.random.randn(n_samples, n_lines)
+    time_series2 = np.random.randn(n_samples, n_lines)
+
+    # Test case 1: Basic plot with default parameters
+    plot_separate_time_series(time_series1, filename=os.path.join(save_dir, 'plot_basic.png'))
+
+    # Test case 2: Plot with specified number of samples and sampling frequency
+    sampling_frequency = 100  # Hz
+    plot_separate_time_series(time_series1, n_samples=500, sampling_frequency=sampling_frequency,
+                                    filename=os.path.join(save_dir, 'plot_samples_frequency.png'))
+
+    # Test case 3: Plot with customized appearance
+    plot_kwargs = {'lw': 1.2, 'color': 'red'}
+    plot_separate_time_series(time_series2, plot_kwargs=plot_kwargs,
+                                    filename=os.path.join(save_dir, 'plot_custom.png'))
+
+def test_plot_epoched_time_series():
+    from osl_dynamics.utils.plotting import plot_epoched_time_series
+
+    # Create directory if it doesn't exist
+    save_dir = 'test_plot/plot_epoched_time_series/'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    else:
+        # Delete previous files in the directory
+        filelist = [f for f in os.listdir(save_dir)]
+        for f in filelist:
+            os.remove(os.path.join(save_dir, f))
+
+    # Generate synthetic continuous data
+    n_samples = 10000
+    n_channels = 4
+    continuous_data = np.random.normal(loc=1.0, scale=1.0, size=(n_samples, n_channels))
+
+    # Generate synthetic time index for epochs
+    epoch_length = 200
+    time_index = np.arange(epoch_length, n_samples, epoch_length)
+
+    # Test case 1: Basic plot with default parameters
+    plot_epoched_time_series(continuous_data, time_index, filename=os.path.join(save_dir, 'plot_basic.png'))
+
+    # Test case 2: Plot with baseline correction
+    plot_epoched_time_series(continuous_data, time_index, baseline_correct=True,
+                             filename=os.path.join(save_dir, 'plot_baseline_corrected.png'))
+
+    # Test case 3: Plot with legend and custom appearance
+    plot_kwargs = {'lw': 1.2, 'color': 'red'}
+    plot_epoched_time_series(continuous_data, time_index, legend=True, plot_kwargs=plot_kwargs,
+                             filename=os.path.join(save_dir, 'plot_legend_custom.png'))
+
+def test_plot_matrices():
+    from osl_dynamics.utils.plotting import plot_matrices
+
+    # Create directory and delete existing files if it already exists
+    plot_dir = 'test_plot/plot_matrices'
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir, exist_ok=True)
+    else:
+        for file in os.listdir(plot_dir):
+            os.remove(os.path.join(plot_dir, file))
+
+    # Test case 1: Single matrix plot
+    matrix1 = np.random.rand(15, 15)
+    plot_matrices([matrix1], main_title="Single Matrix Plot", titles=["Matrix 1"],
+                  filename=os.path.join(plot_dir, 'test_single_matrix.png'))
+
+    # Test case 2: Multiple matrices plot
+    matrix2 = np.random.rand(15, 15)
+    matrix3 = np.random.rand(15, 15)
+    matrices = [matrix1, matrix2, matrix3]
+    plot_matrices(matrices, main_title="Collection of Matrices",
+                  titles=["Matrix 1", "Matrix 2", "Matrix 3"],
+                  filename=os.path.join(plot_dir, 'test_multiple_matrices.png'))
+
+    # Test case 3: Matrices with log normalization
+    matrix4 = np.random.rand(10, 10)
+    matrix5 = np.random.rand(10, 10)
+    matrix6 = np.random.rand(10, 10)
+    matrices_log = [matrix4, matrix5, matrix6]
+    plot_matrices(matrices_log, main_title="Matrices with Log Normalization",
+                  titles=["Matrix 4", "Matrix 5", "Matrix 6"],
+                  log_norm=True,
+                  filename=os.path.join(plot_dir, 'test_matrices_log_normalization.png'))
+
+def test_plot_connections():
+    from osl_dynamics.utils.plotting import plot_connections
+
+    def generate_weights_matrix(shape):
+        # Generate a random matrix with the specified shape
+        return np.random.rand(*shape)
+
+    plot_dir = 'test_plot/plot_connections'
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
+    else:
+        for file in os.listdir(plot_dir):
+            os.remove(os.path.join(plot_dir, file))
+
+    # Test case 1: Square weights matrix
+    shape_1 = (5, 5)
+    weights_1 = generate_weights_matrix(shape_1)
+
+    plot_connections(weights_1, labels=[f"Node {i}" for i in range(1, shape_1[0] + 1)],
+                     filename=os.path.join(plot_dir, f'test_connections_{shape_1[0]}x{shape_1[1]}.png'))
+
+    # Test case 2: Rectangular weights matrix
+    shape_2 = (8,8)
+    weights_2 = generate_weights_matrix(shape_2)
+    plot_connections(weights_2, labels=[f"Node {i}" for i in range(1, shape_2[0] + 1)],
+                     filename=os.path.join(plot_dir, f'test_connections_{shape_2[0]}x{shape_2[1]}.png'))
+
+    # Test case 3: Large square weights matrix
+    shape_3 = (10, 10)
+    weights_3 = generate_weights_matrix(shape_3)
+    plot_connections(weights_3, labels=[f"Node {i}" for i in range(1, shape_3[0] + 1)],
+                     filename=os.path.join(plot_dir, f'test_connections_{shape_3[0]}x{shape_3[1]}.png'))
