@@ -376,8 +376,10 @@ def test_plot_connections():
             os.remove(os.path.join(plot_dir, file))
 
     # Test case 1: Square weights matrix
-    shape_1 = (5, 5)
-    weights_1 = generate_weights_matrix(shape_1)
+    shape_1 = (3, 3)
+    weights_1 = np.array([[1.0,2.0,0.0],
+                          [2.0,1.0,-0.5],
+                          [0.0,-0.5,1.0]])
 
     plot_connections(weights_1, labels=[f"Node {i}" for i in range(1, shape_1[0] + 1)],
                      filename=os.path.join(plot_dir, f'test_connections_{shape_1[0]}x{shape_1[1]}.png'))
@@ -393,3 +395,41 @@ def test_plot_connections():
     weights_3 = generate_weights_matrix(shape_3)
     plot_connections(weights_3, labels=[f"Node {i}" for i in range(1, shape_3[0] + 1)],
                      filename=os.path.join(plot_dir, f'test_connections_{shape_3[0]}x{shape_3[1]}.png'))
+
+def test_plot_alpha():
+    from osl_dynamics.utils.plotting import plot_alpha
+
+    def generate_alpha(n_samples=100, n_modes=3, n_alphas=2):
+        """Generate example alpha matrices."""
+        alphas = []
+        for _ in range(n_alphas):
+            alpha = np.random.randn(n_samples, n_modes)
+            alphas.append(alpha)
+        return alphas
+
+    plot_dir = 'test_plot/plot_alpha'
+    if os.path.exists(plot_dir):
+        for file in os.listdir(plot_dir):
+            os.remove(os.path.join(plot_dir, file))
+    else:
+        os.makedirs(plot_dir)
+
+    alphas = generate_alpha()
+
+    # Ensure the plot directory exists or create it
+    os.makedirs(plot_dir, exist_ok=True)
+
+    # Test case 1: Basic plot
+    plot_alpha(*alphas, filename=os.path.join(plot_dir, 'basic_plot.png'))
+
+    # Test case 2: Plot with customized parameters
+    plot_alpha(
+        *alphas,
+        n_samples=150,
+        #cmap="Blues",
+        sampling_frequency=1000,
+        y_labels=["Alpha 1", "Alpha 2"],
+        title="Example Alpha Plot",
+        filename=os.path.join(plot_dir, 'custom_alpha_plot.png')
+    )
+
