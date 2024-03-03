@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.testing as npt
 
+
 def test_argmax_time_courses():
     from osl_dynamics.inference.modes import argmax_time_courses
 
@@ -27,7 +28,26 @@ def test_argmax_time_courses():
     result = argmax_time_courses(alpha_3d)
     npt.assert_array_equal(result, expected_result)
 
-    
+
+def test_hungarian_pair():
+    from osl_dynamics.inference.modes import hungarian_pair
+
+    # When distance is true
+    matrix = np.array([[8, 4, 7], [5, 2, 3], [9, 4, 8]])
+    indices, matrix_reordered = hungarian_pair(matrix, distance=True)
+    matrix_reordered_true = np.array([[8, 7, 4], [5, 3, 2], [9, 8, 4]])
+    npt.assert_equal(np.array(indices['row']), [0, 1, 2])
+    npt.assert_equal(np.array(indices['col']), [0, 2, 1])
+    npt.assert_equal(matrix_reordered, matrix_reordered_true)
+
+    # When distance is False
+    indices, matrix_reordered = hungarian_pair(-matrix, distance=False)
+    matrix_reordered_true = - np.array([[8, 7, 4], [5, 3, 2], [9, 8, 4]])
+    npt.assert_equal(np.array(indices['row']), [0, 1, 2])
+    npt.assert_equal(np.array(indices['col']), [0, 2, 1])
+    npt.assert_equal(matrix_reordered, matrix_reordered_true)
+
+
 def test_reduce_state_time_course():
     from osl_dynamics.inference.modes import reduce_state_time_course
 
@@ -44,6 +64,7 @@ def test_reduce_state_time_course():
     ]).T
     reduced_state_time_course = reduce_state_time_course(state_time_course)
     npt.assert_equal(reduced_state_time_course, expected_result)
+
 
 def test_correlate_modes():
     from osl_dynamics.inference.modes import correlate_modes
