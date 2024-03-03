@@ -206,29 +206,21 @@ def test_plot_violin():
         for f in filelist:
             os.remove(os.path.join('test_plot/plot_violin', f))
 
-    # Test case 1: Basic violin plot
-    data1 = [np.random.normal(loc=0, scale=1, size=100) for _ in range(3)]
-    plot_violin(
-        data=data1,
-        x_label="Groups",
-        y_label="Values",
-        title="Violin Plot",
-        filename='test_plot/plot_violin/test_plot_violin_1.png'
-    )
+    # Generate sample 2D data
+    np.random.seed(0)
+    n_sessions = 100
+    n_states = 2
+    data = np.zeros((n_sessions, n_states))
 
-    # Test case 2: Violin plot with customized style
-    data2 = [np.random.normal(loc=0, scale=1, size=100) for _ in range(2)]
-    sns_kwargs2 = {'palette': 'husl'}
-    fig_kwargs2 = {'figsize': (10, 6)}
-    plot_violin(
-        data=data2,
-        x_label="Conditions",
-        y_label="Values",
-        title="Customized Violin Plot",
-        fig_kwargs=fig_kwargs2,
-        sns_kwargs=sns_kwargs2,
-        filename='test_plot/plot_violin/test_plot_violin_2.png'
-    )
+    # Populate data[:,0] with a normal distribution with mean 0.1 and std 0.1
+    data[:, 0] = np.random.normal(loc=0.1, scale=0.1, size=n_sessions)
+
+    # Populate data[:,1] with a normal distribution with mean 0.0 and std 0.1
+    data[:, 1] = np.random.normal(loc=0.0, scale=0.1, size=n_sessions)
+
+
+    # Test the function
+    plot_violin(data.T, x_label="State", y_label="Value", title="Violin Plot",filename='test_plot/plot_violin/toy_example.png')
 
 def test_plot_time_series():
     from osl_dynamics.utils.plotting import plot_time_series

@@ -855,7 +855,8 @@ def plot_violin(
     Parameters
     ----------
     data : list of np.ndarray
-        Data to plot.
+        Data to plot. When working on fractional occupancy,
+        the input should be (n_states,n_sessions).
     x : list or np.ndarray, optional
         x-values for data.
     x_label : str, optional
