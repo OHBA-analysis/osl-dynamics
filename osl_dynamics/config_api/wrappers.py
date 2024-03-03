@@ -15,6 +15,7 @@ where:
 """
 
 import os
+import json
 import logging
 from pathlib import Path
 
@@ -66,6 +67,7 @@ def train_hmm(
     init_kwargs=None,
     fit_kwargs=None,
     save_inf_params=True,
+    calculate_free_energy=True
 ):
     """Train a `Hidden Markov Model <https://osl-dynamics.readthedocs.io/en\
     /latest/autoapi/osl_dynamics/models/hmm/index.html>`_.
@@ -84,6 +86,8 @@ def train_hmm(
     - :code:`<output_dir>/model`, which contains the trained model.
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
       This directory is only created if :code:`save_inf_params=True`.
+    - :code:`<output_dir>/metrics`, which contains the free energy on the training data.
+      This directory is only created if :code:`calculate_free_energy=True`.
 
     Parameters
     ----------
@@ -170,6 +174,25 @@ def train_hmm(
         save(f"{inf_params_dir}/alp.pkl", alpha)
         save(f"{inf_params_dir}/means.npy", means)
         save(f"{inf_params_dir}/covs.npy", covs)
+
+    if calculate_free_energy:
+        # Make output directory
+        metric_dir = output_dir + "/metrics/"
+        os.makedirs(metric_dir,exist_ok=True)
+
+        # Get the free energy
+        free_energy = model.free_energy(data,return_components=True)
+        free_energy, log_likelihood, entropy, prior = model.free_energy(data, return_components=True)
+        evidence = model.evidence(data)
+        metrics = {'free_energy': float(free_energy),
+                   'log_likelihood': float(log_likelihood),
+                   'entropy': float(entropy),
+                   'prior': float(prior),
+                   'evidence': float(evidence),
+                   }
+        with open(f'{metric_dir}metrics.json', "w") as json_file:
+            # Use json.dump to write the data to the file
+            json.dump(metrics, json_file)
 
 
 def train_dynemo(

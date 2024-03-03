@@ -10,12 +10,14 @@ import os
 import random
 import time
 import json
+from itertools import product
 
 import yaml
 import numpy as np
 import pandas as pd
 from .pipeline import run_pipeline_from_file
 from ..data.base import Data
+from ..utils.misc import override_dict_defaults
 class IndexParser:
 
     """
@@ -90,8 +92,8 @@ batch_variable:
         self.save_dir = config['save_dir']
         self.batch_variable = config['batch_variable']
         self.non_batch_variable = config['non_batch_variable']
-        self.other_keys = new_dict = {key: value for key, value in config.items()
-                                      if key not in ['batch_variable','non_batch_variable']}
+        self.other_keys =  {key: value for key, value in config.items()
+                                if key not in ['batch_variable','non_batch_variable']}
 
         # Check whether the save_dir exists, make directory if not
         if not os.path.exists(config['save_dir']):
@@ -127,6 +129,9 @@ batch_variable:
         new_config.update(self.other_keys)
         new_config.update(bv)
         new_config.update(self.non_batch_variable)
+
+        new_config['save_dir'] = f'{new_config["save_dir"]}{new_config["model"]}' \
+                             f'_ICA_{new_config["n_channels"]}_state_{new_config["n_states"]}/{new_config["mode"]}/'
 
         return new_config
 
@@ -178,13 +183,12 @@ class BatchTrain:
         # Check whether save directory is specified
         if 'save_dir' not in config:
             raise ValueError('Saving directory not specified!')
-        else:
-            config['save_dir'] = f'{config["save_dir"]}{config["model"]}' \
-                                 f'_ICA_{config["n_channels"]}_state_{config["n_states"]}/{config["mode"]}/'
+
         if not os.path.exists(config['save_dir']):
             os.makedirs(config['save_dir'])
-        with open(f'{config["save_dir"]}batch_config.yaml','w') as file:
-            yaml.safe_dump(config,file, default_flow_style=False)
+        if not os.path.isfile(f'{config["save_dir"]}batch_config.yaml'):
+            with open(f'{config["save_dir"]}batch_config.yaml','w') as file:
+                yaml.safe_dump(config,file, default_flow_style=False)
         self.config = config
 
     def model_train(self,cv_ratio=0.8):
@@ -222,7 +226,7 @@ class BatchTrain:
                 prepare_config['keep_list'] = f'{self.config["save_dir"]}indices_{i+1}.json'
                 with open(f'{temp_save_dir}prepared_config.yaml', 'w') as file:
                     yaml.safe_dump(prepare_config, file, default_flow_style=False)
-                run_pipeline_from_file(f'{self.config["save_dir"]}prepared_config.yaml',
+                run_pipeline_from_file(f'{temp_save_dir}prepared_config.yaml',
                                       temp_save_dir)
 
 
@@ -266,3 +270,55 @@ class BatchTrain:
         # Calculate the remaining indices
         remaining_indices = list(set(all_indices) - set(selected_indices))
         return selected_indices,remaining_indices
+
+def batch_check(config:dict):
+    '''
+    Check whether the batch training is successful, raise value Error
+    and save the list if some batch training is not successful.
+    Parameters
+    ----------
+    config: str
+        configuration file of batch training
+    '''
+    # check the bad directories
+    bad_dirs = []
+
+    # Check whether the fail training list exists, delete if so.
+    bad_dirs_save_path = f'{config["save_dir"]}failure_list.yaml'
+
+    # Check if the file exists, delete if so
+    if os.path.exists(bad_dirs_save_path):
+        os.remove(bad_dirs_save_path)
+
+    for values in product(*config['batch_variable'].values()):
+        combination = dict(zip(config['batch_variable'].keys(), values))
+        vars = override_dict_defaults(config['non_batch_variable'],combination)
+        check_dir = f'{config["save_dir"]}{vars["model"]}_ICA' \
+                    f'_{vars["n_channels"]}_state_{vars["n_states"]}/{vars["mode"]}/'
+
+        # Check whether batch_config exists
+        if not os.path.isfile(f'{check_dir}batch_config.yaml'):
+            bad_dirs.append(check_dir)
+        # Check whether prepared_config exists
+        try:
+            if "split" in vars['mode']:
+                check_dir = f'{check_dir}half_2/'
+            assert os.path.isfile(f'{check_dir}prepared_config.yaml')
+            # Check whether model training is successful
+            assert os.path.exists(f'{check_dir}model')
+            # Check if the covs.npy file exists
+            assert os.path.isfile(f'{check_dir}inf_params/covs.npy')
+            # Check if the means.npy file exists
+            assert os.path.isfile(f'{check_dir}inf_params/means.npy')
+            # Check whether the alp.pkl exists
+            assert os.path.isfile(f'{check_dir}inf_params/alp.pkl')
+        except AssertionError:
+            bad_dirs.append(check_dir)
+
+    if len(bad_dirs)>0:
+        # Serialize and save the list to a file
+        with open(bad_dirs_save_path, 'w') as file:
+            yaml.safe_dump(bad_dirs, file,default_flow_style=False)
+        raise ValueError(f'Some training cases failed, check {bad_dirs_save_path} for the list')
+    else:
+        print('All model training successful!')
