@@ -8,7 +8,7 @@ from sklearn.metrics import confusion_matrix as sklearn_confusion_matrix
 from tqdm.auto import trange
 
 
-def alpha_correlation(alpha_1, alpha_2,return_diagonal=True):
+def alpha_correlation(alpha_1, alpha_2, return_diagonal=True):
     """Calculates the correlation between mixing coefficient time series.
 
     Parameters
@@ -27,10 +27,10 @@ def alpha_correlation(alpha_1, alpha_2,return_diagonal=True):
         Correlation of each mode in the corresponding alphas.
         Shape is (n_modes,) if return_diagonal = True, (n_modes,n_modes) otherwise.
     """
-    if isinstance(alpha_1,list):
-        alpha_1 = np.concatenate(alpha_1,axis=0)
-    if isinstance(alpha_2,list):
-        alpha_2 = np.concatenate(alpha_2,axis=0)
+    if isinstance(alpha_1, list):
+        alpha_1 = np.concatenate(alpha_1, axis=0)
+    if isinstance(alpha_2, list):
+        alpha_2 = np.concatenate(alpha_2, axis=0)
     if alpha_1.shape[1] != alpha_2.shape[1]:
         raise ValueError(
             "alpha_1 and alpha_2 shapes are incomptible. "
@@ -375,3 +375,108 @@ def pairwise_l2_distance(arrays, batch_dims=0):
             axis=tuple(range(pairwise_axis + 2, arrays.ndim + 1)),
         )
     )
+
+
+def fisher_z_transform(r):
+    """
+    Fisher z-transform each element of the input
+    :math:`z = \frac{1}{2}\ln(\frac{1+r}{1-r})`
+    Parameters
+    ----------
+    r: np.ndarray
+        Elements in (-1,1)
+
+    Returns
+    -------
+    z: np.ndarray
+        Fisher z-transformation of the input
+    """
+    return 0.5 * np.log((1 + r) / (1 - r))
+
+
+def fisher_z_correlation(M1, M2):
+    """
+    Calculate the Fisher z-transformed vector correlation.
+    M1 and M2 are symmetric semi-positive definite matrices. Shape is (N, N).
+    Step 1: Obtain the lower triangular element of M1 and M2,
+    unwrap to vectors v1, v2 with length N * (N - 1) / 2
+    Step 2: Fisher z-transform vectors v1, v2 to z1, z2
+    Step 3: return the Pearson's correlation between z1, z2
+    Parameters
+    ----------
+    M1: np.ndarray
+        The first matrix. The shape is (N, N).
+    M2: np.ndarray
+        The second matrix. The shape is (N,N).
+
+    Returns
+    -------
+    dist: (float) distance between M1 and M2
+    """
+    N = M1.shape[0]
+    assert N == M2.shape[0]
+
+    # Obtain the upper triangular elements
+    upper_indices = np.triu_indices(N, k=1)
+    v1 = M1[upper_indices]
+    v2 = M2[upper_indices]
+
+    # Fisher-z-transformation
+    z1 = fisher_z_transform(v1)
+    z2 = fisher_z_transform(v2)
+
+    # return the correlation
+    return np.cov(z1, z2, ddof=0)[0, 1] / (np.std(z1, ddof=0) * np.std(z2, ddof=0))
+
+
+def pairwise_fisher_z_correlations(matrices):
+    """
+    Compute the pairwise Fisher z-transformed correlations of matrices.
+    Parameters
+    ----------
+    matrices: numpy.ndarray
+        set of symmetric semi-positive definite correlation matrices. Shape is (M, N, N).
+
+    Returns
+    -------
+    correlations: numpy.ndarray
+        Fisher z-transformed correlation. Shape is (M, M)
+    """
+
+    N = len(matrices)
+    correlation_metrics = np.eye(N)
+    for i in trange(N, desc='Compute Fisher-z transformated correlation'):
+        for j in range(i + 1, N):
+            correlation_metrics[i][j] = fisher_z_correlation(
+                matrices[i], matrices[j]
+            )
+            correlation_metrics[j][i] = correlation_metrics[i][j]
+
+    return correlation_metrics
+
+def twopair_fisher_z_correlations(matrices_1,matrices_2):
+    """
+    Compute the pairwise Fisher z-transformed correlations of matrices.
+    Parameters
+    ----------
+    matrices_1: np.ndarray
+        set of symmetric semi-positive definite correlation matrices. Shape is (M1, N, N).
+    matrices_2: np.ndarray
+        set of symmetric semi-positive definite correlation matrices. Shape is (M2, N, N).
+
+    Returns
+    -------
+    correlations: np.ndarray
+        Fisher z-transformed correlation. Shape is (M1, M2)
+    """
+    M1 = len(matrices_1)
+    M2 = len(matrices_2)
+    fisher_z_transformed_correlation = np.zeros([M1,M2])
+    for i in trange(M1, desc='Compute twopair Fisher-z transformated correlation'):
+        for j in range(M2):
+            fisher_z_transformed_correlation[i][j] = fisher_z_correlation(
+                matrices_1[i], matrices_2[j]
+            )
+
+    return fisher_z_transformed_correlation
+
