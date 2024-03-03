@@ -433,3 +433,30 @@ def test_plot_alpha():
         filename=os.path.join(plot_dir, 'custom_alpha_plot.png')
     )
 
+def test_plot_state_lifetimes():
+    from osl_dynamics.utils.plotting import plot_state_lifetimes
+
+    # Create directory for test plots if it doesn't exist
+    plot_dir = "test_plot/plot_state_lifetimes"
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
+    else:
+        # Delete existing files in the directory
+        for file_name in os.listdir(plot_dir):
+            file_path = os.path.join(plot_dir, file_name)
+            os.remove(file_path)
+
+    # Test case 1: Basic input
+    state_time_course = np.random.randint(0, 2, size=(100, 5))  # Generate random state time course
+    filename = os.path.join(plot_dir, "test_basic.png")  # Define output filename
+    plot_state_lifetimes(state_time_course, filename=filename)  # Plot and save
+
+    # Test case 2: Customized parameters
+    filename = os.path.join(plot_dir, "test_customized.png")  # Define output filename
+    x_label = "State Lifetime"  # Customize x-axis label
+    y_label = "Frequency"  # Customize y-axis label
+    plot_kwargs = {"alpha": 0.5}  # Customize plot appearance
+    fig_kwargs = {"figsize": (8, 6)}  # Customize figure size
+    plot_state_lifetimes(state_time_course, x_label=x_label, y_label=y_label,
+                         plot_kwargs=plot_kwargs, fig_kwargs=fig_kwargs,
+                         filename=filename)  # Plot and save
