@@ -2415,20 +2415,20 @@ def plot_mode_pairing(
     if fig_kwargs is None:
         fig_kwargs = {}
     default_fig_kwargs = {"figsize": (8, 6),
-                          #"xtick.labelsize": 13,
-                          #"ytick.labelsize": 13,
+                          # "xtick.labelsize": 13,
+                          # "ytick.labelsize": 13,
                           }
     fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
 
     if sns_kwargs is None:
         sns_kwargs = {}
-    default_sns_kwargs = {#"font_scale": 1.2,
-                          "cmap": "coolwarm",
-                          "square": True,
-                          "linewidths": 0.5,
-                          #"cbar_kws": {"shrink": 0.75},
-                          "fmt": ".2f"
-                          }
+    default_sns_kwargs = {  # "font_scale": 1.2,
+        "cmap": "coolwarm",
+        "square": True,
+        "linewidths": 0.5,
+        # "cbar_kws": {"shrink": 0.75},
+        "fmt": ".2f"
+    }
     sns_kwargs = override_dict_defaults(default_sns_kwargs, sns_kwargs)
     # Set up the figure and axis
 
@@ -2441,15 +2441,13 @@ def plot_mode_pairing(
     ax = sns.heatmap(data=metrics, ax=ax, **sns_kwargs)
     # Set xticks and yticks
     if indices is not None:
-        ax.set_xticks(np.arange(len(indices["col"])) + 0.5)
-        ax.set_xticklabels(indices["col"], fontsize=15)
-        ax.set_yticks(np.arange(len(indices["row"])) + 0.5)
-        ax.set_yticklabels(indices["row"], fontsize=15)
+        ax.set_xticks(np.arange(len(indices["col"])) + 0.5, indices["col"], fontsize=15)
+        ax.set_yticks(np.arange(len(indices["row"])) + 0.5, indices["row"], fontsize=15)
 
     # Set title and axis labels
-    ax.set_title(title,fontsize=20)
-    ax.set_xlabel(x_label,fontsize=15)
-    ax.set_ylabel(y_label,fontsize=15)
+    ax.set_title(title, fontsize=20)
+    ax.set_xlabel(x_label, fontsize=15)
+    ax.set_ylabel(y_label, fontsize=15)
 
     # Save the figure if a filename has been pass
     if filename is not None:

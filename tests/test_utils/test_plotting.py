@@ -467,6 +467,6 @@ def test_plot_mode_pairing():
             os.remove(file_path)
 
     metrics = np.random.randn(8,8)
-    indices = {'row':list(range(0,8)),'col':list(range(0,8))}
+    indices = {'row':[3,2,4,5,1,7,0,8],'col':list(range(0,8))}
     plot_mode_pairing(metrics,indices,x_label='split_2',y_label='split_1',title='Pairing test',
                       filename=f'{plot_dir}/toy_example.png')
