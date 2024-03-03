@@ -20,7 +20,6 @@ from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
 from osl_dynamics.utils.parcellation import Parcellation
 
-
 _logger = logging.getLogger("osl-dynamics")
 
 
@@ -141,8 +140,8 @@ def rough_square_axes(n_plots):
     empty : int
         Number of axes left blank from the rectangle.
     """
-    long = np.floor(n_plots**0.5).astype(int)
-    short = np.ceil(n_plots**0.5).astype(int)
+    long = np.floor(n_plots ** 0.5).astype(int)
+    short = np.ceil(n_plots ** 0.5).astype(int)
     if short * long < n_plots:
         short += 1
     empty = short * long - n_plots
@@ -179,20 +178,20 @@ def get_colors(n, colormap="magma"):
 
 
 def plot_line(
-    x,
-    y,
-    labels=None,
-    legend_loc=1,
-    errors=None,
-    x_range=None,
-    y_range=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+        x,
+        y,
+        labels=None,
+        legend_loc=1,
+        errors=None,
+        x_range=None,
+        y_range=None,
+        x_label=None,
+        y_label=None,
+        title=None,
+        plot_kwargs=None,
+        fig_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Basic line plot.
 
@@ -296,7 +295,7 @@ def plot_line(
 
     # Plot lines
     for x_data, y_data, label, e_min, e_max in zip(
-        x, y, labels, errors_min, errors_max
+            x, y, labels, errors_min, errors_max
     ):
         ax.plot(x_data, y_data, label=label, **plot_kwargs)
         if e_min is not None:
@@ -323,22 +322,22 @@ def plot_line(
 
 
 def plot_scatter(
-    x,
-    y,
-    labels=None,
-    legend_loc=1,
-    errors=None,
-    x_range=None,
-    y_range=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    markers=None,
-    annotate=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+        x,
+        y,
+        labels=None,
+        legend_loc=1,
+        errors=None,
+        x_range=None,
+        y_range=None,
+        x_label=None,
+        y_label=None,
+        title=None,
+        markers=None,
+        annotate=None,
+        plot_kwargs=None,
+        fig_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Basic scatter plot.
 
@@ -488,19 +487,19 @@ def plot_scatter(
 
 
 def plot_hist(
-    data,
-    bins,
-    labels=None,
-    legend_loc=1,
-    x_range=None,
-    y_range=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+        data,
+        bins,
+        labels=None,
+        legend_loc=1,
+        x_range=None,
+        y_range=None,
+        x_label=None,
+        y_label=None,
+        title=None,
+        plot_kwargs=None,
+        fig_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Basic histogram plot.
 
@@ -615,17 +614,17 @@ def plot_hist(
 
 
 def plot_bar_chart(
-    counts,
-    x=None,
-    x_range=None,
-    y_range=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+        counts,
+        x=None,
+        x_range=None,
+        y_range=None,
+        x_label=None,
+        y_label=None,
+        title=None,
+        plot_kwargs=None,
+        fig_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Bar chart plot.
 
@@ -721,20 +720,20 @@ def plot_bar_chart(
 
 
 def plot_gmm(
-    data,
-    amplitudes,
-    means,
-    stddevs,
-    bins=50,
-    legend_loc=1,
-    x_range=None,
-    y_range=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+        data,
+        amplitudes,
+        means,
+        stddevs,
+        bins=50,
+        legend_loc=1,
+        x_range=None,
+        y_range=None,
+        x_label=None,
+        y_label=None,
+        title=None,
+        fig_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Plot a two component Gaussian mixture model.
 
@@ -840,15 +839,15 @@ def plot_gmm(
 
 
 def plot_violin(
-    data,
-    x=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    fig_kwargs=None,
-    sns_kwargs=None,
-    ax=None,
-    filename=None,
+        data,
+        x=None,
+        x_label=None,
+        y_label=None,
+        title=None,
+        fig_kwargs=None,
+        sns_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Violin plot.
 
@@ -932,13 +931,13 @@ def plot_violin(
 
 
 def plot_time_series(
-    time_series,
-    n_samples=None,
-    y_tick_values=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+        time_series,
+        n_samples=None,
+        y_tick_values=None,
+        plot_kwargs=None,
+        fig_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Plot a time series with channel separation.
 
@@ -1028,12 +1027,12 @@ def plot_time_series(
 
 
 def plot_separate_time_series(
-    *time_series,
-    n_samples=None,
-    sampling_frequency=None,
-    fig_kwargs=None,
-    plot_kwargs=None,
-    filename=None,
+        *time_series,
+        n_samples=None,
+        sampling_frequency=None,
+        fig_kwargs=None,
+        plot_kwargs=None,
+        filename=None,
 ):
     """Plot time series as separate subplots.
 
@@ -1108,19 +1107,19 @@ def plot_separate_time_series(
 
 
 def plot_epoched_time_series(
-    data,
-    time_index,
-    sampling_frequency=None,
-    pre=125,
-    post=1000,
-    baseline_correct=False,
-    legend=True,
-    legend_loc=1,
-    title=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+        data,
+        time_index,
+        sampling_frequency=None,
+        pre=125,
+        post=1000,
+        baseline_correct=False,
+        legend=True,
+        legend_loc=1,
+        title=None,
+        plot_kwargs=None,
+        fig_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Plot continuous data, epoched and meaned over epochs.
 
@@ -1223,14 +1222,14 @@ def plot_epoched_time_series(
 
 
 def plot_matrices(
-    matrix,
-    group_color_scale=True,
-    titles=None,
-    main_title=None,
-    cmap="viridis",
-    nan_color="white",
-    log_norm=False,
-    filename=None,
+        matrix,
+        group_color_scale=True,
+        titles=None,
+        main_title=None,
+        cmap="viridis",
+        nan_color="white",
+        log_norm=False,
+        filename=None,
 ):
     """Plot a collection of matrices.
 
@@ -1331,12 +1330,12 @@ def plot_matrices(
 
 
 def plot_connections(
-    weights,
-    labels=None,
-    ax=None,
-    cmap="hot",
-    text_color=None,
-    filename=None,
+        weights,
+        labels=None,
+        ax=None,
+        cmap="hot",
+        text_color=None,
+        filename=None,
 ):
     """Create a chord diagram representing the values of a matrix.
 
@@ -1504,18 +1503,18 @@ def plot_connections(
 
 
 def topoplot(
-    layout,
-    data,
-    channel_names=None,
-    plot_boxes=False,
-    show_deleted_sensors=False,
-    show_names=False,
-    title=None,
-    colorbar=True,
-    axis=None,
-    cmap="plasma",
-    n_contours=10,
-    filename=None,
+        layout,
+        data,
+        channel_names=None,
+        plot_boxes=False,
+        show_deleted_sensors=False,
+        show_names=False,
+        title=None,
+        colorbar=True,
+        axis=None,
+        cmap="plasma",
+        n_contours=10,
+        filename=None,
 ):
     """Make a contour plot in sensor space.
 
@@ -1583,13 +1582,13 @@ def topoplot(
 
 
 def plot_brain_surface(
-    values,
-    mask_file,
-    parcellation_file,
-    filename=None,
-    subtract_mean=False,
-    mean_weights=None,
-    **plot_kwargs,
+        values,
+        mask_file,
+        parcellation_file,
+        filename=None,
+        subtract_mean=False,
+        mean_weights=None,
+        **plot_kwargs,
 ):
     """Plot a 2D heat map on the surface of the brain.
 
@@ -1648,16 +1647,16 @@ def plot_brain_surface(
 
 
 def plot_alpha(
-    *alpha,
-    n_samples=None,
-    cmap="Set3",
-    sampling_frequency=None,
-    y_labels=None,
-    title=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    filename=None,
-    axes=None,
+        *alpha,
+        n_samples=None,
+        cmap="Set3",
+        sampling_frequency=None,
+        y_labels=None,
+        title=None,
+        plot_kwargs=None,
+        fig_kwargs=None,
+        filename=None,
+        axes=None,
 ):
     """Plot alpha.
 
@@ -1787,17 +1786,17 @@ def plot_alpha(
 
 
 def plot_state_lifetimes(
-    state_time_course,
-    bins="auto",
-    density=False,
-    match_scale_x=False,
-    match_scale_y=False,
-    x_range=None,
-    x_label=None,
-    y_label=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    filename=None,
+        state_time_course,
+        bins="auto",
+        density=False,
+        match_scale_x=False,
+        match_scale_y=False,
+        x_range=None,
+        x_label=None,
+        y_label=None,
+        plot_kwargs=None,
+        fig_kwargs=None,
+        filename=None,
 ):
     """Create a histogram of state lifetimes.
 
@@ -1924,13 +1923,13 @@ def plot_state_lifetimes(
 
 
 def plot_psd_topo(
-    f,
-    psd,
-    only_show=None,
-    parcellation_file=None,
-    topomap_pos=None,
-    fig_kwargs=None,
-    filename=None,
+        f,
+        psd,
+        only_show=None,
+        parcellation_file=None,
+        topomap_pos=None,
+        fig_kwargs=None,
+        filename=None,
 ):
     """PLot PSDs for parcels and a topomap.
 
@@ -2016,13 +2015,13 @@ def plot_psd_topo(
 
 
 def plot_summary_stats_group_diff(
-    name,
-    summary_stats,
-    pvalues,
-    assignments,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+        name,
+        summary_stats,
+        pvalues,
+        assignments,
+        fig_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Plot summary statistics for two groups as violin plots.
 
@@ -2117,19 +2116,19 @@ def plot_summary_stats_group_diff(
 
 
 def plot_evoked_response(
-    t,
-    epochs,
-    pvalues,
-    significance_level=0.05,
-    offset_between_bars=0.01,
-    labels=None,
-    legend_loc=1,
-    x_label=None,
-    y_label=None,
-    title=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+        t,
+        epochs,
+        pvalues,
+        significance_level=0.05,
+        offset_between_bars=0.01,
+        labels=None,
+        legend_loc=1,
+        x_label=None,
+        y_label=None,
+        title=None,
+        fig_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Plot an evoked responses with significant time points highlighted.
 
@@ -2212,10 +2211,10 @@ def plot_evoked_response(
         fig, ax = create_figure(**fig_kwargs)
 
     for i, e, l, s in zip(
-        range(epochs.shape[1]),
-        epochs.T,
-        labels,
-        significant.T,
+            range(epochs.shape[1]),
+            epochs.T,
+            labels,
+            significant.T,
     ):
         # Plot evoked response
         p = ax.plot(t, e, label=l)
@@ -2254,18 +2253,18 @@ def plot_evoked_response(
 
 
 def plot_wavelet(
-    data,
-    sampling_frequency,
-    w=5,
-    standardize=True,
-    time_range=None,
-    frequency_range=None,
-    title=None,
-    add_colorbar=True,
-    fig_kwargs=None,
-    plot_kwargs=None,
-    ax=None,
-    filename=None,
+        data,
+        sampling_frequency,
+        w=5,
+        standardize=True,
+        time_range=None,
+        frequency_range=None,
+        title=None,
+        add_colorbar=True,
+        fig_kwargs=None,
+        plot_kwargs=None,
+        ax=None,
+        filename=None,
 ):
     """Plot a wavelet transform.
 
@@ -2353,5 +2352,107 @@ def plot_wavelet(
     # Save figure
     if filename is not None:
         save(fig, filename)
+    elif create_fig:
+        return fig, ax
+
+
+def plot_mode_pairing(
+        metrics,
+        indices=None,
+        x_label=None,
+        y_label=None,
+        title=None,
+        fig_kwargs=None,
+        sns_kwargs=None,
+        ax=None,
+        filename=None,
+
+):
+    """
+    Plot the states/modes pairing using the metrics
+    Parameters
+    ----------
+    metrics: np.ndarray
+        measure the similarity/distance between states/modes.
+    indices: dict, optional
+        Indices as xticks and yticks.
+        The format should be {'row':[state_1, state_2,...state_N_1],'col':[state_1, state_2,...state_N_2]}
+    x_label : str, optional
+        Label for x-axis.
+    y_label : str, optional
+        Label for y-axis.
+    title : str, optional
+        Figure title.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    sns_kwargs : dict, optional
+        Arguments to pass to :code:`sns.violinplot()`.
+    ax : matplotlib.axes.axes, optional
+        Axis object to plot on.
+    filename : str, optional
+        Output filename.
+
+    Returns
+    -------
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    """
+
+    # Validation
+    if ax is not None:
+        if filename is not None:
+            raise ValueError(
+                "Please use plotting.save() to save the figure instead of the "
+                + "filename argument."
+            )
+        if isinstance(ax, np.ndarray):
+            raise ValueError("Only pass one axis.")
+
+    if fig_kwargs is None:
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (8, 6),
+                          #"xtick.labelsize": 13,
+                          #"ytick.labelsize": 13,
+                          }
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    if sns_kwargs is None:
+        sns_kwargs = {}
+    default_sns_kwargs = {#"font_scale": 1.2,
+                          "cmap": "coolwarm",
+                          "square": True,
+                          "linewidths": 0.5,
+                          #"cbar_kws": {"shrink": 0.75},
+                          "fmt": ".2f"
+                          }
+    sns_kwargs = override_dict_defaults(default_sns_kwargs, sns_kwargs)
+    # Set up the figure and axis
+
+    # Create figure
+    create_fig = ax is None
+    if create_fig:
+        fig, ax = create_figure(**fig_kwargs)
+
+    # Create a heatmap of the correlation matrix
+    ax = sns.heatmap(data=metrics, ax=ax, **sns_kwargs)
+    # Set xticks and yticks
+    if indices is not None:
+        ax.set_xticks(np.arange(len(indices["col"])) + 0.5)
+        ax.set_xticklabels(indices["col"], fontsize=15)
+        ax.set_yticks(np.arange(len(indices["row"])) + 0.5)
+        ax.set_yticklabels(indices["row"], fontsize=15)
+
+    # Set title and axis labels
+    ax.set_title(title,fontsize=20)
+    ax.set_xlabel(x_label,fontsize=15)
+    ax.set_ylabel(y_label,fontsize=15)
+
+    # Save the figure if a filename has been pass
+    if filename is not None:
+        save(fig, filename, tight_layout=True)
     elif create_fig:
         return fig, ax

@@ -452,3 +452,21 @@ def test_plot_state_lifetimes():
     plot_state_lifetimes(state_time_course, x_label=x_label, y_label=y_label,
                          plot_kwargs=plot_kwargs, fig_kwargs=fig_kwargs,
                          filename=filename)  # Plot and save
+
+def test_plot_mode_pairing():
+    from osl_dynamics.utils.plotting import plot_mode_pairing
+
+    # Create directory for test plots if it doesn't exist
+    plot_dir = "test_plot/plot_mode_pairing"
+    if not os.path.exists(plot_dir):
+        os.makedirs(plot_dir)
+    else:
+        # Delete existing files in the directory
+        for file_name in os.listdir(plot_dir):
+            file_path = os.path.join(plot_dir, file_name)
+            os.remove(file_path)
+
+    metrics = np.random.randn(8,8)
+    indices = {'row':list(range(0,8)),'col':list(range(0,8))}
+    plot_mode_pairing(metrics,indices,x_label='split_2',y_label='split_1',title='Pairing test',
+                      filename=f'{plot_dir}/toy_example.png')
