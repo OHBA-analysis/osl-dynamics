@@ -8,22 +8,29 @@ from sklearn.metrics import confusion_matrix as sklearn_confusion_matrix
 from tqdm.auto import trange
 
 
-def alpha_correlation(alpha_1, alpha_2):
+def alpha_correlation(alpha_1, alpha_2,return_diagonal=True):
     """Calculates the correlation between mixing coefficient time series.
 
     Parameters
     ----------
-    alpha_1 : np.ndarray
+    alpha_1 : np.ndarray or list of numpy.ndarray
         First alpha time series. Shape must be (n_samples, n_modes).
-    alpha_2 : np.ndarray
+        alpha_1 will be concatenated if it's a list.
+    alpha_2 : np.ndarray or list of numpy.ndarray
         Second alpha time series. Shape must be (n_samples, n_modes).
-
+        alpha_2 will be concatenated if it's a list.
+    return_diagonal: bool, optional
+        (optional, default=True) Whether to return the diagonal elements of the correlation.
     Returns
     -------
     corr : np.ndarray
         Correlation of each mode in the corresponding alphas.
-        Shape is (n_modes,).
+        Shape is (n_modes,) if return_diagonal = True, (n_modes,n_modes) otherwise.
     """
+    if isinstance(alpha_1,list):
+        alpha_1 = np.concatenate(alpha_1,axis=0)
+    if isinstance(alpha_2,list):
+        alpha_2 = np.concatenate(alpha_2,axis=0)
     if alpha_1.shape[1] != alpha_2.shape[1]:
         raise ValueError(
             "alpha_1 and alpha_2 shapes are incomptible. "
@@ -31,7 +38,9 @@ def alpha_correlation(alpha_1, alpha_2):
         )
     n_modes = alpha_1.shape[1]
     corr = np.corrcoef(alpha_1, alpha_2, rowvar=False)
-    corr = np.diagonal(corr[:n_modes, n_modes:])
+    corr = corr[:n_modes, n_modes:]
+    if return_diagonal:
+        corr = np.diagonal(corr)
     return corr
 
 
