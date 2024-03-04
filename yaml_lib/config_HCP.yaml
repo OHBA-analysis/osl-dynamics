@@ -1,8 +1,8 @@
 header:
   # We assign a time stamp for each batch training
-  time: 2024-02-05T17:00:00.000Z
+  time: 2024-03-03T22:00:00.000Z
   # Add custom notes, which will also be saved
-  note: "Default configuration for simulation data"
+  note: "Training configuration for HCP data"
 # where to read the data
 load_data:
   inputs: './data/node_timeseries/3T_HCP1200_MSMAll_d25_ts2/'
@@ -12,14 +12,16 @@ load_data:
         - 0
         - 1200
     standardize: {}
+  kwargs:
+    load_memmaps: False
 # Where to save model training results
-save_dir: './results_HCP_yaml/'
+save_dir: './results_HCP_yaml_202403/'
 # where to load the spatial map and spatial surface map
 spatial_map: './data/spatial_maps/groupICA_3T_HCP1200_MSMAll_d25.ica'
 non_batch_variable:
   n_channels: 25
   sequence_length: 400
-  batch_size: 64
+  batch_size: 256
   learn_means: false
   learn_covariances: true
   learn_trans_prob: true
@@ -47,10 +49,5 @@ batch_variable:
     - split_3
     - split_4
     - split_5
-    - cv_1
-    - cv_2
-    - cv_3
-    - cv_4
-    - cv_5
 
 
