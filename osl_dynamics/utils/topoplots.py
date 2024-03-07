@@ -145,9 +145,9 @@ class Topology:
             A list of channel names which are present in the data.
             All others are removed.
         """
-        self.layout.loc[
-            ~self.layout["channel_name"].isin(channel_names), "present"
-        ] = False
+        self.layout.loc[~self.layout["channel_name"].isin(channel_names), "present"] = (
+            False
+        )
 
     def plot_data(
         self,

@@ -86,7 +86,7 @@ original_data = training_data.time_series(prepared=False)
 # Get the prepared data time series
 prepared_data = training_data.time_series()
 
-for i in range(training_data.n_arrays):
+for i in range(training_data.n_sessions):
     print(original_data[i].shape, prepared_data[i].shape)
 
 #%%

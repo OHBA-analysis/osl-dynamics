@@ -40,7 +40,7 @@ class VariationalInferenceModelConfig:
 
     def validate_alpha_parameters(self):
         if self.initial_alpha_temperature is None:
-            raise ValueError("initial_alpha_temperature must be passed.")
+            self.initial_alpha_temperature = 1.0
 
         if self.initial_alpha_temperature <= 0:
             raise ValueError("initial_alpha_temperature must be greater than zero.")
@@ -426,9 +426,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each
-            subject.
+            session.
         concatenate : bool, optional
-            Should we concatenate theta for each subject?
+            Should we concatenate theta for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`theta` and
@@ -439,7 +439,7 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         theta : list or np.ndarray
-            Mode mixing logits with shape (n_subjects, n_samples, n_modes)
+            Mode mixing logits with shape (n_sessions, n_samples, n_modes)
             or (n_samples, n_modes).
         fc_theta : list or np.ndarray
             Mode mixing logits for FC.
@@ -501,9 +501,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each
-            subject.
+            session.
         concatenate : bool, optional
-            Should we concatenate theta for each subject?
+            Should we concatenate theta for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`theta` and
@@ -514,10 +514,10 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         mean_theta : list or np.ndarray
-            Mode mixing logits for mean with shape (n_subjects, n_samples,
+            Mode mixing logits for mean with shape (n_sessions, n_samples,
             n_modes) or (n_samples, n_modes).
         fc_theta : list or np.ndarray
-            Mode mixing logits for FC with shape (n_subjects, n_samples,
+            Mode mixing logits for FC with shape (n_sessions, n_samples,
             n_modes) or (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -581,9 +581,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for each
-            subject.
+            session.
         concatenate : bool, optional
-            Should we concatenate alpha for each subject?
+            Should we concatenate alpha for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha` and
@@ -594,7 +594,7 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            Mode mixing coefficients with shape (n_subjects, n_samples,
+            Mode mixing coefficients with shape (n_sessions, n_samples,
             n_modes) or (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -655,9 +655,9 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction data. This can be a list of datasets, one for each
-            subject.
+            session.
         concatenate : bool, optional
-            Should we concatenate alpha/gamma for each subject?
+            Should we concatenate alpha/gamma for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha`/
@@ -668,10 +668,10 @@ class VariationalInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            Alpha time course with shape (n_subjects, n_samples, n_modes) or
+            Alpha time course with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
         gamma : list or np.ndarray
-            Gamma time course with shape (n_subjects, n_samples, n_modes) or
+            Gamma time course with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -930,7 +930,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             Dictionary with labels for each prediction.
         """
         predictions = self.model.predict(*args, **kwargs)
-        if self.config.model_name == "SE-HMM":
+        if self.config.model_name == "HIVE":
             names = ["ll_loss", "kl_loss", "gamma", "xi"]
         else:
             names = ["ll_loss", "gamma", "xi"]
@@ -945,9 +945,9 @@ class MarkovStateInferenceModelBase(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for
-            each subject.
+            each session.
         concatenate : bool, optional
-            Should we concatenate alpha for each subject?
+            Should we concatenate alpha for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha` and
@@ -958,7 +958,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            State probabilities with shape (n_subjects, n_samples, n_states)
+            State probabilities with shape (n_sessions, n_samples, n_states)
             or (n_samples, n_states).
         """
         if self.is_multi_gpu:
@@ -1383,18 +1383,25 @@ class MarkovStateInferenceModelBase(ModelBase):
         """
 
         # Helper functions
-        def _evidence_predict_step(log_smoothing_distribution):
+        def _evidence_predict_step(log_smoothing_distribution=None):
             # Predict step for calculating the evidence
             # p(s_t=j|x_{1:t-1}) = sum_i p(s_t=j|s_{t-1}=i) p(s_{t-1}=i|x_{1:t-1})
             # log_smoothing_distribution.shape = (batch_size, n_states)
-            log_trans_prob = np.expand_dims(np.log(self.get_trans_prob()), axis=0)
-            log_smoothing_distribution = np.expand_dims(
-                log_smoothing_distribution,
-                axis=-1,
-            )
-            log_prediction_distribution = logsumexp(
-                log_trans_prob + log_smoothing_distribution, axis=-2
-            )
+            if log_smoothing_distribution is None:
+                initial_distribution = self.get_initial_distribution()
+                log_prediction_distribution = np.broadcast_to(
+                    np.expand_dims(initial_distribution, axis=0),
+                    (batch_size, self.config.n_states),
+                )
+            else:
+                log_trans_prob = np.expand_dims(np.log(self.get_trans_prob()), axis=0)
+                log_smoothing_distribution = np.expand_dims(
+                    log_smoothing_distribution,
+                    axis=-1,
+                )
+                log_prediction_distribution = logsumexp(
+                    log_trans_prob + log_smoothing_distribution, axis=-2
+                )
             return log_prediction_distribution
 
         def _evidence_update_step(data, log_prediction_distribution):
@@ -1430,18 +1437,12 @@ class MarkovStateInferenceModelBase(ModelBase):
             pb_i = utils.Progbar(self.config.sequence_length)
             batch_size = tf.shape(x)[0]
             batch_evidence = np.zeros(batch_size, dtype=np.float32)
+            log_smoothing_distribution = None
             for t in range(self.config.sequence_length):
                 # Prediction step
-                if t == 0:
-                    initial_distribution = self.get_initial_distribution()
-                    log_prediction_distribution = np.broadcast_to(
-                        np.expand_dims(initial_distribution, axis=0),
-                        (batch_size, self.config.n_states),
-                    )
-                else:
-                    log_prediction_distribution = _evidence_predict_step(
-                        log_smoothing_distribution
-                    )
+                log_prediction_distribution = _evidence_predict_step(
+                    log_smoothing_distribution
+                )
 
                 # Update step
                 (

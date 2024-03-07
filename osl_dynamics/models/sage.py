@@ -364,7 +364,7 @@ class Model(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            Mode mixing factors with shape (n_subjects, n_samples, n_modes) or
+            Mode mixing factors with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
         """
         inputs = self.make_dataset(inputs, concatenate=concatenate)

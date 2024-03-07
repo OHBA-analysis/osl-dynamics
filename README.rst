@@ -14,6 +14,14 @@ If you find this toolbox useful, please cite:
 Installation
 ============
 
+Conda
+-----
+
+We recommend installing osl-dynamics within a virtual environment. You can do this with `Anaconda <https://docs.anaconda.com/free/anaconda/install/index.html>`_ (or `miniconda <https://docs.conda.io/projects/miniconda/en/latest/miniconda-install.html>`_).
+
+Linux
+-----
+
 Here, we describe how to install osl-dynamics from source. We recommend using the conda environment files in ``/envs``. For a generic linux machine, osl-dynamics can be installed in editable mode with:
 
 .. code-block:: shell
@@ -26,19 +34,18 @@ Here, we describe how to install osl-dynamics from source. We recommend using th
 
 Note, if you have a Mac you may want to use the ``envs/mac.yml`` environment file instead.
 
-Developers might want to clone the repo using SSH instead of HTTPS:
+Windows
+-------
 
-.. code-block:: shell
-
-    git clone git@github.com:OHBA-analysis/osl-dynamics.git
+If you are using a Windows computer, we recommend first installing linux (Ubuntu) as a Windows Subsystem by following the instructions `here <https://ubuntu.com/wsl>`_. Then following the instructions above in the Ubuntu terminal.
 
 Oxford specific computers
 -------------------------
 
 If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``. Note, the ``hbaws.yml`` environment will automatically install spyder and jupyter notebooks.
 
-Installing within an osl environment
-------------------------------------
+Within an osl environment
+-------------------------
 
 If you have already installed `OSL <https://github.com/OHBA-analysis/osl>`_ you can install osl-dynamics in the ``osl`` environment with:
 
@@ -49,6 +56,16 @@ If you have already installed `OSL <https://github.com/OHBA-analysis/osl>`_ you 
     pip install tensorflow==2.9.1
     pip install tensorflow-probability==0.17
     pip install -e .
+
+Developers
+----------
+
+Developers might want to clone the repo using SSH instead of HTTPS:
+
+.. code-block:: shell
+
+    git clone git@github.com:OHBA-analysis/osl-dynamics.git
+
 
 Documentation
 =============

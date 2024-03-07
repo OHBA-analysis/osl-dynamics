@@ -439,7 +439,7 @@ class Model(ModelBase):
         Parameters
         ----------
         B : np.ndarray
-            Probability of individual data points, under observation model for
+            Probability of array data points, under observation model for
             each state. Shape is (n_states, n_samples).
         Pi_0 : np.ndarray
             Initial state probabilities. Shape is (n_states,).
@@ -689,34 +689,6 @@ class Model(ModelBase):
 
         return first_term + remaining_terms
 
-    def _evidence_predict_step(self, log_smoothing_distribution):
-        """Predict step for calculating the evidence.
-
-        .. math::
-            p(s_t=j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i)\
-                                                     p(s_{t-1} = i | x_{1:t-1})
-
-        Parameters
-        ----------
-        log_smoothing_distribution : np.ndarray
-            :math:`\log p(s_{t-1} | x_{1:t-1})`.
-            Shape is (batch_size, n_states).
-
-        Returns
-        -------
-        log_prediction_distribution : np.ndarray
-            :math:`\log p(s_t | x_{1:t-1})`. Shape is (batch_size, n_states).
-        """
-        log_trans_prob = np.expand_dims(np.log(self.trans_prob), 0)
-        log_smoothing_distribution = np.expand_dims(
-            log_smoothing_distribution,
-            axis=-1,
-        )
-        log_prediction_distribution = logsumexp(
-            log_trans_prob + log_smoothing_distribution, -2
-        )
-        return log_prediction_distribution
-
     def get_log_likelihood(self, data):
         """Get the log-likelihood of data, :math:`\log p(x_t | s_t)`.
 
@@ -741,41 +713,6 @@ class Model(ModelBase):
             poi.log_prob(tf.expand_dims(data, axis=-2)), axis=-1
         )
         return log_likelihood.numpy()
-
-    def _evidence_update_step(self, data, log_prediction_distribution):
-        """Update step for calculating the evidence.
-
-        .. math::
-            p(s_t = j | x_{1:t}) &= \displaystyle\\frac{p(x_t | s_t = j) \
-                                    p(s_t = j | x_{1:t-1})}{p(x_t | x_{1:t-1})}
-
-            p(x_t | x_{1:t-1}) &= \displaystyle\sum_i p(x_t | s_t = j) \
-                                                      p(s_t = i | x_{1:t-1})
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Data for the update step. Shape is (batch_size, n_channels).
-        log_prediction_distribution : np.ndarray
-            :math:`\log p(s_t | x_{1:t-1})`. Shape is (batch_size, n_states).
-
-        Returns
-        -------
-        log_smoothing_distribution : np.ndarray
-            :math:`\log p(s_t | x_{1:t})`. Shape is (batch_size, n_states).
-        predictive_log_likelihood : np.ndarray
-            :math:`\log p(x_t | x_{1:t-1})`. Shape is (batch_size,).
-        """
-        log_likelihood = self.get_log_likelihood(data)
-        log_smoothing_distribution = log_likelihood + log_prediction_distribution
-        predictive_log_likelihood = logsumexp(log_smoothing_distribution, -1)
-
-        # Normalise the log smoothing distribution
-        log_smoothing_distribution -= np.expand_dims(
-            predictive_log_likelihood,
-            axis=-1,
-        )
-        return log_smoothing_distribution, predictive_log_likelihood
 
     def get_stationary_distribution(self):
         """Get the stationary distribution of the Markov chain.
@@ -1022,6 +959,78 @@ class Model(ModelBase):
         evidence : float
             Model evidence.
         """
+
+        # Helper functions
+        def _evidence_predict_step(log_smoothing_distribution=None):
+            """Predict step for calculating the evidence.
+
+            .. math::
+                p(s_t=j | x_{1:t-1}) = \displaystyle\sum_i p(s_t = j | s_{t-1} = i)\
+                                                        p(s_{t-1} = i | x_{1:t-1})
+
+            Parameters
+            ----------
+            log_smoothing_distribution : np.ndarray
+                :math:`\log p(s_{t-1} | x_{1:t-1})`.
+                Shape is (batch_size, n_states).
+
+            Returns
+            -------
+            log_prediction_distribution : np.ndarray
+                :math:`\log p(s_t | x_{1:t-1})`. Shape is (batch_size, n_states).
+            """
+            if log_smoothing_distribution is None:
+                initial_distribution = self.get_stationary_distribution()
+                log_prediction_distribution = np.broadcast_to(
+                    np.expand_dims(initial_distribution, axis=0),
+                    (batch_size, self.config.n_states),
+                )
+            else:
+                log_trans_prob = np.expand_dims(np.log(self.trans_prob), 0)
+                log_smoothing_distribution = np.expand_dims(
+                    log_smoothing_distribution,
+                    axis=-1,
+                )
+                log_prediction_distribution = logsumexp(
+                    log_trans_prob + log_smoothing_distribution, -2
+                )
+            return log_prediction_distribution
+
+        def _evidence_update_step(data, log_prediction_distribution):
+            """Update step for calculating the evidence.
+
+            .. math::
+                p(s_t = j | x_{1:t}) &= \displaystyle\\frac{p(x_t | s_t = j) \
+                                        p(s_t = j | x_{1:t-1})}{p(x_t | x_{1:t-1})}
+
+                p(x_t | x_{1:t-1}) &= \displaystyle\sum_i p(x_t | s_t = j) \
+                                                        p(s_t = i | x_{1:t-1})
+
+            Parameters
+            ----------
+            data : np.ndarray
+                Data for the update step. Shape is (batch_size, n_channels).
+            log_prediction_distribution : np.ndarray
+                :math:`\log p(s_t | x_{1:t-1})`. Shape is (batch_size, n_states).
+
+            Returns
+            -------
+            log_smoothing_distribution : np.ndarray
+                :math:`\log p(s_t | x_{1:t})`. Shape is (batch_size, n_states).
+            predictive_log_likelihood : np.ndarray
+                :math:`\log p(x_t | x_{1:t-1})`. Shape is (batch_size,).
+            """
+            log_likelihood = self.get_log_likelihood(data)
+            log_smoothing_distribution = log_likelihood + log_prediction_distribution
+            predictive_log_likelihood = logsumexp(log_smoothing_distribution, -1)
+
+            # Normalise the log smoothing distribution
+            log_smoothing_distribution -= np.expand_dims(
+                predictive_log_likelihood,
+                axis=-1,
+            )
+            return log_smoothing_distribution, predictive_log_likelihood
+
         _logger.info("Getting model evidence")
         dataset = self.make_dataset(dataset, concatenate=True)
         n_batches = dtf.get_n_batches(dataset)
@@ -1033,24 +1042,18 @@ class Model(ModelBase):
             pb_i = utils.Progbar(self.config.sequence_length)
             batch_size = tf.shape(x)[0]
             batch_evidence = np.zeros((batch_size))
+            log_smoothing_distribution = None
             for t in range(self.config.sequence_length):
                 # Prediction step
-                if t == 0:
-                    initial_distribution = self.get_stationary_distribution()
-                    log_prediction_distribution = np.broadcast_to(
-                        np.expand_dims(initial_distribution, axis=0),
-                        (batch_size, self.config.n_states),
-                    )
-                else:
-                    log_prediction_distribution = self._evidence_predict_step(
-                        log_smoothing_distribution
-                    )
+                log_prediction_distribution = _evidence_predict_step(
+                    log_smoothing_distribution
+                )
 
                 # Update step
                 (
                     log_smoothing_distribution,
                     predictive_log_likelihood,
-                ) = self._evidence_update_step(x[:, t, :], log_prediction_distribution)
+                ) = _evidence_update_step(x[:, t, :], log_prediction_distribution)
 
                 # Update the batch evidence
                 batch_evidence += predictive_log_likelihood
@@ -1066,9 +1069,9 @@ class Model(ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Prediction dataset. This can be a list of datasets, one for
-            each subject.
+            each session.
         concatenate : bool, optional
-            Should we concatenate alpha for each subject?
+            Should we concatenate alpha for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha` and
@@ -1079,7 +1082,7 @@ class Model(ModelBase):
         Returns
         -------
         alpha : list or np.ndarray
-            State probabilities with shape (n_subjects, n_samples, n_states)
+            State probabilities with shape (n_sessions, n_samples, n_states)
             or (n_samples, n_states).
         """
         if remove_edge_effects:
@@ -1186,13 +1189,13 @@ class Model(ModelBase):
         )
         return bic
 
-    def subject_fine_tuning(
+    def fine_tuning(
         self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
     ):
-        """Fine tuning the model for each subject.
+        """Fine tuning the model for each session.
 
         Here, we estimate the posterior distribution (state probabilities)
-        and observation model using the data from a single subject with the
+        and observation model using the data from a single session with the
         group-level transition probability matrix held fixed.
 
         Parameters
@@ -1211,11 +1214,11 @@ class Model(ModelBase):
         Returns
         -------
         alpha : list of np.ndarray
-            Subject specific mixing coefficients.
-            Each element has shape (n_samples, n_modes).
+            Session-specific mixing coefficients.
+            Each element has shape (n_samples, n_states).
         log_rates : np.ndarray
-            Subject-specific :code:`log_rates`.
-            Shape is (n_subjects, n_modes, n_channels).
+            Session-specific :code:`log_rates`.
+            Shape is (n_sessions, n_states, n_channels).
         """
         # Save group-level model parameters
         os.makedirs(store_dir, exist_ok=True)
@@ -1232,13 +1235,13 @@ class Model(ModelBase):
         # Reset the optimiser
         self.compile()
 
-        # Fine tune the model for each subject
+        # Fine tune the model for each session
         alpha = []
         log_rates = []
         with set_logging_level(_logger, logging.WARNING):
-            for subject in trange(training_data.n_arrays, desc="Subject fine tuning"):
-                # Train on this subject
-                with training_data.set_keep(subject):
+            for i in trange(training_data.n_sessions, desc="Fine tuning"):
+                # Train on this session
+                with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
                     a = self.get_alpha(training_data, concatenate=True)
 
@@ -1259,9 +1262,9 @@ class Model(ModelBase):
         return alpha, np.array(log_rates)
 
     def dual_estimation(self, training_data, alpha=None, n_jobs=1):
-        """Dual estimation to get subject-specific observation model parameters.
+        """Dual estimation to get session-specific observation model parameters.
 
-        Here, we estimate the state :code:`log_rates` for individual subjects
+        Here, we estimate the state :code:`log_rates` for sessions
         with the posterior distribution of the states held fixed.
 
         Parameters
@@ -1270,15 +1273,15 @@ class Model(ModelBase):
             Prepared training data object.
         alpha : list of np.ndarray, optional
             Posterior distribution of the states. Shape is
-            (n_subjects, n_samples, n_states).
+            (n_sessions, n_samples, n_states).
         n_jobs : int, optional
             Number of jobs to run in parallel.
 
         Returns
         -------
         log_rates : np.ndarray
-            Subject-specific :code:`log_rates`.
-            Shape is (n_subjects, n_states, n_channels).
+            Session-specific :code:`log_rates`.
+            Shape is (n_sessions, n_states, n_channels).
         """
         if alpha is None:
             # Get the posterior
@@ -1288,11 +1291,13 @@ class Model(ModelBase):
         if isinstance(alpha, np.ndarray):
             alpha = [alpha]
 
-        # Get the subject-specific data
+        # Get the session-specific data
         data = training_data.time_series(prepared=True, concatenate=False)
 
         if len(alpha) != len(data):
-            raise ValueError("len(alpha) and training_data.n_arrays must be the same.")
+            raise ValueError(
+                "len(alpha) and training_data.n_sessions must be the same."
+            )
 
         # Make sure the data and alpha have the same number of samples
         data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
@@ -1300,19 +1305,19 @@ class Model(ModelBase):
         n_states = self.config.n_states
         n_channels = self.config.n_channels
 
-        # Helper function for dual estimation for a single subject
+        # Helper function for dual estimation for a single session
         def _single_dual_estimation(a, x):
             sum_a = np.sum(a, axis=0)
             if self.config.learn_log_rates:
-                subject_log_rates = np.empty((n_states, n_channels))
+                session_log_rates = np.empty((n_states, n_channels))
                 for state in range(n_states):
-                    subject_log_rates[state] = (
+                    session_log_rates[state] = (
                         np.sum(x * a[:, state, None], axis=0) / sum_a[state]
                     )
             else:
-                subject_log_rates = self.get_log_rates()
+                session_log_rates = self.get_log_rates()
 
-            return subject_log_rates
+            return session_log_rates
 
         # Setup keyword arguments to pass to the helper function
         kwargs = []

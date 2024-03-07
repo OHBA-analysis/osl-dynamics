@@ -335,7 +335,7 @@ def train_dynemo(
         save(f"{inf_params_dir}/covs.npy", covs)
 
 
-def train_sehmm(
+def train_hive(
     data,
     output_dir,
     config_kwargs,
@@ -343,17 +343,17 @@ def train_sehmm(
     fit_kwargs=None,
     save_inf_params=True,
 ):
-    """ Train a `Subject embedding Hidden Markov Model <https://osl-dynamics.\
-    readthedocs.io/en/latest/autoapi/osl_dynamics/models/sehmm/index.html>`_.
+    """ Train a `HIVE Model <https://osl-dynamics.\
+    readthedocs.io/en/latest/autoapi/osl_dynamics/models/hive/index.html>`_.
     
     This function will:
 
-    1. Build an :code:`sehmm.Model` object.
-    2. Initialize the parameters of the SE-HMM model using
+    1. Build an :code:`hive.Model` object.
+    2. Initialize the parameters of the HIVE model using
         :code:`Model.random_state_time_course_initialization`.
     3. Perform full training.
     4. Save the inferred parameters (state probabilities, means,
-        covariances and subject embeddings) if :code:`save_inf_params=True`.
+        covariances and embeddings) if :code:`save_inf_params=True`.
     
     This function will create two directories:
 
@@ -368,13 +368,13 @@ def train_sehmm(
     output_dir : str
         Path to output directory.
     config_kwargs : dict
-        Keyword arguments to pass to `sehmm.Config <https://osl-dynamics\
-        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/sehmm/index.html\
-        #osl_dynamics.models.sehmm.Config>`_. Defaults to::
+        Keyword arguments to pass to `hive.Config <https://osl-dynamics\
+        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hive/index.html\
+        #osl_dynamics.models.hive.Config>`_. Defaults to::
 
             {
                 'sequence_length': 200,
-                'mode_embeddings_dim': 2,
+                'spatial_embeddings_dim': 2,
                 'dev_n_layers': 5,
                 'dev_n_units': 32,
                 'dev_activation': 'tanh',
@@ -403,7 +403,7 @@ def train_sehmm(
     if data is None:
         raise ValueError("data must be passed.")
 
-    from osl_dynamics.models import sehmm
+    from osl_dynamics.models import hive
 
     init_kwargs = {} if init_kwargs is None else init_kwargs
     fit_kwargs = {} if fit_kwargs is None else fit_kwargs
@@ -416,9 +416,9 @@ def train_sehmm(
     # SE-HMM config
     default_config_kwargs = {
         "n_channels": data.n_channels,
-        "n_subjects": data.n_arrays,
+        "n_sessions": data.n_sessions,
         "sequence_length": 200,
-        "mode_embeddings_dim": 2,
+        "spatial_embeddings_dim": 2,
         "dev_n_layers": 5,
         "dev_n_units": 32,
         "dev_activation": "tanh",
@@ -440,10 +440,10 @@ def train_sehmm(
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
 
-    # Initialise and train SE-HMM
+    # Initialise and train HIVE
     _logger.info(f"Using config_kwargs: {config_kwargs}")
-    config = sehmm.Config(**config_kwargs)
-    model = sehmm.Model(config)
+    config = hive.Config(**config_kwargs)
+    model = hive.Model(config)
     model.summary()
 
     # Set regularisers
@@ -452,7 +452,7 @@ def train_sehmm(
     # Set deviation initializer
     model.set_dev_parameters_initializer(data)
 
-    # Initialise SE-HMM with subject embeddings fixed
+    # Initialise HIVE
     _logger.info(f"Using init_kwargs: {init_kwargs}")
     init_history = model.random_state_time_course_initialization(
         data,
@@ -466,7 +466,7 @@ def train_sehmm(
     model.save(model_dir)
 
     del model
-    model = sehmm.Model.load(model_dir)
+    model = hive.Model.load(model_dir)
 
     # Get the variational free energy
     history["free_energy"] = model.free_energy(data)
@@ -482,14 +482,17 @@ def train_sehmm(
 
         # Get the inferred parameters
         alpha = model.get_alpha(data)
-        means, covs = model.get_subject_means_covariances()
-        subject_embeddings = model.get_subject_embeddings()
+        means, covs = model.get_means_covariances()
+        session_means, session_covs = model.get_session_means_covariances()
+        embeddings = model.get_embeddings()
 
         # Save inferred parameters
         save(f"{inf_params_dir}/alp.pkl", alpha)
         save(f"{inf_params_dir}/means.npy", means)
         save(f"{inf_params_dir}/covs.npy", covs)
-        save(f"{inf_params_dir}/subject_embeddings.npy", subject_embeddings)
+        save(f"{inf_params_dir}/session_means.npy", session_means)
+        save(f"{inf_params_dir}/session_covs.npy", session_covs)
+        save(f"{inf_params_dir}/embeddings.npy", embeddings)
 
 
 def get_inf_params(data, output_dir, observation_model_only=False):
@@ -702,7 +705,7 @@ def plot_state_psds(data, output_dir):
 
     f = load(f"{spectra_dir}/f.npy")
     psd = load(f"{spectra_dir}/psd.npy")
-    psd = np.mean(psd, axis=(0, 2))  # average over subjects and channels
+    psd = np.mean(psd, axis=(0, 2))  # average over arrays and channels
     n_states = psd.shape[0]
 
     from osl_dynamics.utils import plotting
@@ -719,7 +722,7 @@ def plot_state_psds(data, output_dir):
 
 
 def dual_estimation(data, output_dir, n_jobs=1):
-    """Dual estimation for subject-specific observation model parameters.
+    """Dual estimation for session-specific observation model parameters.
 
     This function expects a model has already been trained and the following
     directories to exist:
@@ -729,7 +732,7 @@ def dual_estimation(data, output_dir, n_jobs=1):
 
     This function will create the following directory:
 
-    - :code:`<output_dir>/dual_estimates`, which contains the subject-specific
+    - :code:`<output_dir>/dual_estimates`, which contains the session-specific
       means and covariances.
 
     Parameters
@@ -795,7 +798,7 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
              'keepdims': True}
     nnmf_components : int, optional
         Number of non-negative matrix factorization (NNMF) components to fit to
-        the stacked subject-specific coherence spectra.
+        the stacked session-specific coherence spectra.
     """
     if data is None:
         raise ValueError("data must be passed.")
@@ -1662,7 +1665,7 @@ def plot_group_tde_dynemo_networks(
 def plot_alpha(
     data,
     output_dir,
-    subject=0,
+    session=0,
     normalize=False,
     sampling_frequency=None,
     kwargs=None,
@@ -1688,9 +1691,9 @@ def plot_alpha(
         Data object.
     output_dir : str
         Path to output directory.
-    subject : int, optional
-        Index for subject to plot. If 'all' is passed we create a separate plot
-        for each subject.
+    session : int, optional
+        Index for session to plot. If 'all' is passed we create a separate plot
+        for each session.
     normalize : bool, optional
         Should we also plot the alphas normalized using the trace of the
         inferred covariance matrices? Useful if we are plotting the inferred
@@ -1705,7 +1708,7 @@ def plot_alpha(
         Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
-             'filename': '<output_dir>/alphas/alpha_<subject>.png'}
+             'filename': '<output_dir>/alphas/alpha_*.png'}
     """
     if sampling_frequency is None and data is not None:
         sampling_frequency = data.sampling_frequency
@@ -1730,13 +1733,13 @@ def plot_alpha(
     kwargs = override_dict_defaults(default_kwargs, kwargs)
     _logger.info(f"Using kwargs: {kwargs}")
 
-    if subject == "all":
+    if session == "all":
         for i in range(len(alp)):
             kwargs["filename"] = f"{alphas_dir}/alpha_{i}.png"
             plotting.plot_alpha(alp[i], **kwargs)
     else:
-        kwargs["filename"] = f"{alphas_dir}/alpha_{subject}.png"
-        plotting.plot_alpha(alp[subject], **kwargs)
+        kwargs["filename"] = f"{alphas_dir}/alpha_{session}.png"
+        plotting.plot_alpha(alp[session], **kwargs)
 
     if normalize:
         from osl_dynamics.inference import modes
@@ -1746,13 +1749,13 @@ def plot_alpha(
         norm_alp = modes.reweight_alphas(alp, covs)
 
         # Plot
-        if subject == "all":
+        if session == "all":
             for i in range(len(alp)):
                 kwargs["filename"] = f"{alphas_dir}/norm_alpha_{i}.png"
                 plotting.plot_alpha(norm_alp[i], **kwargs)
         else:
-            kwargs["filename"] = f"{alphas_dir}/norm_alpha_{subject}.png"
-            plotting.plot_alpha(norm_alp[subject], **kwargs)
+            kwargs["filename"] = f"{alphas_dir}/norm_alpha_{session}.png"
+            plotting.plot_alpha(norm_alp[session], **kwargs)
 
 
 def calc_gmm_alpha(data, output_dir, kwargs=None):
@@ -1806,7 +1809,7 @@ def plot_hmm_network_summary_stats(
 ):
     """Plot HMM summary statistics for networks as violin plots.
 
-    This function will plot the distribution over subjects for the following
+    This function will plot the distribution over sessions for the following
     summary statistics:
 
     - Fractional occupancy.
@@ -1871,7 +1874,7 @@ def plot_hmm_network_summary_stats(
         alp = load(f"{inf_params_dir}/alp.pkl")
         if isinstance(alp, np.ndarray):
             raise ValueError(
-                "We must train on multiple subjects to plot the distribution "
+                "We must train on multiple sessions to plot the distribution "
                 "of summary statistics."
             )
         stc = modes.argmax_time_courses(alp)
@@ -1930,7 +1933,7 @@ def plot_hmm_network_summary_stats(
 def plot_dynemo_network_summary_stats(data, output_dir):
     """Plot DyNeMo summary statistics for networks as violin plots.
 
-    This function will plot the distribution over subjects for the following
+    This function will plot the distribution over sessions for the following
     summary statistics:
 
     - Mean (renormalised) mixing coefficients.
@@ -1967,7 +1970,7 @@ def plot_dynemo_network_summary_stats(data, output_dir):
     alp = load(f"{inf_params_dir}/alp.pkl")
     if isinstance(alp, np.ndarray):
         raise ValueError(
-            "We must train on multiple subjects to plot the distribution "
+            "We must train on multiple sessions to plot the distribution "
             "of summary statistics."
         )
 
@@ -2048,14 +2051,14 @@ def compare_groups_hmm_summary_stats(
     output_dir : str
         Path to output directory.
     group2_indices : np.ndarray or list
-        Indices indicating which subjects belong to the second group.
+        Indices indicating which sessions belong to the second group.
     separate_tests : bool, optional
         Should we perform a maximum statistic permutation test for each summary
         statistic separately?
     covariates : str, optional
         Path to a pickle file containing a :code:`dict` with covariances. Each
         item in the :code:`dict` must be the covariate name and value for each
-        subject. The covariates will be loaded with::
+        session. The covariates will be loaded with::
 
             from osl_dynamics.utils.misc import load
             covariates = load("/path/to/file.pkl")
@@ -2103,8 +2106,8 @@ def compare_groups_hmm_summary_stats(
         save(f"{group_diff_dir}/{names[i]}.npy", sum_stats[:, i])
 
     # Create a vector for group assignments
-    n_subjects = fo.shape[0]
-    assignments = np.ones(n_subjects)
+    n_sessions = fo.shape[0]
+    assignments = np.ones(n_sessions)
     assignments[group2_indices] += 1
 
     # Load covariates
@@ -2170,7 +2173,7 @@ def compare_groups_hmm_summary_stats(
 def plot_burst_summary_stats(data, output_dir, sampling_frequency=None):
     """Plot burst summary statistics as violin plots.
 
-    This function will plot the distribution over subjects for the following
+    This function will plot the distribution over sessions for the following
     summary statistics:
 
     - Mean lifetime (s).

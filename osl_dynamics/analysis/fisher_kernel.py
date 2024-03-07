@@ -52,11 +52,11 @@ class FisherKernel:
         Returns
         -------
         features : np.ndarray
-            Fisher kernel matrix. Shape is (n_arrays, n_features).
+            Fisher kernel matrix. Shape is (n_sessions, n_features).
         """
         _logger.info("Getting Fisher features")
 
-        n_arrays = dataset.n_arrays
+        n_sessions = dataset.n_sessions
         if batch_size is not None:
             self.model.config.batch_size = batch_size
 
@@ -66,10 +66,10 @@ class FisherKernel:
             shuffle=False,
         )
 
-        # Initialise list to hold subject features
+        # Initialise list to hold features for each session
         features = []
-        for i in trange(n_arrays, desc="Getting subject features"):
-            subject_data = dataset[i]
+        for i in trange(n_sessions, desc="Getting features"):
+            session_data = dataset[i]
 
             # Initialise dictionary for holding gradients
             d_model = dict()
@@ -94,8 +94,8 @@ class FisherKernel:
                 ):
                     d_model[name] = []
 
-            # Loop over data for each subject
-            for inputs in subject_data:
+            # Loop over data for each session
+            for inputs in session_data:
                 if self.model.config.model_name == "HMM":
                     x = inputs["data"]
                     gamma, xi = self.model.get_posterior(x)
@@ -113,13 +113,13 @@ class FisherKernel:
                         continue
                     d_model[name].append(gradients[name])
 
-            # Concatenate the flattened gradients to get the subject_features
-            subject_features = np.concatenate(
+            # Concatenate the flattened gradients
+            session_features = np.concatenate(
                 [np.sum(grad, axis=0).flatten() for grad in d_model.values()]
             )
-            features.append(subject_features)
+            features.append(session_features)
 
-        features = np.array(features)  # shape=(n_arrays, n_features)
+        features = np.array(features)  # shape=(n_sessions, n_features)
 
         # Normalise the features to l2-norm of 1
         features_l2_norm = np.sqrt(np.sum(np.square(features), axis=-1, keepdims=True))
@@ -139,7 +139,7 @@ class FisherKernel:
         Returns
         -------
         kernel_matrix : np.ndarray
-            Fisher kernel matrix. Shape is (n_arrays, n_arrays).
+            Fisher kernel matrix. Shape is (n_sessions, n_sessions).
         """
         _logger.info("Getting Fisher kernel matrix")
 
@@ -162,6 +162,7 @@ class FisherKernel:
         xi : np.ndarray
             Joint posterior distribution of hidden states given the data.
             Shape is (batch_size*sequence_length-1, n_states*n_states).
+
         Returns
         -------
         d_initial_distribution : np.ndarray

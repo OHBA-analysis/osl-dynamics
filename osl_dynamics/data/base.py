@@ -68,18 +68,17 @@ class Data:
         Path to mask file used to source reconstruct the data.
     parcellation_file : str, optional
         Path to parcellation file used to source reconstruct the data.
-    store_dir : str, optional
-        We don't read all the data into memory. Instead we create store them on
-        disk and create memmaps (unless :code:`load_memmaps=False` is passed).
-        This is the directory to save memmaps to. Default is :code:`./tmp`.
     time_axis_first : bool, optional
         Is the input data of shape (n_samples, n_channels)? Default is
         :code:`True`. If your data is in format (n_channels, n_samples), use
         :code:`time_axis_first=False`.
     load_memmaps : bool, optional
-        Should we load the data as memory maps (memmaps)? If :code:`False`, we
-        will load data into memory rather than storing it on disk. By default
-        we will keep the data on disk and use memmaps.
+        Should we load the data as memory maps (memmaps)? If :code:`True`, we
+        will load store the data on disk rather than loading it into memory.
+    store_dir : str, optional
+        If `load_memmaps=True`, then we save data to disk and load it as
+        a memory map. This is the directory to save the memory maps to.
+        Default is :code:`./tmp`.
     buffer_size : int, optional
         Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
         to less random shuffling but will be quicker. Default is 100000.
@@ -100,9 +99,9 @@ class Data:
         sampling_frequency=None,
         mask_file=None,
         parcellation_file=None,
-        store_dir="tmp",
         time_axis_first=True,
-        load_memmaps=True,
+        load_memmaps=False,
+        store_dir="tmp",
         buffer_size=100000,
         use_tfrecord=False,
         n_jobs=1,
@@ -111,6 +110,7 @@ class Data:
         self.data_field = data_field
         self.picks = picks
         self.reject_by_annotation = reject_by_annotation
+        self.original_sampling_frequency = sampling_frequency
         self.sampling_frequency = sampling_frequency
         self.mask_file = mask_file
         self.parcellation_file = parcellation_file
@@ -146,15 +146,15 @@ class Data:
 
         # Create filenames for prepared data memmaps
         prepared_data_pattern = "prepared_data_{{i:0{width}d}}_{identifier}.npy".format(
-            width=len(str(self.n_arrays)), identifier=self._identifier
+            width=len(str(self.n_sessions)), identifier=self._identifier
         )
         self.prepared_data_filenames = [
             str(self.store_dir / prepared_data_pattern.format(i=i))
-            for i in range(self.n_arrays)
+            for i in range(self.n_sessions)
         ]
 
         # Arrays to keep when making TensorFlow Datasets
-        self.keep = list(range(self.n_arrays))
+        self.keep = list(range(self.n_sessions))
 
     def __iter__(self):
         return iter(self.arrays)
@@ -166,7 +166,7 @@ class Data:
         info = [
             f"{self.__class__.__name__}",
             f"id: {self._identifier}",
-            f"n_arrays: {self.n_arrays}",
+            f"n_sessions: {self.n_sessions}",
             f"n_samples: {self.n_samples}",
             f"n_channels: {self.n_channels}",
         ]
@@ -188,7 +188,7 @@ class Data:
         return sum([array.shape[-2] for array in self.arrays])
 
     @property
-    def n_arrays(self):
+    def n_sessions(self):
         """Number of arrays."""
         return len(self.arrays)
 
@@ -224,6 +224,7 @@ class Data:
         sampling_frequency : float
             Sampling frequency in Hz.
         """
+        self.original_sampling_frequency = sampling_frequency
         self.sampling_frequency = sampling_frequency
 
     def set_buffer_size(self, buffer_size):
@@ -260,7 +261,7 @@ class Data:
             arrays = self.raw_data_arrays
 
         # Should we return one long time series?
-        if concatenate or self.n_arrays == 1:
+        if concatenate or self.n_sessions == 1:
             return np.concatenate(arrays)
         else:
             return arrays
@@ -431,7 +432,7 @@ class Data:
             desc="Filtering",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -467,7 +468,7 @@ class Data:
                 "object."
             )
 
-        if use_raw and hasattr(self, "original_sampling_frequency"):
+        if use_raw:
             sampling_frequency = self.original_sampling_frequency
         else:
             sampling_frequency = self.sampling_frequency
@@ -488,7 +489,7 @@ class Data:
             desc="Downsampling",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -498,7 +499,6 @@ class Data:
             raise e
 
         # Update sampling_frequency attributes
-        self.original_sampling_frequency = self.sampling_frequency
         self.sampling_frequency = freq
 
         return self
@@ -560,8 +560,8 @@ class Data:
             # Use SVD on the covariance to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
-            explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
-            _logger.info(f"Explained variance: {100 * explained_variance:.1f}%")
+            self.explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+            _logger.info(f"Explained variance: {100 * self.explained_variance:.1f}%")
             s = s[:n_pca_components].astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
@@ -583,7 +583,7 @@ class Data:
             desc="PCA",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -630,7 +630,7 @@ class Data:
             desc="TDE",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -705,8 +705,8 @@ class Data:
             # Use SVD on the covariance to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
-            explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
-            _logger.info(f"Explained variance: {100 * explained_variance:.1f}%")
+            self.explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+            _logger.info(f"Explained variance: {100 * self.explained_variance:.1f}%")
             s = s[:n_pca_components].astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
@@ -729,7 +729,7 @@ class Data:
             desc="TDE-PCA",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -769,7 +769,7 @@ class Data:
             desc="Amplitude envelope",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -815,7 +815,7 @@ class Data:
             desc="Sliding window",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -851,7 +851,7 @@ class Data:
             desc="Standardize",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
@@ -1016,7 +1016,7 @@ class Data:
         Returns
         -------
         n : np.ndarray
-            Number of sequences for each array's data.
+            Number of sequences for each session's data.
         """
         return np.array(
             [
@@ -1071,7 +1071,7 @@ class Data:
         n_sequences = self.count_sequences(self.sequence_length)
 
         datasets = []
-        for i in range(self.n_arrays):
+        for i in range(self.n_sessions):
             if i not in self.keep:
                 # We don't want to include this file in the dataset
                 continue
@@ -1083,7 +1083,7 @@ class Data:
             # Dataset with the time series data and ID
             array_tracker = np.zeros(array.shape[0], dtype=np.float32)
             array_tracker = array_tracker + i
-            data = {"data": array, "array_id": array_tracker}
+            data = {"data": array, "session_id": array_tracker}
 
             # Create dataset
             dataset = dtf.create_dataset(
@@ -1169,7 +1169,7 @@ class Data:
                         (1.0 - validation_split) * dataset_size
                     )
 
-                    # Split this array's dataset
+                    # Split this session's dataset
                     training_datasets.append(
                         full_datasets[i].take(training_dataset_size)
                     )
@@ -1177,7 +1177,7 @@ class Data:
                         full_datasets[i].skip(training_dataset_size)
                     )
                     _logger.info(
-                        f"Array {i}: "
+                        f"Session {i}: "
                         + f"{len(training_datasets[i])} batches in training dataset, "
                         + f"{len(validation_datasets[i])} batches in the validation "
                         + "dataset."
@@ -1223,7 +1223,7 @@ class Data:
 
         tfrecord_paths = (
             f"{self.store_dir}"
-            "/dataset_{array:0{v}d}-of-{n_array:0{v}d}"
+            "/dataset_{array:0{v}d}-of-{n_session:0{v}d}"
             f".{self._identifier}.tfrecord"
         )
 
@@ -1239,8 +1239,8 @@ class Data:
         for i in self.keep:
             filepath = tfrecord_paths.format(
                 array=i,
-                n_array=self.n_arrays - 1,
-                v=len(str(self.n_arrays - 1)),
+                n_session=self.n_sessions - 1,
+                v=len(str(self.n_sessions - 1)),
             )
             tfrecord_filenames.append(filepath)
             if not path.exists(filepath):
@@ -1255,7 +1255,7 @@ class Data:
             # Create a dataset with the time series data and ID
             array_tracker = np.zeros(array.shape[0], dtype=np.float32)
             array_tracker = array_tracker + i
-            data = {"data": array, "array_id": array_tracker}
+            data = {"data": array, "session_id": array_tracker}
 
             # Save the dataset
             dtf.save_tfrecord(
@@ -1278,10 +1278,10 @@ class Data:
 
         # Helper function for parsing training examples
         def _parse_example(example):
-            feature_names = ["data", "array_id"]
+            feature_names = ["data", "session_id"]
             tensor_shapes = {
                 "data": [self.sequence_length, self.n_channels],
-                "array_id": [self.sequence_length],
+                "session_id": [self.sequence_length],
             }
             feature_description = {
                 name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
@@ -1400,7 +1400,7 @@ class Data:
                     training_datasets.append(ds.take(training_dataset_size))
                     validation_datasets.append(ds.skip(training_dataset_size))
                     _logger.info(
-                        f"Array {i}: "
+                        f"Session {i}: "
                         + f"{training_dataset_size} batches in training dataset, "
                         + f"{dataset_size - training_dataset_size} batches in the validation "
                         + "dataset."
@@ -1423,6 +1423,7 @@ class Data:
             "data_field",
             "picks",
             "reject_by_annotation",
+            "original_sampling_frequency",
             "sampling_frequency",
             "mask_file",
             "parcellation_file",
@@ -1478,7 +1479,7 @@ class Data:
 
         # Function to save a single array
         def _save(i, arr):
-            padded_number = misc.leading_zeros(i, self.n_arrays)
+            padded_number = misc.leading_zeros(i, self.n_sessions)
             np.save(f"{output_dir}/array{padded_number}.npy", arr)
 
         # Save arrays in parallel
@@ -1488,7 +1489,7 @@ class Data:
             desc="Saving data",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_arrays,
+            total=self.n_sessions,
         )
 
         # Save preparation settings

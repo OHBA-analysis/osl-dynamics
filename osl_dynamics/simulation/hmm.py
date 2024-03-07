@@ -7,7 +7,7 @@ import numpy as np
 
 from osl_dynamics import array_ops
 from osl_dynamics.simulation.mar import MAR
-from osl_dynamics.simulation.mvn import MVN, MDyn_MVN, MSubj_MVN
+from osl_dynamics.simulation.mvn import MVN, MDyn_MVN, MSess_MVN
 from osl_dynamics.simulation.hsmm import HSMM
 from osl_dynamics.simulation.base import Simulation
 from osl_dynamics.simulation.poi import Poisson
@@ -534,25 +534,25 @@ class HMM_Poi(Simulation):
             raise AttributeError(f"No attribute called {attr}.")
 
 
-class MSubj_HMM_MVN(Simulation):
+class MSess_HMM_MVN(Simulation):
     """Simulate an HMM with multivariate normal observation model for each
-    subject.
+    session.
 
     Parameters
     ----------
     n_samples : int
-        Number of samples per subject to draw from the model.
+        Number of samples per session to draw from the model.
     trans_prob : np.ndarray or str
         Transition probability matrix as a numpy array or a :code:`str`
         (:code:`'sequence'` or :code:`'uniform'`) to generate a transition
         probability matrix.
-    subject_means : np.ndarray or str
-        Subject mean vector for each state, shape should be
-        (n_subjects, n_states, n_channels).
+    session_means : np.ndarray or str
+        Session mean vector for each state, shape should be
+        (n_sessions, n_states, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
-    subject_covariances : np.ndarray or str
-        Subject covariance matrix for each state, shape should be
-        (n_subjects, n_states, n_channels, n_channels).
+    session_covariances : np.ndarray or str
+        Session covariance matrix for each state, shape should be
+        (n_sessions, n_states, n_channels, n_channels).
         Either a numpy array or :code:`'random'`.
     n_states : int, optional
         Number of states. Can pass this argument with keyword :code:`n_modes`
@@ -563,18 +563,24 @@ class MSubj_HMM_MVN(Simulation):
         Number of channels.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
-    n_subjects : int, optional
-        Number of subjects.
+    n_sessions : int, optional
+        Number of sessions.
+    embeddings_dim : int
+        Dimension of the embedding vectors.
+    spatial_embeddings_dim : int
+        Dimension of the spatial embedding vectors.
+    embeddings_scale : float
+        Scale of the embedding vectors.
     n_groups : int, optional
-        Number of groups of subjects when subject means or covariances are
+        Number of groups when session means or covariances are
         :code:`'random'`.
     between_group_scale : float, optional
-        Scale of variability between subject observation parameters.
+        Scale of variability between session observation parameters.
     stay_prob : float, optional
         Used to generate the transition probability matrix is :code:`trans_prob`
         is a :code:`str`. Must be between 0 and 1.
-    subject_tc_std : float, optional
-        Standard deviation when generating subject specific stay probability.
+    tc_std : float, optional
+        Standard deviation when generating session-specific stay probability.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
     random_seed : int, optional
@@ -585,19 +591,19 @@ class MSubj_HMM_MVN(Simulation):
         self,
         n_samples,
         trans_prob,
-        subject_means,
-        subject_covariances,
+        session_means,
+        session_covariances,
         n_states=None,
         n_modes=None,
         n_channels=None,
         n_covariances_act=1,
-        n_subjects=None,
-        n_subject_embedding_dim=None,
-        n_mode_embedding_dim=None,
-        subject_embedding_scale=None,
+        n_sessions=None,
+        embeddings_dim=None,
+        spatial_embeddings_dim=None,
+        embeddings_scale=None,
         n_groups=None,
         between_group_scale=None,
-        subject_tc_std=0.0,
+        tc_std=0.0,
         stay_prob=None,
         observation_error=0.0,
         random_seed=None,
@@ -605,21 +611,21 @@ class MSubj_HMM_MVN(Simulation):
         if n_states is None:
             n_states = n_modes
 
-        # Construct trans_prob for each subject
+        # Construct trans_prob for each session
         if isinstance(trans_prob, str) or trans_prob is None:
-            trans_prob = [trans_prob] * n_subjects
+            trans_prob = [trans_prob] * n_sessions
 
         # Observation model
-        self.obs_mod = MSubj_MVN(
-            subject_means=subject_means,
-            subject_covariances=subject_covariances,
+        self.obs_mod = MSess_MVN(
+            session_means=session_means,
+            session_covariances=session_covariances,
             n_modes=n_states,
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
-            n_subjects=n_subjects,
-            n_subject_embedding_dim=n_subject_embedding_dim,
-            n_mode_embedding_dim=n_mode_embedding_dim,
-            subject_embedding_scale=subject_embedding_scale,
+            n_sessions=n_sessions,
+            embeddings_dim=embeddings_dim,
+            spatial_embeddings_dim=spatial_embeddings_dim,
+            embeddings_scale=embeddings_scale,
             n_groups=n_groups,
             between_group_scale=between_group_scale,
             observation_error=observation_error,
@@ -628,44 +634,42 @@ class MSubj_HMM_MVN(Simulation):
 
         self.n_states = self.obs_mod.n_modes
         self.n_channels = self.obs_mod.n_channels
-        self.n_subjects = self.obs_mod.n_subjects
+        self.n_sessions = self.obs_mod.n_sessions
 
-        # vary the stay probability for each subject
+        # Vary the stay probability for each session
         if stay_prob is not None:
-            subject_stay_prob = self.obs_mod._rng.normal(
+            session_stay_prob = self.obs_mod._rng.normal(
                 loc=stay_prob,
-                scale=subject_tc_std,
-                size=self.n_subjects,
+                scale=tc_std,
+                size=self.n_sessions,
             )
             # truncate stay_prob at 0 and 1
-            subject_stay_prob = np.minimum(subject_stay_prob, 1)
-            subject_stay_prob = np.maximum(subject_stay_prob, 0)
+            session_stay_prob = np.minimum(session_stay_prob, 1)
+            session_stay_prob = np.maximum(session_stay_prob, 0)
         else:
-            subject_stay_prob = [stay_prob] * n_subjects
+            session_stay_prob = [stay_prob] * n_sessions
 
         # Initialise base class
         super().__init__(n_samples=n_samples)
 
-        # Simulate state time courses all subjects
+        # Simulate state time courses for all sessions
         self.state_time_course = []
         self.hmm = []
-        for subject in range(self.n_subjects):
-            # Build HMM object with the subject's stay probalibity with
+        for i in range(self.n_sessions):
+            # Build HMM object with the session's stay probalibity with
             # different seeds
             hmm = HMM(
-                trans_prob=trans_prob[subject],
-                stay_prob=subject_stay_prob[subject],
+                trans_prob=trans_prob[i],
+                stay_prob=session_stay_prob[i],
                 n_states=self.n_states,
-                random_seed=random_seed
-                if random_seed is None
-                else random_seed + 1 + subject,
+                random_seed=random_seed if random_seed is None else random_seed + 1 + i,
             )
             self.hmm.append(hmm)
             self.state_time_course.append(hmm.generate_states(self.n_samples))
         self.state_time_course = np.array(self.state_time_course)
 
         # Simulate data
-        self.time_series = self.obs_mod.simulate_multi_subject_data(
+        self.time_series = self.obs_mod.simulate_multi_session_data(
             self.state_time_course
         )
 
@@ -698,10 +702,10 @@ class MSubj_HMM_MVN(Simulation):
         mu = np.mean(self.time_series, axis=1).astype(np.float64)
         sigma = np.std(self.time_series, axis=1).astype(np.float64)
         super().standardize(axis=1)
-        self.obs_mod.subject_means = (
-            self.obs_mod.subject_means - mu[:, np.newaxis, :]
+        self.obs_mod.session_means = (
+            self.obs_mod.session_means - mu[:, np.newaxis, :]
         ) / sigma[:, np.newaxis, :]
-        self.obs_mod.subject_covariances /= np.expand_dims(
+        self.obs_mod.session_covariances /= np.expand_dims(
             sigma[:, :, np.newaxis] @ sigma[:, np.newaxis, :], 1
         )
 
