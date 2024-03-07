@@ -361,17 +361,15 @@ class Data:
 
         # Select channels
         new_arrays = []
-        for i in tqdm(range(self.n_arrays), desc="Selecting channels"):
-            array = arrays[i]
-            if timepoints is None:
-                array = array[:, channels]
-            else:
+        for i in tqdm(range(self.n_sessions), desc="Selecting channels"):
+            array = arrays[i][:, channels]
+            if timepoints is not None:
                 assert len(timepoints) == 2
                 time_start,time_end = timepoints[0], timepoints[1]
                 assert time_start >=0
                 assert time_start <= time_end
                 assert time_end <=len(array)
-                array = array[time_start:time_end,channels]
+                array = array[time_start:time_end,:]
             if self.load_memmaps:
                 array = misc.array_to_memmap(self.prepared_data_filenames[i], array)
             new_arrays.append(array)
