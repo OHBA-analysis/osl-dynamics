@@ -1,13 +1,11 @@
-"""Custom Tensorflow layers.
-
-"""
+"""Custom Tensorflow layers."""
 
 import sys
 
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import activations, layers, initializers, regularizers
+from tensorflow.keras import activations, initializers, layers, regularizers
 
 import osl_dynamics.inference.initializers as osld_initializers
 
@@ -416,6 +414,8 @@ class LearnableTensorLayer(layers.Layer):
         Regularizer for the tensor. Must be from `inference.regularizers 
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
         /inference/regularizers/index.html>`_.
+    constraint : tf.keras.constraints.Constraint, optional
+        Constraint for the tensor. Limits the values the weights can take.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
@@ -427,6 +427,7 @@ class LearnableTensorLayer(layers.Layer):
         initializer=None,
         initial_value=None,
         regularizer=None,
+        constraint=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -465,6 +466,9 @@ class LearnableTensorLayer(layers.Layer):
         # This should be a function of the tensor that returns a float
         self.regularizer = regularizer
 
+        # Constraint for the tensor
+        self.constraint = constraint
+
     def add_regularization(self, tensor, static_loss_scaling_factor):
         # Calculate the regularisation from the tensor
         reg = self.regularizer(tensor)
@@ -482,6 +486,7 @@ class LearnableTensorLayer(layers.Layer):
             dtype=tf.float32,
             initializer=self.tensor_initializer,
             trainable=self.learn,
+            constraint=self.constraint,
         )
         self.built = True
 
@@ -863,6 +868,160 @@ class DiagonalMatricesLayer(layers.Layer):
         diagonals = self.bijector(diagonals)
         diagonals = add_epsilon(diagonals, self.epsilon)
         return tf.linalg.diag(diagonals)
+
+
+class DampedOscillatorLayer(layers.Layer):
+    """Layer to learn a set of damped oscillators.
+
+    Parameters
+    ----------
+    n : int
+        Number of oscillators.
+    m : int
+        Number of elements.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    damping_limit : float
+        Upper limit for the damping parameter.
+        Values are clipped to [0, damping_limit].
+    frequency_limit : tuple
+        Limits for the frequency parameter.
+        Upper limit should not be higher than the Nyquist frequency.
+    learn_amplitude : bool
+        Should the amplitudes be learnable?
+        If not, they will be fixed to 1.0.
+        Overriden if the general `learn` argument is False.
+    learn : bool
+        Should the oscillators be learnable?
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the base class.
+    """
+
+    def __init__(
+        self,
+        n,
+        m,
+        sampling_frequency,
+        damping_limit,
+        frequency_limit,
+        learn_amplitude,
+        learn,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.sampling_frequency = sampling_frequency
+        self.damping_limit = damping_limit
+
+        self.tau = (
+            tf.expand_dims(tf.range(0, m, dtype=tf.float32), axis=0)
+            / sampling_frequency
+        )
+
+        self.damping = LearnableTensorLayer(
+            shape=(n, 1),
+            learn=learn,
+            initializer=initializers.Constant(0.5),
+            name=self.name + "_damping",
+        )
+
+        self.frequency = LearnableTensorLayer(
+            shape=(n, 1),
+            learn=learn,
+            initializer=initializers.RandomUniform(
+                minval=frequency_limit[0],
+                maxval=frequency_limit[1],
+            ),
+            name=self.name + "_frequency",
+        )
+
+        self.amplitude = LearnableTensorLayer(
+            shape=(n, 1),
+            learn=learn and learn_amplitude,
+            initializer=initializers.Constant(1.0),
+            name=self.name + "_amplitude",
+        )
+
+        self.layers = [self.damping, self.frequency, self.amplitude]
+
+    def call(self, inputs, **kwargs):
+        """Calculate damped oscillator.
+
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
+        damping = self.damping(inputs, **kwargs)
+        damping = tf.clip_by_value(damping, 0, self.damping_limit)
+        frequency = self.frequency(inputs, **kwargs)
+        frequency = tf.clip_by_value(frequency, 1, self.sampling_frequency / 2)
+        omega = 2 * np.pi * frequency
+        amplitude = self.amplitude(inputs, **kwargs)
+        return amplitude * tf.exp(-damping * self.tau) * tf.cos(omega * self.tau)
+
+
+class DampedOscillatorCovarianceMatricesLayer(layers.Layer):
+    """Layer to learn a set of damped oscillator covariances.
+
+    Parameters
+    ----------
+    n : int
+        Number of matrices.
+    m : int
+        Number of rows/columns.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    damping_limit : float
+        Upper limit for the damping parameter.
+        Values are clipped to [0, damping_limit].
+    frequency_limit : tuple[float, float]
+        Limits for the frequency parameter.
+        Upper limit should not be higher than the Nyquist frequency.
+    learn_amplitude : bool
+        Should the amplitudes be learnable?
+        If not, they will be fixed to 1.0.
+        Overriden if the general `learn` argument is False.
+    learn : bool
+        Should the matrices be learnable?
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the base class.
+    """
+
+    def __init__(
+        self,
+        n,
+        m,
+        sampling_frequency,
+        damping_limit,
+        frequency_limit,
+        learn_amplitude,
+        learn,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.oscillator_layer = DampedOscillatorLayer(
+            n=n,
+            m=m,
+            sampling_frequency=sampling_frequency,
+            damping_limit=damping_limit,
+            frequency_limit=frequency_limit,
+            learn_amplitude=learn_amplitude,
+            learn=learn,
+        )
+
+        self.layers = [self.oscillator_layer]
+
+    def call(self, inputs, **kwargs):
+        """Retrieve the covariance matrices.
+
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
+        oscillator = self.oscillator_layer(inputs, **kwargs)
+        return tf.linalg.LinearOperatorToeplitz(
+            row=oscillator,
+            col=oscillator,
+        ).to_dense()
 
 
 class MatrixLayer(layers.Layer):
