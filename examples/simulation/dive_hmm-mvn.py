@@ -72,7 +72,10 @@ sim = simulation.MSess_HMM_MVN(
     random_seed=1234,
 )
 sim.standardize()
-training_data = data.Data(sim.time_series)
+training_data = data.Data(
+    sim.time_series,
+    session_labels={"session_id": np.arange(config.n_sessions)},
+)
 
 # Build model
 model = Model(config)
