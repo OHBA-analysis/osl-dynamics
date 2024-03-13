@@ -43,7 +43,7 @@ def render(
     gui=True,
     inflation=0,
     image_name=None,
-    input_cifti=False
+    input_cifti=False,
 ):
     """Render map in workbench.
 
@@ -87,18 +87,20 @@ def render(
     output_left = stem_left.with_suffix(".func.gii")
 
     if input_cifti:
-        subprocess.run([
-            "wb_command",
-            "-cifti-separate",
-            str(nii),
-            "COLUMN",
-            "-metric",
-            "CORTEX_LEFT",
-            str(output_left),
-            "-metric",
-            "CORTEX_RIGHT",
-            str(output_right)
-        ])
+        subprocess.run(
+            [
+                "wb_command",
+                "-cifti-separate",
+                str(nii),
+                "COLUMN",
+                "-metric",
+                "CORTEX_LEFT",
+                str(output_left),
+                "-metric",
+                "CORTEX_RIGHT",
+                str(output_right),
+            ]
+        )
     else:
         volume_to_surface(
             nii,

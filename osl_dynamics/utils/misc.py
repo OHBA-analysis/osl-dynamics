@@ -428,7 +428,8 @@ def set_logging_level(logger, level):
     finally:
         logger.setLevel(current_level)
 
-def IC2brain(spatial_map,IC_metric):
+
+def IC2brain(spatial_map, IC_metric):
     """
     Project the IC_metric map to a brain map according to spatial maps of IC components.
     For example, IC_metric can be the mean activation of states, or the rank-one decomposition
@@ -453,13 +454,18 @@ def IC2brain(spatial_map,IC_metric):
     assert spatial_map_shape[-1] == K
 
     # Implement the multiplication
-    brain_map_data = np.matmul(spatial_map_data,IC_metric)
-    #Store brain map to a Nifti1Image type
-    brain_map = Nifti1Image(brain_map_data, affine=spatial_map.affine, header=spatial_map.header)
+    brain_map_data = np.matmul(spatial_map_data, IC_metric)
+    # Store brain map to a Nifti1Image type
+    brain_map = Nifti1Image(
+        brain_map_data, affine=spatial_map.affine, header=spatial_map.header
+    )
 
     return brain_map
 
-def IC2surface(spatial_map: nib.cifti2.cifti2.Cifti2Image,IC_metric:np.ndarray)->nib.cifti2.cifti2.Cifti2Image:
+
+def IC2surface(
+    spatial_map: nib.cifti2.cifti2.Cifti2Image, IC_metric: np.ndarray
+) -> nib.cifti2.cifti2.Cifti2Image:
     """
     Project the IC_metric map to a brain map according to spatial maps of IC components.
     For example, IC_metric can be the mean activation of states, or the rank-one decomposition
@@ -484,10 +490,12 @@ def IC2surface(spatial_map: nib.cifti2.cifti2.Cifti2Image,IC_metric:np.ndarray)-
     new_data = np.matmul(IC_metric.T, spatial_map_data)
 
     # Define the new axes: the state i(i=1,...,N)
-    new_axes = nib.cifti2.cifti2_axes.ScalarAxis([f'State {i + 1}' for i in range(N)])
+    new_axes = nib.cifti2.cifti2_axes.ScalarAxis([f"State {i + 1}" for i in range(N)])
 
     # Define the new header using new_axes + axes[1] from old header
-    new_header = nib.cifti2.cifti2.Cifti2Header.from_axes((new_axes, header.get_axis(1)))
+    new_header = nib.cifti2.cifti2.Cifti2Header.from_axes(
+        (new_axes, header.get_axis(1))
+    )
 
     # Combine new data and new header to obtain new CIFTI object
     new_cifti = nib.cifti2.cifti2.Cifti2Image(new_data, new_header)
