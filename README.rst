@@ -57,6 +57,8 @@ If you have already installed `OSL <https://github.com/OHBA-analysis/osl>`_ you 
     pip install tensorflow-probability==0.17
     pip install -e .
 
+Note, if you're using a Mac computer you need to install TensorFlow with ``pip install tensorflow-macos==2.9.1`` instead of ``tensorflow==2.9.1``.
+
 Developers
 ----------
 
