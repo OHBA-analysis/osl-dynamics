@@ -43,7 +43,7 @@ means = np.load(f"{results_dir}/inf_params/means.npy")
 power.save(
     means,
     mask_file="MNI152_T1_2mm_brain.nii.gz",
-    parcellation_file="/gpfs3/well/win-fmrib-analysis/users/nhx531/melodic_IC.nii.gz",
+    parcellation_file="melodic_IC.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
     filename=f"{plots_dir}/means_.png",
 )
@@ -56,7 +56,7 @@ covs = np.load(f"{results_dir}/inf_params/covs.npy")
 # Plot
 connectivity.save(
     covs,
-    parcellation_file="/gpfs3/well/win-fmrib-analysis/users/nhx531/melodic_IC.nii.gz",
+    parcellation_file="melodic_IC.nii.gz",
     plot_kwargs={
         "edge_cmap": "Reds",
         "display_mode": "xz",
