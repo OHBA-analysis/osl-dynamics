@@ -8,7 +8,7 @@ import pathlib
 import pickle
 from contextlib import contextmanager
 from shutil import rmtree
-from os import path
+import os
 
 import numpy as np
 from pqdm.threads import pqdm
@@ -1205,62 +1205,50 @@ class Data:
                     )
                 return training_datasets, validation_datasets
 
-    def tfrecord_dataset(
+    def save_tfrecord_dataset(
         self,
+        tfrecord_dir,
         sequence_length,
-        batch_size,
-        shuffle=True,
-        validation_split=None,
-        concatenate=True,
         step_size=None,
-        drop_last_batch=False,
+        overwrite=False,
     ):
-        """Create a TFRecord Dataset for training or evaluation.
+        """Save the data as TFRecord files.
 
         Parameters
         ----------
+        tfrecord_dir : str
+            Directory to save the TFRecord datasets.
         sequence_length : int
             Length of the segement of data to feed into the model.
-        batch_size : int
-            Number sequences in each mini-batch which is used to train the model.
-        shuffle : bool, optional
-            Should we shuffle sequences (within a batch) and batches.
-        validation_split : float, optional
-            Ratio to split the dataset into a training and validation set.
-        concatenate : bool, optional
-            Should we concatenate the datasets for each array?
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
-        drop_last_batch : bool, optional
-            Should we drop the last batch if it is smaller than the batch size?
-
-        Returns
-        -------
-        dataset : tf.data.Dataset
-            Dataset for training or evaluating the model.
+        overwrite : bool, optional
+            Should we overwrite the existing TFRecord datasets if there is a need?
         """
-        import tensorflow as tf  # moved here to avoid slow imports
-
+        os.makedirs(tfrecord_dir, exist_ok=True)
         tfrecord_paths = (
-            f"{self.store_dir}"
+            f"{tfrecord_dir}"
             "/dataset_{array:0{v}d}-of-{n_session:0{v}d}"
             f".{self._identifier}.tfrecord"
         )
 
         self.sequence_length = sequence_length
-        self.batch_size = batch_size
         self.step_size = step_size or sequence_length
 
         def _check_rewrite():
-            # Check if we need to rewrite the TFRecord datasets
-            if not path.exists(f"{self.store_dir}/tfrecord_config.pkl"):
+            if not os.path.exists(f"{tfrecord_dir}/tfrecord_config.pkl"):
                 _logger.warning(
                     "No tfrecord_config.pkl file found. Rewriting TFRecords."
                 )
                 return True
 
-            tfrecord_config = misc.load(f"{self.store_dir}/tfrecord_config.pkl")
+            if not overwrite:
+                return False
+
+            # Check if we need to rewrite the TFRecord datasets
+
+            tfrecord_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
             if tfrecord_config["sequence_length"] != self.sequence_length:
                 _logger.warning("Sequence length has changed. Rewriting TFRecords.")
                 return True
@@ -1290,7 +1278,7 @@ class Data:
                 v=len(str(self.n_sessions - 1)),
             )
             tfrecord_filenames.append(filepath)
-            if rewrite or not path.exists(filepath):
+            if rewrite or not os.path.exists(filepath):
                 tfrecords_to_save.append((i, filepath))
 
         # Function for saving a single TFRecord
@@ -1321,148 +1309,80 @@ class Data:
             )
 
         # Save tfrecords config
-        tfrecord_config = {
-            "sequence_length": self.sequence_length,
-            "step_size": self.step_size,
-            "session_labels": list(self.session_labels.keys()),
-        }
-        misc.save(f"{self.store_dir}/tfrecord_config.pkl", tfrecord_config)
-
-        # Helper function for parsing training examples
-        def _parse_example(example):
-            feature_names = ["data"]
-            tensor_shapes = {
-                "data": [self.sequence_length, self.n_channels],
+        if rewrite:
+            tfrecord_config = {
+                "identifier": self._identifier,
+                "sequence_length": self.sequence_length,
+                "n_channels": self.n_channels,
+                "step_size": self.step_size,
+                "session_labels": list(self.session_labels.keys()),
+                "n_sessions": self.n_sessions,
             }
-            # Add session labels if there are any
-            for feature_name in self.session_labels.keys():
-                feature_names.append(feature_name)
-                tensor_shapes[feature_name] = [self.sequence_length]
+            misc.save(f"{tfrecord_dir}/tfrecord_config.pkl", tfrecord_config)
 
-            feature_description = {
-                name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
-            }
-            parsed_example = tf.io.parse_single_example(
-                example,
-                feature_description,
-            )
-            return {
-                name: tf.ensure_shape(
-                    tf.io.parse_tensor(tensor, tf.float32), tensor_shapes[name]
-                )
-                for name, tensor in parsed_example.items()
-            }
+    def tfrecord_dataset(
+        self,
+        sequence_length,
+        batch_size,
+        shuffle=True,
+        validation_split=None,
+        concatenate=True,
+        step_size=None,
+        drop_last_batch=False,
+        tfrecord_dir=None,
+        overwrite=False,
+    ):
+        """Create a TFRecord Dataset for training or evaluation.
 
-        # Create the TFRecord dataset
-        if concatenate:
-            tfrecord_filenames = tf.data.Dataset.from_tensor_slices(tfrecord_filenames)
+        Parameters
+        ----------
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        batch_size : int
+            Number sequences in each mini-batch which is used to train the model.
+        shuffle : bool, optional
+            Should we shuffle sequences (within a batch) and batches.
+        validation_split : float, optional
+            Ratio to split the dataset into a training and validation set.
+        concatenate : bool, optional
+            Should we concatenate the datasets for each array?
+        step_size : int, optional
+            Number of samples to slide the sequence across the dataset.
+            Default is no overlap.
+        drop_last_batch : bool, optional
+            Should we drop the last batch if it is smaller than the batch size?
+        tfrecord_dir : str, optional
+            Directory to save the TFRecord datasets. If :code:`None`, then
+            :code:`Data.store_dir` is used.
+        overwrite : bool, optional
+            Should we overwrite the existing TFRecord datasets if there is a need?
 
-            if shuffle:
-                # First shuffle the shards
-                tfrecord_filenames = tfrecord_filenames.shuffle(len(tfrecord_filenames))
+        Returns
+        -------
+        dataset : tf.data.Dataset
+            Dataset for training or evaluating the model.
+        """
+        import tensorflow as tf  # moved here to avoid slow imports
 
-                # Create the TFRecord dataset
-                full_dataset = tfrecord_filenames.interleave(
-                    tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
-                )
+        tfrecord_dir = tfrecord_dir or self.store_dir
 
-                # Parse the examples
-                full_dataset = full_dataset.map(_parse_example)
-
-                # Shuffle sequences
-                full_dataset = full_dataset.shuffle(self.buffer_size)
-
-                # Group into batches
-                full_dataset = full_dataset.batch(
-                    self.batch_size, drop_remainder=drop_last_batch
-                )
-
-                # Shuffle batches
-                full_dataset = full_dataset.shuffle(self.buffer_size)
-
-            else:
-                # Create the TFRecord dataset
-                full_dataset = tfrecord_filenames.interleave(
-                    tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
-                )
-
-                # Parse the examples
-                full_dataset = full_dataset.map(_parse_example)
-
-                # Group into batches
-                full_dataset = full_dataset.batch(
-                    self.batch_size, drop_remainder=drop_last_batch
-                )
-
-            if validation_split is None:
-                # Return the dataset
-                return full_dataset.prefetch(tf.data.AUTOTUNE)
-
-            else:
-                # Calculate how many batches should be in the training dataset
-                dataset_size = dtf.get_n_batches(full_dataset)
-                training_dataset_size = round((1.0 - validation_split) * dataset_size)
-
-                # Split the dataset into training and validation datasets
-                training_dataset = full_dataset.take(training_dataset_size)
-                validation_dataset = full_dataset.skip(training_dataset_size)
-                _logger.info(
-                    f"{training_dataset_size} batches in training dataset, "
-                    + f"{dataset_size - training_dataset_size} batches in the validation "
-                    + "dataset."
-                )
-                return training_dataset.prefetch(
-                    tf.data.AUTOTUNE
-                ), validation_dataset.prefetch(tf.data.AUTOTUNE)
-
-        # Otherwise create a dataset for each array separately
-        else:
-            full_datasets = []
-            for filename in tfrecord_filenames:
-                ds = tf.data.TFRecordDataset(filename)
-
-                # Parse the examples
-                ds = ds.map(_parse_example)
-
-                if shuffle:
-                    # Shuffle sequences
-                    ds = ds.shuffle(self.buffer_size)
-
-                # Group into batches
-                ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
-
-                if shuffle:
-                    # Shuffle batches
-                    ds = ds.shuffle(self.buffer_size)
-
-                full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
-
-            if validation_split is None:
-                # Return the full dataset for each array
-                return full_datasets
-
-            else:
-                # Split the dataset for each array separately
-                training_datasets = []
-                validation_datasets = []
-                for i, ds in enumerate(full_datasets):
-                    # Calculate how many batches should be in the training dataset
-                    dataset_size = dtf.get_n_batches(ds)
-                    training_dataset_size = round(
-                        (1.0 - validation_split) * dataset_size
-                    )
-
-                    # Split the dataset into training and validation datasets
-                    training_datasets.append(ds.take(training_dataset_size))
-                    validation_datasets.append(ds.skip(training_dataset_size))
-                    _logger.info(
-                        f"Session {i}: "
-                        + f"{training_dataset_size} batches in training dataset, "
-                        + f"{dataset_size - training_dataset_size} batches in the validation "
-                        + "dataset."
-                    )
-
-                return training_datasets, validation_datasets
+        # Save the TFRecord files
+        self.save_tfrecord_dataset(
+            tfrecord_dir=tfrecord_dir,
+            sequence_length=sequence_length,
+            step_size=step_size,
+            overwrite=overwrite,
+        )
+        return load_tfrecord_dataset(
+            tfrecord_dir=tfrecord_dir,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            validation_split=validation_split,
+            concatenate=concatenate,
+            drop_last_batch=drop_last_batch,
+            buffer_size=self.buffer_size,
+            keep=self.keep,
+        )
 
     def add_session_labels(self, label_name, label_values):
         """Add session labels as a new channel to the data.
@@ -1531,7 +1451,7 @@ class Data:
             Path to directory containing the pickle file with preparation
             settings.
         """
-        if path.isdir(inputs):
+        if os.path.isdir(inputs):
             for file in rw.list_dir(inputs):
                 if "preparation.pkl" in file:
                     preparation = pickle.load(open(f"{inputs}/preparation.pkl", "rb"))
@@ -1574,3 +1494,202 @@ class Data:
         """Deletes :code:`store_dir`."""
         if self.store_dir.exists():
             rmtree(self.store_dir)
+
+
+def load_tfrecord_dataset(
+    tfrecord_dir,
+    batch_size,
+    shuffle=True,
+    validation_split=None,
+    concatenate=True,
+    drop_last_batch=False,
+    buffer_size=100000,
+    keep=None,
+):
+    """Load a TFRecord dataset.
+
+    Parameters
+    ----------
+    tfrecord_dir : str
+        Directory containing the TFRecord datasets.
+    batch_size : int
+        Number sequences in each mini-batch which is used to train the model.
+    shuffle : bool, optional
+        Should we shuffle sequences (within a batch) and batches.
+    validation_split : float, optional
+        Ratio to split the dataset into a training and validation set.
+    concatenate : bool, optional
+        Should we concatenate the datasets for each array?
+    drop_last_batch : bool, optional
+        Should we drop the last batch if it is smaller than the batch size?
+    buffer_size : int, optional
+        Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
+        to less random shuffling but will be quicker. Default is 100000.
+    keep : list of int, optional
+        List of session indices to keep. If :code:`None`, then all sessions
+        are kept.
+
+    Returns
+    -------
+    dataset : tf.data.Dataset or tuple
+        Dataset for training or evaluating the model along with the validation
+        set if :code:`validation_split` was passed.
+    """
+    import tensorflow as tf  # moved here to avoid slow imports
+
+    tf_record_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
+    identifier = tf_record_config["identifier"]
+    sequence_length = tf_record_config["sequence_length"]
+    n_channels = tf_record_config["n_channels"]
+    session_labels = tf_record_config["session_labels"]
+    n_sessions = tf_record_config["n_sessions"]
+
+    keep = keep or list(range(n_sessions))
+
+    # Helper function for parsing training examples
+    def _parse_example(example):
+        feature_names = ["data"]
+        tensor_shapes = {
+            "data": [sequence_length, n_channels],
+        }
+        # Add session labels if there are any
+        for feature_name in session_labels:
+            feature_names.append(feature_name)
+            tensor_shapes[feature_name] = [sequence_length]
+
+        feature_description = {
+            name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
+        }
+        parsed_example = tf.io.parse_single_example(
+            example,
+            feature_description,
+        )
+        return {
+            name: tf.ensure_shape(
+                tf.io.parse_tensor(tensor, tf.float32), tensor_shapes[name]
+            )
+            for name, tensor in parsed_example.items()
+        }
+
+    tfrecord_paths = (
+        f"{tfrecord_dir}"
+        "/dataset_{array:0{v}d}-of-{n_session:0{v}d}"
+        f".{identifier}.tfrecord"
+    )
+    tfrecord_filenames = []
+    for i in keep:
+        filepath = tfrecord_paths.format(
+            array=i,
+            n_session=n_sessions - 1,
+            v=len(str(n_sessions - 1)),
+        )
+        tfrecord_filenames.append(filepath)
+
+    # Create the TFRecord dataset
+    if concatenate:
+        tfrecord_filenames = tf.data.Dataset.from_tensor_slices(tfrecord_filenames)
+
+        if shuffle:
+            # First shuffle the shards
+            tfrecord_filenames = tfrecord_filenames.shuffle(len(tfrecord_filenames))
+
+            # Create the TFRecord dataset
+            full_dataset = tfrecord_filenames.interleave(
+                tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
+            )
+
+            # Parse the examples
+            full_dataset = full_dataset.map(_parse_example)
+
+            # Shuffle sequences
+            full_dataset = full_dataset.shuffle(buffer_size)
+
+            # Group into batches
+            full_dataset = full_dataset.batch(
+                batch_size, drop_remainder=drop_last_batch
+            )
+
+            # Shuffle batches
+            full_dataset = full_dataset.shuffle(buffer_size)
+
+        else:
+            # Create the TFRecord dataset
+            full_dataset = tfrecord_filenames.interleave(
+                tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
+            )
+
+            # Parse the examples
+            full_dataset = full_dataset.map(_parse_example)
+
+            # Group into batches
+            full_dataset = full_dataset.batch(
+                batch_size, drop_remainder=drop_last_batch
+            )
+
+        if validation_split is None:
+            # Return the dataset
+            return full_dataset.prefetch(tf.data.AUTOTUNE)
+
+        else:
+            # Calculate how many batches should be in the training dataset
+            dataset_size = dtf.get_n_batches(full_dataset)
+            training_dataset_size = round((1.0 - validation_split) * dataset_size)
+
+            # Split the dataset into training and validation datasets
+            training_dataset = full_dataset.take(training_dataset_size)
+            validation_dataset = full_dataset.skip(training_dataset_size)
+            _logger.info(
+                f"{training_dataset_size} batches in training dataset, "
+                + f"{dataset_size - training_dataset_size} batches in the validation "
+                + "dataset."
+            )
+            return training_dataset.prefetch(
+                tf.data.AUTOTUNE
+            ), validation_dataset.prefetch(tf.data.AUTOTUNE)
+
+    # Otherwise create a dataset for each array separately
+    else:
+        full_datasets = []
+        for filename in tfrecord_filenames:
+            ds = tf.data.TFRecordDataset(filename)
+
+            # Parse the examples
+            ds = ds.map(_parse_example)
+
+            if shuffle:
+                # Shuffle sequences
+                ds = ds.shuffle(buffer_size)
+
+            # Group into batches
+            ds = ds.batch(batch_size, drop_remainder=drop_last_batch)
+
+            if shuffle:
+                # Shuffle batches
+                ds = ds.shuffle(buffer_size)
+
+            full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
+
+        if validation_split is None:
+            # Return the full dataset for each array
+            return full_datasets
+
+        else:
+            # Split the dataset for each array separately
+            training_datasets = []
+            validation_datasets = []
+            for i, ds in enumerate(full_datasets):
+                # Calculate how many batches should be in the training dataset
+                dataset_size = dtf.get_n_batches(ds)
+                training_dataset_size = round((1.0 - validation_split) * dataset_size)
+
+                # Split the dataset into training and validation datasets
+                training_datasets.append(ds.take(training_dataset_size))
+                validation_datasets.append(ds.skip(training_dataset_size))
+                _logger.info(
+                    f"Session {i}: "
+                    + f"{training_dataset_size} batches in training dataset, "
+                    + f"{dataset_size - training_dataset_size} batches in the validation "
+                    + "dataset."
+                )
+
+            return training_datasets, validation_datasets
