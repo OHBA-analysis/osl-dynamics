@@ -72,18 +72,6 @@ def create_dataset(data, sequence_length, step_size):
         dataset = Dataset.from_tensor_slices(data)
         dataset = dataset.batch(sequence_length, drop_remainder=True)
 
-    # Create an overlapping single model input dataset
-    elif len(data) == 1:
-        dataset = Dataset.from_tensor_slices(list(data.values())[0])
-        dataset = dataset.window(
-            sequence_length,
-            step_size,
-            drop_remainder=True,
-        )
-        dataset = dataset.flat_map(
-            lambda window: window.batch(sequence_length, drop_remainder=True)
-        )
-
     # Create an overlapping multiple model input dataset
     else:
 
