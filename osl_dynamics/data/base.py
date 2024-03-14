@@ -1296,11 +1296,15 @@ class Data:
 
         # Helper function for parsing training examples
         def _parse_example(example):
-            feature_names = ["data", "session_id"]
+            feature_names = ["data"]
             tensor_shapes = {
                 "data": [self.sequence_length, self.n_channels],
-                "session_id": [self.sequence_length],
             }
+            # Add session labels if there are any
+            for feature_name in self.session_labels.keys():
+                feature_names.append(feature_name)
+                tensor_shapes[feature_name] = [self.sequence_length]
+
             feature_description = {
                 name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
             }
