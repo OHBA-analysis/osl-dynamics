@@ -1252,11 +1252,37 @@ class Data:
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
 
+        def _check_rewrite():
+            # Check if we need to rewrite the TFRecord datasets
+            if not path.exists(f"{self.store_dir}/tfrecord_config.pkl"):
+                _logger.warning(
+                    "No tfrecord_config.pkl file found. Rewriting TFRecords."
+                )
+                return True
+
+            tfrecord_config = misc.load(f"{self.store_dir}/tfrecord_config.pkl")
+            if tfrecord_config["sequence_length"] != self.sequence_length:
+                _logger.warning("Sequence length has changed. Rewriting TFRecords.")
+                return True
+            if tfrecord_config["step_size"] != self.step_size:
+                _logger.warning("Step size has changed. Rewriting TFRecords.")
+                return True
+            for label in self.session_labels.keys():
+                if label not in tfrecord_config["session_labels"]:
+                    _logger.warning(
+                        f"Session label {label} not found. Rewriting TFRecords."
+                    )
+                    return True
+
+            return False
+
         n_sequences = self.count_sequences(self.sequence_length)
 
         # TFRecords we need to save
         tfrecord_filenames = []
         tfrecords_to_save = []
+        rewrite = _check_rewrite()
+
         for i in self.keep:
             filepath = tfrecord_paths.format(
                 array=i,
@@ -1264,7 +1290,7 @@ class Data:
                 v=len(str(self.n_sessions - 1)),
             )
             tfrecord_filenames.append(filepath)
-            if not path.exists(filepath):
+            if rewrite or not path.exists(filepath):
                 tfrecords_to_save.append((i, filepath))
 
         # Function for saving a single TFRecord
@@ -1293,6 +1319,14 @@ class Data:
                 argument_type="args",
                 total=len(tfrecords_to_save),
             )
+
+        # Save tfrecords config
+        tfrecord_config = {
+            "sequence_length": self.sequence_length,
+            "step_size": self.step_size,
+            "session_labels": list(self.session_labels.keys()),
+        }
+        misc.save(f"{self.store_dir}/tfrecord_config.pkl", tfrecord_config)
 
         # Helper function for parsing training examples
         def _parse_example(example):
