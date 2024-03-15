@@ -592,3 +592,87 @@ def multi_save(
             parcellation_file=parcellation_file,
             plot_kwargs=plot_kwargs,
         )
+
+
+def independent_components_to_volumetric_maps(ica_spatial_maps, ic_values):
+    """Independent components to volumetric spatial map.
+
+    Project the ic_values map to a brain map according to spatial
+    maps of IC components. For example, ic_values can be the mean
+    activation of states, or the rank-one decomposition of FC matrix
+    corresponding to different states.
+
+    Parameters
+    ----------
+    ica_spatial_maps : Nifti1Image
+        The spatial maps obtained from group ICA.
+    ic_values : np.ndarray
+        The shape is (K, N). K is the number of independent components,
+        and N is the number of states.
+
+    Returns
+    -------
+    vol_map : Nifti1Image
+        Represent the whole brain map of different states.
+    """
+    ica_spatial_maps_data = ica_spatial_maps.get_fdata()
+    ica_spatial_maps_shape = ica_spatial_maps_data.shape
+    K, N = ic_values.shape
+
+    # Assert the matrix multiplication is plausible
+    assert ica_spatial_maps_shape[-1] == K
+
+    # Implement the multiplication
+    vol_map_data = np.matmul(ica_spatial_maps_data, ic_values)
+
+    # Store brain map to a Nifti1Image type
+    vol_map = Nifti1Image(
+        vol_map_data,
+        affine=ica_spatial_maps.affine,
+        header=ica_spatial_maps.header,
+    )
+
+    return vol_map
+
+
+def independent_components_to_surface_maps(ica_spatial_maps, ic_values):
+    """Independent components to surface spatial map.
+
+    Project the ic_values map to a surface map according to spatial maps
+    of group ICA components. For example, ic_values can be the mean
+    activation of states, or the rank-one decomposition of FC matrix
+    corresponding to different states.
+
+    Different from independent_components_to_volumetric_maps,
+    this function works on CIFTI spatial maps.
+
+    Parameters
+    ----------
+    ica_spatial_maps : Cifti2Image
+        The spatial maps obtained from group ICA.
+    ic_values: np.ndarray
+        The shapeis (K, N). K is the number of independent components,
+        and N is the number of states
+
+    Returns
+    -------
+    surf_map : Cifti2Image
+        The whole brain map of different states.
+    """
+    ica_spatial_maps_data = ica_spatial_maps.get_fdata()
+    header = ica_spatial_maps.header
+    K, N = ic_values.shape
+    new_data = np.matmul(ic_values.T, ica_spatial_maps_data)
+
+    # Define the new axes: the state i(i=1,...,N)
+    new_axes = nib.cifti2.cifti2_axes.ScalarAxis([f"State {i + 1}" for i in range(N)])
+
+    # Define the new header using new_axes + axes[1] from old header
+    new_header = nib.cifti2.cifti2.Cifti2Header.from_axes(
+        (new_axes, header.get_axis(1))
+    )
+
+    # Combine new data and new header to obtain new CIFTI object
+    surf_map = nib.cifti2.cifti2.Cifti2Image(new_data, new_header)
+
+    return surf_map
