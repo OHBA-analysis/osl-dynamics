@@ -37,20 +37,20 @@ def setup(path):
 
 
 def render(
-    nii,
+    img,
     save_dir=None,
     interptype="trilinear",
     gui=True,
     inflation=0,
     image_name=None,
-    input_cifti=False,
+    input_is_cifti=False,
 ):
     """Render map in workbench.
 
     Parameters
     ----------
-    nii : str
-        Path to nii image file.
+    img : str
+        Path to image file.
     save_dir : str, optional
         Path to save rendered surface plots.
     interptype : str, optional
@@ -60,16 +60,16 @@ def render(
         Default is :code:`True`.
     image_name : str, optional
         Filename of image to save.
-    input_cifti: bool
+    input_is_cifti: bool
         Whether the input file is a CIFTI file.
     """
-    nii = pathlib.Path(nii)
+    img = pathlib.Path(img)
 
-    if ".nii" not in nii.suffixes:
-        raise ValueError(f"nii should be a nii or nii.gz file, got {nii}.")
+    if ".nii" not in img.suffixes:
+        raise ValueError(f"img should be a nii or nii.gz file, got {nii}.")
 
-    if not nii.exists():
-        raise FileNotFoundError(nii)
+    if not img.exists():
+        raise FileNotFoundError(img)
 
     if save_dir is None:
         save_dir = pathlib.Path.cwd()
@@ -77,7 +77,7 @@ def render(
         save_dir = pathlib.Path(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
-    out_file = save_dir / nii.stem
+    out_file = save_dir / img.stem
     surf_left, surf_right = surfs.get(inflation, surfs[0])
 
     stem_right = out_file.with_name(out_file.stem + "_right")
@@ -86,12 +86,12 @@ def render(
     output_right = stem_right.with_suffix(".func.gii")
     output_left = stem_left.with_suffix(".func.gii")
 
-    if input_cifti:
+    if input_is_cifti:
         subprocess.run(
             [
                 "wb_command",
                 "-cifti-separate",
-                str(nii),
+                str(img),
                 "COLUMN",
                 "-metric",
                 "CORTEX_LEFT",
@@ -103,14 +103,14 @@ def render(
         )
     else:
         volume_to_surface(
-            nii,
+            img,
             surf=surf_right,
             output=output_right,
             interptype=interptype,
         )
 
         volume_to_surface(
-            nii,
+            img,
             surf=surf_left,
             output=output_left,
             interptype=interptype,

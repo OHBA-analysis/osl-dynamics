@@ -32,7 +32,6 @@ print("Importing packages")
 import numpy as np
 
 from osl_dynamics.analysis import power, connectivity
-from osl_dynamics.utils import plotting
 
 #%% Plot group-level amplitude maps
 
