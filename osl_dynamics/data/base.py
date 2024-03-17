@@ -9,6 +9,7 @@ import pickle
 from contextlib import contextmanager
 from shutil import rmtree
 import os
+from dataclasses import dataclass
 
 import numpy as np
 from pqdm.threads import pqdm
@@ -85,7 +86,7 @@ class Data:
     use_tfrecord : bool, optional
         Should we save the data as a TensorFlow Record? This is recommended for
         training on large datasets. Default is :code:`False`.
-    session_labels : dict, optional
+    session_labels : list of SessionLabels, optional
         Extra session labels.
     n_jobs : int, optional
         Number of processes to load the data in parallel.
@@ -122,7 +123,6 @@ class Data:
         self.buffer_size = buffer_size
         self.use_tfrecord = use_tfrecord
         self.n_jobs = n_jobs
-        self.session_labels = dict()
 
         # Validate inputs
         self.inputs = rw.validate_inputs(inputs)
@@ -161,9 +161,8 @@ class Data:
         self.keep = list(range(self.n_sessions))
 
         # Extra session labels
-        if session_labels is not None:
-            for label_name, label_values in session_labels.items():
-                self.add_session_labels(label_name, label_values)
+        if session_labels is None:
+            self.session_labels = []
 
     def __iter__(self):
         return iter(self.arrays)
@@ -1044,8 +1043,10 @@ class Data:
 
         # Add other session labels
         placeholder = np.zeros(array.shape[0], dtype=np.float32)
-        for name, value in self.session_labels.items():
-            data[name] = placeholder + value[i]
+        for session_label in self.session_labels:
+            label_name = session_label.name
+            label_values = session_label.values
+            data[label_name] = placeholder + label_values[i]
 
         return data
 
@@ -1384,7 +1385,7 @@ class Data:
             keep=self.keep,
         )
 
-    def add_session_labels(self, label_name, label_values):
+    def add_session_labels(self, label_name, label_values, label_type):
         """Add session labels as a new channel to the data.
 
         Parameters
@@ -1393,15 +1394,15 @@ class Data:
             Name of the new channel.
         label_values : np.ndarray
             Labels for each session.
+        label_type : str
+            Type of label, either "categorical" or "continuous".
         """
-        if label_values.ndim != 1:
-            raise ValueError("label_values must be a 1D array.")
         if len(label_values) != self.n_sessions:
             raise ValueError(
                 "label_values must have the same length as the number of sessions."
             )
 
-        self.session_labels[label_name] = label_values
+        self.session_labels.append(SessionLabels(label_name, label_values, label_type))
 
     def save_preparation(self, output_dir="."):
         """Save a pickle file containing preparation settings.
@@ -1693,3 +1694,36 @@ def load_tfrecord_dataset(
                 )
 
             return training_datasets, validation_datasets
+
+
+@dataclass
+class SessionLabels:
+    """Class for session labels.
+
+    Parameters
+    ----------
+    name : str
+        Name of the session label.
+    values : np.ndarray
+        Value for each session. Must be a 1D array of numbers.
+    label_type : str
+        Type of the session label. Options are "categorical" and "continuous".
+    """
+
+    name: str
+    values: np.ndarray
+    label_type: str
+
+    def __post_init__(self):
+        if self.label_type not in ["categorical", "continuous"]:
+            raise ValueError("label_type must be 'categorical' or 'continuous'.")
+
+        if self.values.ndim != 1:
+            raise ValueError("values must be a 1D array.")
+
+        if self.label_type == "categorical":
+            self.values = self.values.astype(np.int32)
+            self.n_classes = len(np.unique(self.values))
+        else:
+            self.values = self.values.astype(np.float32)
+            self.n_classes = None

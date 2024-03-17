@@ -68,9 +68,9 @@ sim.standardize()
 sim_stc = np.concatenate(sim.mode_time_course)
 
 # Create training dataset
-training_data = data.Data(
-    sim.time_series,
-    session_labels={"session_id": np.arange(config.n_sessions)},
+training_data = data.Data(sim.time_series)
+training_data.add_session_labels(
+    "session_id", np.arange(config.n_sessions), "categorical"
 )
 
 # Build model
