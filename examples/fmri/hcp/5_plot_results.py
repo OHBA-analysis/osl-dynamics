@@ -31,36 +31,25 @@ print("Importing packages")
 
 import numpy as np
 
-from osl_dynamics.analysis import power, connectivity
-from osl_dynamics.utils import plotting
+from osl_dynamics.analysis import power
 
 #%% Plot group-level amplitude maps
 
 # Load inferred state means
 means = np.load(f"{results_dir}/inf_params/means.npy")
 
-# Plot
-power.save(
-    means,
-    mask_file="MNI152_T1_2mm_brain.nii.gz",
-    parcellation_file="",  # not sure which parcellation file was used to preproc HCP
-    plot_kwargs={"symmetric_cbar": True},
-    filename=f"{plots_dir}/means_.png",
+# Save cifti containing the state maps
+power.independent_components_to_surface_maps(
+    ica_spatial_maps="melodic_IC.dscalar.nii",
+    ic_values=means,
+    output_file=f"{results_dir}/inf_params/means.dscalar.nii",
 )
 
-#%% Plot group-level functional connectivity
-
-# Load inferred covariances
-covs = np.load(f"{results_dir}/inf_params/covs.npy")
-
 # Plot
-connectivity.save(
-    covs,
-    parcellation_file="",
-    plot_kwargs={
-        "edge_cmap": "Reds",
-        "display_mode": "xz",
-        "annotate": False,
-    },
-    filename=f"{plots_dir}/corrs_.png",
+workbench.render(
+    img=f"{results_dir}/inf_params/means.dscalar.nii",
+    gui=False,
+    save_dir="tmp",
+    image_name="plots/means_.png",
+    input_is_cifti=True,
 )

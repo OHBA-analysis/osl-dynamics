@@ -14,6 +14,9 @@ import numpy as np
 import yaml
 from yaml.constructor import ConstructorError
 
+import nibabel as nib
+from nibabel.nifti1 import Nifti1Image
+
 _logger = logging.getLogger("osl-dynamics")
 
 
@@ -31,7 +34,9 @@ def nextpow2(x):
         The smallest power of two that is greater than or equal to the absolute
         value of x.
     """
-    res = np.ceil(np.log2(x))
+    if x == 0:
+        return 0
+    res = np.ceil(np.log2(np.abs(x)))
     return res.astype("int")
 
 
