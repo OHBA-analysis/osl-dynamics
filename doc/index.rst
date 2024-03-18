@@ -23,6 +23,8 @@ If you find this toolbox useful, please cite:
 
     **Gohil C., Huang R., Roberts E., van Es M.W.J., Quinn A.J., Vidaurre D., Woolrich M.W. (2023) osl-dynamics: A toolbox for modelling fast dynamic brain activity. eLife 12:RP91949 https://doi.org/10.7554/eLife.91949.2**
 
+If you would like to request new features or if you're confident that you have found a bug, please create a new issue on the `GitHub issues <https://github.com/OHBA-analysis/osl-dynamics/issues>`_ page.
+
 .. |logo1| image:: https://avatars.githubusercontent.com/u/15248840?s=200&v=4
     :width: 125px
     :target: https://www.win.ox.ac.uk/research/our-locations/OHBA
@@ -46,7 +48,6 @@ Contents
    :maxdepth: 2
 
    Install <install>
-   Development <development>
    Documentation <documentation>
    FAQ <faq>
 
