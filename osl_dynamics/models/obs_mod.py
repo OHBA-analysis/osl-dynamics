@@ -697,7 +697,7 @@ def get_session_means_covariances(
     learn_means : bool
         Whether the mean is learnt.
     learn_covariances : bool
-        Whether the covariances are learnt..
+        Whether the covariances are learnt.
 
     Returns
     -------
