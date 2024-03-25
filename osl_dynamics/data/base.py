@@ -1404,6 +1404,16 @@ class Data:
 
         self.session_labels.append(SessionLabels(label_name, label_values, label_type))
 
+    def get_session_labels(self):
+        """Get the session labels.
+
+        Returns
+        -------
+        session_labels : List[SessionLabels]
+            List of session labels.
+        """
+        return self.session_labels
+
     def save_preparation(self, output_dir="."):
         """Save a pickle file containing preparation settings.
 

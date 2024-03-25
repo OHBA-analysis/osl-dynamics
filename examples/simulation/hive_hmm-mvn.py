@@ -18,7 +18,6 @@ from osl_dynamics.utils import plotting
 os.makedirs("figures", exist_ok=True)
 
 # GPU settings
-tf_ops.select_gpu(1)
 tf_ops.gpu_growth()
 
 # Settings
@@ -75,8 +74,7 @@ training_data.add_session_labels(
     "session_id", np.arange(config.n_sessions), "categorical"
 )
 training_data.add_session_labels("group_id", sim.assigned_groups, "categorical")
-
-config.session_labels.append(training_data.session_labels[1])
+config.session_labels = training_data.get_session_labels()
 
 # Build model
 model = Model(config)
@@ -133,7 +131,7 @@ print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_s
 print("Fractional occupancies (Inferred):", modes.fractional_occupancies(inf_stc))
 
 sim_embeddings = sim.embeddings
-inf_embeddings = model.get_embeddings()["session_id"]
+inf_embeddings = model.get_summed_embeddings()
 lda_inf_embeddings = LinearDiscriminantAnalysis(n_components=2).fit_transform(
     inf_embeddings, sim.assigned_groups
 )
@@ -167,34 +165,5 @@ axes[0].set_title("Simulation")
 axes[1].set_title("Inferred")
 plotting.save(fig, filename="figures/embeddings.png")
 
-embeddings = model.get_embeddings()
-session_embeddings = embeddings["session_id"]
-group_embeddings = embeddings["group_id"]
-plotting.plot_scatter(
-    group_embeddings[:, 0],
-    group_embeddings[:, 1],
-    x_label="dim_1",
-    y_label="dim_2",
-    # annotate=np.arange(sim.n_groups),
-    filename="figures/group_embeddings.png",
-)
-
-summed_embeddings = model.get_summed_embeddings()
-lda_summed_embeddings = LinearDiscriminantAnalysis(n_components=2).fit_transform(
-    summed_embeddings, sim.assigned_groups
-)
-plotting.plot_scatter(
-    [lda_summed_embeddings[group_mask, 0] for group_mask in group_masks],
-    [lda_summed_embeddings[group_mask, 1] for group_mask in group_masks],
-    x_label="dim_1",
-    y_label="dim_2",
-    annotate=[
-        np.array([str(i) for i in range(config.n_sessions)])[group_mask]
-        for group_mask in group_masks
-    ],
-    filename="figures/summed_embeddings.png",
-)
-
-model.get_session_means_covariances()
 # Delete temporary directory
 training_data.delete_dir()

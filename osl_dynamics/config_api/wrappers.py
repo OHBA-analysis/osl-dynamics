@@ -380,6 +380,9 @@ def train_hive(
     if data is None:
         raise ValueError("data must be passed.")
 
+    if not data.get_session_labels():
+        data.add_session_labels("session_id", np.arange(data.n_sessions), "categorical")
+
     from osl_dynamics.models import hive
 
     init_kwargs = {} if init_kwargs is None else init_kwargs
@@ -410,6 +413,7 @@ def train_hive(
         "kl_annealing_curve": "tanh",
         "kl_annealing_sharpness": 10,
         "n_kl_annealing_epochs": 15,
+        "session_labels": data.get_session_labels(),
     }
     config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
 
@@ -461,7 +465,8 @@ def train_hive(
         alpha = model.get_alpha(data)
         means, covs = model.get_means_covariances()
         session_means, session_covs = model.get_session_means_covariances()
-        embeddings = model.get_embeddings()
+        summed_embeddings = model.get_summed_embeddings()
+        embedding_weights = model.get_embedding_weights()
 
         # Save inferred parameters
         save(f"{inf_params_dir}/alp.pkl", alpha)
@@ -469,7 +474,8 @@ def train_hive(
         save(f"{inf_params_dir}/covs.npy", covs)
         save(f"{inf_params_dir}/session_means.npy", session_means)
         save(f"{inf_params_dir}/session_covs.npy", session_covs)
-        save(f"{inf_params_dir}/embeddings.npy", embeddings)
+        save(f"{inf_params_dir}/summed_embeddings.npy", summed_embeddings)
+        save(f"{inf_params_dir}/embedding_weights.npy", embedding_weights)
 
 
 def get_inf_params(data, output_dir, observation_model_only=False):

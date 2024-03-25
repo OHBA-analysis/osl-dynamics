@@ -168,18 +168,25 @@ def set_dev_parameters_initializer(
         covs_beta_layer.tensor_initializer = RandomWeightInitializer(covs_beta, 0.1)
 
 
-def set_embeddings_initializer(model, embeddings):
+def set_embeddings_initializer(model, initial_embeddings):
     """Set the embeddings initializer.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
         The model. * must be :code:`hive` or :code:`dive`.
-    embeddings : np.ndarray
-        The embeddings. Shape is (n_sessions, embeddings_dim).
+    initial_embeddings : dict
+        The initial_embeddings dictionary. {name: initial_embeddings}
     """
-    embeddings_layer = model.get_layer("embeddings")
-    embeddings_layer.embeddings_initializer = WeightInitializer(embeddings)
+
+    def _set_embeddings_initializer(layer_name, initial_embeddings):
+        embedding_layer = model.get_layer(layer_name)
+        embedding_layer.embedding_layer.embeddings_initializer = WeightInitializer(
+            initial_embeddings
+        )
+
+    for k, v in config.items():
+        _set_embeddings_initializer(f"{k}_embeddings", v)
 
 
 def set_means_regularizer(model, training_dataset, layer_name="means"):
@@ -322,43 +329,81 @@ def set_fcs_regularizer(model, training_dataset, epsilon):
     )
 
 
-def get_embeddings(model, session_labels):
-    """Get the embeddings.
+def get_embedding_weights(model, session_labels):
+    """Get the weights of the embedding layers.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
         The model. * must be :code:`hive` or :code:`dive`.
+    session_labels : List[osl_dynamics.data.SessionLabel]
+        List of session labels.
 
     Returns
     -------
-    embeddings : np.ndarray
-        The embeddings. Shape is (n_sessions, embeddings_dim).
+    embedding_weights : dict
+        The weights of the embedding layers.
     """
-    session_label_embeddings = {
-        "session_id": model.get_layer("session_id_embeddings").embeddings.numpy()
-    }
+    embedding_weights = dict()
     for session_label in session_labels:
         label_name = session_label.name
         label_type = session_label.label_type
+        embeddings_layer = model.get_layer(f"{label_name}_embeddings")
         if label_type == "categorical":
-            session_label_embeddings[label_name] = model.get_layer(
-                f"{label_name}_embeddings"
-            ).embeddings.numpy()
-    return session_label_embeddings
+            embedding_weights[label_name] = embeddings_layer.embeddings.numpy()
+        else:
+            embedding_weights[label_name] = [
+                embeddings_layer.kernel.numpy(),
+                embeddings_layer.bias.numpy(),
+            ]
+
+    return embedding_weights
 
 
-def get_summed_embeddings(model, session_labels):
-    embeddings = get_embeddings(model, session_labels)
-    summed_embeddings = embeddings["session_id"]
+def get_session_embeddings(model, session_labels):
+    """Get the embeddings for each session.
+
+    Parameters
+    ----------
+    model : osl_dynamics.models.*.Model.model
+        The model. * must be :code:`hive` or :code:`dive`.
+    session_labels : List[osl_dynamics.data.SessionLabel]
+        List of session labels.
+
+    Returns
+    -------
+    embeddings : dict
+        The embeddings for each session label.
+    """
+    embeddings = dict()
     for session_label in session_labels:
         label_name = session_label.name
         label_values = session_label.values
-        session_label_embeddings_layer = model.get_layer(f"{label_name}_embeddings")
-        summed_embeddings += session_label_embeddings_layer(label_values)
+        embeddings_layer = model.get_layer(f"{label_name}_embeddings")
+        embeddings[label_name] = embeddings_layer(label_values)
 
-    if isinstance(summed_embeddings, np.ndarray):
-        return summed_embeddings
+    return embeddings
+
+
+def get_summed_embeddings(model, session_labels):
+    """Get the summed embeddings for each session.
+
+    Parameters
+    ----------
+    model : osl_dynamics.models.*.Model.model
+        The model. * must be :code:`hive` or :code:`dive`.
+    session_labels : List[osl_dynamics.data.SessionLabel]
+        List of session labels.
+
+    Returns
+    -------
+    summed_embeddings : np.ndarray
+        The summed embeddings. Shape is (n_sessions, embeddings_dim).
+    """
+    embeddings = get_session_embeddings(model, session_labels)
+    summed_embeddings = 0
+    for _, embedding in embeddings.items():
+        summed_embeddings += embedding
     return summed_embeddings.numpy()
 
 

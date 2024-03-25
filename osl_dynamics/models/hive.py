@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import layers, constraints
+from tensorflow.keras import layers
 
 from osl_dynamics.inference.layers import (
     VectorsLayer,
@@ -244,10 +244,17 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
                 )
 
     def validate_session_labels(self):
-        if self.session_labels is None:
-            self.session_labels = []
+        if not self.session_labels:
+            self.session_labels = [
+                SessionLabels("session_id", np.arange(self.n_sessions), "categorical")
+            ]
 
+        label_names = []
         for session_label in self.session_labels:
+            if session_label.name in label_names:
+                raise ValueError(f"Session label {session_label.name} is repeated.")
+            label_names.append(session_label.name)
+
             if len(session_label.values) != self.n_sessions:
                 raise ValueError(
                     f"Session label {session_label.name} must have {self.n_sessions} values."
@@ -402,18 +409,34 @@ class Model(MarkovStateInferenceModelBase):
             self.config.session_labels,
         )
 
-    def get_embeddings(self):
-        """Get the embedding vectors.
+    def get_embedding_weights(self):
+        """Get the weights of the embedding layers.
 
         Returns
         -------
-        embeddings : np.ndarray
-            Embedding vectors.
-            Shape is (n_sessions, embeddings_dim).
+        embedding_weights : dict
+            Weights of the embedding layers.
         """
-        return obs_mod.get_embeddings(self.model, self.config.session_labels)
+        return obs_mod.get_embedding_weights(self.model, self.config.session_labels)
+
+    def get_session_embeddings(self):
+        """Get the embedding vectors for sessions for each session label.
+
+        Returns
+        -------
+        embeddings : dict
+            Embeddings for each session label.
+        """
+        return obs_mod.get_session_embeddings(self.model, self.config.session_labels)
 
     def get_summed_embeddings(self):
+        """Get the summed embeddings.
+
+        Returns
+        -------
+        summed_embeddings : np.ndarray
+            Summed embeddings. Shape is (n_sessions, embeddings_dim).
+        """
         return obs_mod.get_summed_embeddings(self.model, self.config.session_labels)
 
     def set_group_means(self, group_means, update_initializer=True):
@@ -552,17 +575,17 @@ class Model(MarkovStateInferenceModelBase):
         )
         self.reset()
 
-    def set_embeddings_initializer(self, embeddings):
+    def set_embeddings_initializer(self, initial_embeddings):
         """Set the embeddings initializer.
 
         Parameters
         ----------
-        embeddings : np.ndarray
-            The embeddings. Shape is (n_sessions, embeddings_dim).
+        initial_embeddings : dict
+            Initial embeddings for each session label.
         """
         obs_mod.set_embeddings_initializer(
             self.model,
-            embeddings,
+            initial_embeddings,
         )
         self.reset()
 
@@ -584,9 +607,7 @@ def _model_structure(config):
     static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
     # Session labels input
-    session_labels = [
-        layers.Input(shape=(config.sequence_length,), dtype=tf.int32, name="session_id")
-    ]
+    session_labels = []
     for session_label in config.session_labels:
         session_labels.append(
             layers.Input(
@@ -600,13 +621,7 @@ def _model_structure(config):
             )
         )
 
-    session_label_embeddings_layers = [
-        ConstrainedEmbeddingLayer(
-            config.n_sessions,
-            config.embeddings_dim,
-            name="session_id_embeddings",
-        )
-    ]
+    session_label_embeddings_layers = []
     for session_label in config.session_labels:
         if session_label.label_type == "categorical":
             session_label_embeddings_layers.append(
