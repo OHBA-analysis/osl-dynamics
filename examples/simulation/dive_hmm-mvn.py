@@ -7,7 +7,7 @@ print("Importing packages")
 
 import os
 import numpy as np
-from sklearn.decomposition import PCA
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
@@ -72,10 +72,12 @@ sim = simulation.MSess_HMM_MVN(
     random_seed=1234,
 )
 sim.standardize()
-training_data = data.Data(
-    sim.time_series,
-    session_labels={"session_id": np.arange(config.n_sessions)},
+training_data = data.Data(sim.time_series)
+training_data.add_session_labels(
+    "session_id", np.arange(config.n_sessions), "categorical"
 )
+training_data.add_session_labels("group_id", sim.assigned_groups, "categorical")
+config.session_labels = training_data.get_session_labels()
 
 # Build model
 model = Model(config)
@@ -93,7 +95,7 @@ model.random_subset_initialization(training_data, n_init=5, n_epochs=3, take=1)
 # Full training
 print("Training model")
 history = model.fit(training_data)
-
+model.save("tmp")
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)
 print(f"Free energy: {free_energy}")
@@ -112,9 +114,10 @@ print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
 
 # Plot the simulated and inferred embeddings with group labels
 sim_embeddings = sim.embeddings
-inf_embeddings = model.get_embeddings()
-inf_embeddings -= np.mean(inf_embeddings, axis=0)
-inf_embeddings /= np.std(inf_embeddings, axis=0)
+inf_embeddings = model.get_summed_embeddings()
+lda_inf_embeddings = LinearDiscriminantAnalysis(n_components=2).fit_transform(
+    inf_embeddings, sim.assigned_groups
+)
 group_masks = [sim.assigned_groups == i for i in range(sim.n_groups)]
 
 fig, axes = plotting.create_figure(1, 2, figsize=(10, 5))
@@ -132,8 +135,8 @@ plotting.plot_scatter(
 
 # Perform PCA on the embeddings to visualise the embeddings
 plotting.plot_scatter(
-    [inf_embeddings[group_mask, 0] for group_mask in group_masks],
-    [inf_embeddings[group_mask, 1] for group_mask in group_masks],
+    [lda_inf_embeddings[group_mask, 0] for group_mask in group_masks],
+    [lda_inf_embeddings[group_mask, 1] for group_mask in group_masks],
     x_label="dim1",
     y_label="dim2",
     annotate=[
@@ -147,4 +150,4 @@ axes[1].set_title("Inferred")
 plotting.save(fig, filename="figures/embeddings.png")
 
 # Delete temporary directory
-training_data.delete_dir()
+# training_data.delete_dir()

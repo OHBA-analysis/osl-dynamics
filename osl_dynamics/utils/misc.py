@@ -391,7 +391,7 @@ def save(filename, array):
         np.save(filename, array)
 
 
-def load(filename):
+def load(filename, **kwargs):
     """Load a file.
 
     Parameters
@@ -414,7 +414,7 @@ def load(filename):
     if ext == ".pkl":
         array = pickle.load(open(filename, "rb"))
     else:
-        array = np.load(filename)
+        array = np.load(filename, **kwargs)
 
     return array
 

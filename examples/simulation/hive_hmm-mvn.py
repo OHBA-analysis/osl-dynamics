@@ -7,6 +7,7 @@ print("Importing packages")
 
 import os
 import numpy as np
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
@@ -32,12 +33,12 @@ config = Config(
     dev_activation="tanh",
     dev_normalization="layer",
     dev_regularizer="l1",
-    dev_regularizer_factor=10,
+    dev_regularizer_factor=0.01,
     learn_means=False,
     learn_covariances=True,
     batch_size=64,
     learning_rate=0.005,
-    lr_decay=0.05,
+    lr_decay=0.1,
     n_epochs=40,
     learn_trans_prob=True,
     do_kl_annealing=True,
@@ -68,10 +69,12 @@ sim.standardize()
 sim_stc = np.concatenate(sim.mode_time_course)
 
 # Create training dataset
-training_data = data.Data(
-    sim.time_series,
-    session_labels={"session_id": np.arange(config.n_sessions)},
+training_data = data.Data(sim.time_series)
+training_data.add_session_labels(
+    "session_id", np.arange(config.n_sessions), "categorical"
 )
+training_data.add_session_labels("group_id", sim.assigned_groups, "categorical")
+config.session_labels = training_data.get_session_labels()
 
 # Build model
 model = Model(config)
@@ -128,9 +131,10 @@ print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_s
 print("Fractional occupancies (Inferred):", modes.fractional_occupancies(inf_stc))
 
 sim_embeddings = sim.embeddings
-inf_embeddings = model.get_embeddings()
-inf_embeddings -= np.mean(inf_embeddings, axis=0)
-inf_embeddings /= np.std(inf_embeddings, axis=0)
+inf_embeddings = model.get_summed_embeddings()
+lda_inf_embeddings = LinearDiscriminantAnalysis(n_components=2).fit_transform(
+    inf_embeddings, sim.assigned_groups
+)
 group_masks = [sim.assigned_groups == i for i in range(sim.n_groups)]
 
 fig, axes = plotting.create_figure(1, 2, figsize=(10, 5))
@@ -147,8 +151,8 @@ plotting.plot_scatter(
 )
 
 plotting.plot_scatter(
-    [inf_embeddings[group_mask, 0] for group_mask in group_masks],
-    [inf_embeddings[group_mask, 1] for group_mask in group_masks],
+    [lda_inf_embeddings[group_mask, 0] for group_mask in group_masks],
+    [lda_inf_embeddings[group_mask, 1] for group_mask in group_masks],
     x_label="dim_1",
     y_label="dim_2",
     annotate=[

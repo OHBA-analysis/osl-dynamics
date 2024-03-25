@@ -168,18 +168,25 @@ def set_dev_parameters_initializer(
         covs_beta_layer.tensor_initializer = RandomWeightInitializer(covs_beta, 0.1)
 
 
-def set_embeddings_initializer(model, embeddings):
+def set_embeddings_initializer(model, initial_embeddings):
     """Set the embeddings initializer.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
         The model. * must be :code:`hive` or :code:`dive`.
-    embeddings : np.ndarray
-        The embeddings. Shape is (n_sessions, embeddings_dim).
+    initial_embeddings : dict
+        The initial_embeddings dictionary. {name: initial_embeddings}
     """
-    embeddings_layer = model.get_layer("embeddings")
-    embeddings_layer.embeddings_initializer = WeightInitializer(embeddings)
+
+    def _set_embeddings_initializer(layer_name, initial_embeddings):
+        embedding_layer = model.get_layer(layer_name)
+        embedding_layer.embedding_layer.embeddings_initializer = WeightInitializer(
+            initial_embeddings
+        )
+
+    for k, v in config.items():
+        _set_embeddings_initializer(f"{k}_embeddings", v)
 
 
 def set_means_regularizer(model, training_dataset, layer_name="means"):
@@ -322,22 +329,82 @@ def set_fcs_regularizer(model, training_dataset, epsilon):
     )
 
 
-def get_embeddings(model):
-    """Get the embeddings.
+def get_embedding_weights(model, session_labels):
+    """Get the weights of the embedding layers.
 
     Parameters
     ----------
     model : osl_dynamics.models.*.Model.model
         The model. * must be :code:`hive` or :code:`dive`.
+    session_labels : List[osl_dynamics.data.SessionLabel]
+        List of session labels.
 
     Returns
     -------
-    embeddings : np.ndarray
-        The embeddings. Shape is (n_sessions, embeddings_dim).
+    embedding_weights : dict
+        The weights of the embedding layers.
     """
-    embeddings_layer = model.get_layer("embeddings")
-    n_sessions = embeddings_layer.input_dim
-    return embeddings_layer(np.arange(n_sessions)).numpy()
+    embedding_weights = dict()
+    for session_label in session_labels:
+        label_name = session_label.name
+        label_type = session_label.label_type
+        embeddings_layer = model.get_layer(f"{label_name}_embeddings")
+        if label_type == "categorical":
+            embedding_weights[label_name] = embeddings_layer.embeddings.numpy()
+        else:
+            embedding_weights[label_name] = [
+                embeddings_layer.kernel.numpy(),
+                embeddings_layer.bias.numpy(),
+            ]
+
+    return embedding_weights
+
+
+def get_session_embeddings(model, session_labels):
+    """Get the embeddings for each session.
+
+    Parameters
+    ----------
+    model : osl_dynamics.models.*.Model.model
+        The model. * must be :code:`hive` or :code:`dive`.
+    session_labels : List[osl_dynamics.data.SessionLabel]
+        List of session labels.
+
+    Returns
+    -------
+    embeddings : dict
+        The embeddings for each session label.
+    """
+    embeddings = dict()
+    for session_label in session_labels:
+        label_name = session_label.name
+        label_values = session_label.values
+        embeddings_layer = model.get_layer(f"{label_name}_embeddings")
+        embeddings[label_name] = embeddings_layer(label_values)
+
+    return embeddings
+
+
+def get_summed_embeddings(model, session_labels):
+    """Get the summed embeddings for each session.
+
+    Parameters
+    ----------
+    model : osl_dynamics.models.*.Model.model
+        The model. * must be :code:`hive` or :code:`dive`.
+    session_labels : List[osl_dynamics.data.SessionLabel]
+        List of session labels.
+
+    Returns
+    -------
+    summed_embeddings : np.ndarray
+        The summed embeddings. Shape is (n_sessions, embeddings_dim).
+    """
+    embeddings = get_session_embeddings(model, session_labels)
+    summed_embeddings = 0
+    for _, embedding in embeddings.items():
+        summed_embeddings += embedding
+    return summed_embeddings.numpy()
 
 
 def get_means_spatial_embeddings(model):
@@ -392,7 +459,7 @@ def get_spatial_embeddings(model, map):
         raise ValueError("map must be either 'means' or 'covs'")
 
 
-def get_concatenated_embeddings(model, map, embeddings=None):
+def get_concatenated_embeddings(model, map, session_labels):
     """Get the concatenated embeddings.
 
     Parameters
@@ -411,8 +478,7 @@ def get_concatenated_embeddings(model, map, embeddings=None):
         The concatenated embeddings. Shape is (n_sessions, n_states,
         embeddings_dim + spatial_embeddings_dim).
     """
-    if embeddings is None:
-        embeddings = get_embeddings(model)
+    embeddings = get_summed_embeddings(model, session_labels)
     if map == "means":
         spatial_embeddings = get_means_spatial_embeddings(model)
         concat_embeddings_layer = model.get_layer("means_concat_embeddings")
@@ -523,12 +589,11 @@ def get_dev_mag(model, map):
         dev_mag_layer = model.get_layer("covs_dev_mag")
     else:
         raise ValueError("map must be either 'means' or 'covs'")
-    n_sessions = alpha.shape[0]
-    dev_mag = dev_mag_layer([alpha, beta, np.arange(n_sessions)[:, None]])
+    dev_mag = dev_mag_layer([alpha, beta])
     return dev_mag.numpy()
 
 
-def get_dev_map(model, map, embeddings=None):
+def get_dev_map(model, map, session_labels):
     """Get the deviance map.
 
     Parameters
@@ -549,11 +614,7 @@ def get_dev_map(model, map, embeddings=None):
         If :code:`map="covs"`, shape is (n_sessions, n_states,
         n_channels * (n_channels + 1) // 2).
     """
-    concat_embeddings = get_concatenated_embeddings(
-        model,
-        map,
-        embeddings,
-    )
+    concat_embeddings = get_concatenated_embeddings(model, map, session_labels)
     if map == "means":
         dev_decoder_layer = model.get_layer("means_dev_decoder")
         dev_map_layer = model.get_layer("means_dev_map")
@@ -574,8 +635,7 @@ def get_session_dev(
     model,
     learn_means,
     learn_covariances,
-    embeddings=None,
-    n_neighbours=2,
+    session_labels,
 ):
     """Get the session deviation.
 
@@ -605,29 +665,16 @@ def get_session_dev(
     means_dev_layer = model.get_layer("means_dev")
     covs_dev_layer = model.get_layer("covs_dev")
 
-    if embeddings is not None:
-        nearest_neighbours = get_nearest_neighbours(model, embeddings, n_neighbours)
-
     if learn_means:
         means_dev_mag = get_dev_mag(model, "means")
-        if embeddings is not None:
-            means_dev_mag = np.mean(
-                tf.gather(means_dev_mag, nearest_neighbours, axis=0),
-                axis=1,
-            )
-        means_dev_map = get_dev_map(model=model, map="means", embeddings=embeddings)
+        means_dev_map = get_dev_map(model, "means", session_labels)
         means_dev = means_dev_layer([means_dev_mag, means_dev_map])
     else:
         means_dev = means_dev_layer(1)
 
     if learn_covariances:
         covs_dev_mag = get_dev_mag(model, "covs")
-        if embeddings is not None:
-            covs_dev_mag = np.mean(
-                tf.gather(covs_dev_mag, nearest_neighbours, axis=0),
-                axis=1,
-            )
-        covs_dev_map = get_dev_map(model=model, map="covs", embeddings=embeddings)
+        covs_dev_map = get_dev_map(model, "covs", session_labels)
         covs_dev = covs_dev_layer([covs_dev_mag, covs_dev_map])
     else:
         covs_dev = covs_dev_layer(1)
@@ -639,8 +686,7 @@ def get_session_means_covariances(
     model,
     learn_means,
     learn_covariances,
-    embeddings=None,
-    n_neighbours=2,
+    session_labels,
 ):
     """Get the session means and covariances.
 
@@ -652,12 +698,6 @@ def get_session_means_covariances(
         Whether the mean is learnt.
     learn_covariances : bool
         Whether the covariances are learnt.
-    embeddings : np.ndarray, optional
-        Input embeddings. Shape is (n_sessions, embeddings_dim).
-        If None, then the embeddings are retrieved from the model.
-    n_neighbours : int, optional
-        The number of nearest neighbours if :code:`+embedding` is not
-        :code:`None`.
 
     Returns
     -------
@@ -670,7 +710,7 @@ def get_session_means_covariances(
     group_means = get_observation_model_parameter(model, "group_means")
     group_covs = get_observation_model_parameter(model, "group_covs")
     means_dev, covs_dev = get_session_dev(
-        model, learn_means, learn_covariances, embeddings, n_neighbours
+        model, learn_means, learn_covariances, session_labels
     )
 
     session_means_layer = model.get_layer("session_means")
