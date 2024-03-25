@@ -35,7 +35,7 @@ from osl_dynamics.inference.layers import (
     TFRangeLayer,
     ZeroLayer,
     InverseCholeskyLayer,
-    StaticKLDivergenceLayer,
+    GammaExponentialKLDivergenceLayer,
     MultiLayerPerceptronLayer,
     LearnableTensorLayer,
     StaticLossScalingFactorLayer,
@@ -908,7 +908,7 @@ def _model_structure(config):
             name="means_dev_mag_mod_beta",
         )
 
-        means_dev_mag_kl_loss_layer = StaticKLDivergenceLayer(
+        means_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
             config.covariances_epsilon, name="means_dev_mag_kl_loss"
         )
 
@@ -938,7 +938,7 @@ def _model_structure(config):
             name="covs_dev_mag_mod_beta",
         )
 
-        covs_dev_mag_kl_loss_layer = StaticKLDivergenceLayer(
+        covs_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
             config.covariances_epsilon, name="covs_dev_mag_kl_loss"
         )
 

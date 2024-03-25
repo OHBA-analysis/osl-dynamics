@@ -1316,7 +1316,7 @@ class Data:
                 "sequence_length": self.sequence_length,
                 "n_channels": self.n_channels,
                 "step_size": self.step_size,
-                "session_labels": list(self.session_labels.keys()),
+                "session_labels": [label.name for label in self.session_labels],
                 "n_sessions": self.n_sessions,
             }
             misc.save(f"{tfrecord_dir}/tfrecord_config.pkl", tfrecord_config)

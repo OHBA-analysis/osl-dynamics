@@ -7,7 +7,13 @@ import sys
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import activations, layers, initializers, regularizers
+from tensorflow.keras import (
+    activations,
+    layers,
+    initializers,
+    regularizers,
+    constraints,
+)
 
 import osl_dynamics.inference.initializers as osld_initializers
 
@@ -264,19 +270,14 @@ class SampleGammaDistributionLayer(layers.Layer):
 
     def call(self, inputs, training=None, **kwargs):
         """This method accepts the shape and rate and outputs the samples."""
-        alpha, beta, session_id = inputs
-        # alpha.shape = (n_sessions, n_states, 1)
-        # beta.shape = (n_sessions, n_states, 1)
-        # session_id.shape = (None, sequence_length)
+        alpha, beta = inputs
+        # alpha.shape = (None, n_states, 1)
+        # beta.shape = (None, n_states, 1)
 
         # output.shape = (None, n_states, 1)
 
         alpha = add_epsilon(alpha, self.epsilon)
         beta = add_epsilon(beta, self.epsilon)
-        session_id = session_id[:, 0]  # shape = (None,)
-
-        alpha = tf.gather(alpha, session_id, axis=0)  # shape = (None, n_states, 1)
-        beta = tf.gather(beta, session_id, axis=0)  # shape = (None, n_states, 1)
         if training:
             output = alpha / beta
             if self.annealing_factor > 0:
@@ -1430,24 +1431,20 @@ class ConcatEmbeddingsLayer(layers.Layer):
 
     def call(self, inputs):
         embeddings, spatial_embeddings = inputs
-        n_sessions, embeddings_dim = embeddings.shape
+        batch_size, embeddings_dim = embeddings.shape
         n_states, spatial_embeddings_dim = spatial_embeddings.shape
 
-        # Match dimensions for concatenation
-        embeddings = tf.broadcast_to(
-            tf.expand_dims(embeddings, axis=1),
-            [n_sessions, n_states, embeddings_dim],
-        )
-        spatial_embeddings = tf.broadcast_to(
-            tf.expand_dims(spatial_embeddings, axis=0),
-            [n_sessions, n_states, spatial_embeddings_dim],
-        )
+        place_holder = tf.zeros_like(embeddings[:, 0])  # shape = (None,)
 
-        # Concatenate the embeddings
-        concat_embeddings = tf.concat(
-            [embeddings, spatial_embeddings],
-            axis=-1,
+        # Broadcast the embeddings and spatial embeddings
+        embeddings = tf.expand_dims(embeddings, axis=1) + tf.zeros(
+            (1, n_states, embeddings_dim)
         )
+        spatial_embeddings = tf.expand_dims(
+            spatial_embeddings, axis=0
+        ) + 0 * tf.expand_dims(tf.expand_dims(place_holder, axis=-1), axis=-1)
+
+        concat_embeddings = tf.concat([embeddings, spatial_embeddings], axis=-1)
 
         return concat_embeddings
 
@@ -1528,7 +1525,7 @@ class MixSessionSpecificParametersLayer(layers.Layer):
         return m, C
 
 
-class StaticKLDivergenceLayer(layers.Layer):
+class GammaExponentialKLDivergenceLayer(layers.Layer):
     """Layer to calculate KL divergence between Gamma posterior and exponential
     prior for deviation magnitude.
 
@@ -1544,8 +1541,12 @@ class StaticKLDivergenceLayer(layers.Layer):
         super().__init__(**kwargs)
         self.epsilon = epsilon
 
-    def call(self, inputs, static_loss_scaling_factor=1, **kwargs):
-        data, inference_alpha, inference_beta, model_beta = inputs
+    def call(self, inputs, **kwargs):
+        # inference_alpha.shape = (None, n_states, 1)
+        # inference_beta.shape  = (None, n_states, 1)
+        # model_beta.shape      = (None, n_states, 1)
+
+        inference_alpha, inference_beta, model_beta = inputs
 
         # Add a small error for numerical stability
         inference_alpha = add_epsilon(inference_alpha, self.epsilon)
@@ -1560,8 +1561,8 @@ class StaticKLDivergenceLayer(layers.Layer):
         kl_loss = tfp.distributions.kl_divergence(
             posterior, prior, allow_nan_stats=False
         )
-
-        kl_loss = tf.reduce_sum(kl_loss) * static_loss_scaling_factor
+        kl_loss = tf.reduce_mean(kl_loss, axis=0)
+        kl_loss = tf.reduce_sum(kl_loss)
 
         return kl_loss
 
@@ -1939,3 +1940,61 @@ class SumLogLikelihoodLossLayer(layers.Layer):
         self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
+
+
+class TFGatherLayer(layers.Layer):
+    """Wrapper for `tf.gather \
+        <https://www.tensorflow.org/api_docs/python/tf/gather>`_.
+    """
+
+    def __init__(self, axis, batch_dims=0, **kwargs):
+        super().__init__(**kwargs)
+        self.axis = axis
+        self.batch_dims = batch_dims
+
+    def call(self, inputs, **kwargs):
+        return tf.gather(
+            inputs[0], inputs[1], axis=self.axis, batch_dims=self.batch_dims
+        )
+
+
+class AddLayer(layers.Layer):
+    """Wrapper for `tf.add \
+        <https://www.tensorflow.org/api_docs/python/tf/math/add>`_.
+    """
+
+    def call(self, inputs, **kwargs):
+        out = inputs[0]
+        for tensor in inputs[1:]:
+            out = tf.add(out, tensor)
+        return out
+
+
+class ConstrainedEmbeddingLayer(layers.Layer):
+    """Layer for unit norm constrained embeddings.
+
+    Parameters
+    ----------
+    input_dim : int
+        Input dimension.
+    output_dim : int
+        Output dimension.
+    """
+
+    def __init__(self, input_dim, output_dim, **kwargs):
+        super().__init__(**kwargs)
+        self.embedding_layer = layers.Embedding(
+            input_dim=input_dim,
+            output_dim=output_dim,
+        )
+        self.constrain_layer = constraints.UnitNorm(axis=1)
+        self.layers = [self.embedding_layer]
+
+    def call(self, inputs, **kwargs):
+        output = self.embedding_layer(inputs)
+        output = self.constrain_layer(output)
+        return output
+
+    @property
+    def embeddings(self):
+        return self.constrain_layer(self.embedding_layer.embeddings)

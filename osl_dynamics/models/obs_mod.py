@@ -322,7 +322,7 @@ def set_fcs_regularizer(model, training_dataset, epsilon):
     )
 
 
-def get_embeddings(model):
+def get_embeddings(model, session_labels):
     """Get the embeddings.
 
     Parameters
@@ -335,9 +335,31 @@ def get_embeddings(model):
     embeddings : np.ndarray
         The embeddings. Shape is (n_sessions, embeddings_dim).
     """
-    embeddings_layer = model.get_layer("embeddings")
-    n_sessions = embeddings_layer.input_dim
-    return embeddings_layer(np.arange(n_sessions)).numpy()
+    session_label_embeddings = {
+        "session_id": model.get_layer("session_id_embeddings").embeddings.numpy()
+    }
+    for session_label in session_labels:
+        label_name = session_label.name
+        label_type = session_label.label_type
+        if label_type == "categorical":
+            session_label_embeddings[label_name] = model.get_layer(
+                f"{label_name}_embeddings"
+            ).embeddings.numpy()
+    return session_label_embeddings
+
+
+def get_summed_embeddings(model, session_labels):
+    embeddings = get_embeddings(model, session_labels)
+    summed_embeddings = embeddings["session_id"]
+    for session_label in session_labels:
+        label_name = session_label.name
+        label_values = session_label.values
+        session_label_embeddings_layer = model.get_layer(f"{label_name}_embeddings")
+        summed_embeddings += session_label_embeddings_layer(label_values)
+
+    if isinstance(summed_embeddings, np.ndarray):
+        return summed_embeddings
+    return summed_embeddings.numpy()
 
 
 def get_means_spatial_embeddings(model):
@@ -392,7 +414,7 @@ def get_spatial_embeddings(model, map):
         raise ValueError("map must be either 'means' or 'covs'")
 
 
-def get_concatenated_embeddings(model, map, embeddings=None):
+def get_concatenated_embeddings(model, map, session_labels):
     """Get the concatenated embeddings.
 
     Parameters
@@ -411,8 +433,7 @@ def get_concatenated_embeddings(model, map, embeddings=None):
         The concatenated embeddings. Shape is (n_sessions, n_states,
         embeddings_dim + spatial_embeddings_dim).
     """
-    if embeddings is None:
-        embeddings = get_embeddings(model)
+    embeddings = get_summed_embeddings(model, session_labels)
     if map == "means":
         spatial_embeddings = get_means_spatial_embeddings(model)
         concat_embeddings_layer = model.get_layer("means_concat_embeddings")
@@ -523,12 +544,11 @@ def get_dev_mag(model, map):
         dev_mag_layer = model.get_layer("covs_dev_mag")
     else:
         raise ValueError("map must be either 'means' or 'covs'")
-    n_sessions = alpha.shape[0]
-    dev_mag = dev_mag_layer([alpha, beta, np.arange(n_sessions)[:, None]])
+    dev_mag = dev_mag_layer([alpha, beta])
     return dev_mag.numpy()
 
 
-def get_dev_map(model, map, embeddings=None):
+def get_dev_map(model, map, session_labels):
     """Get the deviance map.
 
     Parameters
@@ -549,11 +569,7 @@ def get_dev_map(model, map, embeddings=None):
         If :code:`map="covs"`, shape is (n_sessions, n_states,
         n_channels * (n_channels + 1) // 2).
     """
-    concat_embeddings = get_concatenated_embeddings(
-        model,
-        map,
-        embeddings,
-    )
+    concat_embeddings = get_concatenated_embeddings(model, map, session_labels)
     if map == "means":
         dev_decoder_layer = model.get_layer("means_dev_decoder")
         dev_map_layer = model.get_layer("means_dev_map")
@@ -574,8 +590,7 @@ def get_session_dev(
     model,
     learn_means,
     learn_covariances,
-    embeddings=None,
-    n_neighbours=2,
+    session_labels,
 ):
     """Get the session deviation.
 
@@ -605,29 +620,16 @@ def get_session_dev(
     means_dev_layer = model.get_layer("means_dev")
     covs_dev_layer = model.get_layer("covs_dev")
 
-    if embeddings is not None:
-        nearest_neighbours = get_nearest_neighbours(model, embeddings, n_neighbours)
-
     if learn_means:
         means_dev_mag = get_dev_mag(model, "means")
-        if embeddings is not None:
-            means_dev_mag = np.mean(
-                tf.gather(means_dev_mag, nearest_neighbours, axis=0),
-                axis=1,
-            )
-        means_dev_map = get_dev_map(model=model, map="means", embeddings=embeddings)
+        means_dev_map = get_dev_map(model, "means", session_labels)
         means_dev = means_dev_layer([means_dev_mag, means_dev_map])
     else:
         means_dev = means_dev_layer(1)
 
     if learn_covariances:
         covs_dev_mag = get_dev_mag(model, "covs")
-        if embeddings is not None:
-            covs_dev_mag = np.mean(
-                tf.gather(covs_dev_mag, nearest_neighbours, axis=0),
-                axis=1,
-            )
-        covs_dev_map = get_dev_map(model=model, map="covs", embeddings=embeddings)
+        covs_dev_map = get_dev_map(model, "covs", session_labels)
         covs_dev = covs_dev_layer([covs_dev_mag, covs_dev_map])
     else:
         covs_dev = covs_dev_layer(1)
@@ -639,8 +641,7 @@ def get_session_means_covariances(
     model,
     learn_means,
     learn_covariances,
-    embeddings=None,
-    n_neighbours=2,
+    session_labels,
 ):
     """Get the session means and covariances.
 
@@ -651,13 +652,7 @@ def get_session_means_covariances(
     learn_means : bool
         Whether the mean is learnt.
     learn_covariances : bool
-        Whether the covariances are learnt.
-    embeddings : np.ndarray, optional
-        Input embeddings. Shape is (n_sessions, embeddings_dim).
-        If None, then the embeddings are retrieved from the model.
-    n_neighbours : int, optional
-        The number of nearest neighbours if :code:`+embedding` is not
-        :code:`None`.
+        Whether the covariances are learnt..
 
     Returns
     -------
@@ -670,7 +665,7 @@ def get_session_means_covariances(
     group_means = get_observation_model_parameter(model, "group_means")
     group_covs = get_observation_model_parameter(model, "group_covs")
     means_dev, covs_dev = get_session_dev(
-        model, learn_means, learn_covariances, embeddings, n_neighbours
+        model, learn_means, learn_covariances, session_labels
     )
 
     session_means_layer = model.get_layer("session_means")
