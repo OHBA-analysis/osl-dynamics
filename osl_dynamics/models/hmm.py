@@ -963,10 +963,10 @@ class Model(ModelBase):
             C = []
             for j in range(self.config.n_states):
                 x = data[stc[:, j] == 1]
-                mu_j = np.mean(x, axis=0)
-                sigma_j = np.cov(x, rowvar=False)
-                m.append(mu_j)
-                C.append(sigma_j)
+                mu = np.mean(x, axis=0)
+                sigma = np.cov(x, rowvar=False)
+                m.append(mu)
+                C.append(sigma)
             means += m
             covariances += C
             n_batches += 1
