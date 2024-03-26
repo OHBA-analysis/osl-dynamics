@@ -132,7 +132,7 @@ class Data:
 
         # Directory to store memory maps created by this class
         self.store_dir = pathlib.Path(store_dir)
-        self.store_dir.mkdir(parents=True, exist_ok=True)
+        self.store_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
 
         # Load and validate the raw data
         self.raw_data_arrays, self.raw_data_filenames = self.load_raw_data()
@@ -1231,7 +1231,7 @@ class Data:
         overwrite : bool, optional
             Should we overwrite the existing TFRecord datasets if there is a need?
         """
-        os.makedirs(tfrecord_dir, exist_ok=True)
+        os.makedirs(tfrecord_dir, mode=0o700, exist_ok=True)
         tfrecord_paths = (
             f"{tfrecord_dir}"
             "/dataset_{array:0{v}d}-of-{n_session:0{v}d}"
