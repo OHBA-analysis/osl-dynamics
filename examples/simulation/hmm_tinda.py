@@ -23,7 +23,6 @@ sim = simulation.HMM_MVN(
     stay_prob=0.9,
     means="zero",
     covariances="random",
-    random_seed=42,
 )
 sim_stc = sim.state_time_course
 

@@ -25,15 +25,13 @@ class MAR:
     covs : np.ndarray
         Covariance of the error :math:`\epsilon_t`. Shape must be
         (n_states, n_channels) or (n_states, n_channels, n_channels).
-    random_seed: int, optional
-        Seed for the random number generator.
 
     Note
     ----
     This model is also known as VAR or MVAR.
     """
 
-    def __init__(self, coeffs, covs, random_seed=None):
+    def __init__(self, coeffs, covs):
         # Validation
         if coeffs.ndim != 4:
             raise ValueError(
@@ -58,9 +56,6 @@ class MAR:
         self.n_states = coeffs.shape[0]
         self.n_channels = coeffs.shape[2]
 
-        # Setup random number generator
-        self._rng = np.random.default_rng(random_seed)
-
     def simulate_data(self, state_time_course):
         """Simulate time series data.
 
@@ -84,7 +79,7 @@ class MAR:
         for i in range(self.n_states):
             time_points_active = state_time_course[:, i] == 1
             n_time_points_active = np.count_nonzero(time_points_active)
-            data[time_points_active] = self._rng.multivariate_normal(
+            data[time_points_active] = np.random.multivariate_normal(
                 np.zeros(self.n_channels),
                 self.covs[i],
                 size=n_time_points_active,

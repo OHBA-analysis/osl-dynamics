@@ -26,8 +26,6 @@ class MVN:
         Number of iterations to add activations to covariance matrices.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int, optional
-        Seed for the random number generator.
     """
 
     def __init__(
@@ -38,9 +36,7 @@ class MVN:
         n_channels=None,
         n_covariances_act=1,
         observation_error=0.0,
-        random_seed=None,
     ):
-        self._rng = np.random.default_rng(random_seed)
         self.n_covariances_act = n_covariances_act
         self.observation_error = observation_error
 
@@ -94,7 +90,7 @@ class MVN:
         if option == "zero":
             means = np.zeros([self.n_modes, self.n_channels])
         elif option == "random":
-            means = self._rng.normal(
+            means = np.random.normal(
                 mu,
                 sigma,
                 size=[self.n_modes, self.n_channels],
@@ -106,7 +102,7 @@ class MVN:
     def create_covariances(self, option, activation_strength=1, eps=1e-6):
         if option == "random":
             # Randomly sample the elements of W from a normal distribution
-            W = self._rng.normal(
+            W = np.random.normal(
                 0, 0.1, size=[self.n_modes, self.n_channels, self.n_channels]
             )
 
@@ -116,7 +112,7 @@ class MVN:
                 n_active_channels = max(1, 2 * self.n_channels // self.n_modes)
                 for i in range(self.n_modes):
                     active_channels = np.unique(
-                        self._rng.integers(
+                        np.random.randint(
                             0,
                             self.n_channels,
                             size=n_active_channels,
@@ -171,7 +167,7 @@ class MVN:
             # Generate data for the time points that this combination of
             # modes is active
             data[np.all(state_time_course == alpha, axis=1)] = (
-                self._rng.multivariate_normal(
+                np.random.multivariate_normal(
                     mu,
                     sigma,
                     size=np.count_nonzero(np.all(state_time_course == alpha, axis=1)),
@@ -179,7 +175,7 @@ class MVN:
             )
 
         # Add an error to the data at all time points
-        data += self._rng.normal(scale=self.observation_error, size=data.shape)
+        data += np.random.normal(scale=self.observation_error, size=data.shape)
 
         return data.astype(np.float32)
 
@@ -235,8 +231,6 @@ class MDyn_MVN(MVN):
         Number of iterations to add activations to covariance matrices.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int, optional
-        Seed for the random number generator.
     """
 
     def __init__(
@@ -247,7 +241,6 @@ class MDyn_MVN(MVN):
         n_channels=None,
         n_covariances_act=1,
         observation_error=0.0,
-        random_seed=None,
     ):
         super().__init__(
             means=means,
@@ -256,7 +249,6 @@ class MDyn_MVN(MVN):
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
             observation_error=observation_error,
-            random_seed=random_seed,
         )
 
         # Get the std and FC from self.covariance
@@ -305,7 +297,7 @@ class MDyn_MVN(MVN):
             # Generate data for the time points that this combination of states
             # is active
             data[np.all(state_time_courses == time_courses, axis=(1, 2))] = (
-                self._rng.multivariate_normal(
+                np.random.multivariate_normal(
                     mu,
                     sigma,
                     size=np.count_nonzero(
@@ -315,7 +307,7 @@ class MDyn_MVN(MVN):
             )
 
         # Add an error to the data at all time points
-        data += self._rng.normal(scale=self.observation_error, size=data.shape)
+        data += np.random.normal(scale=self.observation_error, size=data.shape)
 
         return data.astype(np.float32)
 
@@ -399,8 +391,6 @@ class MSess_MVN(MVN):
         embeddings.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int, optional
-        Seed for the random number generator.
     """
 
     def __init__(
@@ -417,9 +407,7 @@ class MSess_MVN(MVN):
         n_groups=None,
         between_group_scale=None,
         observation_error=0.0,
-        random_seed=None,
     ):
-        self._rng = np.random.default_rng(random_seed)
         self.n_covariances_act = n_covariances_act
         self.observation_error = observation_error
         self.embeddings_dim = embeddings_dim
@@ -557,8 +545,8 @@ class MSess_MVN(MVN):
 
     def create_embeddings(self):
         # Assign groups to sessions
-        assigned_groups = self._rng.choice(self.n_groups, self.n_sessions)
-        self.group_centroids = self._rng.normal(
+        assigned_groups = np.random.choice(self.n_groups, self.n_sessions)
+        self.group_centroids = np.random.normal(
             scale=self.between_group_scale,
             size=[self.n_groups, self.embeddings_dim],
         )
@@ -566,7 +554,7 @@ class MSess_MVN(MVN):
         embeddings = np.zeros([self.n_sessions, self.embeddings_dim])
         for i in range(self.n_groups):
             group_mask = assigned_groups == i
-            embeddings[group_mask] = self._rng.multivariate_normal(
+            embeddings[group_mask] = np.random.multivariate_normal(
                 mean=self.group_centroids[i],
                 cov=self.embeddings_scale * np.eye(self.embeddings_dim),
                 size=[np.sum(group_mask)],
@@ -576,7 +564,7 @@ class MSess_MVN(MVN):
         self.embeddings = embeddings
 
     def create_linear_transform(self, input_dim, output_dim, scale=0.1):
-        linear_transform = self._rng.normal(
+        linear_transform = np.random.normal(
             scale=scale,
             size=(output_dim, input_dim),
         )
@@ -730,7 +718,7 @@ class MSess_MVN(MVN):
             # Generate data for the time points that this combination of
             # modes is active
             data[np.all(mode_time_course == alpha, axis=1)] = (
-                self._rng.multivariate_normal(
+                np.random.multivariate_normal(
                     mu,
                     sigma,
                     size=np.count_nonzero(np.all(mode_time_course == alpha, axis=1)),
@@ -738,7 +726,7 @@ class MSess_MVN(MVN):
             )
 
         # Add an error to the data at all time points
-        data += self._rng.normal(scale=self.observation_error, size=data.shape)
+        data += np.random.normal(scale=self.observation_error, size=data.shape)
 
         return data.astype(np.float32)
 

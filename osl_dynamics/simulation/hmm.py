@@ -30,8 +30,6 @@ class HMM:
     n_states : int, optional
         Number of states. Needed when :code:`trans_prob` is a :code:`str` to
         construct the transition probability matrix.
-    random_seed : int, optional
-        Seed for random number generator.
     """
 
     def __init__(
@@ -39,7 +37,6 @@ class HMM:
         trans_prob,
         stay_prob=None,
         n_states=None,
-        random_seed=None,
     ):
         if isinstance(trans_prob, list):
             trans_prob = np.ndarray(trans_prob)
@@ -112,9 +109,6 @@ class HMM:
         # Infer number of states from the transition probability matrix
         self.n_states = self.trans_prob.shape[0]
 
-        # Setup random number generator
-        self._rng = np.random.default_rng(random_seed)
-
     @staticmethod
     def construct_sequence_trans_prob(stay_prob, n_states):
         trans_prob = np.zeros([n_states, n_states])
@@ -133,7 +127,7 @@ class HMM:
     def generate_states(self, n_samples):
         # Here the time course always start from state 0
         rands = [
-            iter(self._rng.choice(self.n_states, size=n_samples, p=self.trans_prob[i]))
+            iter(np.random.choice(self.n_states, size=n_samples, p=self.trans_prob[i]))
             for i in range(self.n_states)
         ]
         states = np.zeros(n_samples, int)
@@ -165,8 +159,6 @@ class HMM_MAR(Simulation):
     stay_prob : float, optional
         Used to generate the transition probability matrix is
         :code:`trans_prob` is a :code:`str`. Must be between 0 and 1.
-    random_seed : int, optional
-        Seed for random number generator.
     """
 
     def __init__(
@@ -176,10 +168,9 @@ class HMM_MAR(Simulation):
         coeffs,
         covs,
         stay_prob=None,
-        random_seed=None,
     ):
         # Observation model
-        self.obs_mod = MAR(coeffs=coeffs, covs=covs, random_seed=random_seed)
+        self.obs_mod = MAR(coeffs=coeffs, covs=covs)
 
         self.n_states = self.obs_mod.n_states
         self.n_channels = self.obs_mod.n_channels
@@ -190,7 +181,6 @@ class HMM_MAR(Simulation):
             trans_prob=trans_prob,
             stay_prob=stay_prob,
             n_states=self.n_states,
-            random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
         # Initialise base class
@@ -246,8 +236,6 @@ class HMM_MVN(Simulation):
         is a :code:`str`. Must be between 0 and 1.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int, optional
-        Seed for random number generator.
     """
 
     def __init__(
@@ -262,7 +250,6 @@ class HMM_MVN(Simulation):
         n_covariances_act=1,
         stay_prob=None,
         observation_error=0.0,
-        random_seed=None,
     ):
         if n_states is None:
             n_states = n_modes
@@ -275,7 +262,6 @@ class HMM_MVN(Simulation):
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
             observation_error=observation_error,
-            random_seed=random_seed,
         )
 
         self.n_states = self.obs_mod.n_modes
@@ -287,7 +273,6 @@ class HMM_MVN(Simulation):
             trans_prob=trans_prob,
             stay_prob=stay_prob,
             n_states=self.n_states,
-            random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
         # Initialise base class
@@ -365,8 +350,6 @@ class MDyn_HMM_MVN(Simulation):
         is a :code:`str`. Must be between 0 and 1.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int, optional
-        Seed for random number generator.
     """
 
     def __init__(
@@ -381,7 +364,6 @@ class MDyn_HMM_MVN(Simulation):
         n_covariances_act=1,
         stay_prob=None,
         observation_error=0.0,
-        random_seed=None,
     ):
         if n_states is None:
             n_states = n_modes
@@ -394,7 +376,6 @@ class MDyn_HMM_MVN(Simulation):
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
             observation_error=observation_error,
-            random_seed=random_seed,
         )
 
         self.n_states = self.obs_mod.n_modes
@@ -406,13 +387,11 @@ class MDyn_HMM_MVN(Simulation):
             trans_prob=trans_prob,
             stay_prob=stay_prob,
             n_states=self.n_states,
-            random_seed=random_seed if random_seed is None else random_seed + 1,
         )
         self.gamma_hmm = HMM(
             trans_prob=trans_prob,
             stay_prob=stay_prob,
             n_states=self.n_states,
-            random_seed=random_seed if random_seed is None else random_seed + 2,
         )
 
         # Initialise base class
@@ -476,8 +455,6 @@ class HMM_Poi(Simulation):
         Shape must be (n_states, n_channels).
     stay_prob : float
         Used to generate the transition probability matrix is trans_prob is a str.
-    random_seed : int
-        Seed for random number generator.
     """
 
     def __init__(
@@ -488,14 +465,12 @@ class HMM_Poi(Simulation):
         n_states=None,
         n_channels=None,
         stay_prob=None,
-        random_seed=None,
     ):
         # Observation model
         self.obs_mod = Poisson(
             rates=rates,
             n_states=n_states,
             n_channels=n_channels,
-            random_seed=random_seed,
         )
 
         self.n_states = self.obs_mod.n_states
@@ -507,7 +482,6 @@ class HMM_Poi(Simulation):
             trans_prob=trans_prob,
             stay_prob=stay_prob,
             n_states=self.n_states,
-            random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
         # Initialise base class
@@ -583,8 +557,6 @@ class MSess_HMM_MVN(Simulation):
         Standard deviation when generating session-specific stay probability.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int, optional
-        Seed for random number generator.
     """
 
     def __init__(
@@ -606,7 +578,6 @@ class MSess_HMM_MVN(Simulation):
         tc_std=0.0,
         stay_prob=None,
         observation_error=0.0,
-        random_seed=None,
     ):
         if n_states is None:
             n_states = n_modes
@@ -629,7 +600,6 @@ class MSess_HMM_MVN(Simulation):
             n_groups=n_groups,
             between_group_scale=between_group_scale,
             observation_error=observation_error,
-            random_seed=random_seed,
         )
 
         self.n_states = self.obs_mod.n_modes
@@ -638,7 +608,7 @@ class MSess_HMM_MVN(Simulation):
 
         # Vary the stay probability for each session
         if stay_prob is not None:
-            session_stay_prob = self.obs_mod._rng.normal(
+            session_stay_prob = np.random.normal(
                 loc=stay_prob,
                 scale=tc_std,
                 size=self.n_sessions,
@@ -662,7 +632,6 @@ class MSess_HMM_MVN(Simulation):
                 trans_prob=trans_prob[i],
                 stay_prob=session_stay_prob[i],
                 n_states=self.n_states,
-                random_seed=random_seed if random_seed is None else random_seed + 1 + i,
             )
             self.hmm.append(hmm)
             self.state_time_course.append(hmm.generate_states(self.n_samples))
@@ -742,12 +711,6 @@ class HierarchicalHMM_MVN(Simulation):
         Number of iterations to add activations to covariance matrices.
     observation_error : float, optional
         Standard deviation of random noise to be added to the observations.
-    top_level_random_seed : int, optional
-        Random seed for generating the state time course of the top level HMM.
-    bottom_level_random_seeds : list of int, optional
-        Random seeds for the bottom level HMMs.
-    data_random_seed : int, optional
-        Random seed for generating the observed data.
     top_level_stay_prob : float, optional
         The stay_prob for the top level HMM. Used if
         :code:`top_level_trans_prob` is a :code:`str`.
@@ -779,9 +742,6 @@ class HierarchicalHMM_MVN(Simulation):
         n_channels=None,
         n_covariances_act=1,
         observation_error=0.0,
-        top_level_random_seed=None,
-        bottom_level_random_seeds=None,
-        data_random_seed=None,
         top_level_stay_prob=None,
         bottom_level_stay_probs=None,
         top_level_hmm_type="hmm",
@@ -799,7 +759,6 @@ class HierarchicalHMM_MVN(Simulation):
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
             observation_error=observation_error,
-            random_seed=data_random_seed,
         )
 
         self.n_states = self.obs_mod.n_modes
@@ -808,15 +767,11 @@ class HierarchicalHMM_MVN(Simulation):
         if bottom_level_stay_probs is None:
             bottom_level_stay_probs = [None] * len(bottom_level_trans_probs)
 
-        if bottom_level_random_seeds is None:
-            bottom_level_random_seeds = [None] * len(bottom_level_trans_probs)
-
         # Top level HMM
         # This will select the bottom level HMM at each time point
         if top_level_hmm_type.lower() == "hmm":
             self.top_level_hmm = HMM(
                 trans_prob=top_level_trans_prob,
-                random_seed=top_level_random_seed,
                 stay_prob=top_level_stay_prob,
                 n_states=len(bottom_level_trans_probs),
             )
@@ -825,7 +780,6 @@ class HierarchicalHMM_MVN(Simulation):
                 gamma_shape=top_level_gamma_shape,
                 gamma_scale=top_level_gamma_scale,
                 n_states=len(bottom_level_trans_probs),
-                random_seed=top_level_random_seed,
             )
         else:
             raise ValueError(f"Unsupported top_level_hmm_type: {top_level_hmm_type}")
@@ -836,7 +790,6 @@ class HierarchicalHMM_MVN(Simulation):
         self.bottom_level_hmms = [
             HMM(
                 trans_prob=bottom_level_trans_probs[i],
-                random_seed=bottom_level_random_seeds[i],
                 stay_prob=bottom_level_stay_probs[i],
                 n_states=n_states,
             )

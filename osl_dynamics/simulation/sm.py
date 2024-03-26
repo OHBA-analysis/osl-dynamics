@@ -27,9 +27,6 @@ class MixedSine:
         Frequency of each sinusoid.
     sampling_frequency : float
         Sampling frequency.
-    random_seed : int, optional
-        Seed used for the random number generator, which is used to sample
-        an initial phase for each sinusoid.
     """
 
     def __init__(
@@ -39,7 +36,6 @@ class MixedSine:
         amplitudes,
         frequencies,
         sampling_frequency,
-        random_seed=None,
     ):
         if len(relative_activation) != n_modes:
             raise ValueError("len(relative_activation) does not match len(n_modes).")
@@ -55,11 +51,10 @@ class MixedSine:
         self.amplitudes = amplitudes
         self.frequencies = frequencies
         self.sampling_frequency = sampling_frequency
-        self._rng = np.random.default_rng(random_seed)
 
     def generate_modes(self, n_samples):
         # Simulate a random initial phase for each sinusoid
-        self.phases = self._rng.uniform(0, 2 * np.pi, self.n_modes)
+        self.phases = np.random.uniform(0, 2 * np.pi, self.n_modes)
 
         # Generator mode time courses
         self.logits = np.empty([n_samples, self.n_modes], dtype=np.float32)
@@ -112,8 +107,6 @@ class MixedSine_MVN(Simulation):
         Number of channels.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int, optional
-        Seed for random number generator.
     """
 
     def __init__(
@@ -129,7 +122,6 @@ class MixedSine_MVN(Simulation):
         n_modes=None,
         n_channels=None,
         observation_error=0.0,
-        random_seed=None,
     ):
         # Observation model
         self.obs_mod = MVN(
@@ -139,7 +131,6 @@ class MixedSine_MVN(Simulation):
             n_modes=n_modes,
             n_channels=n_channels,
             observation_error=observation_error,
-            random_seed=random_seed,
         )
 
         self.n_modes = self.obs_mod.n_modes
@@ -152,7 +143,6 @@ class MixedSine_MVN(Simulation):
             amplitudes=amplitudes,
             frequencies=frequencies,
             sampling_frequency=sampling_frequency,
-            random_seed=random_seed,
         )
 
         super().__init__(n_samples=n_samples)
@@ -227,8 +217,6 @@ class MSess_MixedSine_MVN(Simulation):
         Scale of variability between groups.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
-    random_seed : int, optional
-        Seed for random number generator.
     """
 
     def __init__(
@@ -250,7 +238,6 @@ class MSess_MixedSine_MVN(Simulation):
         n_groups=None,
         between_group_scale=None,
         observation_error=0.0,
-        random_seed=None,
     ):
         # Observation model
         self.obs_mod = MSess_MVN(
@@ -266,7 +253,6 @@ class MSess_MixedSine_MVN(Simulation):
             n_groups=n_groups,
             between_group_scale=between_group_scale,
             observation_error=observation_error,
-            random_seed=random_seed,
         )
 
         self.n_modes = self.obs_mod.n_modes
@@ -286,7 +272,6 @@ class MSess_MixedSine_MVN(Simulation):
                 amplitudes=amplitudes,
                 frequencies=frequencies,
                 sampling_frequency=sampling_frequency,
-                random_seed=random_seed,
             )
             self.sm.append(sm)
             self.mode_time_course.append(sm.generate_modes(self.n_samples))

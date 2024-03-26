@@ -40,7 +40,6 @@ sim = simulation.MSess_HMM_MVN(
     n_groups=3,
     between_group_scale=0.2,
     stay_prob=0.9,
-    random_seed=1234,
 )
 sim.standardize()
 

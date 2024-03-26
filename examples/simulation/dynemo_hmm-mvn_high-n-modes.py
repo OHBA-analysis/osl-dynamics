@@ -43,7 +43,6 @@ sim = simulation.HMM_MVN(
     stay_prob=0.9,
     means="zero",
     covariances="random",
-    random_seed=123,
 )
 sim.standardize()
 training_data = data.Data(sim.time_series)

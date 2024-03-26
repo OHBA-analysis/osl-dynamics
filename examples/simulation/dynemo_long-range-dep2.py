@@ -84,9 +84,6 @@ sim = HierarchicalHMM_MVN(
     bottom_level_trans_probs=bottom_level_trans_probs,
     means="zero",
     covariances="random",
-    top_level_random_seed=123,
-    bottom_level_random_seeds=[124, 126, 127],
-    data_random_seed=555,
 )
 sim.standardize()
 training_data = Data(sim.time_series)

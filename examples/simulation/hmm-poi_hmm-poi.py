@@ -27,7 +27,6 @@ sim = HMM_Poi(
     n_channels=11,
     trans_prob="sequence",
     stay_prob=0.9,
-    random_seed=123,
 )
 
 # Create Data object for training
