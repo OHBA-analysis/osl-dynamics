@@ -559,14 +559,25 @@ class Model(MarkovStateInferenceModelBase):
                 layer_name="group_covs",
             )
 
-    def set_dev_parameters_initializer(self, training_dataset):
+    def set_dev_parameters_initializer(self, training_data):
         """Set the deviance parameters initializer based on training data.
 
         Parameters
         ----------
-        training_dataset : osl_dynamics.data.Data
-            The training dataset.
+        training_data : osl_dynamics.data.Data or tf.data.Dataset
+            The training data.
         """
+        training_dataset = self.make_dataset(
+            training_data,
+            shuffle=False,
+            concatenate=False,
+        )
+        if len(training_dataset) != self.config.n_sessions:
+            raise ValueError(
+                "The number of sessions in the training data must match "
+                "the number of sessions in the model."
+            )
+
         obs_mod.set_dev_parameters_initializer(
             self.model,
             training_dataset,

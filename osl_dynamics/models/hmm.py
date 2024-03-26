@@ -1399,7 +1399,7 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        training_data : osl_dynamics.data.Data
+        training_data : osl_dynamics.data.Data or list of tf.data.Dataset
             Prepared training data object.
         alpha : list of np.ndarray, optional
             Posterior distribution of the states. Shape is
@@ -1424,7 +1424,15 @@ class Model(ModelBase):
             alpha = [alpha]
 
         # Get the session-specific data
-        data = training_data.time_series(prepared=True, concatenate=False)
+        if isinstance(training_data, list):
+            data = []
+            for d in training_data:
+                subject_data = []
+                for batch in d:
+                    subject_data.append(np.concatenate(batch["data"]))
+                data.append(np.concatenate(subject_data))
+        else:
+            data = training_data.time_series(prepared=True, concatenate=False)
 
         if len(alpha) != len(data):
             raise ValueError(
