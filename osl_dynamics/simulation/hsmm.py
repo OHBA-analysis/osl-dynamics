@@ -32,8 +32,6 @@ class HSMM:
         E.g. :code:`state_vectors=[[1,0,0],[0,1,0],[0,0,1]]` are mutually
         exclusive states. :code:`state_vector.shape[0]` must be more than
         :code:`n_states`.
-    random_seed : int, optional
-        Seed for random number generator.
     """
 
     def __init__(
@@ -44,7 +42,6 @@ class HSMM:
         full_trans_prob=None,
         state_vectors=None,
         n_states=None,
-        random_seed=None,
     ):
         # Validation
         if off_diagonal_trans_prob is not None and full_trans_prob is not None:
@@ -87,9 +84,6 @@ class HSMM:
         self.gamma_shape = gamma_shape
         self.gamma_scale = gamma_scale
 
-        # Setup random number generator
-        self._rng = np.random.default_rng(random_seed)
-
     def construct_off_diagonal_trans_prob(self):
         if (self.off_diagonal_trans_prob is None) and (self.full_trans_prob is None):
             self.off_diagonal_trans_prob = np.ones([self.n_states, self.n_states])
@@ -112,23 +106,20 @@ class HSMM:
         )
         alpha = np.zeros([n_samples, self.state_vectors.shape[1]])
 
-        gamma_sample = self._rng.gamma
-        random_sample = self._rng.uniform
-        current_state = self._rng.integers(0, self.n_states)
+        current_state = np.random.randint(0, self.n_states)
         current_position = 0
 
         while current_position < len(alpha):
             state_lifetime = np.round(
-                gamma_sample(shape=self.gamma_shape, scale=self.gamma_scale)
+                np.random.gamma(shape=self.gamma_shape, scale=self.gamma_scale)
             ).astype(int)
 
             alpha[current_position : current_position + state_lifetime] = (
                 self.state_vectors[current_state]
             )
 
-            rand = random_sample()
             current_state = np.argmin(
-                cumsum_off_diagonal_trans_prob[current_state] < rand
+                cumsum_off_diagonal_trans_prob[current_state] < np.random.uniform()
             )
             current_position += state_lifetime
 
@@ -167,8 +158,6 @@ class HSMM_MVN(Simulation):
         Number of channels in the observation model.
     observation_error : float, optional
         Standard deviation of random noise to be added to the observations.
-    random_seed : int, optional
-        Seed for reproducibility.
     """
 
     def __init__(
@@ -184,7 +173,6 @@ class HSMM_MVN(Simulation):
         n_modes=None,
         n_channels=None,
         observation_error=0.0,
-        random_seed=None,
     ):
         if n_states is None:
             n_states = n_modes
@@ -196,7 +184,6 @@ class HSMM_MVN(Simulation):
             n_modes=n_states,
             n_channels=n_channels,
             observation_error=observation_error,
-            random_seed=random_seed,
         )
 
         self.n_states = self.obs_mod.n_modes
@@ -210,7 +197,6 @@ class HSMM_MVN(Simulation):
             off_diagonal_trans_prob=off_diagonal_trans_prob,
             full_trans_prob=full_trans_prob,
             n_states=self.n_states,
-            random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
         # Initialise base class
@@ -280,8 +266,6 @@ class MixedHSMM_MVN(Simulation):
         Number of channels in the observation model.
     observation_error : float, optional
         Standard deviation of random noise to be added to the observations.
-    random_seed : int, optional
-        Seed for reproducibility.
     """
 
     def __init__(
@@ -297,7 +281,6 @@ class MixedHSMM_MVN(Simulation):
         covariances=None,
         n_channels=None,
         observation_error=0.0,
-        random_seed=None,
     ):
         if mixed_state_vectors is None:
             mixed_state_vectors = mixed_mode_vectors
@@ -319,7 +302,6 @@ class MixedHSMM_MVN(Simulation):
             n_modes=self.n_states,
             n_channels=n_channels,
             observation_error=observation_error,
-            random_seed=random_seed,
         )
         self.n_channels = self.obs_mod.n_channels
 
@@ -335,7 +317,6 @@ class MixedHSMM_MVN(Simulation):
             full_trans_prob=full_trans_prob,
             state_vectors=self.state_vectors,
             n_states=self.n_states + self.n_mixed_states,
-            random_seed=random_seed if random_seed is None else random_seed + 1,
         )
 
         # Initialise base class

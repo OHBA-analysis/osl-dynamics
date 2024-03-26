@@ -52,7 +52,6 @@ sim = simulation.MixedSine_MVN(
     sampling_frequency=250,
     means="zero",
     covariances="random",
-    random_seed=123,
 )
 sim_alp = sim.mode_time_course
 training_data = data.Data(sim.time_series)
