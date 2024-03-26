@@ -4,7 +4,6 @@
 
 import inspect
 import logging
-import os
 import pickle
 import random
 import sys
