@@ -215,16 +215,20 @@ class VariationalInferenceModelBase(ModelBase):
         )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_dataset)
-        n_batches = max(round(n_total_batches * take), 1)
-        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
 
             try:
                 history = self.fit(
@@ -1092,16 +1096,20 @@ class MarkovStateInferenceModelBase(ModelBase):
         )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_dataset)
-        n_batches = max(round(n_total_batches * take), 1)
-        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
 
             try:
                 history = self.fit(
@@ -1184,13 +1192,12 @@ class MarkovStateInferenceModelBase(ModelBase):
             _logger.info(f"Initialization {n}")
             self.reset()
             if take < 1:
-                training_data_subset = training_dataset.shuffle(buffer_size).take(
-                    n_batches
-                )
+                training_data_subset = training_dataset.take(n_batches)
             else:
                 training_data_subset = training_dataset
 
             self.set_random_state_time_course_initialization(training_data_subset)
+
             try:
                 history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             except tf.errors.InvalidArgumentError as e:
@@ -1238,6 +1245,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             dtype=np.float32,
         )
 
+        n_batches = 0
         for batch in training_dataset:
             # Concatenate all the sequences in this batch
             data = np.concatenate(batch["data"])
@@ -1257,9 +1265,9 @@ class MarkovStateInferenceModelBase(ModelBase):
                 C.append(sigma_j)
             means += m
             covariances += C
+            n_batches += 1
 
         # Calculate the average from the running total
-        n_batches = dtf.get_n_batches(training_dataset)
         means /= n_batches
         covariances /= n_batches
 
