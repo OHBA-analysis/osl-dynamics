@@ -113,15 +113,21 @@ def set_dev_parameters_initializer(
     ----------
     model : osl_dynamics.models.*.Model.model
         The model. * must be :code:`hive` or :code:`dive`.
-    training_dataset : osl_dynamics.data.Data
+    training_dataset : tf.data.Dataset
         The training dataset.
     learn_means : bool
         Whether the mean is learnt.
     learn_covariances : bool
         Whether the covariances are learnt.
     """
-    time_series = training_dataset.time_series()
-    n_channels = training_dataset.n_channels
+    time_series = []
+    for d in training_dataset:
+        subject_data = []
+        for batch in d:
+            subject_data.append(np.concatenate(batch["data"]))
+        time_series.append(np.concatenate(subject_data))
+
+    n_channels = time_series[0].shape[1]
     if isinstance(time_series, np.ndarray):
         time_series = [time_series]
     if learn_means:

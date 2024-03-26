@@ -545,7 +545,7 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
-        training_data : osl_dynamics.data.Data
+        training_data : osl_dynamics.data.Data or list of tf.data.Dataset
             Training dataset.
         n_epochs : int, optional
             Number of epochs to train for. Defaults to the value in the
@@ -590,10 +590,18 @@ class Model(VariationalInferenceModelBase):
         means = []
         covariances = []
         with self.set_trainable(fixed_layers, False):
-            for i in trange(training_data.n_sessions, desc="Dual estimation"):
+            if isinstance(training_data, list):
+                n_sessions = len(training_data)
+            else:
+                n_sessions = training_data.n_sessions
+
+            for i in trange(n_sessions, desc="Dual estimation"):
                 # Train on this session
-                with training_data.set_keep(i):
-                    self.fit(training_data, verbose=0)
+                if isinstance(training_data, list):
+                    self.fit(training_data[i], verbose=0)
+                else:
+                    with training_data.set_keep(i):
+                        self.fit(training_data, verbose=0)
 
                 # Get inferred parameters
                 m, c = self.get_means_covariances()

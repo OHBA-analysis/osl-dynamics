@@ -142,6 +142,33 @@ def save_tfrecord(data, sequence_length, step_size, filepath):
             writer.write(_make_example(sequence))
 
 
+def _validate_tf_dataset(dataset):
+    """Check if the input is a valid TensorFlow dataset.
+
+    Parameters
+    ----------
+    dataset : tf.data.Dataset or list
+        TensorFlow dataset or list of datasets.
+
+    Returns
+    -------
+    dataset : tf.data.Dataset
+        TensorFlow dataset.
+    """
+    import tensorflow as tf  # avoid slow imports
+
+    if isinstance(dataset, list):
+        if len(dataset) == 1:
+            dataset = dataset[0]
+        else:
+            dataset = concatenate_datasets(dataset)
+
+    if not isinstance(dataset, tf.data.Dataset):
+        raise ValueError("dataset must be a TensorFlow dataset or a list of datasets")
+
+    return dataset
+
+
 def get_range(dataset):
     """The range (max-min) of values contained in a batched Tensorflow dataset.
 
@@ -157,6 +184,7 @@ def get_range(dataset):
     """
     amax = []
     amin = []
+    dataset = _validate_tf_dataset(dataset)
     for batch in dataset:
         if isinstance(batch, dict):
             batch = batch["data"]
@@ -181,6 +209,7 @@ def get_n_channels(dataset):
     n_channels : int
         Number of channels.
     """
+    dataset = _validate_tf_dataset(dataset)
     for batch in dataset:
         if isinstance(batch, dict):
             batch = batch["data"]
@@ -203,15 +232,7 @@ def get_n_batches(dataset):
     """
     import tensorflow as tf  # avoid slow imports
 
-    if isinstance(dataset, list):
-        if len(dataset) == 1:
-            dataset = dataset[0]
-        else:
-            dataset = concatenate_datasets(dataset)
-
-    if not isinstance(dataset, tf.data.Dataset):
-        raise ValueError("dataset must be a TensorFlow dataset or a list of datasets")
-
+    dataset = _validate_tf_dataset(dataset)
     # Count number of batches
     cardinality = dataset.cardinality()
     if cardinality == tf.data.UNKNOWN_CARDINALITY:
