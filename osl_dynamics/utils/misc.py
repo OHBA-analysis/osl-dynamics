@@ -15,9 +15,6 @@ import numpy as np
 import yaml
 from yaml.constructor import ConstructorError
 
-import nibabel as nib
-from nibabel.nifti1 import Nifti1Image
-
 _logger = logging.getLogger("osl-dynamics")
 
 
