@@ -233,6 +233,7 @@ def get_n_batches(dataset):
     import tensorflow as tf  # avoid slow imports
 
     dataset = _validate_tf_dataset(dataset)
+
     # Count number of batches
     cardinality = dataset.cardinality()
     if cardinality == tf.data.UNKNOWN_CARDINALITY:

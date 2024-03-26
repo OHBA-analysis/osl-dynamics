@@ -935,19 +935,16 @@ class Model(ModelBase):
             state_probs_t0 = np.ones((self.config.n_states,)) / self.config.n_states
         self.state_probs_t0 = state_probs_t0
 
-    def set_random_state_time_course_initialization(self, training_data):
+    def set_random_state_time_course_initialization(self, training_dataset):
         """Sets the initial means/covariances based on a random state time
         course.
 
         Parameters
         ----------
-        training_data : tf.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset
             Training data.
         """
         _logger.info("Setting random means and covariances")
-
-        # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(training_data, concatenate=True)
 
         # Mean and covariance for each state
         means = np.zeros(
