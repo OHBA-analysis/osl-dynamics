@@ -545,7 +545,7 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
-        training_data : osl_dynamics.data.Data
+        training_data : osl_dynamics.data.Data or list of tf.data.Dataset
             Training dataset.
         n_epochs : int, optional
             Number of epochs to train for. Defaults to the value in the

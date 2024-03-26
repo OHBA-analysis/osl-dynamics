@@ -143,7 +143,18 @@ def save_tfrecord(data, sequence_length, step_size, filepath):
 
 
 def _validate_tf_dataset(dataset):
-    """Check if the input is a valid TensorFlow dataset."""
+    """Check if the input is a valid TensorFlow dataset.
+
+    Parameters
+    ----------
+    dataset : tf.data.Dataset or list
+        TensorFlow dataset or list of datasets.
+
+    Returns
+    -------
+    dataset : tf.data.Dataset
+        TensorFlow dataset.
+    """
     import tensorflow as tf  # avoid slow imports
 
     if isinstance(dataset, list):
