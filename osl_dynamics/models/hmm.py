@@ -342,9 +342,6 @@ class Model(ModelBase):
 
         _logger.info("Random subset initialization")
 
-        # Get the buffer size
-        buffer_size = getattr(training_data, "buffer_size", 100000)
-
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data, shuffle=True, concatenate=True
@@ -418,9 +415,6 @@ class Model(ModelBase):
             return
 
         _logger.info("Random state time course initialization")
-
-        # Get the buffer size
-        buffer_size = getattr(training_data, "buffer_size", 100000)
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
