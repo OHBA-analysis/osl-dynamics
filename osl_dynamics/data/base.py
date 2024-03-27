@@ -82,7 +82,7 @@ class Data:
         Default is :code:`./tmp`.
     buffer_size : int, optional
         Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
-        to less random shuffling but will be quicker. Default is 100000.
+        to less random shuffling but will be quicker. Default is 10000.
     use_tfrecord : bool, optional
         Should we save the data as a TensorFlow Record? This is recommended for
         training on large datasets. Default is :code:`False`.
@@ -105,7 +105,7 @@ class Data:
         time_axis_first=True,
         load_memmaps=False,
         store_dir="tmp",
-        buffer_size=100000,
+        buffer_size=10000,
         use_tfrecord=False,
         session_labels=None,
         n_jobs=1,

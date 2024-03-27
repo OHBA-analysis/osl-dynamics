@@ -312,7 +312,7 @@ def load_tfrecord_dataset(
     validation_split=None,
     concatenate=True,
     drop_last_batch=False,
-    buffer_size=100000,
+    buffer_size=10000,
     keep=None,
 ):
     """Load a TFRecord dataset.
@@ -333,7 +333,7 @@ def load_tfrecord_dataset(
         Should we drop the last batch if it is smaller than the batch size?
     buffer_size : int, optional
         Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
-        to less random shuffling but will be quicker. Default is 100000.
+        to less random shuffling but will be quicker. Default is 10000.
     keep : list of int, optional
         List of session indices to keep. If :code:`None`, then all sessions
         are kept.
