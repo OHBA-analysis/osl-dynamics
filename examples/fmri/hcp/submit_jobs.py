@@ -15,7 +15,7 @@ def write_job_script(run, queue="short", n_gpus=1, n_cpus=12):
         file.write(f"#SBATCH -e logs/{name}.err\n")
         file.write(f"#SBATCH -p {queue}\n")
         if "gpu" in queue:
-            file.write("#SBATCH --gres gpu:{n_gpus}\n")
+            file.write(f"#SBATCH --gres gpu:{n_gpus}\n")
         else:
             file.write(f"#SBATCH -c {n_cpus}\n")
         file.write("source activate osld\n")
