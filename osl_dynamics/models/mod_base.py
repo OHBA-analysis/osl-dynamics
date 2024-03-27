@@ -317,8 +317,8 @@ class ModelBase:
                     + "Consider using a TFRecord dataset with Data(..., use_tfrecord=True)."
                 )
 
-            # Data object -> list of Dataset if concatenate=False or
-            # Data object -> Dataset if concatenate=True
+            # Data object -> list of Dataset if concatenate=False
+            # or Data object -> Dataset if concatenate=True
             if inputs.use_tfrecord:
                 outputs = inputs.tfrecord_dataset(
                     self.config.sequence_length,
@@ -337,9 +337,11 @@ class ModelBase:
                     step_size=step_size,
                     drop_last_batch=drop_last_batch,
                 )
+
         elif isinstance(inputs, Dataset) and not concatenate:
             # Dataset -> list of Dataset if concatenate=False
             outputs = [inputs]
+
         else:
             outputs = inputs
 

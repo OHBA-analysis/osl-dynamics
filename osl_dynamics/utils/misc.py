@@ -4,7 +4,6 @@
 
 import inspect
 import logging
-import os
 import pickle
 import random
 import sys
@@ -15,9 +14,6 @@ from contextlib import contextmanager
 import numpy as np
 import yaml
 from yaml.constructor import ConstructorError
-
-import nibabel as nib
-from nibabel.nifti1 import Nifti1Image
 
 _logger = logging.getLogger("osl-dynamics")
 

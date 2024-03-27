@@ -10,6 +10,7 @@ import mat73
 import numpy as np
 import scipy.io
 
+
 _logger = logging.getLogger("osl-dynamics")
 _allowed_ext = [".npy", ".mat", ".txt", ".fif"]
 

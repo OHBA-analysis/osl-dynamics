@@ -342,30 +342,26 @@ class Model(ModelBase):
 
         _logger.info("Random subset initialization")
 
-        # Get the buffer size
-        buffer_size = getattr(training_data, "buffer_size", 100000)
-
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data, shuffle=True, concatenate=True
         )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_dataset)
-        n_batches = max(round(n_total_batches * take), 1)
-        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-
-            training_dataset = self.make_dataset(
-                training_data, shuffle=True, concatenate=True
-            )
-            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
-
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
                 continue
@@ -420,26 +416,26 @@ class Model(ModelBase):
 
         _logger.info("Random state time course initialization")
 
-        # Get the buffer size
-        buffer_size = getattr(training_data, "buffer_size", 100000)
-
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data, shuffle=True, concatenate=True
         )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_dataset)
-        n_batches = max(round(n_total_batches * take), 1)
-        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
-
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
             self.set_random_state_time_course_initialization(training_data_subset)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
@@ -933,19 +929,16 @@ class Model(ModelBase):
             state_probs_t0 = np.ones((self.config.n_states,)) / self.config.n_states
         self.state_probs_t0 = state_probs_t0
 
-    def set_random_state_time_course_initialization(self, training_data):
+    def set_random_state_time_course_initialization(self, training_dataset):
         """Sets the initial means/covariances based on a random state time
         course.
 
         Parameters
         ----------
-        training_data : tf.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset
             Training data.
         """
         _logger.info("Setting random means and covariances")
-
-        # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(training_data, concatenate=True)
 
         # Mean and covariance for each state
         means = np.zeros(
@@ -956,6 +949,7 @@ class Model(ModelBase):
             dtype=np.float32,
         )
 
+        n_batches = 0
         for batch in training_dataset:
             # Concatenate all the sequences in this batch
             data = np.concatenate(batch["data"])
@@ -964,20 +958,30 @@ class Model(ModelBase):
             # probability matrix
             stc = self.sample_state_time_course(data.shape[0])
 
+            # Make sure each state activates
+            non_active_states = np.sum(stc, axis=0) == 0
+            while np.any(non_active_states):
+                new_stc = self.sample_state_time_course(data.shape[0])
+                new_active_states = np.sum(new_stc, axis=0) != 0
+                for j in range(self.config.n_states):
+                    if non_active_states[j] and new_active_states[j]:
+                        stc[:, j] = new_stc[:, j]
+                non_active_states = np.sum(stc, axis=0) == 0
+
             # Calculate the mean/covariance for each state for this batch
             m = []
             C = []
             for j in range(self.config.n_states):
                 x = data[stc[:, j] == 1]
-                mu_j = np.mean(x, axis=0)
-                sigma_j = np.cov(x, rowvar=False)
-                m.append(mu_j)
-                C.append(sigma_j)
+                mu = np.mean(x, axis=0)
+                sigma = np.cov(x, rowvar=False)
+                m.append(mu)
+                C.append(sigma)
             means += m
             covariances += C
+            n_batches += 1
 
         # Calculate the average from the running total
-        n_batches = dtf.get_n_batches(training_dataset)
         means /= n_batches
         covariances /= n_batches
 
