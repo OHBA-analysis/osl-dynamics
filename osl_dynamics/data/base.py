@@ -4,11 +4,12 @@
 
 import re
 import logging
+import os
 import pathlib
 import pickle
+import random
 from contextlib import contextmanager
 from shutil import rmtree
-import os
 from dataclasses import dataclass
 
 import numpy as np
@@ -1105,9 +1106,8 @@ class Data:
             # length
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
-            data = self._create_data_dict(i, array)
-
             # Create dataset
+            data = self._create_data_dict(i, array)
             dataset = dtf.create_dataset(
                 data,
                 self.sequence_length,
@@ -1117,9 +1117,11 @@ class Data:
 
         # Create a dataset from all the arrays concatenated
         if concatenate:
-            full_dataset = dtf.concatenate_datasets(datasets)
-
             if shuffle:
+                # Do a perfect shuffle then concatenate across arrays
+                random.shuffle(datasets)
+                full_dataset = dtf.concatenate_datasets(datasets)
+
                 # Shuffle sequences
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
@@ -1132,6 +1134,9 @@ class Data:
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
             else:
+                # Concatenate across arrays
+                full_dataset = dtf.concatenate_datasets(datasets)
+
                 # Group into mini-batches
                 full_dataset = full_dataset.batch(
                     self.batch_size, drop_remainder=drop_last_batch
@@ -1292,9 +1297,8 @@ class Data:
             # sequence length
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
-            data = self._create_data_dict(i, array)
-
             # Save the dataset
+            data = self._create_data_dict(i, array)
             dtf.save_tfrecord(
                 data,
                 self.sequence_length,
@@ -1371,14 +1375,14 @@ class Data:
 
         tfrecord_dir = tfrecord_dir or self.store_dir
 
-        # Save the TFRecord files
+        # Save and load the TFRecord files
         self.save_tfrecord_dataset(
             tfrecord_dir=tfrecord_dir,
             sequence_length=sequence_length,
             step_size=step_size,
             overwrite=overwrite,
         )
-        return rw.load_tfrecord_dataset(
+        return dtf.load_tfrecord_dataset(
             tfrecord_dir=tfrecord_dir,
             batch_size=batch_size,
             shuffle=shuffle,

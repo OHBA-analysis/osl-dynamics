@@ -11,6 +11,6 @@ New users may find the following tutorials helpful:
 """
 
 from osl_dynamics.data.base import Data, SessionLabels
-from osl_dynamics.data.rw import load_tfrecord_dataset
+from osl_dynamics.data.tf import load_tfrecord_dataset
 
 __all__ = ["Data", "SessionLabels", "load_tfrecord_dataset"]
