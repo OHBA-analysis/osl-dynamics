@@ -1217,15 +1217,10 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         Parameters
         ----------
-        training_data : tf.data.Dataset or osl_dynamics.data.Data
+        training_data : tf.data.Dataset
             Training data.
         """
         _logger.info("Setting random means and covariances")
-
-        # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(
-            training_data, concatenate=True, drop_last_batch=True
-        )
 
         # Mean and covariance for each state
         means = np.zeros(
@@ -1244,6 +1239,16 @@ class MarkovStateInferenceModelBase(ModelBase):
             # Sample a state time course using the initial transition
             # probability matrix
             stc = self.sample_state_time_course(data.shape[0])
+
+            # Make sure each state activates
+            non_active_states = np.sum(stc, axis=0) == 0
+            while np.any(non_active_states):
+                new_stc = self.sample_state_time_course(data.shape[0])
+                new_active_states = np.sum(new_stc, axis=0) != 0
+                for j in range(self.config.n_states):
+                    if non_active_states[j] and new_active_states[j]:
+                        stc[:, j] = new_stc[:, j]
+                non_active_states = np.sum(stc, axis=0) == 0
 
             # Calculate the mean/covariance for each state for this batch
             m = []
