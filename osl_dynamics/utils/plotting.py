@@ -1259,11 +1259,9 @@ def plot_matrices(
     Returns
     -------
     fig : plt.figure
-        Matplotlib figure object. Only returned if :code:`ax=None` and
-        :code:`filename=None`.
+        Matplotlib figure object. Only returned if :code:`filename=None`.
     ax : plt.axes
-        Matplotlib axis object(s). Only returned if :code:`ax=None` and
-        :code:`filename=None`.
+        Matplotlib axis object(s). Only returned if :code:`filename=None`.
     """
     matrix = np.array(matrix)
     if matrix.ndim == 2:

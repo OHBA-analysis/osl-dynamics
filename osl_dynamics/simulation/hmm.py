@@ -420,8 +420,9 @@ class MDyn_HMM_MVN(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
+    def get_instantaneous_covariances(self):
         """Get the ground truth covariances at each time point.
-        
+
         Returns
         -------
         inst_covs : np.ndarray

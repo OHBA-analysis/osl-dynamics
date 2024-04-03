@@ -1211,13 +1211,13 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return best_history
 
-    def set_random_state_time_course_initialization(self, training_data):
+    def set_random_state_time_course_initialization(self, training_dataset):
         """Sets the initial means/covariances based on a random state time
         course.
 
         Parameters
         ----------
-        training_data : tf.data.Dataset
+        training_dataset : tf.data.Dataset
             Training data.
         """
         _logger.info("Setting random means and covariances")
