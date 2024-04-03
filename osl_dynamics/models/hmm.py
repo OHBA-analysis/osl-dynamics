@@ -949,6 +949,7 @@ class Model(ModelBase):
             dtype=np.float32,
         )
 
+        n_time_points_needed = self.config.n_channels * (self.config.n_channels + 1) / 2
         n_batches = 0
         for batch in training_dataset:
             # Concatenate all the sequences in this batch
@@ -959,14 +960,14 @@ class Model(ModelBase):
             stc = self.sample_state_time_course(data.shape[0])
 
             # Make sure each state activates
-            non_active_states = np.sum(stc, axis=0) == 0
+            non_active_states = np.sum(stc, axis=0) < n_time_points_needed
             while np.any(non_active_states):
                 new_stc = self.sample_state_time_course(data.shape[0])
                 new_active_states = np.sum(new_stc, axis=0) != 0
                 for j in range(self.config.n_states):
                     if non_active_states[j] and new_active_states[j]:
                         stc[:, j] = new_stc[:, j]
-                non_active_states = np.sum(stc, axis=0) == 0
+                non_active_states = np.sum(stc, axis=0) < n_time_points_needed
 
             # Calculate the mean/covariance for each state for this batch
             m = []
