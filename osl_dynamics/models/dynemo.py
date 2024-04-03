@@ -643,6 +643,7 @@ class Model(VariationalInferenceModelBase):
 
     def _model_structure(self):
         """Build the model structure."""
+
         config = self.config
 
         # Layer for input
@@ -770,5 +771,7 @@ class Model(VariationalInferenceModelBase):
         kl_loss = kl_loss_layer(kl_div)
 
         return tf.keras.Model(
-            inputs=inputs, outputs=[ll_loss, kl_loss, theta_norm], name="DyNeMo"
+            inputs=inputs,
+            outputs=[ll_loss, kl_loss, theta_norm],
+            name=config.model_name,
         )

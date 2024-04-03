@@ -1998,3 +1998,23 @@ class ConstrainedEmbeddingLayer(layers.Layer):
     @property
     def embeddings(self):
         return self.constrain_layer(self.embedding_layer.embeddings)
+
+
+class ShiftForForecastingLayer(layers.Layer):
+    """Clip two tensors to ensure they align for causal forecasting.
+
+    Parameters
+    ----------
+    clip : int
+        Number of elements to clip.
+    """
+
+    def __init__(self, clip, **kwargs):
+        super().__init__(**kwargs)
+        self.clip = clip
+
+    def call(self, inputs, **kwargs):
+        A, B = inputs
+        A = A[:, : -self.clip]
+        B = B[:, self.clip :]
+        return A, B
