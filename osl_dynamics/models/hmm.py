@@ -182,7 +182,7 @@ class Model(ModelBase):
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(self.config)
+        self.model = self._model_structure()
 
         self.rho = 1
         self.set_trans_prob(self.config.initial_trans_prob)
@@ -304,8 +304,10 @@ class Model(ModelBase):
         dataset : tf.data.Dataset
             TensorFlow dataset.
         """
-        n_batches = dtf.get_n_batches(dataset)
-        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
+        layer_names = [layer.name for layer in self.model.layers]
+        if "static_loss_scaling_factor" in layer_names:
+            n_batches = dtf.get_n_batches(dataset)
+            self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
@@ -738,7 +740,7 @@ class Model(ModelBase):
         return first_term + remaining_terms
 
     def get_log_likelihood(self, data):
-        """Get the log-likelihood of data, :math:`\log p(x_t | s_t)`.
+        r"""Get the log-likelihood of data, :math:`\log p(x_t | s_t)`.
 
         Parameters
         ----------
@@ -1580,61 +1582,64 @@ class Model(ModelBase):
         initializers.reinitialize_model_weights(self.model)
         self.set_trans_prob(self.config.initial_trans_prob)
 
+    def _model_structure(self):
+        """Build the model structure."""
 
-def _model_structure(config):
-    # Inputs
-    inputs = layers.Input(
-        shape=(config.sequence_length, config.n_channels + config.n_states),
-        name="inputs",
-    )
-    data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
+        config = self.config
 
-    # Static loss scaling factor
-    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-        name="static_loss_scaling_factor"
-    )
-    static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+        # Inputs
+        inputs = layers.Input(
+            shape=(config.sequence_length, config.n_channels + config.n_states),
+            name="inputs",
+        )
+        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
 
-    # Definition of layers
-    means_layer = VectorsLayer(
-        config.n_states,
-        config.n_channels,
-        config.learn_means,
-        config.initial_means,
-        config.means_regularizer,
-        name="means",
-    )
-    if config.diagonal_covariances:
-        covs_layer = DiagonalMatricesLayer(
+        # Static loss scaling factor
+        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+            name="static_loss_scaling_factor"
+        )
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+
+        # Definition of layers
+        means_layer = VectorsLayer(
             config.n_states,
             config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
+            config.learn_means,
+            config.initial_means,
+            config.means_regularizer,
+            name="means",
         )
-    else:
-        covs_layer = CovarianceMatricesLayer(
-            config.n_states,
-            config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
+        if config.diagonal_covariances:
+            covs_layer = DiagonalMatricesLayer(
+                config.n_states,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        else:
+            covs_layer = CovarianceMatricesLayer(
+                config.n_states,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        ll_loss_layer = CategoricalLogLikelihoodLossLayer(
+            config.n_states, config.covariances_epsilon, name="ll_loss"
         )
-    ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-        config.n_states, config.covariances_epsilon, name="ll_loss"
-    )
 
-    # Data flow
-    mu = means_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # data not used
-    D = covs_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # data not used
-    ll_loss = ll_loss_layer([data, mu, D, gamma, None])
+        # Data flow
+        mu = means_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # data not used
+        D = covs_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # data not used
+        ll_loss = ll_loss_layer([data, mu, D, gamma, None])
 
-    return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM")
+        return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM")
