@@ -468,8 +468,7 @@ class VariationalInferenceModelBase(ModelBase):
     def set_random_state_time_course_initialization(
         self, training_dataset, stay_prob=0.9
     ):
-        """Sets the initial means/covariances based on a random state time
-        course.
+        """Sets the initial means/covariances based on a random state time course.
 
         Parameters
         ----------
@@ -1379,8 +1378,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         return best_history
 
     def set_random_state_time_course_initialization(self, training_dataset):
-        """Sets the initial means/covariances based on a random state time
-        course.
+        """Sets the initial means/covariances based on a random state time course.
 
         Parameters
         ----------

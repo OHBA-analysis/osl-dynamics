@@ -266,23 +266,22 @@ class Model(HMM):
             update_initializer=update_initializer,
         )
 
-    def set_random_state_time_course_initialization(self, training_data):
+    def set_random_state_time_course_initialization(self, training_dataset):
         """Sets the initial :code:`log_rates` based on a random state time course.
 
         Parameters
         ----------
-        training_data : tf.data.Dataset or osl_dynamics.data.Data
-            Training data.
+        training_dataset : tf.data.Dataset
+            Training datas.
         """
         _logger.info("Setting random log_rates")
-
-        # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(training_data, concatenate=True)
 
         # Log_rate for each state
         rates = np.zeros(
             [self.config.n_states, self.config.n_channels], dtype=np.float32
         )
+
+        n_batches = 0
         for batch in training_dataset:
             # Concatenate all the sequences in this batch
             data = np.concatenate(batch["data"])
@@ -298,9 +297,9 @@ class Model(HMM):
                 mu = np.mean(x, axis=0)
                 rate.append(mu)
             rates += rate
+            n_batches += 1
 
         # Calculate the average from the running total
-        n_batches = dtf.get_n_batches(training_dataset)
         rates /= n_batches
 
         if self.config.learn_log_rates:
@@ -508,8 +507,8 @@ class Model(HMM):
         )
 
         # Data flow
-        mu = log_rates_layer(data)  # data not used
-        ll_loss = ll_loss_layer([data, mu, gamma, None])
+        log_rates = log_rates_layer(data)  # data not used
+        ll_loss = ll_loss_layer([data, log_rates, gamma, None])
 
         return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name=config.model_name)
 
