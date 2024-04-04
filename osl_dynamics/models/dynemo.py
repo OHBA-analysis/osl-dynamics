@@ -622,17 +622,11 @@ class Model(VariationalInferenceModelBase):
         """Select the covariance layer based on the config."""
         config = self.config
         if config.diagonal_covariances:
-            return DiagonalMatricesLayer(
-                config.n_modes,
-                config.n_channels,
-                config.learn_covariances,
-                config.initial_covariances,
-                config.covariances_epsilon,
-                config.covariances_regularizer,
-                name="covs",
-            )
-        return CovarianceMatricesLayer(
-            config.n_modes,
+            CovsLayer = DiagonalMatricesLayer
+        else:
+            CovsLayer = CovarianceMatricesLayer
+        return CovsLayer(
+            config.n_modes or config.n_states,
             config.n_channels,
             config.learn_covariances,
             config.initial_covariances,

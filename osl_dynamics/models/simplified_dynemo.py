@@ -27,7 +27,7 @@ from osl_dynamics.inference.layers import (
     LogLikelihoodLossLayer,
     ZeroLayer,
 )
-from osl_dynamics.models.dynemo import Model as DyNeMoModel
+from osl_dynamics.models.dynemo import Model as DyNeMo
 from osl_dynamics.models.inf_mod_base import VariationalInferenceModelConfig
 from osl_dynamics.models.mod_base import BaseModelConfig
 
@@ -149,7 +149,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
                 self.covariances_epsilon = 0.0
 
 
-class Model(DyNeMoModel):
+class Model(DyNeMo):
     """Simplified DyNeMo model class.
 
     Parameters
