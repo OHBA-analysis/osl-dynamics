@@ -497,25 +497,30 @@ class VariationalInferenceModelBase(ModelBase):
             dtype=np.float32,
         )
 
-        n_time_points_needed = self.config.n_channels * (self.config.n_channels + 1) / 2
         n_batches = 0
         for batch in training_dataset:
             # Concatenate all the sequences in this batch
             data = np.concatenate(batch["data"])
+
+            if data.shape[0] < 2 * self.config.n_channels:
+                raise ValueError(
+                    "Not enough time points in batch, "
+                    "increase batch_size or sequence_length"
+                )
 
             # Sample a state time course using the initial transition
             # probability matrix
             stc = sim.generate_states(data.shape[0])
 
             # Make sure each state activates
-            non_active_states = np.sum(stc, axis=0) < n_time_points_needed
+            non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
             while np.any(non_active_states):
                 new_stc = sim.generate_states(data.shape[0])
                 new_active_states = np.sum(new_stc, axis=0) != 0
                 for j in range(self.config.n_states):
                     if non_active_states[j] and new_active_states[j]:
                         stc[:, j] = new_stc[:, j]
-                non_active_states = np.sum(stc, axis=0) < n_time_points_needed
+                non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
 
             # Calculate the mean/covariance for each state for this batch
             m = []
@@ -1393,25 +1398,30 @@ class MarkovStateInferenceModelBase(ModelBase):
             dtype=np.float32,
         )
 
-        n_time_points_needed = self.config.n_channels * (self.config.n_channels + 1) / 2
         n_batches = 0
         for batch in training_dataset:
             # Concatenate all the sequences in this batch
             data = np.concatenate(batch["data"])
+
+            if data.shape[0] < 2 * self.config.n_channels:
+                raise ValueError(
+                    "Not enough time points in batch, "
+                    "increase batch_size or sequence_length"
+                )
 
             # Sample a state time course using the initial transition
             # probability matrix
             stc = self.sample_state_time_course(data.shape[0])
 
             # Make sure each state activates
-            non_active_states = np.sum(stc, axis=0) < n_time_points_needed
+            non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
             while np.any(non_active_states):
                 new_stc = self.sample_state_time_course(data.shape[0])
                 new_active_states = np.sum(new_stc, axis=0) != 0
                 for j in range(self.config.n_states):
                     if non_active_states[j] and new_active_states[j]:
                         stc[:, j] = new_stc[:, j]
-                non_active_states = np.sum(stc, axis=0) < n_time_points_needed
+                non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
 
             # Calculate the mean/covariance for each state for this batch
             m = []
