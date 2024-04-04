@@ -380,6 +380,173 @@ class VariationalInferenceModelBase(ModelBase):
             **kwargs,
         )
 
+    def random_state_time_course_initialization(
+        self, training_data, n_epochs, n_init, take=1, stay_prob=0.9, **kwargs
+    ):
+        """Random state time course initialization.
+
+        The model is trained for a few epochs with a sampled state time course
+        initialization. The model with the best free energy is kept.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int
+            Number of epochs to train the model.
+        n_init : int
+            Number of initializations.
+        take : float, optional
+            Fraction of total batches to take.
+        stay_prob : float, optional
+            Stay probability (diagonal for the transition probability
+            matrix). Other states have uniform probability.
+        kwargs : keyword arguments, optional
+            Keyword arguments for the fit method.
+
+        Returns
+        -------
+        history : history
+            The training history of the best initialization.
+        """
+        if n_init is None or n_init == 0:
+            _logger.info(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        _logger.info("Random state time course initialization")
+
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True, drop_last_batch=True
+        )
+
+        # Calculate the number of batches to use
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+
+        # Pick the initialization with the lowest free energy
+        best_loss = np.Inf
+        for n in range(n_init):
+            _logger.info(f"Initialization {n}")
+            self.reset()
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
+
+            self.set_random_state_time_course_initialization(
+                training_data_subset, stay_prob
+            )
+
+            try:
+                history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            except tf.errors.InvalidArgumentError as e:
+                _logger.warning(e)
+                _logger.warning("Training failed! Skipping initialization.")
+                continue
+
+            loss = history["loss"][-1]
+            if loss < best_loss:
+                best_initialization = n
+                best_loss = loss
+                best_history = history
+                best_weights = self.get_weights()
+
+        if best_loss == np.Inf:
+            raise ValueError("No valid initializations were found.")
+
+        _logger.info(f"Using initialization {best_initialization}")
+        self.set_weights(best_weights)
+
+        return best_history
+
+    def set_random_state_time_course_initialization(
+        self, training_dataset, stay_prob=0.9
+    ):
+        """Sets the initial means/covariances based on a random state time
+        course.
+
+        Parameters
+        ----------
+        training_dataset : tf.data.Dataset
+            Training data.
+        stay_prob : float, optional
+            Stay probability (diagonal for the transition probability
+            matrix). Other states have uniform probability.
+        """
+        _logger.info("Setting random means and covariances")
+
+        # HMM simulation to sample from
+        sim = HMM(
+            trans_prob="uniform",
+            stay_prob=stay_prob,
+            n_states=self.config.n_states or self.config.n_modes,
+        )
+
+        # Mean and covariance for each state
+        means = np.zeros(
+            [self.config.n_states, self.config.n_channels], dtype=np.float32
+        )
+        covariances = np.zeros(
+            [self.config.n_states, self.config.n_channels, self.config.n_channels],
+            dtype=np.float32,
+        )
+
+        n_batches = 0
+        for batch in training_dataset:
+            # Concatenate all the sequences in this batch
+            data = np.concatenate(batch["data"])
+
+            if data.shape[0] < 2 * self.config.n_channels:
+                raise ValueError(
+                    "Not enough time points in batch, "
+                    "increase batch_size or sequence_length"
+                )
+
+            # Sample a state time course using the initial transition
+            # probability matrix
+            stc = sim.generate_states(data.shape[0])
+
+            # Make sure each state activates
+            non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+            while np.any(non_active_states):
+                new_stc = sim.generate_states(data.shape[0])
+                new_active_states = np.sum(new_stc, axis=0) != 0
+                for j in range(self.config.n_states):
+                    if non_active_states[j] and new_active_states[j]:
+                        stc[:, j] = new_stc[:, j]
+                non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+
+            # Calculate the mean/covariance for each state for this batch
+            m = []
+            C = []
+            for j in range(self.config.n_states):
+                x = data[stc[:, j] == 1]
+                mu = np.mean(x, axis=0)
+                sigma = np.cov(x, rowvar=False)
+                m.append(mu)
+                C.append(sigma)
+            means += m
+            covariances += C
+            n_batches += 1
+
+        # Calculate the average from the running total
+        means /= n_batches
+        covariances /= n_batches
+
+        if self.config.learn_means:
+            # Set initial means
+            self.set_means(means, update_initializer=True)
+
+        if self.config.learn_covariances:
+            # Set initial covariances
+            self.set_covariances(covariances, update_initializer=True)
+
     def reset_kl_annealing_factor(self):
         """Sets the KL annealing factor to zero.
 
@@ -1231,25 +1398,30 @@ class MarkovStateInferenceModelBase(ModelBase):
             dtype=np.float32,
         )
 
-        n_time_points_needed = self.config.n_channels * (self.config.n_channels + 1) / 2
         n_batches = 0
         for batch in training_dataset:
             # Concatenate all the sequences in this batch
             data = np.concatenate(batch["data"])
+
+            if data.shape[0] < 2 * self.config.n_channels:
+                raise ValueError(
+                    "Not enough time points in batch, "
+                    "increase batch_size or sequence_length"
+                )
 
             # Sample a state time course using the initial transition
             # probability matrix
             stc = self.sample_state_time_course(data.shape[0])
 
             # Make sure each state activates
-            non_active_states = np.sum(stc, axis=0) < n_time_points_needed
+            non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
             while np.any(non_active_states):
                 new_stc = self.sample_state_time_course(data.shape[0])
                 new_active_states = np.sum(new_stc, axis=0) != 0
                 for j in range(self.config.n_states):
                     if non_active_states[j] and new_active_states[j]:
                         stc[:, j] = new_stc[:, j]
-                non_active_states = np.sum(stc, axis=0) < n_time_points_needed
+                non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
 
             # Calculate the mean/covariance for each state for this batch
             m = []

@@ -14,20 +14,15 @@ tf_ops.gpu_growth()
 config = Config(
     n_states=5,
     n_channels=11,
-    sequence_length=200,
-    inference_n_units=64,
-    inference_normalization="layer",
+    sequence_length=100,
     model_n_units=64,
     model_normalization="layer",
     learn_means=False,
     learn_covariances=True,
-    do_kl_annealing=True,
-    kl_annealing_curve="tanh",
-    kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
     batch_size=16,
-    learning_rate=0.005,
-    n_epochs=200,
+    learning_rate=0.01,
+    lr_decay=0,
+    n_epochs=50,
 )
 
 # Simulate data
@@ -47,6 +42,14 @@ training_data = data.Data(sim.time_series)
 # Build model
 model = Model(config)
 model.summary()
+
+# Initialization
+init_history = model.random_state_time_course_initialization(
+    training_data,
+    n_epochs=10,
+    n_init=5,
+    take=1,
+)
 
 print("Training model")
 history = model.fit(training_data)
