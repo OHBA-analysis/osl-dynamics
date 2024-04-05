@@ -75,16 +75,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     covariances_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for covariance matrices.
 
-    do_kl_annealing : bool
-        Should we use KL annealing during training?
-    kl_annealing_curve : str
-        Type of KL annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
-    kl_annealing_sharpness : float
-        Parameter to control the shape of the annealing curve if
-        :code:`kl_annealing_curve='tanh'`.
-    n_kl_annealing_epochs : int
-        Number of epochs to perform KL annealing.
-
     batch_size : int
         Mini-batch size.
     learning_rate : float

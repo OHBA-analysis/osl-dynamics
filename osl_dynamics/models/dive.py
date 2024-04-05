@@ -49,7 +49,7 @@ from osl_dynamics.data import SessionLabels
 
 @dataclass
 class Config(BaseModelConfig, VariationalInferenceModelConfig):
-    """Settings for SE-DyNeMo.
+    """Settings for DIVE.
 
     Parameters
     ----------
@@ -523,7 +523,7 @@ class Model(VariationalInferenceModelBase):
         )
 
     def random_subject_initialization(self, **kwargs):
-        """random subject initialisation not compatible with SE-DyNeMo."""
+        """random subject initialisation not compatible with DIVE."""
         raise AttributeError(
             " 'Model' object has no attribute 'random_subject_initialization'."
         )

@@ -462,6 +462,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         _logger.info(f"Using initialization {best_initialization}")
         self.set_weights(best_weights)
+        self.reset_kl_annealing_factor()
 
         return best_history
 
@@ -489,10 +490,15 @@ class VariationalInferenceModelBase(ModelBase):
 
         # Mean and covariance for each state
         means = np.zeros(
-            [self.config.n_states, self.config.n_channels], dtype=np.float32
+            [self.config.n_states or self.config.n_modes, self.config.n_channels],
+            dtype=np.float32,
         )
         covariances = np.zeros(
-            [self.config.n_states, self.config.n_channels, self.config.n_channels],
+            [
+                self.config.n_states or self.config.n_modes,
+                self.config.n_channels,
+                self.config.n_channels,
+            ],
             dtype=np.float32,
         )
 
@@ -516,7 +522,7 @@ class VariationalInferenceModelBase(ModelBase):
             while np.any(non_active_states):
                 new_stc = sim.generate_states(data.shape[0])
                 new_active_states = np.sum(new_stc, axis=0) != 0
-                for j in range(self.config.n_states):
+                for j in range(self.config.n_states or self.config.n_modes):
                     if non_active_states[j] and new_active_states[j]:
                         stc[:, j] = new_stc[:, j]
                 non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
@@ -524,7 +530,7 @@ class VariationalInferenceModelBase(ModelBase):
             # Calculate the mean/covariance for each state for this batch
             m = []
             C = []
-            for j in range(self.config.n_states):
+            for j in range(self.config.n_states or self.config.n_modes):
                 x = data[stc[:, j] == 1]
                 mu = np.mean(x, axis=0)
                 sigma = np.cov(x, rowvar=False)
@@ -1542,7 +1548,7 @@ class MarkovStateInferenceModelBase(ModelBase):
                 predictions["gamma"], predictions["xi"]
             )
             fe = ll_loss + entropy - prior
-            if self.config.model_name == "SE-HMM":
+            if self.config.model_name == "HIVE":
                 kl_loss = np.mean(predictions["kl_loss"])
                 fe += kl_loss
             free_energy.append(fe)
