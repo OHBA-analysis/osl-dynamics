@@ -20,6 +20,7 @@ import numpy as np
 from nilearn import plotting
 from scipy import stats
 from tqdm.auto import trange
+import matplotlib.pyplot as plt
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import gmm
@@ -759,6 +760,9 @@ def save(
     component=None,
     threshold=0,
     plot_kwargs=None,
+    axes=None,
+    combined=False,
+    titles=None,
 ):
     """Save connectivity maps as image files.
 
@@ -787,6 +791,13 @@ def save(
         (n_modes,).
     plot_kwargs : dict, optional
         Keyword arguments to pass to the nilearn plotting function.
+    axes : list, optional
+        List of matplotlib axes to plot the connectivity maps on.
+    combined : bool, optional
+        Should the connectivity maps be combined on the same figure?
+    titles : list, optional
+        List of titles for each connectivity map. Only used if
+        :code:`combined=True`.
 
     Examples
     --------
@@ -838,6 +849,8 @@ def save(
 
     # Loop through each connectivity map
     n_modes = conn_map.shape[0]
+    axes = axes or [None] * n_modes
+    output_files = []
     for i in trange(n_modes, desc="Saving images"):
         # Overwrite keyword arguments if passed
         kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
@@ -861,8 +874,24 @@ def save(
             parcellation.roi_centers(),
             edge_threshold=f"{threshold[i] * 100}%",
             output_file=output_file,
+            axes=axes[i],
             **kwargs,
         )
+        output_files.append(output_file)
+
+    if combined:
+        # Combine the images
+        if filename is None:
+            raise ValueError("filename must be passed to save the combined image.")
+
+        titles = titles or [None] * n_modes
+        fig, axes = plt.subplots(1, n_modes, figsize=(n_modes * 10, 5))
+        for i, ax in enumerate(axes):
+            ax.imshow(plt.imread(output_files[i]))
+            ax.axis("off")
+            ax.set_title(titles[i], fontsize=20)
+        fig.tight_layout()
+        fig.savefig(filename)
 
 
 def save_interactive(
