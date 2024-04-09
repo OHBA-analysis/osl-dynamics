@@ -18,6 +18,7 @@ import numpy as np
 import nibabel as nib
 from nilearn import plotting
 from tqdm.auto import trange
+import matplotlib.pyplot as plt
 
 from osl_dynamics import array_ops, files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
@@ -300,6 +301,9 @@ def save(
     subtract_mean=False,
     mean_weights=None,
     plot_kwargs=None,
+    show_plots=True,
+    combined=False,
+    titles=None,
 ):
     """Saves power maps.
 
@@ -334,6 +338,13 @@ def save(
         Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
         <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
         .plot_img_on_surf.html>`_.
+    show_plots : bool, optional
+        Should the individual plots be shown on screen (for Juptyer notebooks)?
+    combined : bool, optional
+        Should the individual plots be combined into a single image?
+        The combined image is always shown on screen (for Juptyer notebooks).
+    titles : list, optional
+        List of titles for each power plot. Only used if :code:`combined=True`.
 
     Returns
     -------
@@ -439,6 +450,7 @@ def save(
 
         else:
             # Save each map as an image
+            output_files = []
             for i in trange(n_modes, desc="Saving images"):
                 nii = nib.Nifti1Image(
                     power_map[:, :, :, i],
@@ -451,7 +463,22 @@ def save(
                 output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
                     fn=Path(filename), i=i, w=len(str(n_modes))
                 )
+                output_files.append(output_file)
                 fig.savefig(output_file)
+
+                if not show_plots:
+                    plt.close(fig)
+
+            if combined:
+                titles = titles or [None] * n_modes
+                # Combine images into a single image
+                fig, axes = plt.subplots(1, n_modes, figsize=(n_modes * 5, 5))
+                for i, ax in enumerate(axes):
+                    ax.imshow(plt.imread(output_files[i]))
+                    ax.axis("off")
+                    ax.set_title(titles[i], fontsize=20)
+                fig.tight_layout()
+                fig.savefig(filename)
 
 
 def multi_save(
