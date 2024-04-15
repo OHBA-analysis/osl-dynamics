@@ -270,14 +270,19 @@ class SampleGammaDistributionLayer(layers.Layer):
 
     def call(self, inputs, training=None, **kwargs):
         """This method accepts the shape and rate and outputs the samples."""
-        alpha, beta = inputs
-        # alpha.shape = (None, n_states, 1)
-        # beta.shape = (None, n_states, 1)
+        alpha, beta, session_id = inputs
+        # alpha.shape = (n_sessions, n_states, 1)
+        # beta.shape = (n_sessions, n_states, 1)
+        # session_id.shape = (None, sequence_length)
 
         # output.shape = (None, n_states, 1)
 
         alpha = add_epsilon(alpha, self.epsilon)
         beta = add_epsilon(beta, self.epsilon)
+        session_id = session_id[:, 0]
+
+        alpha = tf.gather(alpha, session_id, axis=0)  # shape = (None, n_states, 1)
+        beta = tf.gather(beta, session_id, axis=0)  # shape = (None, n_states, 1)
         if training:
             output = alpha / beta
             if self.annealing_factor > 0:
@@ -1541,10 +1546,10 @@ class GammaExponentialKLDivergenceLayer(layers.Layer):
         super().__init__(**kwargs)
         self.epsilon = epsilon
 
-    def call(self, inputs, **kwargs):
-        # inference_alpha.shape = (None, n_states, 1)
-        # inference_beta.shape  = (None, n_states, 1)
-        # model_beta.shape      = (None, n_states, 1)
+    def call(self, inputs, static_loss_scaling_factor=1, **kwargs):
+        # inference_alpha.shape = (n_sessions, n_states, 1)
+        # inference_beta.shape  = (n_sessions, n_states, 1)
+        # model_beta.shape      = (n_sessions, n_states, 1)
 
         inference_alpha, inference_beta, model_beta = inputs
 
@@ -1561,10 +1566,9 @@ class GammaExponentialKLDivergenceLayer(layers.Layer):
         kl_loss = tfp.distributions.kl_divergence(
             posterior, prior, allow_nan_stats=False
         )
-        kl_loss = tf.reduce_mean(kl_loss, axis=0)
         kl_loss = tf.reduce_sum(kl_loss)
 
-        return kl_loss
+        return kl_loss * static_loss_scaling_factor
 
 
 class MultiLayerPerceptronLayer(layers.Layer):
@@ -1987,17 +1991,22 @@ class ConstrainedEmbeddingLayer(layers.Layer):
             input_dim=input_dim,
             output_dim=output_dim,
         )
-        self.constrain_layer = constraints.UnitNorm(axis=1)
         self.layers = [self.embedding_layer]
 
     def call(self, inputs, **kwargs):
         output = self.embedding_layer(inputs)
-        output = self.constrain_layer(output)
+
+        # Add the last element to ensure the embeddings are unit norm
+        norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)
+        output = tf.concat([2 * output, norm_sq - 1], axis=-1) / (norm_sq + 1)
         return output
 
     @property
     def embeddings(self):
-        return self.constrain_layer(self.embedding_layer.embeddings)
+        output = self.embedding_layer.embeddings
+        norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)
+        output = tf.concat([2 * output, norm_sq - 1], axis=-1) / (norm_sq + 1)
+        return output
 
 
 class ShiftForForecastingLayer(layers.Layer):
@@ -2018,3 +2027,16 @@ class ShiftForForecastingLayer(layers.Layer):
         A = A[:, : -self.clip]
         B = B[:, self.clip :]
         return A, B
+
+
+class TFConstantLayer(layers.Layer):
+    """Wrapper for `tf.constant \
+        <https://www.tensorflow.org/api_docs/python/tf/constant>`_.
+    """
+
+    def __init__(self, values, **kwargs):
+        super().__init__(**kwargs)
+        self.values = values
+
+    def call(self, inputs, **kwargs):
+        return tf.constant(self.values)

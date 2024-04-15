@@ -1300,6 +1300,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         _logger.info(f"Using initialization {best_initialization}")
         self.set_weights(best_weights)
+        self.reset_kl_annealing_factor()
 
         return best_history
 
@@ -1380,6 +1381,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         _logger.info(f"Using initialization {best_initialization}")
         self.set_weights(best_weights)
+        self.reset_kl_annealing_factor()
 
         return best_history
 

@@ -12,7 +12,8 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.hive import Config, Model
-from osl_dynamics.utils import plotting
+from osl_dynamics.utils import plotting, set_random_seed
+
 
 # Directory for plots
 os.makedirs("figures", exist_ok=True)
@@ -20,6 +21,7 @@ os.makedirs("figures", exist_ok=True)
 # GPU settings
 tf_ops.gpu_growth()
 
+set_random_seed(1234)
 # Settings
 config = Config(
     n_states=5,
