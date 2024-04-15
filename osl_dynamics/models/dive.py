@@ -10,7 +10,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import layers
 
-import osl_dynamics.data.tf as dtf
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.models.inf_mod_base import (
@@ -40,9 +39,8 @@ from osl_dynamics.inference.layers import (
     LearnableTensorLayer,
     StaticLossScalingFactorLayer,
     BatchSizeLayer,
-    TFGatherLayer,
     AddLayer,
-    ConstrainedEmbeddingLayer,
+    TFConstantLayer,
 )
 from osl_dynamics.data import SessionLabels
 
@@ -545,51 +543,42 @@ def _model_structure(config):
     )
     static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
-    # Session labels input
-    session_labels = []
+    session_id = layers.Input(
+        shape=(config.sequence_length,),
+        dtype=tf.int32,
+        name="session_id",
+    )
+    session_label_layers = dict()
+    session_labels = dict()
+    label_embeddings_layers = dict()
+    label_embeddings = []
     for session_label in config.session_labels:
-        session_labels.append(
-            layers.Input(
-                shape=(config.sequence_length,),
-                dtype=(
-                    tf.int32
-                    if session_label.label_type == "categorical"
-                    else tf.float32
-                ),
-                name=session_label.name,
+        session_label_layers[session_label.name] = TFConstantLayer(
+            values=session_label.values,
+            name=f"{session_label.name}_constant",
+        )
+        session_labels[session_label.name] = session_label_layers[session_label.name](
+            data
+        )
+        label_embeddings_layers[session_label.name] = (
+            layers.Embedding(
+                session_label.n_classes,
+                config.embeddings_dim,
+                name=f"{session_label.name}_embeddings",
+            )
+            if session_label.label_type == "categorical"
+            else layers.Dense(
+                config.embeddings_dim, name=f"{session_label.name}_embeddings"
             )
         )
-
-    session_label_embeddings_layers = []
-    for session_label in config.session_labels:
-        if session_label.label_type == "categorical":
-            session_label_embeddings_layers.append(
-                ConstrainedEmbeddingLayer(
-                    session_label.n_classes,
-                    config.embeddings_dim,
-                    name=f"{session_label.name}_embeddings",
-                )
+        label_embeddings.append(
+            label_embeddings_layers[session_label.name](
+                session_labels[session_label.name]
             )
-        else:
-            session_label_embeddings_layers.append(
-                layers.Dense(
-                    config.embeddings_dim, name=f"{session_label.name}_embeddings"
-                ),
-            )
-
-    tf_gather_0_layer = TFGatherLayer(axis=0)
-    tf_gather_1_layer = TFGatherLayer(axis=1)
-    session_label_embeddings = []
-    # session_label_embeddings[0].shape = (None, embeddings_dim)
-    for session_label, session_label_embeddings_layer in zip(
-        session_labels, session_label_embeddings_layers
-    ):
-        session_label_embeddings.append(
-            session_label_embeddings_layer(tf_gather_1_layer([session_label, 0]))
         )
 
     embeddings_layer = AddLayer(name="embeddings")
-    embeddings = embeddings_layer(session_label_embeddings)
+    embeddings = embeddings_layer(label_embeddings)
 
     # Inference RNN:
     # Layer definitions
@@ -677,7 +666,6 @@ def _model_structure(config):
         means_concat_embeddings_layer = ConcatEmbeddingsLayer(
             name="means_concat_embeddings",
         )
-
         means_dev_decoder_layer = MultiLayerPerceptronLayer(
             config.dev_n_layers,
             config.dev_n_units,
@@ -724,13 +712,13 @@ def _model_structure(config):
 
         means_dev_layer = layers.Multiply(name="means_dev")
 
-        # Data flow to get the means deviations
+        # Data flow to get mean deviations
 
         # Get the concatenated embeddings
         means_spatial_embeddings = means_spatial_embeddings_layer(group_mu)
         means_concat_embeddings = means_concat_embeddings_layer(
             [embeddings, means_spatial_embeddings]
-        )  # shape = (None, n_modes, embeddings_dim + spatial_embeddings_dim)
+        )  # shape = (n_sessions, n_modes, embeddings_dim + spatial_embeddings_dim)
 
         # Get the mean deviation maps (no global magnitude information)
         means_dev_decoder = means_dev_decoder_layer(
@@ -738,26 +726,28 @@ def _model_structure(config):
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
         means_dev_map = means_dev_map_layer(means_dev_decoder)
-        norm_means_dev_map = norm_means_dev_map_layer(means_dev_map)
-        # norm_means_dev_map.shape = (None, n_modes, n_channels)
+        norm_means_dev_map = tf.gather(
+            norm_means_dev_map_layer(means_dev_map),
+            session_id[:, 0],
+            axis=0,
+        )
+        # shape = (None, n_modes, n_channels)
 
         # Get the deviation magnitudes (scale deviation maps globally)
         means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(data)
-        means_dev_mag_inf_alpha_input = tf_gather_0_layer(
-            [means_dev_mag_inf_alpha_input, tf_gather_1_layer([session_labels[0], 0])]
-        )
         means_dev_mag_inf_alpha = means_dev_mag_inf_alpha_layer(
             means_dev_mag_inf_alpha_input
         )
         means_dev_mag_inf_beta_input = means_dev_mag_inf_beta_input_layer(data)
-        means_dev_mag_inf_beta_input = tf_gather_0_layer(
-            [means_dev_mag_inf_beta_input, tf_gather_1_layer([session_labels[0], 0])]
-        )
         means_dev_mag_inf_beta = means_dev_mag_inf_beta_layer(
             means_dev_mag_inf_beta_input
         )
         means_dev_mag = means_dev_mag_layer(
-            [means_dev_mag_inf_alpha, means_dev_mag_inf_beta]
+            [
+                means_dev_mag_inf_alpha,
+                means_dev_mag_inf_beta,
+                session_id,
+            ]
         )
         means_dev = means_dev_layer([means_dev_mag, norm_means_dev_map])
     else:
@@ -844,23 +834,26 @@ def _model_structure(config):
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
         covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
-        norm_covs_dev_map = norm_covs_dev_map_layer(covs_dev_map)
+        norm_covs_dev_map = tf.gather(
+            norm_covs_dev_map_layer(covs_dev_map),
+            session_id[:, 0],
+            axis=0,
+        )
 
         # Get the deviation magnitudes (scale deviation maps globally)
         covs_dev_mag_inf_alpha_input = covs_dev_mag_inf_alpha_input_layer(data)
-        covs_dev_mag_inf_alpha_input = tf_gather_0_layer(
-            [covs_dev_mag_inf_alpha_input, tf_gather_1_layer([session_labels[0], 0])]
-        )
         covs_dev_mag_inf_alpha = covs_dev_mag_inf_alpha_layer(
             covs_dev_mag_inf_alpha_input
         )
         covs_dev_mag_inf_beta_input = covs_dev_mag_inf_beta_input_layer(data)
-        covs_dev_mag_inf_beta_input = tf_gather_0_layer(
-            [covs_dev_mag_inf_beta_input, tf_gather_1_layer([session_labels[0], 0])]
-        )
         covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(covs_dev_mag_inf_beta_input)
+
         covs_dev_mag = covs_dev_mag_layer(
-            [covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta]
+            [
+                covs_dev_mag_inf_alpha,
+                covs_dev_mag_inf_beta,
+                session_id,
+            ]
         )
         # covs_dev_mag.shape = (None, n_modes, 1)
         covs_dev = covs_dev_layer([covs_dev_mag, norm_covs_dev_map])
@@ -894,8 +887,12 @@ def _model_structure(config):
     )
 
     # Data flow
-    mu = session_means_layer([group_mu, means_dev])
-    D = session_covs_layer([group_D, covs_dev])
+    mu = session_means_layer(
+        [group_mu, means_dev]
+    )  # shape = (None, n_modes, n_channels)
+    D = session_covs_layer(
+        [group_D, covs_dev]
+    )  # shape = (None, n_modes, n_channels, n_channels)
 
     # -----------------------------------
     # Mix the session specific paraemters
@@ -966,6 +963,7 @@ def _model_structure(config):
                 means_dev_mag_inf_beta,
                 means_dev_mag_mod_beta,
             ],
+            static_loss_scaling_factor=static_loss_scaling_factor,
         )
     else:
         means_dev_mag_kl_loss_layer = ZeroLayer(
@@ -996,6 +994,7 @@ def _model_structure(config):
                 covs_dev_mag_inf_beta,
                 covs_dev_mag_mod_beta,
             ],
+            static_loss_scaling_factor=static_loss_scaling_factor,
         )
     else:
         covs_dev_mag_kl_loss_layer = ZeroLayer((), name="covs_dev_mag_kl_loss")
@@ -1011,7 +1010,7 @@ def _model_structure(config):
     )
 
     return tf.keras.Model(
-        inputs=[data] + session_labels,
+        inputs=[data, session_id],
         outputs=[ll_loss, kl_loss, theta_norm],
         name="DIVE",
     )

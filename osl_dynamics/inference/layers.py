@@ -1996,16 +1996,16 @@ class ConstrainedEmbeddingLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         output = self.embedding_layer(inputs)
 
-        # # Add the last element to ensure the embeddings are unit norm
-        # norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)
-        # output = tf.concat([2 * output, norm_sq - 1], axis=-1) / (norm_sq + 1)
+        # Add the last element to ensure the embeddings are unit norm
+        norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)
+        output = tf.concat([2 * output, norm_sq - 1], axis=-1) / (norm_sq + 1)
         return output
 
     @property
     def embeddings(self):
         output = self.embedding_layer.embeddings
-        # norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)
-        # output = tf.concat([2 * output, norm_sq - 1], axis=-1) / (norm_sq + 1)
+        norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)
+        output = tf.concat([2 * output, norm_sq - 1], axis=-1) / (norm_sq + 1)
         return output
 
 

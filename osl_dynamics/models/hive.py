@@ -27,9 +27,7 @@ from osl_dynamics.inference.layers import (
     SumLogLikelihoodLossLayer,
     LearnableTensorLayer,
     BatchSizeLayer,
-    TFGatherLayer,
     AddLayer,
-    ConstrainedEmbeddingLayer,
     TFConstantLayer,
 )
 from osl_dynamics.models import obs_mod
@@ -626,7 +624,6 @@ def _model_structure(config):
     )
     static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
-    # Session labels input (This is for calculating the LL loss)
     session_id = layers.Input(
         shape=(config.sequence_length,),
         dtype=tf.int32,
