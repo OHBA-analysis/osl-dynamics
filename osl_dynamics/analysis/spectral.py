@@ -1737,7 +1737,7 @@ def _multitaper(
         if np.isnan(psd_).any():
             psd[i] = np.nan_to_num(psd_)  # zero out nan values
             _logger.warn(
-                "PSD contains NaN values. This may indicate a potentially"
+                "PSD contains NaN values. This may indicate a potentially "
                 "poor HMM fit. You should consider running the model again "
                 "or selecting the model run with the lowest free energy after "
                 "training multiple times."
