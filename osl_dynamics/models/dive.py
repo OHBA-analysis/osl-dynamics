@@ -41,6 +41,7 @@ from osl_dynamics.inference.layers import (
     BatchSizeLayer,
     AddLayer,
     TFConstantLayer,
+    EmbeddingLayer,
 )
 from osl_dynamics.data import SessionLabels
 
@@ -153,6 +154,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Number of dimensions for the embedding vectors.
     spatial_embeddings_dim : int
         Number of dimensions for the spatial embeddings.
+    unit_norm_embeddings : bool
+        Should we normalize the embeddings to have unit norm?
 
     dev_n_layers : int
         Number of layers for the MLP for deviations.
@@ -209,6 +212,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_sessions: int = None
     embeddings_dim: int = None
     spatial_embeddings_dim: int = None
+    unit_norm_embeddings: bool = False
 
     dev_n_layers: int = 0
     dev_n_units: int = None
@@ -365,11 +369,7 @@ class Model(VariationalInferenceModelBase):
         """
         return obs_mod.get_summed_embeddings(self.model, self.config.session_labels)
 
-    def get_session_means_covariances(
-        self,
-        embeddings=None,
-        n_neighbours=2,
-    ):
+    def get_session_means_covariances(self):
         """Get the means and covariances for each session.
 
         Returns
@@ -561,9 +561,10 @@ def _model_structure(config):
             data
         )
         label_embeddings_layers[session_label.name] = (
-            layers.Embedding(
+            EmbeddingLayer(
                 session_label.n_classes,
                 config.embeddings_dim,
+                config.unit_norm_embeddings,
                 name=f"{session_label.name}_embeddings",
             )
             if session_label.label_type == "categorical"

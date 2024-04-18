@@ -29,6 +29,7 @@ from osl_dynamics.inference.layers import (
     BatchSizeLayer,
     AddLayer,
     TFConstantLayer,
+    EmbeddingLayer,
 )
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig
@@ -77,6 +78,8 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Number of dimensions for embeddings dimension.
     spatial_embeddings_dim : int
         Number of dimensions for spatial embeddings.
+    unit_norm_embeddings : bool
+        Should we normalize the embeddings to have unit norm?
 
     dev_n_layers : int
         Number of layers for the MLP for deviations.
@@ -151,6 +154,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     n_sessions: int = None
     embeddings_dim: int = None
     spatial_embeddings_dim: int = None
+    unit_norm_embeddings: bool = False
 
     # Observation model parameters
     learn_means: bool = None
@@ -642,9 +646,10 @@ def _model_structure(config):
             data
         )
         label_embeddings_layers[session_label.name] = (
-            layers.Embedding(
+            EmbeddingLayer(
                 session_label.n_classes,
                 config.embeddings_dim,
+                config.unit_norm_embeddings,
                 name=f"{session_label.name}_embeddings",
             )
             if session_label.label_type == "categorical"

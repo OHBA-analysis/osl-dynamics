@@ -47,6 +47,7 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=20,
+    unit_norm_embeddings=True,
 )
 
 # Simulate data
