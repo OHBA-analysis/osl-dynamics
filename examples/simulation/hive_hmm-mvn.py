@@ -28,7 +28,7 @@ config = Config(
     n_channels=20,
     sequence_length=200,
     n_sessions=100,
-    embeddings_dim=2,
+    embeddings_dim=5,
     spatial_embeddings_dim=2,
     dev_n_layers=5,
     dev_n_units=32,
@@ -90,7 +90,7 @@ model.set_dev_parameters_initializer(training_data)
 
 # Model initialization
 model.random_state_time_course_initialization(
-    training_data, n_epochs=3, n_init=5, take=1
+    training_data, n_epochs=5, n_init=5, take=1
 )
 
 # Full model training

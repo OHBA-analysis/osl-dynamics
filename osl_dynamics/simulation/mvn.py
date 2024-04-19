@@ -485,8 +485,9 @@ class MSess_MVN(MVN):
             self.n_modes = session_covariances.shape[1]
             self.n_channels = session_covariances.shape[2]
 
-            self.validate_embedding_parameters()
-            self.create_embeddings()
+            if not session_means == "zero":
+                self.validate_embedding_parameters()
+                self.create_embeddings()
 
             self.group_means = super().create_means(session_means)
             self.session_means = self.create_session_means(session_means)

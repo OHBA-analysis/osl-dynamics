@@ -1989,6 +1989,9 @@ class EmbeddingLayer(layers.Layer):
 
     def __init__(self, input_dim, output_dim, unit_norm, **kwargs):
         super().__init__(**kwargs)
+        if unit_norm:
+            output_dim = output_dim - 1
+
         self.embedding_layer = layers.Embedding(
             input_dim=input_dim,
             output_dim=output_dim,

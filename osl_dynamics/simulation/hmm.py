@@ -583,10 +583,6 @@ class MSess_HMM_MVN(Simulation):
         if n_states is None:
             n_states = n_modes
 
-        # Construct trans_prob for each session
-        if isinstance(trans_prob, str) or trans_prob is None:
-            trans_prob = [trans_prob] * n_sessions
-
         # Observation model
         self.obs_mod = MSess_MVN(
             session_means=session_means,
@@ -607,6 +603,10 @@ class MSess_HMM_MVN(Simulation):
         self.n_channels = self.obs_mod.n_channels
         self.n_sessions = self.obs_mod.n_sessions
 
+        # Construct trans_prob for each session
+        if isinstance(trans_prob, str) or trans_prob is None:
+            trans_prob = [trans_prob] * self.n_sessions
+
         # Vary the stay probability for each session
         if stay_prob is not None:
             session_stay_prob = np.random.normal(
@@ -618,7 +618,7 @@ class MSess_HMM_MVN(Simulation):
             session_stay_prob = np.minimum(session_stay_prob, 1)
             session_stay_prob = np.maximum(session_stay_prob, 0)
         else:
-            session_stay_prob = [stay_prob] * n_sessions
+            session_stay_prob = [stay_prob] * self.n_sessions
 
         # Initialise base class
         super().__init__(n_samples=n_samples)
