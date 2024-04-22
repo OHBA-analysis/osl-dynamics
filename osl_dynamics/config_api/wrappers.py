@@ -475,7 +475,7 @@ def train_hive(
         save(f"{inf_params_dir}/session_means.npy", session_means)
         save(f"{inf_params_dir}/session_covs.npy", session_covs)
         save(f"{inf_params_dir}/summed_embeddings.npy", summed_embeddings)
-        save(f"{inf_params_dir}/embedding_weights.npy", embedding_weights)
+        save(f"{inf_params_dir}/embedding_weights.pkl", embedding_weights)
 
 
 def get_inf_params(data, output_dir, observation_model_only=False):
