@@ -191,7 +191,7 @@ def set_embeddings_initializer(model, initial_embeddings):
             initial_embeddings
         )
 
-    for k, v in config.items():
+    for k, v in initial_embeddings.items():
         _set_embeddings_initializer(f"{k}_embeddings", v)
 
 
@@ -729,31 +729,21 @@ def get_session_means_covariances(
     return mu.numpy(), D.numpy()
 
 
-def get_nearest_neighbours(model, embeddings, n_neighbours):
-    """Get the indices of the nearest neighours in the embedding space.
+def generate_covariances(model, session_labels):
+    dev_map = get_dev_map(model, "covs", session_labels)
+    concat_embeddings = get_concatenated_embeddings(model, "covs", session_labels)
 
-    Parameters
-    ----------
-    model : osl_dynamics.models.*.Model.model
-        The model. * must be :code:`hive` or :code:`dive`.
-    embeddings : np.ndarray
-        Input embeddings. Shape is (n_sessions, embeddings_dim).
-    n_neighbours : int
-        The number of nearest neighbours.
+    covs_dev_decoder_layer = model.get_layer("covs_dev_decoder")
+    dev_mag_mod_layer = model.get_layer("covs_dev_mag_mod_beta")
+    dev_mag_mod = 1 / dev_mag_mod_layer(covs_dev_decoder_layer(concat_embeddings))
 
-    Returns
-    -------
-    nearest_neighbours : np.ndarray
-        The indices of the nearest neighbours.
-        Shape is (n_sessions, n_neighbours).
-    """
-    model_embeddings = get_embeddings(model)
-    distances = np.linalg.norm(
-        np.expand_dims(embeddings, axis=1) - np.expand_dims(model_embeddings, axis=0),
-        axis=-1,
-    )
+    # Generate deviations
+    dev_layer = model.get_layer("covs_dev")
+    dev = dev_layer([dev_mag_mod, dev_map])
 
-    # Sort distances and get indices of nearest neighbours
-    sorted_distances = np.argsort(distances, axis=1)
-    nearest_neighbours = sorted_distances[:, :n_neighbours]
-    return nearest_neighbours
+    # Generate covariances
+    group_covs = get_observation_model_parameter(model, "group_covs")
+    covs_layer = model.get_layer("session_covs")
+    covs = np.squeeze(covs_layer([group_covs, dev]).numpy())
+
+    return covs
