@@ -1454,15 +1454,15 @@ class ConcatEmbeddingsLayer(layers.Layer):
         return concat_embeddings
 
 
-class SessionMapLayer(layers.Layer):
-    """Layer for getting the array specific maps.
+class SessionParamLayer(layers.Layer):
+    """Layer for getting the array specific parameters.
 
-    This layer adds deviations to the group spatial maps.
+    This layer adds deviations to the group spatial parameters.
 
     Parameters
     ----------
-    which_map : str
-        Which spatial map are we using? Must be :code:`'means'` or
+    param : str
+        Which parameter are we using? Must be :code:`'means'` or
         :code:`'covariances'`.
     epsilon : float
         Error added to the diagonal of covariances for numerical stability.
@@ -1470,32 +1470,32 @@ class SessionMapLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, which_map, epsilon, **kwargs):
+    def __init__(self, param, epsilon, **kwargs):
         super().__init__(**kwargs)
-        self.which_map = which_map
+        self.param = param
         self.epsilon = epsilon
-        if which_map == "covariances":
+        if param == "covariances":
             self.bijector = tfb.Chain(
                 [tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()],
             )
-        elif which_map == "means":
+        elif param == "means":
             self.bijector = tfb.Identity()
         else:
-            raise ValueError("which_map must be one of 'means' and 'covariances'.")
+            raise ValueError("param must be one of 'means' and 'covariances'.")
 
     def call(self, inputs):
-        group_map, dev = inputs
-        group_map = self.bijector.inverse(group_map)
+        group_param, dev = inputs
+        group_param = self.bijector.inverse(group_param)
 
         # Match dimensions for addition
-        group_map = tf.expand_dims(group_map, axis=0)
-        session_map = tf.add(group_map, dev)
-        session_map = self.bijector(session_map)
+        group_param = tf.expand_dims(group_param, axis=0)
+        session_param = tf.add(group_param, dev)
+        session_param = self.bijector(session_param)
 
-        if self.which_map == "covariances":
-            session_map = add_epsilon(session_map, self.epsilon, diag=True)
+        if self.param == "covariances":
+            session_param = add_epsilon(session_param, self.epsilon, diag=True)
 
-        return session_map
+        return session_param
 
 
 class MixSessionSpecificParametersLayer(layers.Layer):
