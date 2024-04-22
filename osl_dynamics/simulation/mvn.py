@@ -166,12 +166,12 @@ class MVN:
 
             # Generate data for the time points that this combination of
             # modes is active
-            data[
-                np.all(state_time_course == alpha, axis=1)
-            ] = np.random.multivariate_normal(
-                mu,
-                sigma,
-                size=np.count_nonzero(np.all(state_time_course == alpha, axis=1)),
+            data[np.all(state_time_course == alpha, axis=1)] = (
+                np.random.multivariate_normal(
+                    mu,
+                    sigma,
+                    size=np.count_nonzero(np.all(state_time_course == alpha, axis=1)),
+                )
             )
 
         # Add an error to the data at all time points
@@ -296,14 +296,14 @@ class MDyn_MVN(MVN):
 
             # Generate data for the time points that this combination of states
             # is active
-            data[
-                np.all(state_time_courses == time_courses, axis=(1, 2))
-            ] = np.random.multivariate_normal(
-                mu,
-                sigma,
-                size=np.count_nonzero(
-                    np.all(state_time_courses == time_courses, axis=(1, 2))
-                ),
+            data[np.all(state_time_courses == time_courses, axis=(1, 2))] = (
+                np.random.multivariate_normal(
+                    mu,
+                    sigma,
+                    size=np.count_nonzero(
+                        np.all(state_time_courses == time_courses, axis=(1, 2))
+                    ),
+                )
             )
 
         # Add an error to the data at all time points
@@ -675,9 +675,9 @@ class MSess_MVN(MVN):
         )
         for i in range(self.n_sessions):
             for j in range(self.n_modes):
-                session_cholesky_covariances[
-                    i, j, m, n
-                ] = flattened_session_cholesky_covariances[i, j]
+                session_cholesky_covariances[i, j, m, n] = (
+                    flattened_session_cholesky_covariances[i, j]
+                )
 
         session_covariances = session_cholesky_covariances @ np.transpose(
             session_cholesky_covariances, (0, 1, 3, 2)
@@ -718,12 +718,12 @@ class MSess_MVN(MVN):
 
             # Generate data for the time points that this combination of
             # modes is active
-            data[
-                np.all(mode_time_course == alpha, axis=1)
-            ] = np.random.multivariate_normal(
-                mu,
-                sigma,
-                size=np.count_nonzero(np.all(mode_time_course == alpha, axis=1)),
+            data[np.all(mode_time_course == alpha, axis=1)] = (
+                np.random.multivariate_normal(
+                    mu,
+                    sigma,
+                    size=np.count_nonzero(np.all(mode_time_course == alpha, axis=1)),
+                )
             )
 
         # Add an error to the data at all time points
