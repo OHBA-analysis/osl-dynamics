@@ -550,8 +550,32 @@ def tinda(
 
     return fo_density, fo_sum, stats
 
+def circle_angles(order):
+   """ Compute the phase differences between states in a circular plot.
+   
+    Parameters
+    ----------
+    order : list
+        List of state orders (in order of counterclockwise
+        rotation).
+        
+    Returns
+    -------
+    angleplot : array_like
+        Array of phase differences between states in a circular plot.
+   
+   """
+   K = len(order)
+   disttoplot_manual = np.zeros(K, dtype=complex)
+   for i3 in range(K):
+        disttoplot_manual[order[i3]] = np.exp(1j*(i3+1)/K*2*np.pi)
+         
+   angleplot = np.exp(1j*(np.angle(disttoplot_manual[:, np.newaxis]).T - np.angle(disttoplot_manual[:, np.newaxis])))
+   return angleplot
 
-def optimise_sequence(fo_density, metric_to_use=0):
+
+
+def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
     """Optimise the sequence to maximal circularity.
 
     This function reads in the mean pattern of differential fractional
@@ -596,51 +620,25 @@ def optimise_sequence(fo_density, metric_to_use=0):
     n_metrics = len(metric)
     K = fo_density.shape[0]
 
-    # Get all possible permutations of states
-    my_perms = np.array(list(permutations(range(1, K - 1), K - 2)))
-
-    sequence_metric = np.zeros((len(my_perms), 9, 3))
-    for i2, iperm in enumerate(tqdm(my_perms, desc="Optimising sequence")):
-        for i in range(5):
-            # Setup state points on unit circle:
-            manual_order = [1] + [2 + val for val in iperm]
-            manual_order = manual_order[:i] + [2] + manual_order[i:]
-            manual_order = [val - 1 for val in manual_order]
-            distance_to_plot_manual = np.zeros(K, dtype=complex)
-            for i3 in range(K):
-                distance_to_plot_manual[manual_order[i3]] = np.exp(
-                    1j * (i3 + 1) / K * 2 * np.pi
-                )
-            angle_plot = np.exp(
-                1j
-                * (
-                    np.angle(distance_to_plot_manual[:, np.newaxis]).T
-                    - np.angle(distance_to_plot_manual[:, np.newaxis])
-                )
-            )
-
-            # Compute the metric
-            for i3 in range(n_metrics):
-                sequence_metric[i2, i, i3] = np.imag(
-                    np.nansum(np.nansum(angle_plot * metric[i3]))
-                )
-
-    # Find the permutation that maximizes the metric
     best_sequence = []
     for i in range(n_metrics):
-        m1 = np.argmax(np.max(np.abs(sequence_metric[:, :, i]), axis=0))
-        m = np.argmax(np.abs(sequence_metric[:, m1, i]))
-        true_sequence_metric = sequence_metric[m, m1, i]
-        seq = [1] + [2 + val for val in my_perms[m]]
-        seq = seq[:m1] + [2] + seq[m1:]
-        # Want rotation to be clockwise, so flip if necessary:
-        if true_sequence_metric > 0:
-            seq = [1] + list(reversed(seq[1:]))
-        best_sequence.append(seq)
-
+        ix = np.arange(K)
+        v = np.imag(np.sum(circle_angles(ix) * metric[i]))
+        cnt = 0
+        while cnt < n_perms:
+            cnt += 1
+            swaps = np.random.permutation(K)
+            swaps = swaps[:2]
+            tmpix = ix.copy()
+            tmpix[swaps[0]] = ix[swaps[1]]
+            tmpix[swaps[1]] = ix[swaps[0]]
+            tmpv = np.imag(np.sum(circle_angles(tmpix) * metric[i]))
+            if tmpv < v:
+                v = tmpv
+                ix = tmpix
+        best_sequence.append(np.roll(ix, -np.where([iix==0 for iix in ix])[0][0]))
     # Return the best sequence for the chosen metric (in order of counterclockwise
     # rotation)
-    best_sequence = [i - 1 for i in best_sequence[metric_to_use]]
     return best_sequence
 
 
