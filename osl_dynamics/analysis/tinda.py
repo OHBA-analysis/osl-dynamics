@@ -643,22 +643,24 @@ def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
 
 
 def compute_cycle_strength(angleplot, asym, relative=True, whichstate=None):
-    tmp = angleplot*asym
+    if len(asym.shape) == 3:
+        tmp = np.stack([angleplot*asym[:,:,i] for i in range(asym.shape[2])], axis=-1)
+    else:
+        tmp = angleplot*asym
     if whichstate is not None:
         # Note that we are counting each (i,j) double because for the rotational
         # momentum per state we take into account (i,j) and (j,i) for all j and one
         # particular i.
-        tmp = np.squeeze(tmp[whichstate,:,]) + np.squeeze(tmp[:,whichstate,:])
+        tmp = np.squeeze(tmp[whichstate,:,]) + np.squeeze(tmp[:,whichstate])
         cycle_strength = np.imag(np.nansum(tmp, axis=0))
     else:
         cycle_strength = np.imag(np.nansum(tmp, axis=(0,1)))
-    cycle_strength = np.squeeze(cycle_strength)
-    if cycle_strength.shape[1] > cycle_strength.shape[0] and cycle_strength.shape[0]==1:
-        cycle_strength = cycle_strength.T
-    cycle_strength = -cycle_strength # positive rotational momentum should indicate clockwise cycle
+
+    # positive rotational momentum should indicate clockwise cycle
+    cycle_strength = -cycle_strength 
     
     if relative: # normalise by the theoretical maximum
-        cycle_strength = cycle_strength/np.abs(compute_cycle_strength(angleplot, np.sign(np.imag(angleplot)), whichstate=whichstate))
+        cycle_strength = cycle_strength/np.abs(compute_cycle_strength(angleplot, np.sign(np.imag(angleplot)), relative=False, whichstate=whichstate))
         
     return cycle_strength
 
