@@ -642,25 +642,25 @@ def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
     return best_sequence[metric_to_use]
 
 
-def compute_rotational_momentum(angleplot, assym, relative=True, whichstate=None):
-    tmp = angleplot*assym
+def compute_cycle_strength(angleplot, asym, relative=True, whichstate=None):
+    tmp = angleplot*asym
     if whichstate is not None:
         # Note that we are counting each (i,j) double because for the rotational
         # momentum per state we take into account (i,j) and (j,i) for all j and one
         # particular i.
         tmp = np.squeeze(tmp[whichstate,:,]) + np.squeeze(tmp[:,whichstate,:])
-        rotational_momentum = np.imag(np.nansum(tmp, axis=0))
+        cycle_strength = np.imag(np.nansum(tmp, axis=0))
     else:
-        rotational_momentum = np.imag(np.nansum(tmp, axis=(0,1)))
-    rotational_momentum = np.squeeze(rotational_momentum)
-    if rotational_momentum.shape[1] > rotational_momentum.shape[0] and rotational_momentum.shape[0]==1:
-        rotational_momentum = rotational_momentum.T
-    rotational_momentum = -rotational_momentum # positive rotational momentum should indicate clockwise cycle
+        cycle_strength = np.imag(np.nansum(tmp, axis=(0,1)))
+    cycle_strength = np.squeeze(cycle_strength)
+    if cycle_strength.shape[1] > cycle_strength.shape[0] and cycle_strength.shape[0]==1:
+        cycle_strength = cycle_strength.T
+    cycle_strength = -cycle_strength # positive rotational momentum should indicate clockwise cycle
     
     if relative: # normalise by the theoretical maximum
-        rotational_momentum = rotational_momentum/np.abs(compute_rotational_momentum(angleplot, np.sign(np.imag(angleplot)), whichstate=whichstate))
+        cycle_strength = cycle_strength/np.abs(compute_cycle_strength(angleplot, np.sign(np.imag(angleplot)), whichstate=whichstate))
         
-    return rotational_momentum
+    return cycle_strength
 
 
 def plot_cycle(
