@@ -605,6 +605,9 @@ def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
     if len(fo_density.shape) == 5:
         fo_density = np.squeeze(fo_density)
 
+    # make sure there are no nans:
+    fo_density[np.isnan(fo_density)] = 0
+    
     # Compute different metrics to optimise
     metric = []
     metric.append(np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2))
