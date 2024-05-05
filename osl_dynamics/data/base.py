@@ -329,7 +329,7 @@ class Data:
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
 
-    def select(self, channels=None, use_raw=False):
+    def select(self, channels=None, sessions=None, use_raw=False):
         """Select channels.
 
         This is an in-place operation.
@@ -338,6 +338,8 @@ class Data:
         ----------
         channels : int or list of int, optional
             Channel indices to keep. If None, all channels are retained.
+        sessions : int or list of int, optional
+            Session indices to keep. If None, all sessions are retained.
         use_raw : bool, optional
             Should we select channel from the original 'raw' data that
             we loaded?
@@ -355,21 +357,38 @@ class Data:
                 n_channels = self.arrays[0].shape[-1]
             channels = range(n_channels)
 
+        if sessions is None:
+            # Keep all sessions
+            if use_raw:
+                n_sessions = len(self.raw_data_arrays)
+            else:
+                n_sessions = len(self.arrays)
+            sessions = range(n_sessions)
+
         if isinstance(channels, int):
             channels = [channels]
+
+        if isinstance(sessions, int):
+            sessions = [sessions]
 
         if isinstance(channels, range):
             channels = list(channels)
 
+        if isinstance(sessions, range):
+            sessions = list(sessions)
+
         if not isinstance(channels, list):
             raise ValueError("channels must be an int or list of int.")
+
+        if not isinstance(sessions, list):
+            raise ValueError("sessions must be an int or list of int.")
 
         # What data should we use?
         arrays = self.raw_data_arrays if use_raw else self.arrays
 
         # Select channels
         new_arrays = []
-        for i in tqdm(range(self.n_sessions), desc="Selecting channels"):
+        for i in tqdm(sessions, desc="Selecting channels/sessions"):
             array = arrays[i][:, channels]
             if self.load_memmaps:
                 array = misc.array_to_memmap(self.prepared_data_filenames[i], array)

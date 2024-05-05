@@ -7,6 +7,8 @@ import logging
 
 import numpy as np
 from scipy import signal
+from pqdm.threads import pqdm
+from tqdm.auto import trange
 
 from osl_dynamics import array_ops
 
@@ -777,3 +779,106 @@ def partial_covariances(data, alpha):
         pcovs.append(np.linalg.pinv(a_normed) @ X)
 
     return np.squeeze(pcovs)
+
+
+def hmm_dual_estimation(data, alpha, zero_mean=False, eps=1e-5, n_jobs=1):
+    """HMM dual estiation of observation model parameters.
+
+    Parameters
+    ----------
+    data : np.ndarray or list of np.ndarray
+        Time series data. Shape must be (n_samples, n_channels)
+        or (n_subjects, n_samples, n_channels).
+    alpha : np.ndarray or list of np.ndarray
+        State probabilities. Shape must be (n_samples, n_states)
+        or (n_subjects, n_samples, n_states).
+    zero_mean : bool, optional
+        Should we force the state means to be zero?
+    eps : float, optional
+        Small value to add to the diagonal of each state covariance.
+    n_jobs : int, optional
+        Number of jobs to run in parallel.
+
+    Returns
+    -------
+    means : np.ndarray or list of np.ndarray
+        State means. Shape is (n_states, n_channels) or
+        (n_subjects, n_states, n_channels).
+    covariances : np.ndarray or list of np.ndarray
+        State covariances. Shape is (n_states, n_channels, n_channels)
+        or (n_subjects, n_states, n_channels, n_channels).
+    """
+
+    # Validation
+    if (isinstance(data, list) != isinstance(alpha, list)) or (
+        isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
+    ):
+        raise ValueError(
+            f"data is type {type(data)} and alpha is type "
+            f"{type(alpha)}. They must both be lists or numpy arrays."
+        )
+
+    if isinstance(data, np.ndarray):
+        if alpha.shape[0] != data.shape[0]:
+            raise ValueError("data and alpha must have the same number of samples.")
+
+        if data.ndim == 2:
+            data = [data]
+            alpha = [alpha]
+
+    if len(data) != len(alpha):
+        raise ValueError(
+            "A different number of arrays has been passed for "
+            f"data and alpha: len(data)={len(data)}, "
+            f"len(alpha)={len(alpha)}."
+        )
+
+    # Check the number of samples in data and alpha
+    for i in range(len(alpha)):
+        if alpha[i].shape[0] != data[i].shape[0]:
+            raise ValueError(
+                "items in data and alpha must have the same number of samples."
+            )
+
+    n_states = alpha[0].shape[1]
+    n_channels = data[0].shape[1]
+
+    # Helper function
+    def _calc(a, x):
+        sum_a = np.sum(a, axis=0)
+
+        m = np.zeros([n_states, n_channels])
+        if not zero_mean:
+            for i in range(n_states):
+                m[i] = np.sum(x * a[:, i, None], axis=0) / sum_a[i]
+
+        c = np.zeros([n_states, n_channels, n_channels])
+        for i in range(n_states):
+            d = x - m[i]
+            c[i] = (
+                np.sum(d[:, :, None] * d[:, None, :] * a[:, i, None, None], axis=0)
+                / sum_a[i]
+            )
+            c[i] += eps * np.eye(n_channels)
+
+        return m, c
+
+    # Calculate in parallel
+    results = pqdm(
+        array=zip(alpha, data),
+        function=_calc,
+        n_jobs=n_jobs,
+        desc="Dual estimation",
+        argument_type="args",
+        total=len(data),
+    )
+
+    # Unpack results
+    means = []
+    covariances = []
+    for result in results:
+        m, c = result
+        means.append(m)
+        covariances.append(c)
+
+    return np.squeeze(means), np.squeeze(covariances)
