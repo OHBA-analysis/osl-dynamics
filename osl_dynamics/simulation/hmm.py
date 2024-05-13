@@ -538,6 +538,9 @@ class MSess_HMM_MVN(Simulation):
         Number of channels.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
+    embedding_vectors : np.ndarray, optional
+        Embedding vectors for each state, shape should be
+        (n_states, embeddings_dim).
     n_sessions : int, optional
         Number of sessions.
     embeddings_dim : int
@@ -570,6 +573,7 @@ class MSess_HMM_MVN(Simulation):
         n_modes=None,
         n_channels=None,
         n_covariances_act=1,
+        embedding_vectors=None,
         n_sessions=None,
         embeddings_dim=None,
         spatial_embeddings_dim=None,
@@ -590,6 +594,7 @@ class MSess_HMM_MVN(Simulation):
             n_modes=n_states,
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
+            embedding_vectors=embedding_vectors,
             n_sessions=n_sessions,
             embeddings_dim=embeddings_dim,
             spatial_embeddings_dim=spatial_embeddings_dim,
