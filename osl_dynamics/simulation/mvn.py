@@ -251,9 +251,9 @@ class MDyn_MVN(MVN):
             observation_error=observation_error,
         )
 
-        # Get the std and FC from self.covariance
+        # Get the stds and corrs from self.covariance
         self.stds = array_ops.cov2std(self.covariances)
-        self.fcs = array_ops.cov2corr(self.covariances)
+        self.corrs = array_ops.cov2corr(self.covariances)
 
     def simulate_data(self, state_time_courses):
         """Simulates data.
@@ -284,14 +284,14 @@ class MDyn_MVN(MVN):
         for time_courses in np.unique(state_time_courses, axis=0):
             # Extract the different time courses
             alpha = time_courses[:, 0]
-            gamma = time_courses[:, 1]
+            beta = time_courses[:, 1]
 
-            # Mean, standard deviation, FC for this combination of time courses
+            # Mean, standard deviation, corr for this combination of time courses
             mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
             G = np.diag(np.sum(self.stds * alpha[:, np.newaxis], axis=0))
-            F = np.sum(self.fcs * gamma[:, np.newaxis, np.newaxis], axis=0)
+            F = np.sum(self.corrs * beta[:, np.newaxis, np.newaxis], axis=0)
 
-            # Calculate covariance matrix from the standard deviation and FC
+            # Calculate covariance matrix from the standard deviation and corr
             sigma = G @ F @ G
 
             # Generate data for the time points that this combination of states
@@ -341,13 +341,13 @@ class MDyn_MVN(MVN):
         for time_courses in np.unique(state_time_courses, axis=0):
             # Extract the different time courses
             alpha = time_courses[:, 0]
-            gamma = time_courses[:, 1]
+            beta = time_courses[:, 1]
 
-            # Mean, standard deviation, FC for this combination of time courses
+            # Mean, standard deviation, corr for this combination of time courses
             G = np.diag(np.sum(self.stds * alpha[:, np.newaxis], axis=0))
-            F = np.sum(self.fcs * gamma[:, np.newaxis, np.newaxis], axis=0)
+            F = np.sum(self.corrs * beta[:, np.newaxis, np.newaxis], axis=0)
 
-            # Calculate covariance matrix from the standard deviation and FC
+            # Calculate covariance matrix from the standard deviation and corr
             sigma = G @ F @ G
 
             inst_covs[np.all(state_time_courses == time_courses, axis=(1, 2))] = sigma

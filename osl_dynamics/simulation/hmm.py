@@ -388,7 +388,7 @@ class MDyn_HMM_MVN(Simulation):
             stay_prob=stay_prob,
             n_states=self.n_states,
         )
-        self.gamma_hmm = HMM(
+        self.beta_hmm = HMM(
             trans_prob=trans_prob,
             stay_prob=stay_prob,
             n_states=self.n_states,
@@ -399,9 +399,9 @@ class MDyn_HMM_MVN(Simulation):
 
         # Simulate state time courses
         alpha = self.alpha_hmm.generate_states(self.n_samples)
-        gamma = self.gamma_hmm.generate_states(self.n_samples)
+        beta = self.beta_hmm.generate_states(self.n_samples)
 
-        self.state_time_course = np.array([alpha, gamma])
+        self.state_time_course = np.array([alpha, beta])
 
         # Simulate data
         self.time_series = self.obs_mod.simulate_data(self.state_time_course)
