@@ -34,7 +34,7 @@ def get_observation_model_parameter(model, layer_name):
         "means",
         "covs",
         "stds",
-        "fcs",
+        "corrs",
         "group_means",
         "group_covs",
         "log_rates",
@@ -75,7 +75,7 @@ def set_observation_model_parameter(
         "means",
         "covs",
         "stds",
-        "fcs",
+        "corrs",
         "group_means",
         "group_covs",
         "log_rates",
@@ -308,10 +308,10 @@ def set_stds_regularizer(model, training_dataset, epsilon):
     )
 
 
-def set_fcs_regularizer(model, training_dataset, epsilon):
-    """Set the FCS regularizer based on training data.
+def set_corrs_regularizer(model, training_dataset, epsilon):
+    """Set the correlations regularizer based on training data.
 
-    A marginal inverse Wishart prior is applied to the functional connectivities
+    A marginal inverse Wishart prior is applied to the correlations
     with :code:`nu=n_channels-1+0.1`.
 
     Parameters
@@ -321,14 +321,14 @@ def set_fcs_regularizer(model, training_dataset, epsilon):
     training_dataset : osl_dynamics.data.Data
         The training dataset.
     epsilon : float
-        Error added to the functional connectivities.
+        Error added to the correlations.
     """
     n_channels = dtf.get_n_channels(training_dataset)
 
     nu = n_channels - 1 + 0.1
 
-    fcs_layer = model.get_layer("fcs")
-    learnable_tensor_layer = fcs_layer.layers[0]
+    corrs_layer = model.get_layer("corrs")
+    learnable_tensor_layer = corrs_layer.layers[0]
     learnable_tensor_layer.regularizer = regularizers.MarginalInverseWishart(
         nu,
         epsilon,
