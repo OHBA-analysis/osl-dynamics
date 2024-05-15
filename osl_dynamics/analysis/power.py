@@ -343,6 +343,7 @@ def save(
     combined : bool, optional
         Should the individual plots be combined into a single image?
         The combined image is always shown on screen (for Juptyer notebooks).
+        Note if :code:`True` is passed, the individual images will be deleted.
     titles : list, optional
         List of titles for each power plot. Only used if :code:`combined=True`.
 
@@ -479,6 +480,10 @@ def save(
                     ax.set_title(titles[i], fontsize=20)
                 fig.tight_layout()
                 fig.savefig(filename)
+
+                # Remove the individual images
+                for output_file in output_files:
+                    os.remove(output_file)
 
 
 def multi_save(

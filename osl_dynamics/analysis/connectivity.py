@@ -14,6 +14,7 @@ This module is used in the following tutorials:
   /tutorials_build/dynemo_plotting_networks.html>`_.
 """
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -795,6 +796,8 @@ def save(
         List of matplotlib axes to plot the connectivity maps on.
     combined : bool, optional
         Should the connectivity maps be combined on the same figure?
+        The combined image is always shown on screen (for Juptyer notebooks).
+        Note if :code:`True` is passed, the individual images will be deleted.
     titles : list, optional
         List of titles for each connectivity map. Only used if
         :code:`combined=True`.
@@ -892,6 +895,10 @@ def save(
             ax.set_title(titles[i], fontsize=20)
         fig.tight_layout()
         fig.savefig(filename)
+
+        # Remove the individual images
+        for output_file in output_files:
+            os.remove(output_file)
 
 
 def save_interactive(
