@@ -50,7 +50,6 @@ sim = simulation.HSMM_MVN(
     observation_error=0.0,
     gamma_shape=10,
     gamma_scale=5,
-    random_seed=123,
 )
 sim.standardize()
 training_data = data.Data(sim.time_series)

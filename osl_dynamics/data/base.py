@@ -4,11 +4,13 @@
 
 import re
 import logging
+import os
 import pathlib
 import pickle
+import random
 from contextlib import contextmanager
 from shutil import rmtree
-from os import path
+from dataclasses import dataclass
 
 import numpy as np
 from pqdm.threads import pqdm
@@ -85,6 +87,8 @@ class Data:
     use_tfrecord : bool, optional
         Should we save the data as a TensorFlow Record? This is recommended for
         training on large datasets. Default is :code:`False`.
+    session_labels : list of SessionLabels, optional
+        Extra session labels.
     n_jobs : int, optional
         Number of processes to load the data in parallel.
         Default is 1, which loads data in serial.
@@ -104,12 +108,14 @@ class Data:
         store_dir="tmp",
         buffer_size=100000,
         use_tfrecord=False,
+        session_labels=None,
         n_jobs=1,
     ):
         self._identifier = id(self)
         self.data_field = data_field
         self.picks = picks
         self.reject_by_annotation = reject_by_annotation
+        self.original_sampling_frequency = sampling_frequency
         self.sampling_frequency = sampling_frequency
         self.mask_file = mask_file
         self.parcellation_file = parcellation_file
@@ -127,7 +133,7 @@ class Data:
 
         # Directory to store memory maps created by this class
         self.store_dir = pathlib.Path(store_dir)
-        self.store_dir.mkdir(parents=True, exist_ok=True)
+        self.store_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
 
         # Load and validate the raw data
         self.raw_data_arrays, self.raw_data_filenames = self.load_raw_data()
@@ -154,6 +160,10 @@ class Data:
 
         # Arrays to keep when making TensorFlow Datasets
         self.keep = list(range(self.n_sessions))
+
+        # Extra session labels
+        if session_labels is None:
+            self.session_labels = []
 
     def __iter__(self):
         return iter(self.arrays)
@@ -223,6 +233,7 @@ class Data:
         sampling_frequency : float
             Sampling frequency in Hz.
         """
+        self.original_sampling_frequency = sampling_frequency
         self.sampling_frequency = sampling_frequency
 
     def set_buffer_size(self, buffer_size):
@@ -318,7 +329,7 @@ class Data:
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
 
-    def select(self, channels=None, use_raw=False):
+    def select(self, channels=None, sessions=None, use_raw=False):
         """Select channels.
 
         This is an in-place operation.
@@ -327,6 +338,8 @@ class Data:
         ----------
         channels : int or list of int, optional
             Channel indices to keep. If None, all channels are retained.
+        sessions : int or list of int, optional
+            Session indices to keep. If None, all sessions are retained.
         use_raw : bool, optional
             Should we select channel from the original 'raw' data that
             we loaded?
@@ -344,21 +357,38 @@ class Data:
                 n_channels = self.arrays[0].shape[-1]
             channels = range(n_channels)
 
+        if sessions is None:
+            # Keep all sessions
+            if use_raw:
+                n_sessions = len(self.raw_data_arrays)
+            else:
+                n_sessions = len(self.arrays)
+            sessions = range(n_sessions)
+
         if isinstance(channels, int):
             channels = [channels]
+
+        if isinstance(sessions, int):
+            sessions = [sessions]
 
         if isinstance(channels, range):
             channels = list(channels)
 
+        if isinstance(sessions, range):
+            sessions = list(sessions)
+
         if not isinstance(channels, list):
             raise ValueError("channels must be an int or list of int.")
+
+        if not isinstance(sessions, list):
+            raise ValueError("sessions must be an int or list of int.")
 
         # What data should we use?
         arrays = self.raw_data_arrays if use_raw else self.arrays
 
         # Select channels
         new_arrays = []
-        for i in tqdm(range(self.n_sessions), desc="Selecting channels"):
+        for i in tqdm(sessions, desc="Selecting channels/sessions"):
             array = arrays[i][:, channels]
             if self.load_memmaps:
                 array = misc.array_to_memmap(self.prepared_data_filenames[i], array)
@@ -457,7 +487,7 @@ class Data:
                 "object."
             )
 
-        if use_raw and hasattr(self, "original_sampling_frequency"):
+        if use_raw:
             sampling_frequency = self.original_sampling_frequency
         else:
             sampling_frequency = self.sampling_frequency
@@ -488,7 +518,6 @@ class Data:
             raise e
 
         # Update sampling_frequency attributes
-        self.original_sampling_frequency = self.sampling_frequency
         self.sampling_frequency = freq
 
         return self
@@ -550,8 +579,8 @@ class Data:
             # Use SVD on the covariance to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
-            explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
-            _logger.info(f"Explained variance: {100 * explained_variance:.1f}%")
+            self.explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+            _logger.info(f"Explained variance: {100 * self.explained_variance:.1f}%")
             s = s[:n_pca_components].astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
@@ -695,8 +724,8 @@ class Data:
             # Use SVD on the covariance to calculate PCA components
             u, s, vh = np.linalg.svd(covariance)
             u = u[:, :n_pca_components].astype(np.float32)
-            explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
-            _logger.info(f"Explained variance: {100 * explained_variance:.1f}%")
+            self.explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+            _logger.info(f"Explained variance: {100 * self.explained_variance:.1f}%")
             s = s[:n_pca_components].astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
@@ -1015,6 +1044,32 @@ class Data:
             ]
         )
 
+    def _create_data_dict(self, i, array):
+        """Create a dictionary of data for a single session.
+
+        Parameters
+        ----------
+        i : int
+            Index of the session.
+        array : np.ndarray
+            Time series data for a single session.
+
+        Returns
+        -------
+        data : dict
+            Dictionary of data for a single session.
+        """
+        data = {"data": array}
+
+        # Add other session labels
+        placeholder = np.zeros(array.shape[0], dtype=np.float32)
+        for session_label in self.session_labels:
+            label_name = session_label.name
+            label_values = session_label.values
+            data[label_name] = placeholder + label_values[i]
+
+        return data
+
     def dataset(
         self,
         sequence_length,
@@ -1070,12 +1125,8 @@ class Data:
             # length
             array = self.arrays[i][: n_sequences[i] * sequence_length]
 
-            # Dataset with the time series data and ID
-            array_tracker = np.zeros(array.shape[0], dtype=np.float32)
-            array_tracker = array_tracker + i
-            data = {"data": array, "session_id": array_tracker}
-
             # Create dataset
+            data = self._create_data_dict(i, array)
             dataset = dtf.create_dataset(
                 data,
                 self.sequence_length,
@@ -1085,9 +1136,11 @@ class Data:
 
         # Create a dataset from all the arrays concatenated
         if concatenate:
-            full_dataset = dtf.concatenate_datasets(datasets)
-
             if shuffle:
+                # Do a perfect shuffle then concatenate across arrays
+                random.shuffle(datasets)
+                full_dataset = dtf.concatenate_datasets(datasets)
+
                 # Shuffle sequences
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
@@ -1100,6 +1153,9 @@ class Data:
                 full_dataset = full_dataset.shuffle(self.buffer_size)
 
             else:
+                # Concatenate across arrays
+                full_dataset = dtf.concatenate_datasets(datasets)
+
                 # Group into mini-batches
                 full_dataset = full_dataset.batch(
                     self.batch_size, drop_remainder=drop_last_batch
@@ -1161,10 +1217,14 @@ class Data:
 
                     # Split this session's dataset
                     training_datasets.append(
-                        full_datasets[i].take(training_dataset_size)
+                        full_datasets[i]
+                        .take(training_dataset_size)
+                        .prefetch(tf.data.AUTOTUNE)
                     )
                     validation_datasets.append(
-                        full_datasets[i].skip(training_dataset_size)
+                        full_datasets[i]
+                        .skip(training_dataset_size)
+                        .prefetch(tf.data.AUTOTUNE)
                     )
                     _logger.info(
                         f"Session {i}: "
@@ -1173,6 +1233,120 @@ class Data:
                         + "dataset."
                     )
                 return training_datasets, validation_datasets
+
+    def save_tfrecord_dataset(
+        self,
+        tfrecord_dir,
+        sequence_length,
+        step_size=None,
+        overwrite=False,
+    ):
+        """Save the data as TFRecord files.
+
+        Parameters
+        ----------
+        tfrecord_dir : str
+            Directory to save the TFRecord datasets.
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        step_size : int, optional
+            Number of samples to slide the sequence across the dataset.
+            Default is no overlap.
+        overwrite : bool, optional
+            Should we overwrite the existing TFRecord datasets if there is a need?
+        """
+        os.makedirs(tfrecord_dir, mode=0o700, exist_ok=True)
+        tfrecord_paths = (
+            f"{tfrecord_dir}"
+            "/dataset_{array:0{v}d}-of-{n_session:0{v}d}"
+            f".{self._identifier}.tfrecord"
+        )
+
+        self.sequence_length = sequence_length
+        self.step_size = step_size or sequence_length
+
+        def _check_rewrite():
+            if not os.path.exists(f"{tfrecord_dir}/tfrecord_config.pkl"):
+                _logger.warning(
+                    "No tfrecord_config.pkl file found. Rewriting TFRecords."
+                )
+                return True
+
+            if not overwrite:
+                return False
+
+            # Check if we need to rewrite the TFRecord datasets
+
+            tfrecord_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
+            if tfrecord_config["sequence_length"] != self.sequence_length:
+                _logger.warning("Sequence length has changed. Rewriting TFRecords.")
+                return True
+            if tfrecord_config["step_size"] != self.step_size:
+                _logger.warning("Step size has changed. Rewriting TFRecords.")
+                return True
+            for label in self.session_labels.keys():
+                if label not in tfrecord_config["session_labels"]:
+                    _logger.warning(
+                        f"Session label {label} not found. Rewriting TFRecords."
+                    )
+                    return True
+
+            return False
+
+        n_sequences = self.count_sequences(self.sequence_length)
+
+        # TFRecords we need to save
+        tfrecord_filenames = []
+        tfrecords_to_save = []
+        rewrite = _check_rewrite()
+
+        for i in self.keep:
+            filepath = tfrecord_paths.format(
+                array=i,
+                n_session=self.n_sessions - 1,
+                v=len(str(self.n_sessions - 1)),
+            )
+            tfrecord_filenames.append(filepath)
+            if rewrite or not os.path.exists(filepath):
+                tfrecords_to_save.append((i, filepath))
+
+        # Function for saving a single TFRecord
+        def _save_tfrecord(i, filepath):
+            # Get time series data and ensure an integer multiple of
+            # sequence length
+            array = self.arrays[i][: n_sequences[i] * sequence_length]
+
+            # Save the dataset
+            data = self._create_data_dict(i, array)
+            dtf.save_tfrecord(
+                data,
+                self.sequence_length,
+                self.step_size,
+                filepath,
+            )
+
+        # Save TFRecords
+        if len(tfrecords_to_save) > 0:
+            pqdm(
+                array=tfrecords_to_save,
+                function=_save_tfrecord,
+                n_jobs=self.n_jobs,
+                desc="Creating TFRecord datasets",
+                argument_type="args",
+                total=len(tfrecords_to_save),
+            )
+
+        # Save tfrecords config
+        if rewrite:
+            tfrecord_config = {
+                "identifier": self._identifier,
+                "sequence_length": self.sequence_length,
+                "n_channels": self.n_channels,
+                "step_size": self.step_size,
+                "session_labels": [label.name for label in self.session_labels],
+                "n_sessions": self.n_sessions,
+            }
+            misc.save(f"{tfrecord_dir}/tfrecord_config.pkl", tfrecord_config)
 
     def tfrecord_dataset(
         self,
@@ -1183,6 +1357,8 @@ class Data:
         concatenate=True,
         step_size=None,
         drop_last_batch=False,
+        tfrecord_dir=None,
+        overwrite=False,
     ):
         """Create a TFRecord Dataset for training or evaluation.
 
@@ -1203,6 +1379,11 @@ class Data:
             Default is no overlap.
         drop_last_batch : bool, optional
             Should we drop the last batch if it is smaller than the batch size?
+        tfrecord_dir : str, optional
+            Directory to save the TFRecord datasets. If :code:`None`, then
+            :code:`Data.store_dir` is used.
+        overwrite : bool, optional
+            Should we overwrite the existing TFRecord datasets if there is a need?
 
         Returns
         -------
@@ -1211,192 +1392,54 @@ class Data:
         """
         import tensorflow as tf  # moved here to avoid slow imports
 
-        tfrecord_paths = (
-            f"{self.store_dir}"
-            "/dataset_{array:0{v}d}-of-{n_session:0{v}d}"
-            f".{self._identifier}.tfrecord"
+        tfrecord_dir = tfrecord_dir or self.store_dir
+
+        # Save and load the TFRecord files
+        self.save_tfrecord_dataset(
+            tfrecord_dir=tfrecord_dir,
+            sequence_length=sequence_length,
+            step_size=step_size,
+            overwrite=overwrite,
+        )
+        return dtf.load_tfrecord_dataset(
+            tfrecord_dir=tfrecord_dir,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            validation_split=validation_split,
+            concatenate=concatenate,
+            drop_last_batch=drop_last_batch,
+            buffer_size=self.buffer_size,
+            keep=self.keep,
         )
 
-        self.sequence_length = sequence_length
-        self.batch_size = batch_size
-        self.step_size = step_size or sequence_length
+    def add_session_labels(self, label_name, label_values, label_type):
+        """Add session labels as a new channel to the data.
 
-        n_sequences = self.count_sequences(self.sequence_length)
-
-        # TFRecords we need to save
-        tfrecord_filenames = []
-        tfrecords_to_save = []
-        for i in self.keep:
-            filepath = tfrecord_paths.format(
-                array=i,
-                n_session=self.n_sessions - 1,
-                v=len(str(self.n_sessions - 1)),
-            )
-            tfrecord_filenames.append(filepath)
-            if not path.exists(filepath):
-                tfrecords_to_save.append((i, filepath))
-
-        # Function for saving a single TFRecord
-        def _save_tfrecord(i, filepath):
-            # Get time series data and ensure an integer multiple of
-            # sequence length
-            array = self.arrays[i][: n_sequences[i] * sequence_length]
-
-            # Create a dataset with the time series data and ID
-            array_tracker = np.zeros(array.shape[0], dtype=np.float32)
-            array_tracker = array_tracker + i
-            data = {"data": array, "session_id": array_tracker}
-
-            # Save the dataset
-            dtf.save_tfrecord(
-                data,
-                self.sequence_length,
-                self.step_size,
-                filepath,
+        Parameters
+        ----------
+        label_name : str
+            Name of the new channel.
+        label_values : np.ndarray
+            Labels for each session.
+        label_type : str
+            Type of label, either "categorical" or "continuous".
+        """
+        if len(label_values) != self.n_sessions:
+            raise ValueError(
+                "label_values must have the same length as the number of sessions."
             )
 
-        # Save TFRecords
-        if len(tfrecords_to_save) > 0:
-            pqdm(
-                array=tfrecords_to_save,
-                function=_save_tfrecord,
-                n_jobs=self.n_jobs,
-                desc="Creating TFRecord datasets",
-                argument_type="args",
-                total=len(tfrecords_to_save),
-            )
+        self.session_labels.append(SessionLabels(label_name, label_values, label_type))
 
-        # Helper function for parsing training examples
-        def _parse_example(example):
-            feature_names = ["data", "session_id"]
-            tensor_shapes = {
-                "data": [self.sequence_length, self.n_channels],
-                "session_id": [self.sequence_length],
-            }
-            feature_description = {
-                name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
-            }
-            parsed_example = tf.io.parse_single_example(
-                example,
-                feature_description,
-            )
-            return {
-                name: tf.ensure_shape(
-                    tf.io.parse_tensor(tensor, tf.float32), tensor_shapes[name]
-                )
-                for name, tensor in parsed_example.items()
-            }
+    def get_session_labels(self):
+        """Get the session labels.
 
-        # Create the TFRecord dataset
-        if concatenate:
-            tfrecord_filenames = tf.data.Dataset.from_tensor_slices(tfrecord_filenames)
-
-            if shuffle:
-                # First shuffle the shards
-                tfrecord_filenames = tfrecord_filenames.shuffle(len(tfrecord_filenames))
-
-                # Create the TFRecord dataset
-                full_dataset = tfrecord_filenames.interleave(
-                    tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
-                )
-
-                # Parse the examples
-                full_dataset = full_dataset.map(_parse_example)
-
-                # Shuffle sequences
-                full_dataset = full_dataset.shuffle(self.buffer_size)
-
-                # Group into batches
-                full_dataset = full_dataset.batch(
-                    self.batch_size, drop_remainder=drop_last_batch
-                )
-
-                # Shuffle batches
-                full_dataset = full_dataset.shuffle(self.buffer_size)
-
-            else:
-                # Create the TFRecord dataset
-                full_dataset = tfrecord_filenames.interleave(
-                    tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
-                )
-
-                # Parse the examples
-                full_dataset = full_dataset.map(_parse_example)
-
-                # Group into batches
-                full_dataset = full_dataset.batch(
-                    self.batch_size, drop_remainder=drop_last_batch
-                )
-
-            if validation_split is None:
-                # Return the dataset
-                return full_dataset.prefetch(tf.data.AUTOTUNE)
-
-            else:
-                # Calculate how many batches should be in the training dataset
-                dataset_size = dtf.get_n_batches(full_dataset)
-                training_dataset_size = round((1.0 - validation_split) * dataset_size)
-
-                # Split the dataset into training and validation datasets
-                training_dataset = full_dataset.take(training_dataset_size)
-                validation_dataset = full_dataset.skip(training_dataset_size)
-                _logger.info(
-                    f"{training_dataset_size} batches in training dataset, "
-                    + f"{dataset_size - training_dataset_size} batches in the validation "
-                    + "dataset."
-                )
-                return training_dataset.prefetch(
-                    tf.data.AUTOTUNE
-                ), validation_dataset.prefetch(tf.data.AUTOTUNE)
-
-        # Otherwise create a dataset for each array separately
-        else:
-            full_datasets = []
-            for filename in tfrecord_filenames:
-                ds = tf.data.TFRecordDataset(filename)
-
-                # Parse the examples
-                ds = ds.map(_parse_example)
-
-                if shuffle:
-                    # Shuffle sequences
-                    ds = ds.shuffle(self.buffer_size)
-
-                # Group into batches
-                ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
-
-                if shuffle:
-                    # Shuffle batches
-                    ds = ds.shuffle(self.buffer_size)
-
-                full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
-
-            if validation_split is None:
-                # Return the full dataset for each array
-                return full_datasets
-
-            else:
-                # Split the dataset for each array separately
-                training_datasets = []
-                validation_datasets = []
-                for i, ds in enumerate(full_datasets):
-                    # Calculate how many batches should be in the training dataset
-                    dataset_size = dtf.get_n_batches(ds)
-                    training_dataset_size = round(
-                        (1.0 - validation_split) * dataset_size
-                    )
-
-                    # Split the dataset into training and validation datasets
-                    training_datasets.append(ds.take(training_dataset_size))
-                    validation_datasets.append(ds.skip(training_dataset_size))
-                    _logger.info(
-                        f"Session {i}: "
-                        + f"{training_dataset_size} batches in training dataset, "
-                        + f"{dataset_size - training_dataset_size} batches in the validation "
-                        + "dataset."
-                    )
-
-                return training_datasets, validation_datasets
+        Returns
+        -------
+        session_labels : List[SessionLabels]
+            List of session labels.
+        """
+        return self.session_labels
 
     def save_preparation(self, output_dir="."):
         """Save a pickle file containing preparation settings.
@@ -1413,6 +1456,7 @@ class Data:
             "data_field",
             "picks",
             "reject_by_annotation",
+            "original_sampling_frequency",
             "sampling_frequency",
             "mask_file",
             "parcellation_file",
@@ -1445,7 +1489,7 @@ class Data:
             Path to directory containing the pickle file with preparation
             settings.
         """
-        if path.isdir(inputs):
+        if os.path.isdir(inputs):
             for file in rw.list_dir(inputs):
                 if "preparation.pkl" in file:
                     preparation = pickle.load(open(f"{inputs}/preparation.pkl", "rb"))
@@ -1488,3 +1532,36 @@ class Data:
         """Deletes :code:`store_dir`."""
         if self.store_dir.exists():
             rmtree(self.store_dir)
+
+
+@dataclass
+class SessionLabels:
+    """Class for session labels.
+
+    Parameters
+    ----------
+    name : str
+        Name of the session label.
+    values : np.ndarray
+        Value for each session. Must be a 1D array of numbers.
+    label_type : str
+        Type of the session label. Options are "categorical" and "continuous".
+    """
+
+    name: str
+    values: np.ndarray
+    label_type: str
+
+    def __post_init__(self):
+        if self.label_type not in ["categorical", "continuous"]:
+            raise ValueError("label_type must be 'categorical' or 'continuous'.")
+
+        if self.values.ndim != 1:
+            raise ValueError("values must be a 1D array.")
+
+        if self.label_type == "categorical":
+            self.values = self.values.astype(np.int32)
+            self.n_classes = len(np.unique(self.values))
+        else:
+            self.values = self.values.astype(np.float32)
+            self.n_classes = None

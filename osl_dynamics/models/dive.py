@@ -2,6 +2,7 @@
 
 """
 
+from typing import List
 from dataclasses import dataclass
 
 import numpy as np
@@ -9,7 +10,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import layers
 
-import osl_dynamics.data.tf as dtf
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.models.inf_mod_base import (
@@ -30,22 +30,25 @@ from osl_dynamics.inference.layers import (
     SampleGammaDistributionLayer,
     SoftmaxLayer,
     ConcatEmbeddingsLayer,
-    SessionMapLayer,
+    SessionParamLayer,
     MixSessionSpecificParametersLayer,
-    TFRangeLayer,
     ZeroLayer,
     InverseCholeskyLayer,
-    StaticKLDivergenceLayer,
+    GammaExponentialKLDivergenceLayer,
     MultiLayerPerceptronLayer,
     LearnableTensorLayer,
     StaticLossScalingFactorLayer,
     BatchSizeLayer,
+    AddLayer,
+    TFConstantLayer,
+    EmbeddingLayer,
 )
+from osl_dynamics.data import SessionLabels
 
 
 @dataclass
 class Config(BaseModelConfig, VariationalInferenceModelConfig):
-    """Settings for SE-DyNeMo.
+    """Settings for DIVE.
 
     Parameters
     ----------
@@ -151,6 +154,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Number of dimensions for the embedding vectors.
     spatial_embeddings_dim : int
         Number of dimensions for the spatial embeddings.
+    unit_norm_embeddings : bool
+        Should we normalize the embeddings to have unit norm?
 
     dev_n_layers : int
         Number of layers for the MLP for deviations.
@@ -169,6 +174,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         This will be scaled by the amount of data.
     initial_dev : dict
         Initialisation for dev posterior parameters.
+
+    session_labels : List[SessionLabels]
+        List of session labels.
     """
 
     model_name: str = "DIVE"
@@ -204,6 +212,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_sessions: int = None
     embeddings_dim: int = None
     spatial_embeddings_dim: int = None
+    unit_norm_embeddings: bool = False
 
     dev_n_layers: int = 0
     dev_n_units: int = None
@@ -212,7 +221,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     dev_dropout: float = 0.0
     dev_regularizer: str = None
     dev_regularizer_factor: float = 0.0
-    initial_dev: dict = None
+
+    # Session labels
+    session_labels: List[SessionLabels] = None
 
     def __post_init__(self):
         self.validate_rnn_parameters()
@@ -222,6 +233,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         self.validate_dimension_parameters()
         self.validate_training_parameters()
         self.validate_embedding_parameters()
+        self.validate_session_labels()
 
     def validate_rnn_parameters(self):
         if self.inference_n_units is None:
@@ -240,9 +252,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             else:
                 self.covariances_epsilon = 0.0
 
-        if self.initial_dev is None:
-            self.initial_dev = dict()
-
     def validate_embedding_parameters(self):
         if (
             self.n_sessions is None
@@ -255,6 +264,23 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
         if self.dev_n_layers != 0 and self.dev_n_units is None:
             raise ValueError("Please pass dev_n_units.")
+
+    def validate_session_labels(self):
+        if not self.session_labels:
+            self.session_labels = [
+                SessionLabels("session_id", np.arange(self.n_sessions), "categorical")
+            ]
+
+        label_names = []
+        for session_label in self.session_labels:
+            if session_label.name in label_names:
+                raise ValueError(f"Session label {session_label.name} is repeated.")
+            label_names.append(session_label.name)
+
+            if len(session_label.values) != self.n_sessions:
+                raise ValueError(
+                    f"Session label {session_label.name} must have {self.n_sessions} values."
+                )
 
 
 class Model(VariationalInferenceModelBase):
@@ -313,32 +339,38 @@ class Model(VariationalInferenceModelBase):
         """Wrapper for :code:`get_group_means_covariances`."""
         return self.get_group_means_covariances()
 
-    def get_embeddings(self):
-        """Get the embedding vectors.
+    def get_embedding_weights(self):
+        """Get the weights of the embedding layers.
 
         Returns
         -------
-        embeddings : np.ndarray
-            Embedding vectors.
-            Shape is (n_sessions, embedding_dim).
+        embedding_weights : dict
+            Weights of the embedding layers.
         """
-        return obs_mod.get_embeddings(self.model)
+        return obs_mod.get_embedding_weights(self.model, self.config.session_labels)
 
-    def get_session_means_covariances(
-        self,
-        embeddings=None,
-        n_neighbours=2,
-    ):
+    def get_session_embeddings(self):
+        """Get the embedding vectors for sessions for each session label.
+
+        Returns
+        -------
+        embeddings : dict
+            Embeddings for each session label.
+        """
+        return obs_mod.get_session_embeddings(self.model, self.config.session_labels)
+
+    def get_summed_embeddings(self):
+        """Get the summed embeddings.
+
+        Returns
+        -------
+        summed_embeddings : np.ndarray
+            Summed embeddings. Shape is (n_sessions, embeddings_dim).
+        """
+        return obs_mod.get_summed_embeddings(self.model, self.config.session_labels)
+
+    def get_session_means_covariances(self):
         """Get the means and covariances for each session.
-
-        Parameters
-        ----------
-        embeddings : np.ndarray, optional
-            Input embedding vectors.
-            Shape is (n_sessions, embeddings_dim).
-        n_neighbours : int, optional
-            Number of nearest neighbours.
-            Ignored if :code:`embeddings=None`.
 
         Returns
         -------
@@ -353,8 +385,7 @@ class Model(VariationalInferenceModelBase):
             self.model,
             self.config.learn_means,
             self.config.learn_covariances,
-            embeddings,
-            n_neighbours,
+            self.config.session_labels,
         )
 
     def set_regularizers(self, training_dataset):
@@ -388,14 +419,24 @@ class Model(VariationalInferenceModelBase):
                 layer_name="group_covs",
             )
 
-    def set_dev_parameters_initializer(self, training_dataset):
+    def set_dev_parameters_initializer(self, training_data):
         """Set the deviance parameters initializer based on training data.
 
         Parameters
         ----------
-        training_dataset : osl_dynamics.data.Data
-            The training dataset.
+        training_data : osl_dynamics.data.Data or tf.data.Dataset
+            The training data.
         """
+        training_dataset = self.make_dataset(
+            training_data,
+            shuffle=False,
+            concatenate=False,
+        )
+        if len(training_dataset) != self.config.n_sessions:
+            raise ValueError(
+                "The number of sessions in the training data must match "
+                "the number of sessions in the model."
+            )
         obs_mod.set_dev_parameters_initializer(
             self.model,
             training_dataset,
@@ -404,17 +445,17 @@ class Model(VariationalInferenceModelBase):
         )
         self.reset()
 
-    def set_embeddings_initializer(self, embeddings):
+    def set_embeddings_initializer(self, initial_embeddings):
         """Set the embeddings initializer.
 
         Parameters
         ----------
-        embeddings : np.ndarray
-            The embeddings. Shape is (n_sessions, embeddings_dim).
+        initial_embeddings : dict
+            Initial embeddings for each session label.
         """
         obs_mod.set_embeddings_initializer(
             self.model,
-            embeddings,
+            initial_embeddings,
         )
         self.reset()
 
@@ -479,57 +520,20 @@ class Model(VariationalInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_bayesian_kl_scaling(self, training_dataset):
-        """Set the correct scaling for KL loss between deviation posterior
-        and prior.
-
-        Parameters
-        ----------
-        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Training dataset.
-        """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
-        n_batches = dtf.get_n_batches(training_dataset)
-        learn_means = self.config.learn_means
-        learn_covariances = self.config.learn_covariances
-        obs_mod.set_bayesian_kl_scaling(
-            self.model, n_batches, learn_means, learn_covariances
-        )
-
-    def set_dev_mlp_reg_scaling(self, training_dataset):
-        """Set the correct scaling for the deviation MLP regularization.
-
-        Parameters
-        ----------
-        training_dataset : tf.data.Dataset or osl_dynamics.data.Data
-            Training dataset.
-        """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
-        n_batches = dtf.get_n_batches(training_dataset)
-        learn_means = self.config.learn_means
-        learn_covariances = self.config.learn_covariances
-        obs_mod.set_dev_mlp_reg_scaling(
-            self.model, n_batches, learn_means, learn_covariances
-        )
-
     def random_subject_initialization(self, **kwargs):
-        """random subject initialisation not compatible with SE-DyNeMo."""
+        """random subject initialisation not compatible with DIVE."""
         raise AttributeError(
             " 'Model' object has no attribute 'random_subject_initialization'."
         )
 
 
 def _model_structure(config):
-    # Layers for inputs
+    # Inputs
     data = layers.Input(
         shape=(config.sequence_length, config.n_channels),
         dtype=tf.float32,
         name="data",
     )
-    session_id = layers.Input(
-        shape=(config.sequence_length,), dtype=tf.int32, name="session_id"
-    )
-
     batch_size_layer = BatchSizeLayer(name="batch_size")
     batch_size = batch_size_layer(data)
 
@@ -538,6 +542,44 @@ def _model_structure(config):
         name="static_loss_scaling_factor"
     )
     static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+
+    session_id = layers.Input(
+        shape=(config.sequence_length,),
+        dtype=tf.int32,
+        name="session_id",
+    )
+    session_label_layers = dict()
+    session_labels = dict()
+    label_embeddings_layers = dict()
+    label_embeddings = []
+    for session_label in config.session_labels:
+        session_label_layers[session_label.name] = TFConstantLayer(
+            values=session_label.values,
+            name=f"{session_label.name}_constant",
+        )
+        session_labels[session_label.name] = session_label_layers[session_label.name](
+            data
+        )
+        label_embeddings_layers[session_label.name] = (
+            EmbeddingLayer(
+                session_label.n_classes,
+                config.embeddings_dim,
+                config.unit_norm_embeddings,
+                name=f"{session_label.name}_embeddings",
+            )
+            if session_label.label_type == "categorical"
+            else layers.Dense(
+                config.embeddings_dim, name=f"{session_label.name}_embeddings"
+            )
+        )
+        label_embeddings.append(
+            label_embeddings_layers[session_label.name](
+                session_labels[session_label.name]
+            )
+        )
+
+    embeddings_layer = AddLayer(name="embeddings")
+    embeddings = embeddings_layer(label_embeddings)
 
     # Inference RNN:
     # Layer definitions
@@ -587,14 +629,6 @@ def _model_structure(config):
     # -----------------
     # Observation model
 
-    # Embedding layers
-    sessions_layer = TFRangeLayer(config.n_sessions, name="sessions")
-    embeddings_layer = layers.Embedding(
-        config.n_sessions,
-        config.embeddings_dim,
-        name="embeddings",
-    )
-
     # Group level observation model parameters
     group_means_layer = VectorsLayer(
         config.n_modes,
@@ -613,9 +647,6 @@ def _model_structure(config):
         config.covariances_regularizer,
         name="group_covs",
     )
-
-    sessions = sessions_layer(data)
-    embeddings = embeddings_layer(sessions)
 
     group_mu = group_means_layer(
         data, static_loss_scaling_factor=static_loss_scaling_factor
@@ -636,7 +667,6 @@ def _model_structure(config):
         means_concat_embeddings_layer = ConcatEmbeddingsLayer(
             name="means_concat_embeddings",
         )
-
         means_dev_decoder_layer = MultiLayerPerceptronLayer(
             config.dev_n_layers,
             config.dev_n_units,
@@ -651,7 +681,6 @@ def _model_structure(config):
             config.n_channels,
             name="means_dev_map",
         )
-
         norm_means_dev_map_layer = layers.LayerNormalization(
             axis=-1, scale=False, name="norm_means_dev_map"
         )
@@ -660,8 +689,7 @@ def _model_structure(config):
             shape=(config.n_sessions, config.n_modes, 1),
             learn=config.learn_means,
             initializer=osld_initializers.RandomWeightInitializer(
-                tfp.math.softplus_inverse(config.initial_dev.get("means_alpha", 0.0)),
-                0.1,
+                tfp.math.softplus_inverse(0.0), 0.1
             ),
             name="means_dev_mag_inf_alpha_input",
         )
@@ -672,8 +700,7 @@ def _model_structure(config):
             shape=(config.n_sessions, config.n_modes, 1),
             learn=config.learn_means,
             initializer=osld_initializers.RandomWeightInitializer(
-                tfp.math.softplus_inverse(config.initial_dev.get("means_beta", 5.0)),
-                0.1,
+                tfp.math.softplus_inverse(5.0), 0.1
             ),
             name="means_dev_mag_inf_beta_input",
         )
@@ -686,13 +713,13 @@ def _model_structure(config):
 
         means_dev_layer = layers.Multiply(name="means_dev")
 
-        # Data flow to get the means deviations
+        # Data flow to get mean deviations
 
         # Get the concatenated embeddings
         means_spatial_embeddings = means_spatial_embeddings_layer(group_mu)
         means_concat_embeddings = means_concat_embeddings_layer(
             [embeddings, means_spatial_embeddings]
-        )
+        )  # shape = (n_sessions, n_modes, embeddings_dim + spatial_embeddings_dim)
 
         # Get the mean deviation maps (no global magnitude information)
         means_dev_decoder = means_dev_decoder_layer(
@@ -700,13 +727,15 @@ def _model_structure(config):
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
         means_dev_map = means_dev_map_layer(means_dev_decoder)
-        norm_means_dev_map = norm_means_dev_map_layer(means_dev_map)
+        norm_means_dev_map = tf.gather(
+            norm_means_dev_map_layer(means_dev_map),
+            session_id[:, 0],
+            axis=0,
+        )
+        # shape = (None, n_modes, n_channels)
 
         # Get the deviation magnitudes (scale deviation maps globally)
-
-        means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(
-            data,
-        )
+        means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(data)
         means_dev_mag_inf_alpha = means_dev_mag_inf_alpha_layer(
             means_dev_mag_inf_alpha_input
         )
@@ -715,9 +744,12 @@ def _model_structure(config):
             means_dev_mag_inf_beta_input
         )
         means_dev_mag = means_dev_mag_layer(
-            [means_dev_mag_inf_alpha, means_dev_mag_inf_beta, session_id]
+            [
+                means_dev_mag_inf_alpha,
+                means_dev_mag_inf_beta,
+                session_id,
+            ]
         )
-        norm_means_dev_map = tf.gather(norm_means_dev_map, session_id[:, 0], axis=0)
         means_dev = means_dev_layer([means_dev_mag, norm_means_dev_map])
     else:
         means_dev_layer = ZeroLayer(
@@ -725,7 +757,8 @@ def _model_structure(config):
             name="means_dev",
         )
         means_dev = tf.broadcast_to(
-            means_dev_layer(data), (batch_size, config.n_modes, config.n_channels)
+            means_dev_layer(data),
+            (batch_size, config.n_modes, config.n_channels),
         )
 
     # ----------------------
@@ -752,7 +785,8 @@ def _model_structure(config):
             name="covs_dev_decoder",
         )
         covs_dev_map_layer = layers.Dense(
-            config.n_channels * (config.n_channels + 1) // 2, name="covs_dev_map"
+            config.n_channels * (config.n_channels + 1) // 2,
+            name="covs_dev_map",
         )
         norm_covs_dev_map_layer = layers.LayerNormalization(
             axis=-1, scale=False, name="norm_covs_dev_map"
@@ -762,8 +796,7 @@ def _model_structure(config):
             shape=(config.n_sessions, config.n_modes, 1),
             learn=config.learn_covariances,
             initializer=osld_initializers.RandomWeightInitializer(
-                tfp.math.softplus_inverse(config.initial_dev.get("covs_alpha", 0.0)),
-                0.1,
+                tfp.math.softplus_inverse(0.0), 0.1
             ),
             name="covs_dev_mag_inf_alpha_input",
         )
@@ -774,8 +807,7 @@ def _model_structure(config):
             shape=(config.n_sessions, config.n_modes, 1),
             learn=config.learn_covariances,
             initializer=osld_initializers.RandomWeightInitializer(
-                tfp.math.softplus_inverse(config.initial_dev.get("covs_beta", 5.0)),
-                0.1,
+                tfp.math.softplus_inverse(5.0), 0.1
             ),
             name="covs_dev_mag_inf_beta_input",
         )
@@ -803,7 +835,11 @@ def _model_structure(config):
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
         covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
-        norm_covs_dev_map = norm_covs_dev_map_layer(covs_dev_map)
+        norm_covs_dev_map = tf.gather(
+            norm_covs_dev_map_layer(covs_dev_map),
+            session_id[:, 0],
+            axis=0,
+        )
 
         # Get the deviation magnitudes (scale deviation maps globally)
         covs_dev_mag_inf_alpha_input = covs_dev_mag_inf_alpha_input_layer(data)
@@ -811,14 +847,18 @@ def _model_structure(config):
             covs_dev_mag_inf_alpha_input
         )
         covs_dev_mag_inf_beta_input = covs_dev_mag_inf_beta_input_layer(data)
-        covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(
-            covs_dev_mag_inf_beta_input,
-        )
+        covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(covs_dev_mag_inf_beta_input)
+
         covs_dev_mag = covs_dev_mag_layer(
-            [covs_dev_mag_inf_alpha, covs_dev_mag_inf_beta, session_id]
+            [
+                covs_dev_mag_inf_alpha,
+                covs_dev_mag_inf_beta,
+                session_id,
+            ]
         )
-        norm_covs_dev_map = tf.gather(norm_covs_dev_map, session_id[:, 0], axis=0)
+        # covs_dev_mag.shape = (None, n_modes, 1)
         covs_dev = covs_dev_layer([covs_dev_mag, norm_covs_dev_map])
+        # covs_dev.shape = (None, n_modes, n_channels * (n_channels + 1) // 2)
     else:
         covs_dev_layer = ZeroLayer(
             shape=(
@@ -840,16 +880,20 @@ def _model_structure(config):
     # Add deviations to group level parameters
 
     # Layer definitions
-    session_means_layer = SessionMapLayer(
+    session_means_layer = SessionParamLayer(
         "means", config.covariances_epsilon, name="session_means"
     )
-    session_covs_layer = SessionMapLayer(
+    session_covs_layer = SessionParamLayer(
         "covariances", config.covariances_epsilon, name="session_covs"
     )
 
     # Data flow
-    mu = session_means_layer([group_mu, means_dev])
-    D = session_covs_layer([group_D, covs_dev])
+    mu = session_means_layer(
+        [group_mu, means_dev]
+    )  # shape = (None, n_modes, n_channels)
+    D = session_covs_layer(
+        [group_D, covs_dev]
+    )  # shape = (None, n_modes, n_channels, n_channels)
 
     # -----------------------------------
     # Mix the session specific paraemters
@@ -908,7 +952,7 @@ def _model_structure(config):
             name="means_dev_mag_mod_beta",
         )
 
-        means_dev_mag_kl_loss_layer = StaticKLDivergenceLayer(
+        means_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
             config.covariances_epsilon, name="means_dev_mag_kl_loss"
         )
 
@@ -916,7 +960,6 @@ def _model_structure(config):
         means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(means_dev_decoder)
         means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(
             [
-                data,
                 means_dev_mag_inf_alpha,
                 means_dev_mag_inf_beta,
                 means_dev_mag_mod_beta,
@@ -938,15 +981,16 @@ def _model_structure(config):
             name="covs_dev_mag_mod_beta",
         )
 
-        covs_dev_mag_kl_loss_layer = StaticKLDivergenceLayer(
+        covs_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
             config.covariances_epsilon, name="covs_dev_mag_kl_loss"
         )
 
         # Data flow
-        covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(covs_dev_decoder)
+        covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
+            covs_dev_decoder,
+        )
         covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
             [
-                data,
                 covs_dev_mag_inf_alpha,
                 covs_dev_mag_inf_beta,
                 covs_dev_mag_mod_beta,

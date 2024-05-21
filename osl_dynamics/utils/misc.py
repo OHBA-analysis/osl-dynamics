@@ -5,6 +5,7 @@
 import inspect
 import logging
 import pickle
+import random
 import sys
 from copy import copy
 from pathlib import Path
@@ -31,7 +32,9 @@ def nextpow2(x):
         The smallest power of two that is greater than or equal to the absolute
         value of x.
     """
-    res = np.ceil(np.log2(x))
+    if x == 0:
+        return 0
+    res = np.ceil(np.log2(np.abs(x)))
     return res.astype("int")
 
 
@@ -386,7 +389,7 @@ def save(filename, array):
         np.save(filename, array)
 
 
-def load(filename):
+def load(filename, **kwargs):
     """Load a file.
 
     Parameters
@@ -409,9 +412,28 @@ def load(filename):
     if ext == ".pkl":
         array = pickle.load(open(filename, "rb"))
     else:
-        array = np.load(filename)
+        array = np.load(filename, **kwargs)
 
     return array
+
+
+def set_random_seed(seed):
+    """Set all random seeds.
+
+    This includes Python's random module, NumPy and TensorFlow.
+
+    Parameters
+    ----------
+    seed : int
+        Random seed.
+    """
+    import tensorflow as tf  # avoids slow imports
+
+    _logger.info(f"Setting random seed to {seed}")
+
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
 
 
 @contextmanager

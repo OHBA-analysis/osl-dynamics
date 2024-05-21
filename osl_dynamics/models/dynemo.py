@@ -545,7 +545,7 @@ class Model(VariationalInferenceModelBase):
 
         Parameters
         ----------
-        training_data : osl_dynamics.data.Data
+        training_data : osl_dynamics.data.Data or list of tf.data.Dataset
             Training dataset.
         n_epochs : int, optional
             Number of epochs to train for. Defaults to the value in the
@@ -590,10 +590,18 @@ class Model(VariationalInferenceModelBase):
         means = []
         covariances = []
         with self.set_trainable(fixed_layers, False):
-            for i in trange(training_data.n_sessions, desc="Dual estimation"):
+            if isinstance(training_data, list):
+                n_sessions = len(training_data)
+            else:
+                n_sessions = training_data.n_sessions
+
+            for i in trange(n_sessions, desc="Dual estimation"):
                 # Train on this session
-                with training_data.set_keep(i):
-                    self.fit(training_data, verbose=0)
+                if isinstance(training_data, list):
+                    self.fit(training_data[i], verbose=0)
+                else:
+                    with training_data.set_keep(i):
+                        self.fit(training_data, verbose=0)
 
                 # Get inferred parameters
                 m, c = self.get_means_covariances()
@@ -614,17 +622,11 @@ class Model(VariationalInferenceModelBase):
         """Select the covariance layer based on the config."""
         config = self.config
         if config.diagonal_covariances:
-            return DiagonalMatricesLayer(
-                config.n_modes,
-                config.n_channels,
-                config.learn_covariances,
-                config.initial_covariances,
-                config.covariances_epsilon,
-                config.covariances_regularizer,
-                name="covs",
-            )
-        return CovarianceMatricesLayer(
-            config.n_modes,
+            CovsLayer = DiagonalMatricesLayer
+        else:
+            CovsLayer = CovarianceMatricesLayer
+        return CovsLayer(
+            config.n_modes or config.n_states,
             config.n_channels,
             config.learn_covariances,
             config.initial_covariances,
@@ -635,6 +637,7 @@ class Model(VariationalInferenceModelBase):
 
     def _model_structure(self):
         """Build the model structure."""
+
         config = self.config
 
         # Layer for input
@@ -762,5 +765,7 @@ class Model(VariationalInferenceModelBase):
         kl_loss = kl_loss_layer(kl_div)
 
         return tf.keras.Model(
-            inputs=inputs, outputs=[ll_loss, kl_loss, theta_norm], name="DyNeMo"
+            inputs=inputs,
+            outputs=[ll_loss, kl_loss, theta_norm],
+            name=config.model_name,
         )

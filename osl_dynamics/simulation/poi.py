@@ -21,8 +21,6 @@ class Poisson:
         Number of channels.
     n_modes : int
         Number of modes.
-    random_seed : int
-        Seed for the random number generator.
     """
 
     def __init__(
@@ -30,10 +28,7 @@ class Poisson:
         rates,
         n_states=None,
         n_channels=None,
-        random_seed=None,
     ):
-        self._rng = np.random.default_rng(random_seed)
-
         if isinstance(rates, np.ndarray):
             self.n_states = rates.shape[0]
             self.n_channels = rates.shape[1]
@@ -52,7 +47,7 @@ class Poisson:
     def create_rates(self, option, eps=1e-2):
         if option == "random":
             # Randomly sample the rates from a gamma distribution
-            rates = self._rng.gamma(
+            rates = np.random.gamma(
                 shape=1.0, scale=1.1, size=(self.n_states, self.n_channels)
             )
 
@@ -60,7 +55,7 @@ class Poisson:
             n_active_channels = max(1, self.n_channels // self.n_states)
             for i in range(self.n_states):
                 active_channels = np.unique(
-                    self._rng.integers(0, self.n_channels, size=n_active_channels)
+                    np.random.randint(0, self.n_channels, size=n_active_channels)
                 )
                 rates[i, active_channels] += 1
 
@@ -76,6 +71,6 @@ class Poisson:
         # Generate data
         for i in range(n_samples):
             state = np.argmax(state_time_course[i])
-            data[i] = self._rng.poisson(self.rates[state])
+            data[i] = np.random.poisson(self.rates[state])
 
         return data

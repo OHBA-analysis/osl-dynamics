@@ -19,10 +19,10 @@ Conda
 
 We recommend installing osl-dynamics within a virtual environment. You can do this with `Anaconda <https://docs.anaconda.com/free/anaconda/install/index.html>`_ (or `miniconda <https://docs.conda.io/projects/miniconda/en/latest/miniconda-install.html>`_).
 
+Below we describe how to install osl-dynamics from source. We recommend using the conda environment files in ``/envs``.
+
 Linux
 -----
-
-Here, we describe how to install osl-dynamics from source. We recommend using the conda environment files in ``/envs``. For a generic linux machine, osl-dynamics can be installed in editable mode with:
 
 .. code-block:: shell
 
@@ -32,17 +32,15 @@ Here, we describe how to install osl-dynamics from source. We recommend using th
     conda activate osld
     pip install -e .
 
-Note, if you have a Mac you may want to use the ``envs/mac.yml`` environment file instead.
+Mac
+---
+
+For a Mac, the installation of TensorFlow is slightly different to a Linux computer. We recommend using the lines above replacing the Linux environment file ``envs/linux.yml`` with the Mac environment file ``envs/mac.yml``.
 
 Windows
 -------
 
-If you are using a Windows computer, we recommend first installing linux (Ubuntu) as a Windows Subsystem by following the instructions `here <https://ubuntu.com/wsl>`_. Then following the instructions above in the Ubuntu terminal.
-
-Oxford specific computers
--------------------------
-
-If you're installing on the Oxford BMRC server, use ``envs/bmrc.yml``. If you're installing on the OHBA workstation, use ``envs/hbaws.yml``. Note, the ``hbaws.yml`` environment will automatically install spyder and jupyter notebooks.
+If you are using a Windows computer, we recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions `here <https://ubuntu.com/wsl>`_. Then following the instructions above in the Ubuntu terminal.
 
 Within an osl environment
 -------------------------
@@ -57,15 +55,17 @@ If you have already installed `OSL <https://github.com/OHBA-analysis/osl>`_ you 
     pip install tensorflow-probability==0.17
     pip install -e .
 
-Developers
-----------
+Note, if you're using a Mac computer you need to install TensorFlow with ``pip install tensorflow-macos==2.9.1`` instead of ``tensorflow==2.9.1``.
 
-Developers might want to clone the repo using SSH instead of HTTPS:
+Removing osl-dynamics
+---------------------
+
+Simply delete the conda environment and repository:
 
 .. code-block:: shell
 
-    git clone git@github.com:OHBA-analysis/osl-dynamics.git
-
+    conda env remove -n osld
+    rm -rf osl-dynamics
 
 Documentation
 =============
@@ -91,8 +91,6 @@ The local build of the documentation webpage can be found in ``build/sphinx/html
 
 Releases
 ========
-
-The process of packaging a python project is described here: `https://packaging.python.org/en/latest/tutorials/packaging-projects <https://packaging.python.org/en/latest/tutorials/packaging-projects>`_.
 
 A couple packages are needed to build and upload a project to PyPI, these can be installed in your conda environment with:
 

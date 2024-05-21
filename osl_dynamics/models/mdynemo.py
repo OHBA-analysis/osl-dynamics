@@ -52,9 +52,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_name : str
         Model name.
     n_modes : int
-        Number of modes for both power.
-    n_fc_modes : int
-        Number of modes for functional connectivity.
+        Number of modes.
+    n_corr_modes : int
+        Number of modes for correlation.
         If :code:`None`, then set to :code:`n_modes`.
     n_channels : int
         Number of channels.
@@ -99,34 +99,29 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Type of normalization to apply to the posterior samples, :code:`theta`.
         Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
         The same parameter is used for the :code:`gamma` time course.
-    learn_alpha_temperature : bool
-        Should we learn the :code:`alpha_temperature`?
-        The same parameter is used for the :code:`gamma` time course.
-    initial_alpha_temperature : float
-        Initial value for :code:`alpha_temperature`.
-        The same parameter is used for the :code:`gamma` time course.
+
 
     learn_means : bool
         Should we make the mean for each mode trainable?
     learn_stds : bool
         Should we make the standard deviation for each mode trainable?
-    learn_fcs : bool
-        Should we make the functional connectivity for each mode trainable?
+    learn_corrs : bool
+        Should we make the correlation for each mode trainable?
     initial_means : np.ndarray
         Initialisation for the mode means.
     initial_stds : np.ndarray
         Initialisation for mode standard deviations.
-    initial_fcs : np.ndarray
-        Initialisation for mode functional connectivity matrices.
+    initial_corrs : np.ndarray
+        Initialisation for mode correlation matrices.
     stds_epsilon : float
         Error added to mode stds for numerical stability.
-    fcs_epsilon : float
-        Error added to mode fcs for numerical stability.
+    corrs_epsilon : float
+        Error added to mode corrs for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for the mean vectors.
     stds_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for the standard deviation vectors.
-    fcs_regularizer : tf.keras.regularizers.Regularizer
+    corrs_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for the correlation matrices.
 
     do_kl_annealing : bool
@@ -180,19 +175,21 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_regularizer: str = None
 
     # Observation model parameters
-    n_fc_modes: int = None
+    n_corr_modes: int = None
     learn_means: bool = None
     learn_stds: bool = None
-    learn_fcs: bool = None
+    learn_corrs: bool = None
     initial_means: np.ndarray = None
     initial_stds: np.ndarray = None
-    initial_fcs: np.ndarray = None
+    initial_corrs: np.ndarray = None
     stds_epsilon: float = None
-    fcs_epsilon: float = None
+    corrs_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     stds_regularizer: tf.keras.regularizers.Regularizer = None
-    fcs_regularizer: tf.keras.regularizers.Regularizer = None
+    corrs_regularizer: tf.keras.regularizers.Regularizer = None
     multiple_dynamics: bool = True
+
+    pca_components: np.ndarray = None
 
     def __post_init__(self):
         self.validate_rnn_parameters()
@@ -213,9 +210,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         if (
             self.learn_means is None
             or self.learn_stds is None
-            or self.learn_fcs is None
+            or self.learn_corrs is None
         ):
-            raise ValueError("learn_means, learn_stds and learn_fcs must be passed.")
+            raise ValueError("learn_means, learn_stds and learn_corrs must be passed.")
 
         if self.stds_epsilon is None:
             if self.learn_stds:
@@ -223,17 +220,21 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             else:
                 self.stds_epsilon = 0.0
 
-        if self.fcs_epsilon is None:
-            if self.learn_fcs:
-                self.fcs_epsilon = 1e-6
+        if self.corrs_epsilon is None:
+            if self.learn_corrs:
+                self.corrs_epsilon = 1e-6
             else:
-                self.fcs_epsilon = 0.0
+                self.corrs_epsilon = 0.0
+
+        if self.pca_components is None:
+            self.pca_components = np.eye(self.n_channels)
+        self.pca_components = self.pca_components.astype(np.float32)
 
     def validate_dimension_parameters(self):
         super().validate_dimension_parameters()
-        if self.n_fc_modes is None:
-            self.n_fc_modes = self.n_modes
-            _logger.warning("n_fc_modes is None, set to n_modes.")
+        if self.n_corr_modes is None:
+            self.n_corr_modes = self.n_modes
+            _logger.warning("n_corr_modes is None, set to n_modes.")
 
 
 class Model(VariationalInferenceModelBase):
@@ -270,22 +271,22 @@ class Model(VariationalInferenceModelBase):
         """
         return obs_mod.get_observation_model_parameter(self.model, "stds")
 
-    def get_fcs(self):
-        """Get the mode functional connectivities.
+    def get_corrs(self):
+        """Get the mode correlations.
 
         Returns
         -------
-        fcs : np.ndarray
-            Mode functional connectivities.
+        corrs : np.ndarray
+            Mode correlations.
             Shape (n_modes, n_channels, n_channels).
         """
-        return obs_mod.get_observation_model_parameter(self.model, "fcs")
+        return obs_mod.get_observation_model_parameter(self.model, "corrs")
 
-    def get_means_stds_fcs(self):
-        """Get the mode means, standard deviations, functional connectivities.
+    def get_means_stds_corrs(self):
+        """Get the mode means, standard deviations, correlations.
 
         This is a wrapper for :code:`get_means`, :code:`get_stds`,
-        :code:`get_fcs`.
+        :code:`get_corrs`.
 
         Returns
         -------
@@ -294,15 +295,15 @@ class Model(VariationalInferenceModelBase):
         stds : np.ndarray
             Mode standard deviations.
             Shape is (n_modes, n_channels, n_channels).
-        fcs : np.ndarray
-            Mode functional connectivities.
+        corrs : np.ndarray
+            Mode correlations.
             Shape is (n_modes, n_channels, n_channels).
         """
-        return self.get_means(), self.get_stds(), self.get_fcs()
+        return self.get_means(), self.get_stds(), self.get_corrs()
 
     def get_observation_model_parameters(self):
-        """Wrapper for :code:`get_means_stds_fcs`."""
-        return self.get_means_stds_fcs()
+        """Wrapper for :code:`get_means_stds_corrs`."""
+        return self.get_means_stds_corrs()
 
     def set_means(self, means, update_initializer=True):
         """Set the mode means.
@@ -341,13 +342,13 @@ class Model(VariationalInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_fcs(self, fcs, update_initializer=True):
-        """Set the mode functional connectivities.
+    def set_corrs(self, corrs, update_initializer=True):
+        """Set the mode correlations.
 
         Parameters
         ----------
-        fcs : np.ndarray
-            Mode functional connectivities.
+        corrs : np.ndarray
+            Mode correlations.
             Shape is (n_modes, n_channels, n_channels).
         update_initializer : bool
             Do we want to use the passed parameters when we re-initialize
@@ -355,22 +356,22 @@ class Model(VariationalInferenceModelBase):
         """
         obs_mod.set_observation_model_parameter(
             self.model,
-            fcs,
-            layer_name="fcs",
+            corrs,
+            layer_name="corrs",
             update_initializer=update_initializer,
         )
 
-    def set_means_stds_fcs(self, means, stds, fcs, update_initializer=True):
-        """This is a wrapper for set_means, set_stds, set_fcs."""
+    def set_means_stds_corrs(self, means, stds, corrs, update_initializer=True):
+        """This is a wrapper for set_means, set_stds, set_corrs."""
         self.set_means(means, update_initializer=update_initializer)
         self.set_stds(stds, update_initializer=update_initializer)
-        self.set_fcs(fcs, update_initializer=update_initializer)
+        self.set_corrs(corrs, update_initializer=update_initializer)
 
     def set_observation_model_parameters(
         self, observation_model_parameters, update_initializer=True
     ):
-        """Wrapper for set_means_stds_fcs."""
-        self.set_means_stds_fcs(
+        """Wrapper for set_means_stds_corrs."""
+        self.set_means_stds_corrs(
             observation_model_parameters[0],
             observation_model_parameters[1],
             observation_model_parameters[2],
@@ -378,7 +379,7 @@ class Model(VariationalInferenceModelBase):
         )
 
     def set_regularizers(self, training_dataset):
-        """Set the regularizers of means, stds and fcs based on the training
+        """Set the regularizers of means, stds and corrs based on the training
         data.
 
         A multivariate normal prior is applied to the mean vectors with
@@ -403,14 +404,14 @@ class Model(VariationalInferenceModelBase):
                 self.model, training_dataset, self.config.stds_epsilon
             )
 
-        if self.config.learn_fcs:
-            obs_mod.set_fcs_regularizer(
-                self.model, training_dataset, self.config.fcs_epsilon
+        if self.config.learn_corrs:
+            obs_mod.set_corrs_regularizer(
+                self.model, training_dataset, self.config.corrs_epsilon
             )
 
-    def sample_time_courses(self, n_samples: int):
+    def sample_time_courses(self, n_samples):
         """Uses the model RNN to sample mode mixing factors,
-        :code:`alpha` and :code:`gamma`.
+        :code:`alpha` and :code:`beta`.
 
         Parameters
         ----------
@@ -421,83 +422,85 @@ class Model(VariationalInferenceModelBase):
         -------
         alpha : np.ndarray
             Sampled :code:`alpha`.
-        gamma : np.ndarray
-            Sampled :code:`gamma`.
+        beta : np.ndarray
+            Sampled :code:`beta`.
         """
         # Get layers
         model_rnn_layer = self.model.get_layer("mod_rnn")
-        mean_mod_mu_layer = self.model.get_layer("mean_mod_mu")
-        mean_mod_sigma_layer = self.model.get_layer("mean_mod_sigma")
-        mean_theta_norm_layer = self.model.get_layer("mean_theta_norm")
+        power_mod_mu_layer = self.model.get_layer("power_mod_mu")
+        power_mod_sigma_layer = self.model.get_layer("power_mod_sigma")
+        power_theta_norm_layer = self.model.get_layer("power_theta_norm")
         alpha_layer = self.model.get_layer("alpha")
         fc_mod_mu_layer = self.model.get_layer("fc_mod_mu")
         fc_mod_sigma_layer = self.model.get_layer("fc_mod_sigma")
         fc_theta_norm_layer = self.model.get_layer("fc_theta_norm")
-        gamma_layer = self.model.get_layer("gamma")
+        beta_layer = self.model.get_layer("beta")
         concatenate_layer = self.model.get_layer("theta_norm")
 
         # Normally distributed random numbers used to sample the logits theta
-        mean_epsilon = np.random.normal(
+        power_epsilon = np.random.normal(
             0, 1, [n_samples + 1, self.config.n_modes]
         ).astype(np.float32)
         fc_epsilon = np.random.normal(
-            0, 1, [n_samples + 1, self.config.n_fc_modes]
+            0, 1, [n_samples + 1, self.config.n_corr_modes]
         ).astype(np.float32)
 
         # Initialise sequence of underlying logits theta
-        mean_theta_norm = np.zeros(
+        power_theta_norm = np.zeros(
             [self.config.sequence_length, self.config.n_modes],
             dtype=np.float32,
         )
-        mean_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
+        power_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
         fc_theta_norm = np.zeros(
-            [self.config.sequence_length, self.config.n_fc_modes],
+            [self.config.sequence_length, self.config.n_corr_modes],
             dtype=np.float32,
         )
-        fc_theta_norm[-1] = np.random.normal(size=self.config.n_fc_modes)
+        fc_theta_norm[-1] = np.random.normal(size=self.config.n_corr_modes)
 
         # Sample the mode time courses
         alpha = np.empty([n_samples, self.config.n_modes])
-        gamma = np.empty([n_samples, self.config.n_fc_modes])
+        beta = np.empty([n_samples, self.config.n_corr_modes])
         for i in trange(n_samples, desc="Sampling mode time courses"):
             # If there are leading zeros we trim theta so that we don't pass
             # the zeros
-            trimmed_mean_theta = mean_theta_norm[~np.all(mean_theta_norm == 0, axis=1)][
-                np.newaxis, :, :
-            ]
+            trimmed_power_theta = power_theta_norm[
+                ~np.all(power_theta_norm == 0, axis=1)
+            ][np.newaxis, :, :]
             trimmed_fc_theta = fc_theta_norm[~np.all(fc_theta_norm == 0, axis=1)][
                 np.newaxis, :, :
             ]
-            trimmed_theta = concatenate_layer([trimmed_mean_theta, trimmed_fc_theta])
+            trimmed_theta = concatenate_layer([trimmed_power_theta, trimmed_fc_theta])
             # p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
             model_rnn = model_rnn_layer(trimmed_theta)
-            mean_mod_mu = mean_mod_mu_layer(model_rnn)[0, -1]
-            mean_mod_sigma = mean_mod_sigma_layer(model_rnn)[0, -1]
+            power_mod_mu = power_mod_mu_layer(model_rnn)[0, -1]
+            power_mod_sigma = power_mod_sigma_layer(model_rnn)[0, -1]
             fc_mod_mu = fc_mod_mu_layer(model_rnn)[0, -1]
             fc_mod_sigma = fc_mod_sigma_layer(model_rnn)[0, -1]
 
             # Shift theta one time step to the left
-            mean_theta_norm = np.roll(mean_theta_norm, -1, axis=0)
+            power_theta_norm = np.roll(power_theta_norm, -1, axis=0)
             fc_theta_norm = np.roll(fc_theta_norm, -1, axis=0)
 
             # Sample from the probability distribution function
-            mean_theta = mean_mod_mu + mean_mod_sigma * mean_epsilon[i]
-            mean_theta_norm[-1] = mean_theta_norm_layer(
-                mean_theta[np.newaxis, np.newaxis, :]
+            power_theta = power_mod_mu + power_mod_sigma * power_epsilon[i]
+            power_theta_norm[-1] = power_theta_norm_layer(
+                power_theta[np.newaxis, np.newaxis, :]
             )
             fc_theta = fc_mod_mu + fc_mod_sigma * fc_epsilon[i]
             fc_theta_norm[-1] = fc_theta_norm_layer(fc_theta[np.newaxis, np.newaxis, :])
 
-            alpha[i] = alpha_layer(mean_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
-            gamma[i] = gamma_layer(fc_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
+            alpha[i] = alpha_layer(power_theta_norm[-1][np.newaxis, np.newaxis, :])[
+                0, 0
+            ]
+            beta[i] = beta_layer(fc_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
 
-        return alpha, gamma
+        return alpha, beta
 
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
         This includes the model RNN weights and biases, mixing coefficients,
-        mode means and covariances.
+        mode means, standard deviations and correlations.
 
         Returns
         -------
@@ -511,10 +514,10 @@ class Model(VariationalInferenceModelBase):
             if (
                 "mod_" in var_name
                 or "alpha" in var_name
-                or "gamma" in var_name
+                or "beta" in var_name
                 or "means" in var_name
                 or "stds" in var_name
-                or "fcs" in var_name
+                or "corrs" in var_name
             ):
                 n_params += np.prod(var.shape)
 
@@ -555,41 +558,41 @@ def _model_structure(config):
     inf_rnn = inf_rnn_layer(data_drop)
 
     #
-    # Mode time course for the mean and standard deviation
+    # Mode time course for Power
     #
 
     # Layers
-    mean_inf_mu_layer = layers.Dense(config.n_modes, name="mean_inf_mu")
-    mean_inf_sigma_layer = layers.Dense(
-        config.n_modes, activation="softplus", name="mean_inf_sigma"
+    power_inf_mu_layer = layers.Dense(config.n_modes, name="power_inf_mu")
+    power_inf_sigma_layer = layers.Dense(
+        config.n_modes, activation="softplus", name="power_inf_sigma"
     )
-    mean_theta_layer = SampleNormalDistributionLayer(
-        config.theta_std_epsilon, name="mean_theta"
+    power_theta_layer = SampleNormalDistributionLayer(
+        config.theta_std_epsilon, name="power_theta"
     )
-    mean_theta_norm_layer = NormalizationLayer(
-        config.theta_normalization, name="mean_theta_norm"
+    power_theta_norm_layer = NormalizationLayer(
+        config.theta_normalization, name="power_theta_norm"
     )
     alpha_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
+        initial_temperature=1.0,
+        learn_temperature=False,
         name="alpha",
     )
 
     # Data flow
-    mean_inf_mu = mean_inf_mu_layer(inf_rnn)
-    mean_inf_sigma = mean_inf_sigma_layer(inf_rnn)
-    mean_theta = mean_theta_layer([mean_inf_mu, mean_inf_sigma])
-    mean_theta_norm = mean_theta_norm_layer(mean_theta)
-    alpha = alpha_layer(mean_theta_norm)
+    power_inf_mu = power_inf_mu_layer(inf_rnn)
+    power_inf_sigma = power_inf_sigma_layer(inf_rnn)
+    power_theta = power_theta_layer([power_inf_mu, power_inf_sigma])
+    power_theta_norm = power_theta_norm_layer(power_theta)
+    alpha = alpha_layer(power_theta_norm)
 
     #
     # Mode time course for the FCs
     #
 
     # Layers
-    fc_inf_mu_layer = layers.Dense(config.n_fc_modes, name="fc_inf_mu")
+    fc_inf_mu_layer = layers.Dense(config.n_corr_modes, name="fc_inf_mu")
     fc_inf_sigma_layer = layers.Dense(
-        config.n_fc_modes, activation="softplus", name="fc_inf_sigma"
+        config.n_corr_modes, activation="softplus", name="fc_inf_sigma"
     )
     fc_theta_layer = SampleNormalDistributionLayer(
         config.theta_std_epsilon, name="fc_theta"
@@ -597,10 +600,10 @@ def _model_structure(config):
     fc_theta_norm_layer = NormalizationLayer(
         config.theta_normalization, name="fc_theta_norm"
     )
-    gamma_layer = SoftmaxLayer(
-        config.initial_alpha_temperature,
-        config.learn_alpha_temperature,
-        name="gamma",
+    beta_layer = SoftmaxLayer(
+        initial_temperature=1.0,
+        learn_temperature=False,
+        name="beta",
     )
 
     # Data flow
@@ -608,7 +611,7 @@ def _model_structure(config):
     fc_inf_sigma = fc_inf_sigma_layer(inf_rnn)
     fc_theta = fc_theta_layer([fc_inf_mu, fc_inf_sigma])
     fc_theta_norm = fc_theta_norm_layer(fc_theta)
-    gamma = gamma_layer(fc_theta_norm)
+    beta = beta_layer(fc_theta_norm)
 
     #
     # Observation model
@@ -632,21 +635,24 @@ def _model_structure(config):
         config.stds_regularizer,
         name="stds",
     )
-    fcs_layer = CorrelationMatricesLayer(
-        config.n_fc_modes,
+    corrs_layer = CorrelationMatricesLayer(
+        config.n_corr_modes,
         config.n_channels,
-        config.learn_fcs,
-        config.initial_fcs,
-        config.fcs_epsilon,
-        config.fcs_regularizer,
-        name="fcs",
+        config.learn_corrs,
+        config.initial_corrs,
+        config.corrs_epsilon,
+        config.corrs_regularizer,
+        name="corrs",
     )
     mix_means_layer = MixVectorsLayer(name="mix_means")
     mix_stds_layer = MixMatricesLayer(name="mix_stds")
-    mix_fcs_layer = MixMatricesLayer(name="mix_fcs")
+    mix_corrs_layer = MixMatricesLayer(name="mix_corrs")
     matmul_layer = MatMulLayer(name="cov")
+    pca_means_layer = MatMulLayer(name="pca_means")
+    pca_stds_layer = MatMulLayer(name="pca_stds")
+    pca_corrs_layer = MatMulLayer(name="pca_corrs")
     ll_loss_layer = LogLikelihoodLossLayer(
-        np.maximum(config.stds_epsilon, config.fcs_epsilon), name="ll_loss"
+        np.maximum(config.stds_epsilon, config.corrs_epsilon), name="ll_loss"
     )
 
     # Data flow
@@ -656,13 +662,37 @@ def _model_structure(config):
     E = stds_layer(
         inputs, static_loss_scaling_factor=static_loss_scaling_factor
     )  # inputs not used
-    D = fcs_layer(
+    R = corrs_layer(
         inputs, static_loss_scaling_factor=static_loss_scaling_factor
     )  # inputs not used
 
-    m = mix_means_layer([alpha, mu])
-    G = mix_stds_layer([alpha, E])
-    F = mix_fcs_layer([gamma, D])
+    # multiply with pca components
+    pca_mu = tf.squeeze(
+        pca_means_layer(
+            [
+                tf.expand_dims(tf.transpose(config.pca_components), 0),
+                tf.expand_dims(mu, -1),
+            ]
+        )
+    )
+    pca_E = pca_stds_layer(
+        [
+            tf.expand_dims(tf.transpose(config.pca_components), 0),
+            E,
+            tf.expand_dims(config.pca_components, 0),
+        ]
+    )
+    pca_R = pca_corrs_layer(
+        [
+            tf.expand_dims(tf.transpose(config.pca_components), 0),
+            R,
+            tf.expand_dims(config.pca_components, 0),
+        ]
+    )
+
+    m = mix_means_layer([alpha, pca_mu])
+    G = mix_stds_layer([alpha, pca_E])
+    F = mix_corrs_layer([beta, pca_R])
     C = matmul_layer([G, F, G])
 
     ll_loss = ll_loss_layer([inputs, m, C])
@@ -689,7 +719,7 @@ def _model_structure(config):
     )
 
     # Data flow
-    theta_norm = concatenate_layer([mean_theta_norm, fc_theta_norm])
+    theta_norm = concatenate_layer([power_theta_norm, fc_theta_norm])
     theta_norm_drop = theta_norm_drop_layer(theta_norm)
     mod_rnn = mod_rnn_layer(theta_norm_drop)
 
@@ -698,20 +728,20 @@ def _model_structure(config):
     #
 
     # Layers
-    mean_mod_mu_layer = layers.Dense(config.n_modes, name="mean_mod_mu")
-    mean_mod_sigma_layer = layers.Dense(
-        config.n_modes, activation="softplus", name="mean_mod_sigma"
+    power_mod_mu_layer = layers.Dense(config.n_modes, name="power_mod_mu")
+    power_mod_sigma_layer = layers.Dense(
+        config.n_modes, activation="softplus", name="power_mod_sigma"
     )
-    kl_div_layer_mean = KLDivergenceLayer(
+    kl_div_layer_power = KLDivergenceLayer(
         config.theta_std_epsilon,
-        name="mean_kl_div",
+        name="power_kl_div",
     )
 
     # Data flow
-    mean_mod_mu = mean_mod_mu_layer(mod_rnn)
-    mean_mod_sigma = mean_mod_sigma_layer(mod_rnn)
-    mean_kl_div = kl_div_layer_mean(
-        [mean_inf_mu, mean_inf_sigma, mean_mod_mu, mean_mod_sigma]
+    power_mod_mu = power_mod_mu_layer(mod_rnn)
+    power_mod_sigma = power_mod_sigma_layer(mod_rnn)
+    power_kl_div = kl_div_layer_power(
+        [power_inf_mu, power_inf_sigma, power_mod_mu, power_mod_sigma]
     )
 
     #
@@ -719,9 +749,9 @@ def _model_structure(config):
     #
 
     # Layers
-    fc_mod_mu_layer = layers.Dense(config.n_fc_modes, name="fc_mod_mu")
+    fc_mod_mu_layer = layers.Dense(config.n_corr_modes, name="fc_mod_mu")
     fc_mod_sigma_layer = layers.Dense(
-        config.n_fc_modes, activation="softplus", name="fc_mod_sigma"
+        config.n_corr_modes, activation="softplus", name="fc_mod_sigma"
     )
     fc_kl_div_layer = KLDivergenceLayer(
         config.theta_std_epsilon,
@@ -739,10 +769,10 @@ def _model_structure(config):
     # Total KL loss
     #
     kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
-    kl_loss = kl_loss_layer([mean_kl_div, fc_kl_div])
+    kl_loss = kl_loss_layer([power_kl_div, fc_kl_div])
 
     return tf.keras.Model(
         inputs=inputs,
-        outputs=[ll_loss, kl_loss, mean_theta_norm, fc_theta_norm],
+        outputs=[ll_loss, kl_loss, power_theta_norm, fc_theta_norm],
         name="M-DyNeMo",
     )

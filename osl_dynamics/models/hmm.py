@@ -182,7 +182,7 @@ class Model(ModelBase):
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(self.config)
+        self.model = self._model_structure()
 
         self.rho = 1
         self.set_trans_prob(self.config.initial_trans_prob)
@@ -304,8 +304,10 @@ class Model(ModelBase):
         dataset : tf.data.Dataset
             TensorFlow dataset.
         """
-        n_batches = dtf.get_n_batches(dataset)
-        self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
+        layer_names = [layer.name for layer in self.model.layers]
+        if "static_loss_scaling_factor" in layer_names:
+            n_batches = dtf.get_n_batches(dataset)
+            self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     def random_subset_initialization(
         self, training_data, n_epochs, n_init, take, **kwargs
@@ -342,30 +344,26 @@ class Model(ModelBase):
 
         _logger.info("Random subset initialization")
 
-        # Get the buffer size
-        buffer_size = getattr(training_data, "buffer_size", 100000)
-
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data, shuffle=True, concatenate=True
         )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_dataset)
-        n_batches = max(round(n_total_batches * take), 1)
-        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-
-            training_dataset = self.make_dataset(
-                training_data, shuffle=True, concatenate=True
-            )
-            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
-
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
                 continue
@@ -420,26 +418,26 @@ class Model(ModelBase):
 
         _logger.info("Random state time course initialization")
 
-        # Get the buffer size
-        buffer_size = getattr(training_data, "buffer_size", 100000)
-
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data, shuffle=True, concatenate=True
         )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_dataset)
-        n_batches = max(round(n_total_batches * take), 1)
-        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
-
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
             self.set_random_state_time_course_initialization(training_data_subset)
             history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             if history is None:
@@ -742,7 +740,7 @@ class Model(ModelBase):
         return first_term + remaining_terms
 
     def get_log_likelihood(self, data):
-        """Get the log-likelihood of data, :math:`\log p(x_t | s_t)`.
+        r"""Get the log-likelihood of data, :math:`\log p(x_t | s_t)`.
 
         Parameters
         ----------
@@ -933,19 +931,15 @@ class Model(ModelBase):
             state_probs_t0 = np.ones((self.config.n_states,)) / self.config.n_states
         self.state_probs_t0 = state_probs_t0
 
-    def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial means/covariances based on a random state time
-        course.
+    def set_random_state_time_course_initialization(self, training_dataset):
+        """Sets the initial means/covariances based on a random state time course.
 
         Parameters
         ----------
-        training_data : tf.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset
             Training data.
         """
         _logger.info("Setting random means and covariances")
-
-        # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(training_data, concatenate=True)
 
         # Mean and covariance for each state
         means = np.zeros(
@@ -956,28 +950,45 @@ class Model(ModelBase):
             dtype=np.float32,
         )
 
+        n_batches = 0
         for batch in training_dataset:
             # Concatenate all the sequences in this batch
             data = np.concatenate(batch["data"])
 
+            if data.shape[0] < 2 * self.config.n_channels:
+                raise ValueError(
+                    "Not enough time points in batch, "
+                    "increase batch_size or sequence_length"
+                )
+
             # Sample a state time course using the initial transition
             # probability matrix
             stc = self.sample_state_time_course(data.shape[0])
+
+            # Make sure each state activates
+            non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+            while np.any(non_active_states):
+                new_stc = self.sample_state_time_course(data.shape[0])
+                new_active_states = np.sum(new_stc, axis=0) != 0
+                for j in range(self.config.n_states):
+                    if non_active_states[j] and new_active_states[j]:
+                        stc[:, j] = new_stc[:, j]
+                non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
 
             # Calculate the mean/covariance for each state for this batch
             m = []
             C = []
             for j in range(self.config.n_states):
                 x = data[stc[:, j] == 1]
-                mu_j = np.mean(x, axis=0)
-                sigma_j = np.cov(x, rowvar=False)
-                m.append(mu_j)
-                C.append(sigma_j)
+                mu = np.mean(x, axis=0)
+                sigma = np.cov(x, rowvar=False)
+                m.append(mu)
+                C.append(sigma)
             means += m
             covariances += C
+            n_batches += 1
 
         # Calculate the average from the running total
-        n_batches = dtf.get_n_batches(training_dataset)
         means /= n_batches
         covariances /= n_batches
 
@@ -1399,7 +1410,7 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        training_data : osl_dynamics.data.Data
+        training_data : osl_dynamics.data.Data or list of tf.data.Dataset
             Prepared training data object.
         alpha : list of np.ndarray, optional
             Posterior distribution of the states. Shape is
@@ -1424,7 +1435,15 @@ class Model(ModelBase):
             alpha = [alpha]
 
         # Get the session-specific data
-        data = training_data.time_series(prepared=True, concatenate=False)
+        if isinstance(training_data, list):
+            data = []
+            for d in training_data:
+                subject_data = []
+                for batch in d:
+                    subject_data.append(np.concatenate(batch["data"]))
+                data.append(np.concatenate(subject_data))
+        else:
+            data = training_data.time_series(prepared=True, concatenate=False)
 
         if len(alpha) != len(data):
             raise ValueError(
@@ -1562,61 +1581,64 @@ class Model(ModelBase):
         initializers.reinitialize_model_weights(self.model)
         self.set_trans_prob(self.config.initial_trans_prob)
 
+    def _model_structure(self):
+        """Build the model structure."""
 
-def _model_structure(config):
-    # Inputs
-    inputs = layers.Input(
-        shape=(config.sequence_length, config.n_channels + config.n_states),
-        name="inputs",
-    )
-    data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
+        config = self.config
 
-    # Static loss scaling factor
-    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-        name="static_loss_scaling_factor"
-    )
-    static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+        # Inputs
+        inputs = layers.Input(
+            shape=(config.sequence_length, config.n_channels + config.n_states),
+            name="inputs",
+        )
+        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
 
-    # Definition of layers
-    means_layer = VectorsLayer(
-        config.n_states,
-        config.n_channels,
-        config.learn_means,
-        config.initial_means,
-        config.means_regularizer,
-        name="means",
-    )
-    if config.diagonal_covariances:
-        covs_layer = DiagonalMatricesLayer(
+        # Static loss scaling factor
+        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+            name="static_loss_scaling_factor"
+        )
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+
+        # Definition of layers
+        means_layer = VectorsLayer(
             config.n_states,
             config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
+            config.learn_means,
+            config.initial_means,
+            config.means_regularizer,
+            name="means",
         )
-    else:
-        covs_layer = CovarianceMatricesLayer(
-            config.n_states,
-            config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
+        if config.diagonal_covariances:
+            covs_layer = DiagonalMatricesLayer(
+                config.n_states,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        else:
+            covs_layer = CovarianceMatricesLayer(
+                config.n_states,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        ll_loss_layer = CategoricalLogLikelihoodLossLayer(
+            config.n_states, config.covariances_epsilon, name="ll_loss"
         )
-    ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-        config.n_states, config.covariances_epsilon, name="ll_loss"
-    )
 
-    # Data flow
-    mu = means_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # data not used
-    D = covs_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # data not used
-    ll_loss = ll_loss_layer([data, mu, D, gamma, None])
+        # Data flow
+        mu = means_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # data not used
+        D = covs_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # data not used
+        ll_loss = ll_loss_layer([data, mu, D, gamma, None])
 
-    return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM")
+        return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM")

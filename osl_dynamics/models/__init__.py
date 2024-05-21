@@ -6,6 +6,7 @@ import yaml
 
 from osl_dynamics.models import (
     dynemo,
+    simplified_dynemo,
     mage,
     sage,
     mdynemo,
@@ -15,10 +16,11 @@ from osl_dynamics.models import (
     hive,
     dive,
 )
-from osl_dynamics.utils.misc import NumpyLoader
+from osl_dynamics.utils import misc
 
 models = {
     "DyNeMo": dynemo.Model,
+    "Simplified-DyNeMo": simplified_dynemo.Model,
     "MAGE": mage.Model,
     "SAGE": sage.Model,
     "M-DyNeMo": mdynemo.Model,
@@ -46,7 +48,7 @@ def load(dirname, single_gpu=True):
         Model object.
     """
     with open(f"{dirname}/config.yml", "r") as file:
-        config_dict = yaml.load(file, NumpyLoader)
+        config_dict = yaml.load(file, misc.NumpyLoader)
 
     if "model_name" not in config_dict:
         raise ValueError(

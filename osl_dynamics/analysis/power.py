@@ -18,6 +18,7 @@ import numpy as np
 import nibabel as nib
 from nilearn import plotting
 from tqdm.auto import trange
+import matplotlib.pyplot as plt
 
 from osl_dynamics import array_ops, files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
@@ -300,6 +301,9 @@ def save(
     subtract_mean=False,
     mean_weights=None,
     plot_kwargs=None,
+    show_plots=True,
+    combined=False,
+    titles=None,
 ):
     """Saves power maps.
 
@@ -334,6 +338,14 @@ def save(
         Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
         <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
         .plot_img_on_surf.html>`_.
+    show_plots : bool, optional
+        Should the individual plots be shown on screen (for Juptyer notebooks)?
+    combined : bool, optional
+        Should the individual plots be combined into a single image?
+        The combined image is always shown on screen (for Juptyer notebooks).
+        Note if :code:`True` is passed, the individual images will be deleted.
+    titles : list, optional
+        List of titles for each power plot. Only used if :code:`combined=True`.
 
     Returns
     -------
@@ -439,6 +451,7 @@ def save(
 
         else:
             # Save each map as an image
+            output_files = []
             for i in trange(n_modes, desc="Saving images"):
                 nii = nib.Nifti1Image(
                     power_map[:, :, :, i],
@@ -451,7 +464,26 @@ def save(
                 output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
                     fn=Path(filename), i=i, w=len(str(n_modes))
                 )
+                output_files.append(output_file)
                 fig.savefig(output_file)
+
+                if not show_plots:
+                    plt.close(fig)
+
+            if combined:
+                titles = titles or [None] * n_modes
+                # Combine images into a single image
+                fig, axes = plt.subplots(1, n_modes, figsize=(n_modes * 5, 5))
+                for i, ax in enumerate(axes):
+                    ax.imshow(plt.imread(output_files[i]))
+                    ax.axis("off")
+                    ax.set_title(titles[i], fontsize=20)
+                fig.tight_layout()
+                fig.savefig(filename)
+
+                # Remove the individual images
+                for output_file in output_files:
+                    os.remove(output_file)
 
 
 def multi_save(
@@ -592,3 +624,132 @@ def multi_save(
             parcellation_file=parcellation_file,
             plot_kwargs=plot_kwargs,
         )
+
+
+def independent_components_to_volumetric_maps(
+    ica_spatial_maps,
+    ic_values,
+    output_file=None,
+):
+    """Independent components to volumetric spatial map.
+
+    Project the ic_values map to a brain map according to spatial
+    maps of group ICA components. For example, ic_values can be the mean
+    activation of states, or the rank-one decomposition of FC matrix
+    corresponding to different states.
+
+    Parameters
+    ----------
+    ica_spatial_maps : str or Nifti1Image
+        Path to nifti file or nifti object containing the spatial maps
+        obtained from group ICA. Should be in (n_x, n_y, n_z, n_voxels)
+        format.
+    ic_values : np.ndarray
+        Independent component values.
+        Should be in (n_maps, n_ica_components) format.
+    output_file : str, optional
+        Path to output file to save volumetric map to.
+
+    Returns
+    -------
+    vol_map : Nifti1Image
+        Volumetric maps. Shape is (n_x, n_y, n_z, n_maps).
+    """
+    # Load nifti
+    if isinstance(ica_spatial_maps, str):
+        ica_spatial_maps = nib.load(ica_spatial_maps)
+
+    # Validation
+    if not isinstance(ica_spatial_maps, nib.nifti1.Nifti1Image):
+        raise ValueError(
+            "ica_spatial_maps must be a path to a nifti file or "
+            "nib.nifti1.Nifti1Image object."
+        )
+
+    # Get data from nifti
+    ica_spatial_maps_data = ica_spatial_maps.get_fdata()
+    ica_spatial_maps_shape = ica_spatial_maps_data.shape
+    n_maps, n_ica_components = ic_values.shape
+
+    # Calculate volumetric maps
+    data = np.matmul(ica_spatial_maps_data, ic_values.T)
+
+    # Store map to a Nifti1Image type
+    vol_map = nib.nifti1.Nifti1Image(
+        data,
+        affine=ica_spatial_maps.affine,
+        header=ica_spatial_maps.header,
+    )
+
+    if output_file is not None:
+        # Save
+        _logger.info(f"Saving {output_file}")
+        nib.save(vol_map, output_file)
+
+    return vol_map
+
+
+def independent_components_to_surface_maps(
+    ica_spatial_maps, ic_values, output_file=None
+):
+    """Independent components to surface spatial map.
+
+    Project the ic_values map to a surface map according to spatial maps
+    of group ICA components. For example, ic_values can be the mean
+    activation of states, or the rank-one decomposition of FC matrix
+    corresponding to different states.
+
+    Different from independent_components_to_volumetric_maps,
+    this function works on CIFTI spatial maps.
+
+    Parameters
+    ----------
+    ica_spatial_maps : str or Cifti2Image
+        Path to cifti file or cifti object containing the spatial maps
+        obtained from group ICA. Should be in (n_ica_components, n_voxels)
+        format.
+    ic_values: np.ndarray
+        Independent component values.
+        Should be in (n_maps, n_ica_components) format.
+    output_file : str, optional
+        Path to output file to save surface map to.
+
+    Returns
+    -------
+    surf_map : Cifti2Image
+        Surface map. Shape is (n_maps, n_voxels).
+    """
+    # Load cifti
+    if isinstance(ica_spatial_maps, str):
+        ica_spatial_maps = nib.load(ica_spatial_maps)
+
+    # Validation
+    if not isinstance(ica_spatial_maps, nib.cifti2.cifti2.Cifti2Image):
+        raise ValueError(
+            "ica_spatial_maps must be a path to a cifti file or "
+            "nib.cifti2.cifti2.Cifti2Image object."
+        )
+
+    # Get data from cifti
+    ica_spatial_maps_data = ica_spatial_maps.get_fdata()
+    header = ica_spatial_maps.header
+    n_maps = ic_values.shape[0]
+
+    # Calculate surface maps
+    data = np.matmul(ic_values, ica_spatial_maps_data)
+
+    # Define the new axes: the Map i (i = 1 ,..., n_maps)
+    axes = nib.cifti2.cifti2_axes.ScalarAxis([f"Map {i + 1}" for i in range(n_maps)])
+
+    # Define the new header using axes + axes[1] from old header
+    header = nib.cifti2.cifti2.Cifti2Header.from_axes((axes, header.get_axis(1)))
+
+    # Combine new data and new header to obtain new CIFTI object
+    surf_map = nib.cifti2.cifti2.Cifti2Image(data, header)
+
+    if output_file is not None:
+        # Save
+        _logger.info(f"Saving {output_file}")
+        nib.save(surf_map, output_file)
+
+    return surf_map

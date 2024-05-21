@@ -35,7 +35,12 @@ with open("data_files.txt", "r") as file:
     inputs = file.read().split("\n")
 
 # Create Data object for training
-data = Data(inputs, load_memmaps=False, n_jobs=8)
+data = Data(
+    inputs,
+    use_tfrecord=True,
+    store_dir=f"tmp_{id}",
+    n_jobs=8,
+)
 
 # Prepare data
 data.standardize()

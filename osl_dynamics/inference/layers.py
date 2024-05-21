@@ -5,7 +5,13 @@ import sys
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-from tensorflow.keras import activations, initializers, layers, regularizers
+from tensorflow.keras import (
+    activations,
+    layers,
+    initializers,
+    regularizers,
+    constraints,
+)
 
 import osl_dynamics.inference.initializers as osld_initializers
 
@@ -271,7 +277,7 @@ class SampleGammaDistributionLayer(layers.Layer):
 
         alpha = add_epsilon(alpha, self.epsilon)
         beta = add_epsilon(beta, self.epsilon)
-        session_id = session_id[:, 0]  # shape = (None,)
+        session_id = session_id[:, 0]
 
         alpha = tf.gather(alpha, session_id, axis=0)  # shape = (None, n_states, 1)
         beta = tf.gather(beta, session_id, axis=0)  # shape = (None, n_states, 1)
@@ -1589,37 +1595,33 @@ class ConcatEmbeddingsLayer(layers.Layer):
 
     def call(self, inputs):
         embeddings, spatial_embeddings = inputs
-        n_sessions, embeddings_dim = embeddings.shape
+        batch_size, embeddings_dim = embeddings.shape
         n_states, spatial_embeddings_dim = spatial_embeddings.shape
 
-        # Match dimensions for concatenation
-        embeddings = tf.broadcast_to(
-            tf.expand_dims(embeddings, axis=1),
-            [n_sessions, n_states, embeddings_dim],
-        )
-        spatial_embeddings = tf.broadcast_to(
-            tf.expand_dims(spatial_embeddings, axis=0),
-            [n_sessions, n_states, spatial_embeddings_dim],
-        )
+        place_holder = tf.zeros_like(embeddings[:, 0])  # shape = (None,)
 
-        # Concatenate the embeddings
-        concat_embeddings = tf.concat(
-            [embeddings, spatial_embeddings],
-            axis=-1,
+        # Broadcast the embeddings and spatial embeddings
+        embeddings = tf.expand_dims(embeddings, axis=1) + tf.zeros(
+            (1, n_states, embeddings_dim)
         )
+        spatial_embeddings = tf.expand_dims(
+            spatial_embeddings, axis=0
+        ) + 0 * tf.expand_dims(tf.expand_dims(place_holder, axis=-1), axis=-1)
+
+        concat_embeddings = tf.concat([embeddings, spatial_embeddings], axis=-1)
 
         return concat_embeddings
 
 
-class SessionMapLayer(layers.Layer):
-    """Layer for getting the array specific maps.
+class SessionParamLayer(layers.Layer):
+    """Layer for getting the array specific parameters.
 
-    This layer adds deviations to the group spatial maps.
+    This layer adds deviations to the group spatial parameters.
 
     Parameters
     ----------
-    which_map : str
-        Which spatial map are we using? Must be :code:`'means'` or
+    param : str
+        Which parameter are we using? Must be :code:`'means'` or
         :code:`'covariances'`.
     epsilon : float
         Error added to the diagonal of covariances for numerical stability.
@@ -1627,32 +1629,32 @@ class SessionMapLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, which_map, epsilon, **kwargs):
+    def __init__(self, param, epsilon, **kwargs):
         super().__init__(**kwargs)
-        self.which_map = which_map
+        self.param = param
         self.epsilon = epsilon
-        if which_map == "covariances":
+        if param == "covariances":
             self.bijector = tfb.Chain(
                 [tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()],
             )
-        elif which_map == "means":
+        elif param == "means":
             self.bijector = tfb.Identity()
         else:
-            raise ValueError("which_map must be one of 'means' and 'covariances'.")
+            raise ValueError("param must be one of 'means' and 'covariances'.")
 
     def call(self, inputs):
-        group_map, dev = inputs
-        group_map = self.bijector.inverse(group_map)
+        group_param, dev = inputs
+        group_param = self.bijector.inverse(group_param)
 
         # Match dimensions for addition
-        group_map = tf.expand_dims(group_map, axis=0)
-        session_map = tf.add(group_map, dev)
-        session_map = self.bijector(session_map)
+        group_param = tf.expand_dims(group_param, axis=0)
+        session_param = tf.add(group_param, dev)
+        session_param = self.bijector(session_param)
 
-        if self.which_map == "covariances":
-            session_map = add_epsilon(session_map, self.epsilon, diag=True)
+        if self.param == "covariances":
+            session_param = add_epsilon(session_param, self.epsilon, diag=True)
 
-        return session_map
+        return session_param
 
 
 class MixSessionSpecificParametersLayer(layers.Layer):
@@ -1687,7 +1689,7 @@ class MixSessionSpecificParametersLayer(layers.Layer):
         return m, C
 
 
-class StaticKLDivergenceLayer(layers.Layer):
+class GammaExponentialKLDivergenceLayer(layers.Layer):
     """Layer to calculate KL divergence between Gamma posterior and exponential
     prior for deviation magnitude.
 
@@ -1704,7 +1706,11 @@ class StaticKLDivergenceLayer(layers.Layer):
         self.epsilon = epsilon
 
     def call(self, inputs, static_loss_scaling_factor=1, **kwargs):
-        data, inference_alpha, inference_beta, model_beta = inputs
+        # inference_alpha.shape = (n_sessions, n_states, 1)
+        # inference_beta.shape  = (n_sessions, n_states, 1)
+        # model_beta.shape      = (n_sessions, n_states, 1)
+
+        inference_alpha, inference_beta, model_beta = inputs
 
         # Add a small error for numerical stability
         inference_alpha = add_epsilon(inference_alpha, self.epsilon)
@@ -1719,10 +1725,9 @@ class StaticKLDivergenceLayer(layers.Layer):
         kl_loss = tfp.distributions.kl_divergence(
             posterior, prior, allow_nan_stats=False
         )
+        kl_loss = tf.reduce_sum(kl_loss)
 
-        kl_loss = tf.reduce_sum(kl_loss) * static_loss_scaling_factor
-
-        return kl_loss
+        return kl_loss * static_loss_scaling_factor
 
 
 class MultiLayerPerceptronLayer(layers.Layer):
@@ -2098,3 +2103,107 @@ class SumLogLikelihoodLossLayer(layers.Layer):
         self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
+
+
+class TFGatherLayer(layers.Layer):
+    """Wrapper for `tf.gather \
+        <https://www.tensorflow.org/api_docs/python/tf/gather>`_.
+    """
+
+    def __init__(self, axis, batch_dims=0, **kwargs):
+        super().__init__(**kwargs)
+        self.axis = axis
+        self.batch_dims = batch_dims
+
+    def call(self, inputs, **kwargs):
+        return tf.gather(
+            inputs[0], inputs[1], axis=self.axis, batch_dims=self.batch_dims
+        )
+
+
+class AddLayer(layers.Layer):
+    """Wrapper for `tf.add \
+        <https://www.tensorflow.org/api_docs/python/tf/math/add>`_.
+    """
+
+    def call(self, inputs, **kwargs):
+        out = inputs[0]
+        for tensor in inputs[1:]:
+            out = tf.add(out, tensor)
+        return out
+
+
+class EmbeddingLayer(layers.Layer):
+    """Layer for embeddings.
+
+    Parameters
+    ----------
+    input_dim : int
+        Input dimension.
+    output_dim : int
+        Output dimension.
+    unit_norm : bool, optional
+        Should the embeddings be unit norm?
+    """
+
+    def __init__(self, input_dim, output_dim, unit_norm, **kwargs):
+        super().__init__(**kwargs)
+        if unit_norm:
+            output_dim = output_dim - 1
+
+        self.embedding_layer = layers.Embedding(
+            input_dim=input_dim,
+            output_dim=output_dim,
+        )
+        self.layers = [self.embedding_layer]
+        self.unit_norm = unit_norm
+
+    def call(self, inputs, **kwargs):
+        output = self.embedding_layer(inputs)
+
+        # Add the last element to ensure the embeddings are unit norm
+        if self.unit_norm:
+            norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)
+            output = tf.concat([2 * output, norm_sq - 1], axis=-1) / (norm_sq + 1)
+        return output
+
+    @property
+    def embeddings(self):
+        output = self.embedding_layer.embeddings
+        if self.unit_norm:
+            norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)
+            output = tf.concat([2 * output, norm_sq - 1], axis=-1) / (norm_sq + 1)
+        return output
+
+
+class ShiftForForecastingLayer(layers.Layer):
+    """Clip two tensors to ensure they align for causal forecasting.
+
+    Parameters
+    ----------
+    clip : int
+        Number of elements to clip.
+    """
+
+    def __init__(self, clip, **kwargs):
+        super().__init__(**kwargs)
+        self.clip = clip
+
+    def call(self, inputs, **kwargs):
+        A, B = inputs
+        A = A[:, : -self.clip]
+        B = B[:, self.clip :]
+        return A, B
+
+
+class TFConstantLayer(layers.Layer):
+    """Wrapper for `tf.constant \
+        <https://www.tensorflow.org/api_docs/python/tf/constant>`_.
+    """
+
+    def __init__(self, values, **kwargs):
+        super().__init__(**kwargs)
+        self.values = values
+
+    def call(self, inputs, **kwargs):
+        return tf.constant(self.values)

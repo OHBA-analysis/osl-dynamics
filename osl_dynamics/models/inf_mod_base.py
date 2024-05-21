@@ -40,7 +40,7 @@ class VariationalInferenceModelConfig:
 
     def validate_alpha_parameters(self):
         if self.initial_alpha_temperature is None:
-            raise ValueError("initial_alpha_temperature must be passed.")
+            self.initial_alpha_temperature = 1.0
 
         if self.initial_alpha_temperature <= 0:
             raise ValueError("initial_alpha_temperature must be greater than zero.")
@@ -203,9 +203,6 @@ class VariationalInferenceModelBase(ModelBase):
             n_kl_annealing_epochs or original_n_kl_annealing_epochs
         )
 
-        # Get the buffer size
-        buffer_size = getattr(training_data, "buffer_size", 100000)
-
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data,
@@ -215,16 +212,20 @@ class VariationalInferenceModelBase(ModelBase):
         )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_dataset)
-        n_batches = max(round(n_total_batches * take), 1)
-        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
 
             try:
                 history = self.fit(
@@ -379,6 +380,178 @@ class VariationalInferenceModelBase(ModelBase):
             **kwargs,
         )
 
+    def random_state_time_course_initialization(
+        self, training_data, n_epochs, n_init, take=1, stay_prob=0.9, **kwargs
+    ):
+        """Random state time course initialization.
+
+        The model is trained for a few epochs with a sampled state time course
+        initialization. The model with the best free energy is kept.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int
+            Number of epochs to train the model.
+        n_init : int
+            Number of initializations.
+        take : float, optional
+            Fraction of total batches to take.
+        stay_prob : float, optional
+            Stay probability (diagonal for the transition probability
+            matrix). Other states have uniform probability.
+        kwargs : keyword arguments, optional
+            Keyword arguments for the fit method.
+
+        Returns
+        -------
+        history : history
+            The training history of the best initialization.
+        """
+        if n_init is None or n_init == 0:
+            _logger.info(
+                "Number of initializations was set to zero. "
+                + "Skipping initialization."
+            )
+            return
+
+        _logger.info("Random state time course initialization")
+
+        # Make a TensorFlow Dataset
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True, drop_last_batch=True
+        )
+
+        # Calculate the number of batches to use
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+
+        # Pick the initialization with the lowest free energy
+        best_loss = np.Inf
+        for n in range(n_init):
+            _logger.info(f"Initialization {n}")
+            self.reset()
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
+
+            self.set_random_state_time_course_initialization(
+                training_data_subset, stay_prob
+            )
+
+            try:
+                history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
+            except tf.errors.InvalidArgumentError as e:
+                _logger.warning(e)
+                _logger.warning("Training failed! Skipping initialization.")
+                continue
+
+            loss = history["loss"][-1]
+            if loss < best_loss:
+                best_initialization = n
+                best_loss = loss
+                best_history = history
+                best_weights = self.get_weights()
+
+        if best_loss == np.Inf:
+            raise ValueError("No valid initializations were found.")
+
+        _logger.info(f"Using initialization {best_initialization}")
+        self.set_weights(best_weights)
+        self.reset_kl_annealing_factor()
+
+        return best_history
+
+    def set_random_state_time_course_initialization(
+        self, training_dataset, stay_prob=0.9
+    ):
+        """Sets the initial means/covariances based on a random state time course.
+
+        Parameters
+        ----------
+        training_dataset : tf.data.Dataset
+            Training data.
+        stay_prob : float, optional
+            Stay probability (diagonal for the transition probability
+            matrix). Other states have uniform probability.
+        """
+        _logger.info("Setting random means and covariances")
+
+        # HMM simulation to sample from
+        sim = HMM(
+            trans_prob="uniform",
+            stay_prob=stay_prob,
+            n_states=self.config.n_states or self.config.n_modes,
+        )
+
+        # Mean and covariance for each state
+        means = np.zeros(
+            [self.config.n_states or self.config.n_modes, self.config.n_channels],
+            dtype=np.float32,
+        )
+        covariances = np.zeros(
+            [
+                self.config.n_states or self.config.n_modes,
+                self.config.n_channels,
+                self.config.n_channels,
+            ],
+            dtype=np.float32,
+        )
+
+        n_batches = 0
+        for batch in training_dataset:
+            # Concatenate all the sequences in this batch
+            data = np.concatenate(batch["data"])
+
+            if data.shape[0] < 2 * self.config.n_channels:
+                raise ValueError(
+                    "Not enough time points in batch, "
+                    "increase batch_size or sequence_length"
+                )
+
+            # Sample a state time course using the initial transition
+            # probability matrix
+            stc = sim.generate_states(data.shape[0])
+
+            # Make sure each state activates
+            non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+            while np.any(non_active_states):
+                new_stc = sim.generate_states(data.shape[0])
+                new_active_states = np.sum(new_stc, axis=0) != 0
+                for j in range(self.config.n_states or self.config.n_modes):
+                    if non_active_states[j] and new_active_states[j]:
+                        stc[:, j] = new_stc[:, j]
+                non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+
+            # Calculate the mean/covariance for each state for this batch
+            m = []
+            C = []
+            for j in range(self.config.n_states or self.config.n_modes):
+                x = data[stc[:, j] == 1]
+                mu = np.mean(x, axis=0)
+                sigma = np.cov(x, rowvar=False)
+                m.append(mu)
+                C.append(sigma)
+            means += m
+            covariances += C
+            n_batches += 1
+
+        # Calculate the average from the running total
+        means /= n_batches
+        covariances /= n_batches
+
+        if self.config.learn_means:
+            # Set initial means
+            self.set_means(means, update_initializer=True)
+
+        if self.config.learn_covariances:
+            # Set initial covariances
+            self.set_covariances(covariances, update_initializer=True)
+
     def reset_kl_annealing_factor(self):
         """Sets the KL annealing factor to zero.
 
@@ -412,7 +585,7 @@ class VariationalInferenceModelBase(ModelBase):
         if not self.config.multiple_dynamics:
             return_names = ["ll_loss", "kl_loss", "theta"]
         else:
-            return_names = ["ll_loss", "kl_loss", "mean_theta", "fc_theta"]
+            return_names = ["ll_loss", "kl_loss", "power_theta", "fc_theta"]
         predictions_dict = dict(zip(return_names, predictions))
 
         return predictions_dict
@@ -513,8 +686,8 @@ class VariationalInferenceModelBase(ModelBase):
 
         Returns
         -------
-        mean_theta : list or np.ndarray
-            Mode mixing logits for mean with shape (n_sessions, n_samples,
+        power_theta : list or np.ndarray
+            Mode mixing logits for power with shape (n_sessions, n_samples,
             n_modes) or (n_samples, n_modes).
         fc_theta : list or np.ndarray
             Mode mixing logits for FC with shape (n_sessions, n_samples,
@@ -545,32 +718,32 @@ class VariationalInferenceModelBase(ModelBase):
             iterator = range(n_datasets)
             _logger.info("Getting mode logits")
 
-        mean_theta = []
+        power_theta = []
         fc_theta = []
         for i in iterator:
             predictions = self.predict(dataset[i], **kwargs)
-            mean_theta_ = predictions["mean_theta"]
+            power_theta_ = predictions["power_theta"]
             fc_theta_ = predictions["fc_theta"]
             if remove_edge_effects:
                 trim = step_size // 2  # throw away 25%
-                mean_theta_ = (
-                    [mean_theta_[0, :-trim]]
-                    + list(mean_theta_[1:-1, trim:-trim])
-                    + [mean_theta_[-1, trim:]]
+                power_theta_ = (
+                    [power_theta_[0, :-trim]]
+                    + list(power_theta_[1:-1, trim:-trim])
+                    + [power_theta_[-1, trim:]]
                 )
                 fc_theta_ = (
                     [fc_theta_[0, :-trim]]
                     + list(fc_theta_[1:-1, trim:-trim])
                     + [fc_theta_[-1, trim:]]
                 )
-            mean_theta.append(np.concatenate(mean_theta_))
+            power_theta.append(np.concatenate(power_theta_))
             fc_theta.append(np.concatenate(fc_theta_))
 
-        if concatenate or len(mean_theta) == 1:
-            mean_theta = np.concatenate(mean_theta)
+        if concatenate or len(power_theta) == 1:
+            power_theta = np.concatenate(power_theta)
             fc_theta = np.concatenate(fc_theta)
 
-        return mean_theta, fc_theta
+        return power_theta, fc_theta
 
     def get_alpha(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
@@ -657,11 +830,11 @@ class VariationalInferenceModelBase(ModelBase):
             Prediction data. This can be a list of datasets, one for each
             session.
         concatenate : bool, optional
-            Should we concatenate alpha/gamma for each session?
+            Should we concatenate alpha/beta for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha`/
-            :code:`gamma` and disregarding the :code:`alpha`/:code:`gamma` near
+            :code:`beta` and disregarding the :code:`alpha`/:code:`beta` near
             the ends. Passing :code:`True` does this by using sequences with 50%
             overlap and throwing away the first and last 25% of predictions.
 
@@ -670,8 +843,8 @@ class VariationalInferenceModelBase(ModelBase):
         alpha : list or np.ndarray
             Alpha time course with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
-        gamma : list or np.ndarray
-            Gamma time course with shape (n_sessions, n_samples, n_modes) or
+        beta : list or np.ndarray
+            Beta time course with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -691,7 +864,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         dataset = self.make_dataset(dataset, step_size=step_size)
         alpha_layer = self.model.get_layer("alpha")
-        gamma_layer = self.model.get_layer("gamma")
+        beta_layer = self.model.get_layer("beta")
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
@@ -702,13 +875,13 @@ class VariationalInferenceModelBase(ModelBase):
             _logger.info("Getting mode time courses")
 
         alpha = []
-        gamma = []
+        beta = []
         for i in iterator:
             predictions = self.predict(dataset[i], **kwargs)
-            mean_theta = predictions["mean_theta"]
+            power_theta = predictions["power_theta"]
             fc_theta = predictions["fc_theta"]
-            alpha_ = alpha_layer(mean_theta)
-            gamma_ = gamma_layer(fc_theta)
+            alpha_ = alpha_layer(power_theta)
+            beta_ = beta_layer(fc_theta)
             if remove_edge_effects:
                 trim = step_size // 2  # throw away 25%
                 alpha_ = (
@@ -716,19 +889,19 @@ class VariationalInferenceModelBase(ModelBase):
                     + list(alpha_[1:-1, trim:-trim])
                     + [alpha_[-1, trim:]]
                 )
-                gamma_ = (
-                    [gamma_[0, :-trim]]
-                    + list(gamma_[1:-1, trim:-trim])
-                    + [gamma_[-1, trim:]]
+                beta_ = (
+                    [beta_[0, :-trim]]
+                    + list(beta_[1:-1, trim:-trim])
+                    + [beta_[-1, trim:]]
                 )
             alpha.append(np.concatenate(alpha_))
-            gamma.append(np.concatenate(gamma_))
+            beta.append(np.concatenate(beta_))
 
         if concatenate or len(alpha) == 1:
             alpha = np.concatenate(alpha)
-            gamma = np.concatenate(gamma)
+            beta = np.concatenate(beta)
 
-        return alpha, gamma
+        return alpha, beta
 
     def losses(self, dataset, **kwargs):
         """Calculates the log-likelihood and KL loss for a dataset.
@@ -1083,25 +1256,26 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         _logger.info("Random subset initialization")
 
-        # Get the buffer size
-        buffer_size = getattr(training_data, "buffer_size", 100000)
-
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data, shuffle=True, concatenate=True, drop_last_batch=True
         )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_dataset)
-        n_batches = max(round(n_total_batches * take), 1)
-        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
 
             try:
                 history = self.fit(
@@ -1126,6 +1300,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         _logger.info(f"Using initialization {best_initialization}")
         self.set_weights(best_weights)
+        self.reset_kl_annealing_factor()
 
         return best_history
 
@@ -1164,27 +1339,29 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         _logger.info("Random state time course initialization")
 
-        # Get the buffer size
-        buffer_size = getattr(training_data, "buffer_size", 100000)
-
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
             training_data, shuffle=True, concatenate=True, drop_last_batch=True
         )
 
         # Calculate the number of batches to use
-        n_total_batches = dtf.get_n_batches(training_dataset)
-        n_batches = max(round(n_total_batches * take), 1)
-        _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
+        if take < 1:
+            n_total_batches = dtf.get_n_batches(training_dataset)
+            n_batches = max(round(n_total_batches * take), 1)
+            _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
         best_loss = np.Inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
-            training_data_subset = training_dataset.shuffle(buffer_size).take(n_batches)
+            if take < 1:
+                training_data_subset = training_dataset.take(n_batches)
+            else:
+                training_data_subset = training_dataset
 
             self.set_random_state_time_course_initialization(training_data_subset)
+
             try:
                 history = self.fit(training_data_subset, epochs=n_epochs, **kwargs)
             except tf.errors.InvalidArgumentError as e:
@@ -1204,24 +1381,19 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         _logger.info(f"Using initialization {best_initialization}")
         self.set_weights(best_weights)
+        self.reset_kl_annealing_factor()
 
         return best_history
 
-    def set_random_state_time_course_initialization(self, training_data):
-        """Sets the initial means/covariances based on a random state time
-        course.
+    def set_random_state_time_course_initialization(self, training_dataset):
+        """Sets the initial means/covariances based on a random state time course.
 
         Parameters
         ----------
-        training_data : tf.data.Dataset or osl_dynamics.data.Data
+        training_dataset : tf.data.Dataset
             Training data.
         """
         _logger.info("Setting random means and covariances")
-
-        # Make a TensorFlow Dataset
-        training_dataset = self.make_dataset(
-            training_data, concatenate=True, drop_last_batch=True
-        )
 
         # Mean and covariance for each state
         means = np.zeros(
@@ -1232,28 +1404,45 @@ class MarkovStateInferenceModelBase(ModelBase):
             dtype=np.float32,
         )
 
+        n_batches = 0
         for batch in training_dataset:
             # Concatenate all the sequences in this batch
             data = np.concatenate(batch["data"])
 
+            if data.shape[0] < 2 * self.config.n_channels:
+                raise ValueError(
+                    "Not enough time points in batch, "
+                    "increase batch_size or sequence_length"
+                )
+
             # Sample a state time course using the initial transition
             # probability matrix
             stc = self.sample_state_time_course(data.shape[0])
+
+            # Make sure each state activates
+            non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+            while np.any(non_active_states):
+                new_stc = self.sample_state_time_course(data.shape[0])
+                new_active_states = np.sum(new_stc, axis=0) != 0
+                for j in range(self.config.n_states):
+                    if non_active_states[j] and new_active_states[j]:
+                        stc[:, j] = new_stc[:, j]
+                non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
 
             # Calculate the mean/covariance for each state for this batch
             m = []
             C = []
             for j in range(self.config.n_states):
                 x = data[stc[:, j] == 1]
-                mu_j = np.mean(x, axis=0)
-                sigma_j = np.cov(x, rowvar=False)
-                m.append(mu_j)
-                C.append(sigma_j)
+                mu = np.mean(x, axis=0)
+                sigma = np.cov(x, rowvar=False)
+                m.append(mu)
+                C.append(sigma)
             means += m
             covariances += C
+            n_batches += 1
 
         # Calculate the average from the running total
-        n_batches = dtf.get_n_batches(training_dataset)
         means /= n_batches
         covariances /= n_batches
 
@@ -1361,7 +1550,7 @@ class MarkovStateInferenceModelBase(ModelBase):
                 predictions["gamma"], predictions["xi"]
             )
             fe = ll_loss + entropy - prior
-            if self.config.model_name == "SE-HMM":
+            if self.config.model_name == "HIVE":
                 kl_loss = np.mean(predictions["kl_loss"])
                 fe += kl_loss
             free_energy.append(fe)

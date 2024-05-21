@@ -1,7 +1,7 @@
 """Example script for running inference on simulated MDyn_HMM_MVN data.
 
 - Multi-dynamic version for dynemo_hmm-mvn.py
-- Should achieve a dice of ~0.99 for alpha and ~0.99 for gamma.
+- Should achieve a dice of ~0.99 for alpha and ~0.99 for beta.
 """
 
 print("Setting up")
@@ -27,11 +27,9 @@ config = Config(
     model_n_units=128,
     model_normalization="layer",
     theta_normalization="layer",
-    learn_alpha_temperature=True,
-    initial_alpha_temperature=1.0,
     learn_means=True,
     learn_stds=True,
-    learn_fcs=True,
+    learn_corrs=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
@@ -52,10 +50,14 @@ sim = simulation.MDyn_HMM_MVN(
     stay_prob=0.9,
     means="random",
     covariances="random",
-    random_seed=123,
 )
 sim.standardize()
 training_data = data.Data(sim.time_series)
+
+training_data.prepare(
+    {"pca": {"n_pca_components": config.n_channels}, "standardize": {}}
+)
+config.pca_components = training_data.pca_components
 
 # Build model
 model = Model(config)
@@ -72,50 +74,50 @@ free_energy = model.free_energy(training_data)
 print(f"Free energy: {free_energy}")
 
 # Inferred mode mixing factors
-inf_alpha, inf_gamma = model.get_mode_time_courses(training_data)
+inf_alpha, inf_beta = model.get_mode_time_courses(training_data)
 
 inf_alpha = modes.argmax_time_courses(inf_alpha)
-inf_gamma = modes.argmax_time_courses(inf_gamma)
+inf_beta = modes.argmax_time_courses(inf_beta)
 
 # Simulated mode mixing factors
-sim_alpha, sim_gamma = sim.mode_time_course
+sim_alpha, sim_beta = sim.mode_time_course
 
-# Inferred means, stds, fcs
-inf_means, inf_stds, inf_fcs = model.get_means_stds_fcs()
+# Inferred means, stds, corrs
+inf_means, inf_stds, inf_corrs = model.get_means_stds_corrs()
 sim_means = sim.means
 sim_stds = sim.stds
-sim_fcs = sim.fcs
+sim_corrs = sim.corrs
 
 # Match the inferred and simulated mixing factors
 _, order_alpha = modes.match_modes(sim_alpha, inf_alpha, return_order=True)
-_, order_gamma = modes.match_modes(sim_gamma, inf_gamma, return_order=True)
+_, order_beta = modes.match_modes(sim_beta, inf_beta, return_order=True)
 
 inf_alpha = inf_alpha[:, order_alpha]
-inf_gamma = inf_gamma[:, order_gamma]
+inf_beta = inf_beta[:, order_beta]
 
 inf_means = inf_means[order_alpha]
 inf_stds = np.array([np.diag(std) for std in inf_stds[order_alpha]])
-inf_fcs = inf_fcs[order_gamma]
+inf_corrs = inf_corrs[order_beta]
 
 # Dice coefficients
 dice_alpha = metrics.dice_coefficient(sim_alpha, inf_alpha)
-dice_gamma = metrics.dice_coefficient(sim_gamma, inf_gamma)
+dice_beta = metrics.dice_coefficient(sim_beta, inf_beta)
 
-print("Dice coefficient for mean:", dice_alpha)
-print("Dice coefficient for fc:", dice_gamma)
+print("Dice coefficient for power:", dice_alpha)
+print("Dice coefficient for FC:", dice_beta)
 
 # Fractional occupancies
 fo_sim_alpha = modes.fractional_occupancies(sim_alpha)
-fo_sim_gamma = modes.fractional_occupancies(sim_gamma)
+fo_sim_beta = modes.fractional_occupancies(sim_beta)
 
 fo_inf_alpha = modes.fractional_occupancies(inf_alpha)
-fo_inf_gamma = modes.fractional_occupancies(inf_gamma)
+fo_inf_beta = modes.fractional_occupancies(inf_beta)
 
 print("Fractional occupancies mean (Simulation):", fo_sim_alpha)
 print("Fractional occupancies mean (DyNeMo):", fo_inf_alpha)
 
-print("Fractional occupancies fc (Simulation):", fo_sim_gamma)
-print("Fractional occupancies fc (DyNeMo):", fo_inf_gamma)
+print("Fractional occupancies FC (Simulation):", fo_sim_beta)
+print("Fractional occupancies FC (DyNeMo):", fo_inf_beta)
 
 # Plots
 plotting.plot_alpha(
@@ -133,18 +135,18 @@ plotting.plot_alpha(
     filename="figures/inf_alpha.png",
 )
 plotting.plot_alpha(
-    sim_gamma,
+    sim_beta,
     n_samples=2000,
-    title="Ground truth " + r"$\gamma$",
-    y_labels=r"$\gamma_{jt}$",
-    filename="figures/sim_gamma.png",
+    title="Ground truth " + r"$\beta$",
+    y_labels=r"$\beta_{jt}$",
+    filename="figures/sim_beta.png",
 )
 plotting.plot_alpha(
-    inf_gamma,
+    inf_beta,
     n_samples=2000,
-    title="Inferred " + r"$\gamma$",
-    y_labels=r"$\gamma_{jt}$",
-    filename="figures/inf_gamma.png",
+    title="Inferred " + r"$\beta$",
+    y_labels=r"$\beta_{jt}$",
+    filename="figures/inf_beta.png",
 )
 plotting.plot_matrices(
     sim_means, main_title="Ground Truth", filename="figures/sim_means.png"
@@ -158,6 +160,10 @@ plotting.plot_matrices(
 )
 plotting.plot_matrices(inf_stds, main_title="Inferred", filename="figures/inf_stds.png")
 plotting.plot_matrices(
-    sim_fcs, main_title="Ground Truth", filename="figures/sim_fcs.png"
+    sim_corrs, main_title="Ground Truth", filename="figures/sim_corrs.png"
 )
-plotting.plot_matrices(inf_fcs, main_title="Inferred", filename="figures/inf_fcs.png")
+plotting.plot_matrices(
+    inf_corrs, main_title="Inferred", filename="figures/inf_corrs.png"
+)
+
+training_data.delete_dir()
