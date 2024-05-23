@@ -247,6 +247,9 @@ def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
         Value at each voxel. Shape is (x, y, z), where :code:`x`,
         :code:`y` and :code:`z` correspond to 3D voxel locations.
     """
+    # Suppress INFO messages from nibabel
+    logging.getLogger("nibabel.global").setLevel(logging.ERROR)
+
     # Validation
     mask_file = files.check_exists(mask_file, files.mask.directory)
     parcellation_file = files.check_exists(
@@ -304,6 +307,7 @@ def save(
     show_plots=True,
     combined=False,
     titles=None,
+    n_rows=1,
 ):
     """Saves power maps.
 
@@ -343,8 +347,11 @@ def save(
     combined : bool, optional
         Should the individual plots be combined into a single image?
         The combined image is always shown on screen (for Juptyer notebooks).
+        Note if :code:`True` is passed, the individual images will be deleted.
     titles : list, optional
         List of titles for each power plot. Only used if :code:`combined=True`.
+    n_rows : int, optional
+        Number of rows in the combined image. Only used if :code:`combined=True`.
 
     Returns
     -------
@@ -470,15 +477,24 @@ def save(
                     plt.close(fig)
 
             if combined:
+                n_columns = -(n_modes // -n_rows)
+
                 titles = titles or [None] * n_modes
                 # Combine images into a single image
-                fig, axes = plt.subplots(1, n_modes, figsize=(n_modes * 5, 5))
-                for i, ax in enumerate(axes):
-                    ax.imshow(plt.imread(output_files[i]))
+                fig, axes = plt.subplots(
+                    n_rows, n_columns, figsize=(n_columns * 5, n_rows * 5)
+                )
+                for i, ax in enumerate(axes.flatten()):
                     ax.axis("off")
-                    ax.set_title(titles[i], fontsize=20)
+                    if i < n_modes:
+                        ax.imshow(plt.imread(output_files[i]))
+                        ax.set_title(titles[i], fontsize=20)
                 fig.tight_layout()
                 fig.savefig(filename)
+
+                # Remove the individual images
+                for output_file in output_files:
+                    os.remove(output_file)
 
 
 def multi_save(

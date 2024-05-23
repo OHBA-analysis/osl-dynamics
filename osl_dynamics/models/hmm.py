@@ -49,6 +49,7 @@ from osl_dynamics.utils.misc import set_logging_level
 _logger = logging.getLogger("osl-dynamics")
 
 warnings.filterwarnings("ignore", category=NumbaWarning)
+logging.getLogger("numba.core.transforms").setLevel(logging.ERROR)
 
 EPS = sys.float_info.epsilon
 

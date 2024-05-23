@@ -9,8 +9,7 @@ import mne
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm.auto import trange
-from scipy.optimize import linear_sum_assignment
-from scipy.cluster import hierarchy
+from scipy import cluster, spatial, optimize
 from sklearn.cluster import AgglomerativeClustering
 
 from osl_dynamics import analysis, array_ops
@@ -294,7 +293,7 @@ def match_covariances(
                     F[j, k] = -metrics.pairwise_rv_coefficient(
                         np.array([covariances[i][k], covariances[0][j]])
                     )[0, 1]
-        order = linear_sum_assignment(F)[1]
+        order = optimize.linear_sum_assignment(F)[1]
 
         # Add the ordered matrix to the list
         matched_covariances.append(covariances[i][order])
@@ -304,6 +303,75 @@ def match_covariances(
         return orders
     else:
         return tuple(matched_covariances)
+
+
+def match_vectors(*vectors, comparison="correlation", return_order=False):
+    """Matches vectors.
+
+    Parameters
+    ----------
+    vectors : tuple of np.ndarray
+        Sets of vectors to match.
+        Each variable must be shape (n_vectors, n_channels).
+    comparison : str, optional
+        Must be :code:`'correlation' or :code:`'cosine_similarity'`.
+    return_order : bool, optional
+        Should we return the order instead of the matched vectors?
+
+    Returns
+    -------
+    matched_vectors : tuple of np.ndarray
+        Set of matched vectors of shape (n_vectors, n_channels)
+        or order if :code:`return_order=True`.
+
+    Examples
+    --------
+    Reorder the vectors directly:
+
+    >>> v1, v2 = match_vectors(v1, v2, comparison="correlation")
+
+    Just get the reordering:
+
+    >>> orders = match_vectors(v1, v2, comparison="correlation", return_order=True)
+    >>> print(orders[0])  # order for v1 (always unchanged)
+    >>> print(orders[1])  # order for v2
+    """
+    # Validation
+    for vector in vectors[1:]:
+        if vector.shape != vectors[0].shape:
+            raise ValueError("Vectors must have the same shape.")
+
+    if comparison not in ["correlation", "cosine_similarity"]:
+        raise ValueError("Comparison must be 'correlation' or 'cosine_similarity'.")
+
+    # Number of arguments and number of vectors in each argument passed
+    n_args = len(vectors)
+    n_vectors = vectors[0].shape[0]
+
+    # Calculate the similarity between vectors
+    F = np.empty([n_vectors, n_vectors])
+    matched_vectors = [vectors[0]]
+    orders = [np.arange(vectors[0].shape[0])]
+    for i in range(1, n_args):
+        for j in range(n_vectors):
+            # Find the vector that is most similar to vector j
+            for k in range(n_vectors):
+                if comparison == "correlation":
+                    F[j, k] = -np.corrcoef(vectors[i][k], vectors[0][j])[0, 1]
+                elif comparison == "cosine_similarity":
+                    F[j, k] = -(
+                        1 - spatial.distance.cosine(vectors[i][k], vectors[0][j])
+                    )
+        order = optimize.linear_sum_assignment(F)[1]
+
+        # Add the ordered vector to the list
+        matched_vectors.append(vectors[i][order])
+        orders.append(order)
+
+    if return_order:
+        return orders
+    else:
+        return tuple(matched_vectors)
 
 
 def match_modes(*mode_time_courses, return_order=False):
@@ -356,7 +424,7 @@ def match_modes(*mode_time_courses, return_order=False):
         correlation = np.nan_to_num(
             np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
         )
-        matches = linear_sum_assignment(-correlation)
+        matches = optimize.linear_sum_assignment(-correlation)
         matched_mode_time_courses.append(mode_time_course[:n_samples, matches[1]])
         orders.append(matches[1])
 
@@ -565,20 +633,46 @@ def reweight_alphas(alpha, covs):
     reweighted_alpha : list of np.ndarray or np.ndarray
         Re-weighted mixing coefficients. Shape is the same as :code:`alpha`.
     """
-    if isinstance(alpha, np.ndarray):
-        alpha = [alpha]
+    return reweight_mtc(alpha, covs, "covariance")
 
-    # Calculate normalised alphas
-    traces = np.trace(covs, axis1=1, axis2=2)
-    reweighted_alpha = [a * traces[np.newaxis, :] for a in alpha]
-    reweighted_alpha = [
-        na / np.sum(na, axis=1, keepdims=True) for na in reweighted_alpha
-    ]
 
-    if len(reweighted_alpha) == 1:
-        reweighted_alpha = reweighted_alpha[0]
+def reweight_mtc(mtc, params, params_type):
+    """Re-weight mixing coefficients to account for the magnitude of
+    observation model parameters.
 
-    return reweighted_alpha
+    Parameters
+    ----------
+    mtc : List[np.ndarray] or np.ndarray
+        Raw mixing coefficients. Shape must be (n_sessions, n_samples, n_modes)
+        or (n_samples, n_modes).
+    params : np.ndarray
+        Observation model parameters. Shape must be (n_modes, n_channels, n_channels).
+    params_type : str
+        Observation model parameters type. Either 'covariance' or 'correlation'.
+
+    Returns
+    -------
+    reweighted_mtc : List[np.ndarray]
+        Re-weighted mixing coefficients. Shape is the same as :code:`mtc`.
+    """
+    if isinstance(mtc, np.ndarray):
+        mtc = [mtc]
+
+    if params_type == "covariance":
+        weights = np.trace(params, axis1=1, axis2=2)
+    elif params_type == "correlation":
+        m, n = np.tril_indices(params.shape[-1], -1)
+        weights = np.sum(np.abs(params[:, m, n]), axis=-1)
+    else:
+        raise ValueError("params_type must be 'covariance' or 'correlation'.")
+
+    reweighted_mtc = [x * weights[np.newaxis, :] for x in mtc]
+    reweighted_mtc = [x / np.sum(x, axis=1, keepdims=True) for x in reweighted_mtc]
+
+    if len(reweighted_mtc) == 1:
+        reweighted_mtc = reweighted_mtc[0]
+
+    return reweighted_mtc
 
 
 def average_runs(alpha, n_clusters=None, return_cluster_info=False):
@@ -657,7 +751,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
 
     if return_cluster_info:
         # Create a dictionary containing the clustering info
-        linkage = hierarchy.linkage(dissimilarity, method="ward")
+        linkage = cluster.hierarchy.linkage(dissimilarity, method="ward")
         cluster_info = {
             "correlation": corr,
             "dissimilarity": dissimilarity,

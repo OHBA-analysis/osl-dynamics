@@ -988,7 +988,7 @@ class Data:
         if verbose:
             _logger.info(
                 f"Removing {n_remove} data points from the start and end"
-                + " of each array due to time embedding/sliding window."
+                " of each array due to time embedding/sliding window."
             )
 
         # What data should we trim?
@@ -1009,8 +1009,8 @@ class Data:
                 n_keep = n_sequences * sequence_length
                 if verbose:
                     _logger.info(
-                        f"Removing {array.shape[0] - n_keep} data points"
-                        + f" from the end of array {i} due to sequencing."
+                        f"Removing {array.shape[0] - n_keep} data points "
+                        f"from the end of array {i} due to sequencing."
                     )
                 array = array[:n_keep]
 
@@ -1175,8 +1175,8 @@ class Data:
                 validation_dataset = full_dataset.skip(training_dataset_size)
                 _logger.info(
                     f"{len(training_dataset)} batches in training dataset, "
-                    + f"{len(validation_dataset)} batches in the validation "
-                    + "dataset."
+                    f"{len(validation_dataset)} batches in the validation "
+                    "dataset."
                 )
 
                 return training_dataset.prefetch(
@@ -1228,9 +1228,9 @@ class Data:
                     )
                     _logger.info(
                         f"Session {i}: "
-                        + f"{len(training_datasets[i])} batches in training dataset, "
-                        + f"{len(validation_datasets[i])} batches in the validation "
-                        + "dataset."
+                        f"{len(training_datasets[i])} batches in training dataset, "
+                        f"{len(validation_datasets[i])} batches in the validation "
+                        "dataset."
                     )
                 return training_datasets, validation_datasets
 

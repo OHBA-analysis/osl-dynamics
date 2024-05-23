@@ -14,6 +14,7 @@ This module is used in the following tutorials:
   /tutorials_build/dynemo_plotting_networks.html>`_.
 """
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -763,6 +764,7 @@ def save(
     axes=None,
     combined=False,
     titles=None,
+    n_rows=1,
 ):
     """Save connectivity maps as image files.
 
@@ -795,9 +797,13 @@ def save(
         List of matplotlib axes to plot the connectivity maps on.
     combined : bool, optional
         Should the connectivity maps be combined on the same figure?
+        The combined image is always shown on screen (for Juptyer notebooks).
+        Note if :code:`True` is passed, the individual images will be deleted.
     titles : list, optional
         List of titles for each connectivity map. Only used if
         :code:`combined=True`.
+    n_rows : int, optional
+        Number of rows in the combined image. Only used if :code:`combined=True`.
 
     Examples
     --------
@@ -884,14 +890,20 @@ def save(
         if filename is None:
             raise ValueError("filename must be passed to save the combined image.")
 
+        n_columns = -(n_modes // -n_rows)
         titles = titles or [None] * n_modes
-        fig, axes = plt.subplots(1, n_modes, figsize=(n_modes * 10, 5))
-        for i, ax in enumerate(axes):
-            ax.imshow(plt.imread(output_files[i]))
+        fig, axes = plt.subplots(n_rows, n_columns, figsize=(n_columns * 5, n_rows * 5))
+        for i, ax in enumerate(axes.flatten()):
             ax.axis("off")
-            ax.set_title(titles[i], fontsize=20)
+            if i < n_modes:
+                ax.imshow(plt.imread(output_files[i]))
+                ax.set_title(titles[i], fontsize=20)
         fig.tight_layout()
         fig.savefig(filename)
+
+        # Remove the individual images
+        for output_file in output_files:
+            os.remove(output_file)
 
 
 def save_interactive(
