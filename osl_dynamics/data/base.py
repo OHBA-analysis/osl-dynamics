@@ -1166,13 +1166,11 @@ class Data:
                 return full_dataset.prefetch(tf.data.AUTOTUNE)
 
             else:
-                # Calculate how many batches should be in the training dataset
-                dataset_size = len(full_dataset)
-                training_dataset_size = round((1.0 - validation_split) * dataset_size)
-
                 # Split the full dataset into a training and validation dataset
-                training_dataset = full_dataset.take(training_dataset_size)
-                validation_dataset = full_dataset.skip(training_dataset_size)
+                training_dataset, validation_dataset = tf.keras.utils.split_dataset(
+                    full_dataset,
+                    right_size=validation_split,
+                )
                 _logger.info(
                     f"{len(training_dataset)} batches in training dataset, "
                     f"{len(validation_dataset)} batches in the validation "
@@ -1209,28 +1207,16 @@ class Data:
                 training_datasets = []
                 validation_datasets = []
                 for i in range(len(full_datasets)):
-                    # Calculate the number of batches in the training dataset
-                    dataset_size = len(full_datasets[i])
-                    training_dataset_size = round(
-                        (1.0 - validation_split) * dataset_size
+                    tds, vds = tf.keras.utils.split_dataset(
+                        full_datasets[i],
+                        right_size=validation_split,
                     )
-
-                    # Split this session's dataset
-                    training_datasets.append(
-                        full_datasets[i]
-                        .take(training_dataset_size)
-                        .prefetch(tf.data.AUTOTUNE)
-                    )
-                    validation_datasets.append(
-                        full_datasets[i]
-                        .skip(training_dataset_size)
-                        .prefetch(tf.data.AUTOTUNE)
-                    )
+                    training_datasets.append(tds.prefetch(tf.data.AUTOTUNE))
+                    validation_datasets.append(vds.prefetch(tf.data.AUTOTUNE))
                     _logger.info(
                         f"Session {i}: "
-                        f"{len(training_datasets[i])} batches in training dataset, "
-                        f"{len(validation_datasets[i])} batches in the validation "
-                        "dataset."
+                        f"{len(tds)} batches in training dataset, "
+                        f"{len(vds)} batches in the validation dataset."
                     )
                 return training_datasets, validation_datasets
 
