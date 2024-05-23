@@ -12,7 +12,7 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     ::
 
-        conda create --name osld python=3.10
+        conda create --name osld python=3.10.14
         conda activate osld
 
     Note, this environment must be activated every time you want to use osl-dynamics.
@@ -23,7 +23,7 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     ::
 
-        pip install tensorflow==2.9.1
+        pip install tensorflow==2.11.0
 
     If you have GPU resources you may need to install additional libraries (CUDA/cuDNN), see https://www.tensorflow.org/install/pip for detailed instructions.
 
@@ -31,19 +31,19 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     ::
 
-        pip install tensorflow-macos==2.9.1
+        pip install tensorflow-macos==2.11.0
 
     If pip can not find the package, then you can try installing TensorFlow with conda:
 
     ::
 
-        conda install tensorflow=2.9.1
+        conda install tensorflow=2.11.0
 
     After you have installed TensorFlow, install the tensorflow-probability addon with:
 
     ::
 
-        pip install tensorflow-probability==0.17
+        pip install tensorflow-probability==0.19.0
 
 #. Finally, install osl-dynamics:
 
