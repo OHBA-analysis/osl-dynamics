@@ -18,6 +18,7 @@ import numpy as np
 import nibabel as nib
 from nilearn import plotting
 from tqdm.auto import trange
+from pqdm.threads import pqdm
 import matplotlib.pyplot as plt
 
 from osl_dynamics import array_ops, files
@@ -27,7 +28,7 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def sliding_window_power(
-    data, window_length, step_size=None, power_type="mean", concatenate=False
+    data, window_length, step_size=None, power_type="mean", concatenate=False, n_jobs=1
 ):
     """Calculate sliding window power.
 
@@ -46,6 +47,8 @@ def sliding_window_power(
     concatenate : bool, optional
         Should we concatenate the sliding window power from each array
         into one big time series?
+    n_jobs : int, optional
+        Number of jobs to run in parallel. Default is 1.
 
     Returns
     -------
@@ -69,25 +72,45 @@ def sliding_window_power(
         if data.ndim != 3:
             data = [data]
 
-    # Calculate sliding window power for each array
-    sliding_window_power = []
-    for i in trange(len(data), desc="Calculating sliding window power"):
-        ts = data[i]
-        n_samples = ts.shape[0]
-        n_channels = ts.shape[1]
+    # Helper function to calculate power
+    def _swp(x):
+        n_samples = x.shape[0]
+        n_channels = x.shape[1]
         n_windows = (n_samples - window_length - 1) // step_size + 1
 
+        # Preallocate an array fo hold moving average values
         swp = np.empty([n_windows, n_channels], dtype=np.float32)
-        for j in range(n_windows):
-            window_ts = ts[j * step_size : j * step_size + window_length]
-            swp[j] = metric(window_ts, axis=0)
+        for i in range(n_windows):
+            window_ts = x[i * step_size : i * step_size + window_length]
+            swp[i] = metric(window_ts, axis=0)
 
-        sliding_window_power.append(swp)
+        return swp
 
-    if concatenate or len(sliding_window_power) == 1:
-        sliding_window_power = np.concatenate(sliding_window_power)
+    # Setup keyword arguments to pass to the helper function
+    kwargs = [{"x": x} for x in data]
 
-    return sliding_window_power
+    if len(data) == 1:
+        _logger.info("Sliding window power")
+        results = [_swp(**kwargs[0])]
+
+    elif n_jobs == 1:
+        results = []
+        for i in trange(len(data), desc="Sliding window power"):
+            results.append(_swp(**kwargs[i]))
+
+    else:
+        _logger.info(f"Sliding window power")
+        results = pqdm(
+            kwargs,
+            _swp,
+            argument_type="kwargs",
+            n_jobs=n_jobs,
+        )
+
+    if concatenate or len(results) == 1:
+        results = np.concatenate(results)
+
+    return results
 
 
 def variance_from_spectra(
