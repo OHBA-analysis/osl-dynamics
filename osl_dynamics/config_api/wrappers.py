@@ -321,6 +321,70 @@ def train_mdynemo(
     corrs_init_kwargs=None,
     save_inf_params=True,
 ):
+    """Train `MDyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
+        /osl_dynamics/models/mdynemo/index.html>`_. This function will:
+    
+    1. Build an :code:`mdynemo.Model` object.
+    2. Initialize the mode correlations using sliding window and KMeans.
+    3. Initialize the parameters of the model using
+        :code:`Model.random_subset_initialization`.
+    4. Perform full training.
+    5. Save the inferred parameters (mode time courses, means, stds and corrs)
+        if :code:`save_inf_params=True`.
+
+    This function will create two directories:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object for training the model.
+    output_dir : str
+        Path to output directory.
+    config_kwargs : dict
+        Keyword arguments to pass to `mdynemo.Config <https://osl-dynamics\
+        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/mdynemo\
+        /index.html#osl_dynamics.models.mdynemo.Config>`_. Defaults to::
+
+            {
+                'n_channels': data.n_channels,
+                'sequence_length': 200,
+                'inference_n_units': 64,
+                'inference_normalization': 'layer',
+                'model_n_units': 64,
+                'model_normalization': 'layer',
+                'do_kl_annealing': True,
+                'kl_annealing_curve': 'tanh',
+                'kl_annealing_sharpness': 10,
+                'n_kl_annealing_epochs': 20,
+                'batch_size': 128,
+                'learning_rate': 0.01,
+                'lr_decay': 0.1,
+                'n_epochs': 40,
+            }.
+    init_kwargs : dict, optional
+        Keyword arguments to pass to :code:`Model.random_subset_initialization`.
+        Defaults to::
+
+            {'n_init': 5, 'n_epochs': 5, 'take': 1}.
+    fit_kwargs : dict, optional
+        Keyword arguments to pass to the :code:`Model.fit`.
+    corrs_init_kwargs : dict, optional
+        Keyword arguments to pass to the mode correlations
+        initialisation. Defaults to::
+
+            {
+                'window_length': data.sampling_frequency * 2,
+                'step_size': data.sampling_frequency // 25,
+                'random_state': None,
+                'n_init': 'auto',
+                'init': 'k-means++',
+            }.
+    save_inf_params : bool, optional
+        Should we save the inferred parameters?
+    """
     if data is None:
         raise ValueError("data must be passed.")
 
