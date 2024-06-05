@@ -9,7 +9,7 @@ Citation
 
 If you find this toolbox useful, please cite:
 
-    **Gohil C., Huang R., Roberts E., van Es M.W.J., Quinn A.J., Vidaurre D., Woolrich M.W. (2023) osl-dynamics: A toolbox for modelling fast dynamic brain activity. eLife 12:RP91949 https://doi.org/10.7554/eLife.91949.2**
+    **Chetan GohilRukuang HuangEvan RobertsMats WJ van EsAndrew J QuinnDiego VidaurreMark W Woolrich (2024) osl-dynamics, a toolbox for modeling fast dynamic brain activity eLife 12:RP91949.**
 
 Installation
 ============
