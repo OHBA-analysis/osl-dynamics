@@ -9,11 +9,6 @@ import numpy as np
 from osl_dynamics.analysis import power, modes
 from osl_dynamics.data import rw
 
-# We will download example data hosted on osf.io/by2tc.
-# Note, osfclient must be installed. This can be installed with pip:
-#
-#     pip install osfclient
-
 def get_data(name, output_dir):
     if os.path.exists(output_dir):
         print(f"{output_dir} already downloaded. Skipping..")
@@ -23,7 +18,8 @@ def get_data(name, output_dir):
     os.remove(f"{name}.zip")
     print(f"Data downloaded to: {output_dir}")
 
-get_data("tde-hmm_notts_rest_55_subj", output_dir="notts_tde_hmm")
+# We will download example data hosted on osf.io/by2tc.
+get_data("tde_hmm_notts_mrc_meguk_glasser", output_dir="notts_tde_hmm")
 
 # Get the inferred covariances
 #
@@ -47,7 +43,7 @@ power_map = modes.raw_covariances(
 power.save(
     power_map,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
     subtract_mean=True,
     filename="maps_.png",
 )
