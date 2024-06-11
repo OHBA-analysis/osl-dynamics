@@ -23,7 +23,9 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 **Data tutorials**:
 
 - :doc:`tutorials_build/data_loading`.
-- :doc:`tutorials_build/data_preparation`.
+- :doc:`tutorials_build/data_prepare_meg`.
+- :doc:`tutorials_build/data_prepare_fmri`.
+- :doc:`tutorials_build/data_time_delay_embedding`.
 
 **Static modelling tutorials**:
 
@@ -34,18 +36,17 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 **Dynamic modelling tutorials**:
 
 - :doc:`tutorials_build/sliding_window_analysis`.
-- :doc:`tutorials_build/hmm_simulation`.
-- :doc:`tutorials_build/hmm_training_real_data`.
+- :doc:`tutorials_build/hmm_training`.
 - :doc:`tutorials_build/hmm_summary_stats_analysis`.
 - :doc:`tutorials_build/hmm_power_analysis`.
 - :doc:`tutorials_build/hmm_coherence_analysis`.
-- :doc:`tutorials_build/hmm_evoked_response_analysis`.
-- :doc:`tutorials_build/dynemo_minimal_code`.
-- :doc:`tutorials_build/dynemo_soft_mix_simulation`.
-- :doc:`tutorials_build/dynemo_long_range_dep_simulation`.
-- :doc:`tutorials_build/dynemo_training_real_data`.
+- :doc:`tutorials_build/dynemo_training`.
 - :doc:`tutorials_build/dynemo_mixing_coef_analysis`.
 - :doc:`tutorials_build/dynemo_plotting_networks`.
+
+**Group-level analysis tutorials**:
+
+- :doc:`tutorials_build/evoked_response_analysis`.
 
 More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
 
