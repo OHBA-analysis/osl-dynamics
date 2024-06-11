@@ -84,6 +84,8 @@ Summary Statistics
 
 We can calculate the usual statistics we study with the `HMM <hmm.html>`_ by binarizing the mixing coefficient time course. The :doc:`DyNeMo Mixing Coefficients Analysis tutorial <../tutorials_build/dynemo_mixing_coef_analysis>` discusses how to do this.
 
+Alternatively, we can use the statistics calculated from the mixing coefficient time series, like the mean, standard deviation or kurtosis. Normally, we calculate these quantities on the reweighted mixing coefficients (to account for the magnitude of the mode covariances).
+
 Spectral Analysis
 ^^^^^^^^^^^^^^^^^
 
