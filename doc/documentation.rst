@@ -27,7 +27,7 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 - :doc:`tutorials_build/data_prepare_fmri`.
 - :doc:`tutorials_build/data_time_delay_embedding`.
 
-**Static modelling tutorials**:
+**Static (time-averaged) modelling tutorials for MEG**:
 
 - :doc:`tutorials_build/static_spectra_analysis`.
 - :doc:`tutorials_build/static_power_analysis`.
@@ -37,15 +37,22 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 
 - :doc:`tutorials_build/sliding_window_analysis`.
 - :doc:`tutorials_build/hmm_training`.
+- :doc:`tutorials_build/dynemo_training`.
+
+**HMM post-hoc analysis tutorials**:
+
 - :doc:`tutorials_build/hmm_summary_stats_analysis`.
 - :doc:`tutorials_build/hmm_power_analysis`.
 - :doc:`tutorials_build/hmm_coherence_analysis`.
-- :doc:`tutorials_build/dynemo_training`.
+
+**DyNeMo post-hoc analysis tutorials**:
+
 - :doc:`tutorials_build/dynemo_mixing_coef_analysis`.
 - :doc:`tutorials_build/dynemo_plotting_networks`.
 
 **Group-level analysis tutorials**:
 
+- :doc:`tutorials_build/group_contrast`.
 - :doc:`tutorials_build/evoked_response_analysis`.
 
 More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
