@@ -38,6 +38,7 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 - :doc:`tutorials_build/sliding_window_analysis`.
 - :doc:`tutorials_build/hmm_training`.
 - :doc:`tutorials_build/dynemo_training`.
+- :doc:`tutorials_build/hmm_dynemo_get_params`.
 
 **HMM post-hoc analysis tutorials**:
 
@@ -53,7 +54,7 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 **Group-level analysis tutorials**:
 
 - :doc:`tutorials_build/group_contrast`.
-- :doc:`tutorials_build/evoked_response_analysis`.
+- :doc:`tutorials_build/group_evoked_response`.
 
 More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
 
