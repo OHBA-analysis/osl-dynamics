@@ -1,6 +1,6 @@
 """
-Spectral Analysis
-=================
+Static: Spectral Analysis
+=========================
 
 MEG data is useful because it has a high temporal resolution. We can take advantage of this by examining the spectral (i.e. frequency) content of the data. In this tutorial we will perform static spectral analysis on source space MEG data. This tutorial covers:
 

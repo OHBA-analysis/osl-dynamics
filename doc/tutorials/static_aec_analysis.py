@@ -1,6 +1,6 @@
 """
-Amplitude Envelope Correlation (AEC) Analysis
-=============================================
+Static: Amplitude Envelope Correlation (AEC) Analysis
+=====================================================
 
 In this tutorial we will perform static AEC analysis on source space MEG data. This tutorial covers:
 

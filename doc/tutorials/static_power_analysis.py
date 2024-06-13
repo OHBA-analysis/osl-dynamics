@@ -1,6 +1,6 @@
 """
-Power Analysis
-============== 
+Static: Power Analysis
+======================
 
 In this tutorial we will perform static power analysis on source space MEG data. This tutorial covers:
 
