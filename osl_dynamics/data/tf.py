@@ -151,7 +151,7 @@ def load_tfrecord_dataset(
     validation_split=None,
     concatenate=True,
     drop_last_batch=False,
-    buffer_size=100000,
+    buffer_size=4000,
     keep=None,
 ):
     """Load a TFRecord dataset.

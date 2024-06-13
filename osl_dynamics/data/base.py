@@ -106,7 +106,7 @@ class Data:
         time_axis_first=True,
         load_memmaps=False,
         store_dir="tmp",
-        buffer_size=100000,
+        buffer_size=4000,
         use_tfrecord=False,
         session_labels=None,
         n_jobs=1,
