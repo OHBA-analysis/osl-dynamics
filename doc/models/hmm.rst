@@ -86,12 +86,12 @@ It is common to look at four summary statistics:
 - The **mean interval**, which is the average duration between successive state visits.
 - The **switching rate**, which is the average number of visits to a state (i.e. activations) per second.
 
-Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <../tutorials_build/hmm_summary_stats_analysis>` for example code of how to calculate these quantities.
+Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <../tutorials_build/hmm_summary_stats>` for example code of how to calculate these quantities.
 
 Spectral Analysis
 ^^^^^^^^^^^^^^^^^
 
-When we train using the time-delay embedding (see the :doc:`Data Preparation tutorial <../tutorials_build/data_preparation>` for further details) we can learn spectrally distinct states. I.e. states that exhibit oscillatory activity at different frequencies. We can estimate the power spectral density (PSD) of each state using the unprepared training data (i.e. before time-delay emebdding) and the hidden state time course. We normally a **multitaper** approach for this. This involves a few steps:
+When we train using the time-delay embedding (see the :doc:`Data Preparation tutorial <../tutorials_build/data_prepare_meg>` for further details) we can learn spectrally distinct states. I.e. states that exhibit oscillatory activity at different frequencies. We can estimate the power spectral density (PSD) of each state using the unprepared training data (i.e. before time-delay emebdding) and the hidden state time course. We normally a **multitaper** approach for this. This involves a few steps:
 
 - Multiple the (unprepared) training data by the hidden state time course (or state probability time course). This essentially picks out the time points that corresponds to when the state is activity.
 - Split the time series into windows with no overlap. Typically we use twice the sampling frequency for the window length to give us a frequency resolution of 0.5 Hz.
@@ -101,7 +101,7 @@ When we train using the time-delay embedding (see the :doc:`Data Preparation tut
 
 The above is performed in the `analysis.spectral.multitaper_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.multitaper_spectra>`_ function in osl-dynamics.
 
-We find high frequency activity (above ~25 Hz) sometimes leads to noisy estimates for coherence networks. To remove this noise, we often use a non-negative matrix factorization (NNMF) approach to separate different bands of oscillatory activity. These bands are sometimes referred to as 'spectral components'. The :doc:`HMM Coherence Analysis tutorial <../tutorials_build/hmm_coherence_analysis>` goes into this in more detail.
+We find high frequency activity (above ~25 Hz) sometimes leads to noisy estimates for coherence networks. To remove this noise, we often use a non-negative matrix factorization (NNMF) approach to separate different bands of oscillatory activity. These bands are sometimes referred to as 'spectral components'. The :doc:`HMM Plotting MEG Networks tutorial <../tutorials_build/hmm_plotting_meg_networks>` goes into this in more detail.
 
 **When calculating power and coherence maps for HMM states the multitaper and NNMF approach is recommended.**
 
