@@ -2,7 +2,7 @@
 DyNeMo: Training
 ================
 
-This tutorial covers how to train a Hidden Markov Model (HMM). We will use MEG data in this tutorial, however, this can easily be substituted with fMRI data.
+This tutorial covers how to train a DyNeMo model. We will use MEG data in this tutorial, however, this can easily be substituted with fMRI data.
 """
 
 #%%
@@ -42,10 +42,15 @@ get_data("notts_mrc_meguk_glasser_prepared")
 
 from osl_dynamics.data import Data
 
-data = Data("notts_mrc_meguk_glasser_prepared")
+data = Data(
+    "notts_mrc_meguk_glasser_prepared",
+    n_jobs=4,
+)
 print(data)
 
 #%%
+# Note, we can pass `use_tfrecord=True` when creating the Data object if we are training on large datasets and run into an out of memory error.
+#
 # Fitting DyNeMo
 # ^^^^^^^^^^^^^^
 #
@@ -89,7 +94,7 @@ config = Config(
     n_kl_annealing_epochs=10,
     batch_size=32,
     learning_rate=0.01,
-    n_epochs=10,
+    n_epochs=20,
 )
 
 #%%
@@ -140,5 +145,15 @@ model.save("results/model")
 #
 #     from osl_dynamics.models import load
 #
-#     # Load the trained model
 #     model = load("results/model")
+#
+# It's also useful to save the variational free energy to compare different runs.
+
+import pickle
+
+free_energy = model.free_energy(data)
+
+history["free_energy"] = free_energy
+
+pickle.dump(history, open("results/model/history.pkl", "wb"))
+

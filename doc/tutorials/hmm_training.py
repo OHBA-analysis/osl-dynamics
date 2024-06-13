@@ -2,7 +2,7 @@
 HMM: Training
 =============
 
-This tutorial covers how to train a Hidden Markov Model (HMM). We will use MEG data in this tutorial, however, this can easily be substituted with fMRI data.
+This tutorial covers how to train an HMM. We will use MEG data in this tutorial, however, this can easily be substituted with fMRI data.
 """
 
 #%%
@@ -42,24 +42,30 @@ get_data("notts_mrc_meguk_glasser_prepared")
 
 from osl_dynamics.data import Data
 
-data = Data("notts_mrc_meguk_glasser_prepared")
+data = Data(
+    "notts_mrc_meguk_glasser_prepared",
+    n_jobs=4,
+)
 print(data)
 
 #%%
+# Note, we can pass `use_tfrecord=True` when creating the Data object if we are training on large datasets and run into an out of memory error.
+#
 # Fitting an HMM
 # ^^^^^^^^^^^^^^
 #
 # The Config object
 # *****************
-# Let's build a model to train. To do this we first need to specify the `Config object <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html#osl_dynamics.models.hmm.Config>`_ for the HMM. This is a class that acts as a container for all hyperparameters of a model. The API reference guide lists all the arguments for a Config object. There are a lot of arguments that can be passed to this class, however, a lot of them have good default values you don't need to change.
+# First need to specify the `Config object <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html#osl_dynamics.models.hmm.Config>`_ for the HMM. This is a class that acts as a container for all hyperparameters of a model. The API reference guide lists all the arguments for a Config object. There are a lot of arguments that can be passed to this class, however, a lot of them have good default values you don't need to change.
 #
-# An important hyperparameters to specify is `n_states`, which the number of states. We advise starting with something between 6-14 and making sure any results based on the HMM are not critically sensitive to the choice for `n_states`. In this tutorial, we'll use 8 states.
+# An important hyperparameters to specify is `n_states`, which the number of states. We advise starting with something between 6-14 and making sure any results based on the HMM are not critically sensitive to the choice for `n_states`. In this tutorial, we’ll use 8 states.
 #
-# The `sequence_length` and `batch_size` can be chosen to ensure the model fits into memory. 
+# The `sequence_length` and `batch_size` can be chosen to ensure the model fits into memory.
 
 
 from osl_dynamics.models.hmm import Config
 
+# Create a config object
 config = Config(
     n_states=8,
     n_channels=data.n_channels,
@@ -132,5 +138,15 @@ model.save("results/model")
 #
 #     from osl_dynamics.models import load
 #
-#     # Load the trained model
-#     model = load("results/model")
+#     model = load("trained_model")
+#
+# It's also useful to save the variational free energy to compare different runs.
+
+import pickle
+
+free_energy = model.free_energy(data)
+
+history["free_energy"] = free_energy
+
+pickle.dump(history, open("results/model/history.pkl", "wb"))
+
