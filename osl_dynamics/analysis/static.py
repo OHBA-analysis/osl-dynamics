@@ -1,15 +1,5 @@
 """Functions to calculate static properties of time series data.
 
-Note
-----
-This module is used in the following tutorials:
-
-- `Static Spectral Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/static_spectra_analysis.html>`_.
-- `Static Power Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/static_power_analysis.html>`_
-- `Static AEC Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/static_aec_analysis.html>`_.
 """
 
 import logging
