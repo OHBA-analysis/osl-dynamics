@@ -1,17 +1,5 @@
 """Functions to calculate and plot network connectivity.
 
-Note
-----
-This module is used in the following tutorials:
-
-- `Static AEC Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/static_aec_analysis.html>`_.
-- `Sliding Window Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/sliding_window_analysis.html>`_.
-- `HMM Coherence Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/hmm_coherence_analysis.html>`_.
-- `DyNeMo Plotting Networks <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/dynemo_plotting_networks.html>`_.
 """
 
 import os

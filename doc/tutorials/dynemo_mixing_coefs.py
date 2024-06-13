@@ -1,57 +1,26 @@
 """
-DyNeMo: Mixing Coefficients Analysis
-====================================
+DyNeMo: Mixing Coefficients
+===========================
 
-In this tutorial we will analyse the dynamic networks inferred by DyNeMo on resting-state source reconstructed MEG data. This tutorial covers:
+In this tutorial we analyse DyNeMo mixing coefficients. This tutorial covers:
 
-1. Downloading a Trained Model
-2. Summarizing the Mixing Coefficient Time Course
-3. Binarizing the Mixing Coefficeint Time Course
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/68cxf>`_ for the expected output.
+1. Summarizing the mixing coefficient time course
+2. Binarizing the mixing coefficeint time course
 """
 
 #%%
-# Downloading a Trained Model
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# First, let's download a model that's already been trained on a resting-state dataset. See the `DyNeMo Training on Real Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_training_real_data.html>`_ for how to train DyNeMo.
-
-import os
-
-def get_trained_model(name):
-    if os.path.exists(name):
-        return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p by2tc fetch trained_models/{name}.zip")
-    os.system(f"unzip -o {name}.zip -d {name}")
-    os.remove(f"{name}.zip")
-    return f"Model downloaded to: {name}"
-
-# Download the trained model (approximately 33 MB)
-model_name = "dynemo_notts_rest_10_subj"
-get_trained_model(model_name)
-
-# List the contents of the downloaded directory
-sub_dirs = os.listdir(model_name)
-print(sub_dirs)
-for sub_dir in sub_dirs:
-    print(f"{sub_dir}:", os.listdir(f"{model_name}/{sub_dir}"))
-
-#%%
-# We can see the directory contains two sub-directories:
-#
-# - `model`: contains the trained HMM.
-# - `data`: contains the inferred mixing coefficients (`alpha.pkl`) and mode spectra (`f.npy`, `psd.npy`, `coh.npy`).
-#
-# Summarizing the Mixing Coefficient Time Course
+# Summarizing the mixing coefficient time course
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Let's start by plotting the mixing coefficients to get a feel for the description provided by DyNeMo. First, we load the inferred mixing coefficients.
 
+
 import pickle
 
-alpha = pickle.load(open(f"{model_name}/data/alpha.pkl", "rb"))
+alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
 
 #%%
 # We can use the `utils.plotting.plot_alpha <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_ to plot the mixing coefficients.
+
 
 from osl_dynamics.utils import plotting
 
@@ -65,25 +34,15 @@ plotting.plot_alpha(alpha[0], n_samples=2000)
 # ***********************************
 # To account for the difference in mode covariances we can renormalise the mixing coefficients include the 'size' of the mode covariances.
 
-import numpy as np
 
-def normalize_alpha(a, D):
-    # Calculate the weighting for each mode
-    # We use the trace of each mode covariance
-    w = np.trace(D, axis1=1, axis2=2)
-    
-    # Weight the alphas
-    wa = w[np.newaxis, ...] * a
-    
-    # Renormalize so the alphas sum to one
-    wa /= np.sum(wa, axis=1, keepdims=True)
-    return wa
+import numpy as np
+from osl_dynamics.inference import modes
 
 # Load the inferred mode covariances
 covs = np.load("dynemo_notts_rest_10_subj/data/covs.npy")
 
 # Renormalize the mixing coefficients
-norm_alpha = [normalize_alpha(a, covs) for a in alpha]
+norm_alpha = modes.reweight_alphas(alpha, covs)
 
 # Plot the renormalized mixing coefficient time course for the first subject (8 seconds)
 plotting.plot_alpha(norm_alpha[0], n_samples=2000)
@@ -95,6 +54,7 @@ plotting.plot_alpha(norm_alpha[0], n_samples=2000)
 # ******************
 # An analogous summary measure to the Hidden Markov Model's (HMM's) fractional occupancy is the time average mixing coefficient. This is the average contribution a mode makes to the total covariance. Let's calculate this for each subject.
 
+
 mean_norm_alpha = np.array([np.mean(a, axis=0) for a in norm_alpha])
 print(mean_norm_alpha)
 
@@ -103,12 +63,23 @@ print(mean_norm_alpha)
 #
 # Another summary measure we could calculate for each subject is the standard deviation of the mixing coefficient time course, which can be a measure for how variable the mixing of each modes is.
 
+
 std_norm_alpha = np.array([np.std(a, axis=0) for a in norm_alpha])
 print(std_norm_alpha)
 
 #%%
-# Binarizing the Mixing Coefficient Time Course
+# Another summary statistic is the kurtosis, which reflects spiking the in mixing coefficient time course.
+
+
+from scipy import stats
+
+kurt_norm_alpha = np.array([stat.kurtosis(a, axis=0) for a in norm_alpha])
+print(kurt_norm_alpha)
+
+#%%
+# Binarizing the mixing coefficient time course
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
 # If we convert the mixing coefficients into a binary time course for each mode (i.e. something similar to the HMM state time courses) we can calculate the usual summary statistics we did for the HMM states (fractional occupancies, lifetimes, intervals). See the `HMM Summary Statistics Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_summary_stats_analysis.html>`_ for further details.
 #
 # We have a couple options for binarizing the mixing coefficient time course:
@@ -122,6 +93,7 @@ print(std_norm_alpha)
 # ********************
 # We can use the `inference.modes.argmax_time_courses <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.argmax_time_courses>`_ function to calculate a mutually exclusive mode activation time course.
 
+
 from osl_dynamics.inference import modes
 
 # Use the mode with the largest value to define mode activations
@@ -133,6 +105,7 @@ plotting.plot_alpha(atc[0], n_samples=2000)
 #%%
 # With the mode activation time course we can calculate the usual HMM summary statistics like fractional occupancy.
 
+
 fo = modes.fractional_occupancies(atc)
 print(np.round(fo, 2))
 
@@ -142,6 +115,7 @@ print(np.round(fo, 2))
 # Binarize with a percentile threshold
 # ************************************
 # Next, let's first specify a threshold by hand. Looking at the distribution of mixing coefficients could help us evaluate a good threshold.
+
 
 import matplotlib.pyplot as plt
 
@@ -165,8 +139,10 @@ plot_hist(concat_norm_alpha, x_label="Normalized mixing coefficients")
 thres = np.array([np.percentile(a, 90, axis=0) for a in norm_alpha])
 print(thres)
 
+
 #%%
 # We see the threshold varies a lot across the subjects. Now we have the threshold, let's binarize.
+
 
 # Binarize the mixing coefficients
 thres_norm_alpha = []
@@ -181,11 +157,13 @@ plotting.plot_separate_time_series(thres_norm_alpha[0], n_samples=2000)
 #%%
 # When we threshold using a percentile with the group concatenated data, by definition the fractional occupancy equals the percentile.
 
+
 fo = modes.fractional_occupancies(thres_norm_alpha)
 print(fo)
 
 #%%
 # We see the fractional occupancy for each subject and state is 0.1, which corresponds to the segments with normalised alpha values in the top 10%. In contrast, the lifetimes are interpretable.
+
 
 mlt = modes.mean_lifetimes(thres_norm_alpha, sampling_frequency=250)
 print(mlt * 1000)  # in ms
@@ -196,6 +174,7 @@ print(mlt * 1000)  # in ms
 # Binarize with a GMM threshold
 # *****************************
 # An aternative approach is to use a two-component GMM to identify an on and off component. This involves fitting the two-component GMM to the distribution of mixing coefficients. We can do this with the `inference.modes.gmm_time_courses <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.gmm_time_courses>`_ function in osl-dynamics.
+
 
 # Binarize the mixing coefficients using a GMM
 thres_norm_alpha = modes.gmm_time_courses(norm_alpha)
@@ -210,9 +189,4 @@ print(fo)
 #%%
 # We can see the GMM thresholds identify more mode activations, which are reflected in the higher fractional occupancies.
 #
-# With a mode activation time course we can do the same analysis we did for the HMM state time courses. See the `HMM Summary Statistics Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_summary_stats_analysis.html>`_ for more details.
-#
-# Wrap Up
-# ^^^^^^^
-# - We have shown how to plot the inferred mixing coefficients and how to normalize them.
-# - We have explored various options for binarizing the mixing coefficient time courses.
+# With a mode activation time course we can do the same analysis we did for the HMM state time courses. See the `HMM Summary Statistics tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_summary_stats.html>`_ for more details.

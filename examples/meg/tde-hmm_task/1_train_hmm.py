@@ -34,7 +34,7 @@ data = Data(
 
 # Prepare data
 methods = {
-    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": 120},
     "standardize": {},
 }
 data.prepare(methods)

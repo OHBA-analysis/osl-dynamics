@@ -89,8 +89,8 @@ def gmm_time_courses(
         Should we standardize the mode time course?
     p_value : float, optional
         Used to determine a threshold. We ensure the data points assigned
-        to the 'on' component have a probability of less than :code:`p_value` of
-        belonging to the 'off' component.
+        to the 'on' component have a probability of less than :code:`p_value`
+        of belonging to the 'off' component.
     filename : str, optional
         Path to directory to plot the GMM fit plots.
     sklearn_kwargs : dict, optional
@@ -198,7 +198,7 @@ def correlate_modes(mode_time_course_1, mode_time_course_2):
 
     Given two mode time courses, calculate the correlation between each pair of
     modes in the mode time courses. The output for each value in the matrix is
-    the value :code:`numpy.corrcoef(mode_time_course_1,
+    the value :code:`numpy.corrcoef(mode_time_course_1, \
     mode_time_course_2)[0, 1]`.
 
     Parameters
@@ -232,8 +232,8 @@ def match_covariances(
     Parameters
     ----------
     covariances : tuple of np.ndarray
-        Covariance matrices to match. Each covariance must be (n_modes,
-        n_channel, n_channels).
+        Covariance matrices to match.
+        Each covariance must be (n_modes, n_channel, n_channels).
     comparison : str, optional
         Either :code:`'rv_coefficient'`, :code:`'correlation'` or
         :code:`'frobenius'`. Default is :code:`'rv_coefficient'`.
@@ -314,7 +314,7 @@ def match_vectors(*vectors, comparison="correlation", return_order=False):
         Sets of vectors to match.
         Each variable must be shape (n_vectors, n_channels).
     comparison : str, optional
-        Must be :code:`'correlation' or :code:`'cosine_similarity'`.
+        Must be :code:`'correlation'` or :code:`'cosine_similarity'`.
     return_order : bool, optional
         Should we return the order instead of the matched vectors?
 
@@ -642,17 +642,18 @@ def reweight_mtc(mtc, params, params_type):
 
     Parameters
     ----------
-    mtc : List[np.ndarray] or np.ndarray
+    mtc : list of np.ndarray or np.ndarray
         Raw mixing coefficients. Shape must be (n_sessions, n_samples, n_modes)
         or (n_samples, n_modes).
     params : np.ndarray
-        Observation model parameters. Shape must be (n_modes, n_channels, n_channels).
+        Observation model parameters.
+        Shape must be (n_modes, n_channels, n_channels).
     params_type : str
         Observation model parameters type. Either 'covariance' or 'correlation'.
 
     Returns
     -------
-    reweighted_mtc : List[np.ndarray]
+    reweighted_mtc : list of np.ndarray
         Re-weighted mixing coefficients. Shape is the same as :code:`mtc`.
     """
     if isinstance(mtc, np.ndarray):
