@@ -304,6 +304,7 @@ def multitaper_spectra(
     n_tapers=7,
     frequency_range=None,
     standardize=True,
+    calc_cpsd=False,
     calc_coh=True,
     return_weights=False,
     keepdims=False,
@@ -334,6 +335,9 @@ def multitaper_spectra(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the spectra?
+    calc_cpsd : bool, optional
+        Should we return the cross spectra for :code:`psd`?
+        If True, we force :code:`calc_coh` to False.
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
@@ -352,8 +356,9 @@ def multitaper_spectra(
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
         Power spectra for each session and state. Shape is (n_sessions,
-        n_states, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
+        n_states, n_channels, n_freq) if :code:`calc_cpsd=False`, otherwise
+        the shape is (n_sessions, n_states, n_channels, n_channels, n_freq).
+        Any axis of length 1 is removed if :code:`keepdims=False`.
     coh : np.ndarray
         Coherences for each session and state. Shape is (n_sessions, n_states,
         n_channels, n_channels, n_freq). Any axis of length 1 is removed if
@@ -412,6 +417,9 @@ def multitaper_spectra(
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
 
+    if calc_cpsd:
+        calc_coh = False
+
     # Create keyword arguments to pass to the main function
     # that calculates spectra
     kwargs = []
@@ -427,6 +435,7 @@ def multitaper_spectra(
                 "n_tapers": n_tapers,
                 "frequency_range": frequency_range,
                 "standardize": standardize,
+                "calc_cpsd": calc_cpsd,
                 "calc_coh": calc_coh,
                 "keepdims": True,
             }
@@ -1627,6 +1636,7 @@ def _multitaper(
     n_tapers=7,
     frequency_range=None,
     standardize=True,
+    calc_cpsd=False,
     calc_coh=True,
     keepdims=False,
 ):
@@ -1660,6 +1670,8 @@ def _multitaper(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the spectra?
+    calc_cpsd : bool, optional
+        Should we return the cross spectra for :code:`psd`?
     calc_coh : bool, optional
         Should we calculate the coherence between channels?
     keepdims : bool, optional
@@ -1671,7 +1683,9 @@ def _multitaper(
         Frequencies of the power spectra and coherences.
         Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra. Shape is (..., n_channels, n_freq).
+        Power spectra. Shape is (..., n_channels, n_freq) if
+        :code:`calc_cpsd=False`, otherwise the shape is
+        (..., n_channels, n_channels, n_freq).
     coh : np.ndarray
         Coherences spectra.
         Shape is (..., n_channels, n_channels, n_freq).
@@ -1704,17 +1718,17 @@ def _multitaper(
             window_length=window_length,
             step_size=step_size,
             frequency_range=frequency_range,
-            calc_cpsd=calc_coh,
+            calc_cpsd=calc_cpsd or calc_coh,
             time_half_bandwidth=time_half_bandwidth,
             n_tapers=n_tapers,
         )
 
         # Average over the time dimension
         p = np.mean(p, axis=0)
+        n_freq = p.shape[-1]
 
         if calc_coh:
             # Create a channels by channels matrix for cross PSDs
-            n_freq = p.shape[-1]
             cpsd = np.empty(
                 [n_channels, n_channels, n_freq],
                 dtype=np.complex64,
@@ -1727,6 +1741,16 @@ def _multitaper(
 
             # Calculate coherence
             coh.append(coherence_spectra(cpsd))
+
+        elif calc_cpsd:
+            cpsd = np.empty(
+                [n_channels, n_channels, n_freq],
+                dtype=np.complex64,
+            )
+            cpsd[m, n] = p
+            cpsd[n, m] = p
+            psd.append(cpsd)
+
         else:
             psd.append(p)
 
