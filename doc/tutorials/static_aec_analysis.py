@@ -6,6 +6,8 @@ In this tutorial we will perform static AEC analysis on source space MEG data. T
 
 1. Getting the data
 2. Calculating AEC networks
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/j56q3>`_ for the expected output.
 """
 
 #%%

@@ -3,6 +3,8 @@ HMM: Multitaper Spectra
 =======================
 
 In this tutorial we calculate subject and state-specific multitaper spectra using a trained HMM and **source space** data. Here, we should **not** use the prepared (e.g. TDE-PCA) data.
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/ktjzn>`_ for the expected output.
 """
 
 #%%

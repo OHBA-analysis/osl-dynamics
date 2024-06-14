@@ -10,6 +10,8 @@ In this tutorial we calculate summary statistics for dynamics:
 - Mean lifetime, which is the average duration a state is activate.
 - Mean interval, which is the average duration between successive state visits.
 - Switching rate, which is the average number of state activations.
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/27h6y>`_ for the expected output.
 """
 
 #%%

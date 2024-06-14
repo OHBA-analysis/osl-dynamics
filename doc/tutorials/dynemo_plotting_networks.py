@@ -9,6 +9,8 @@ In this tutorial we will plot networks from a DyNeMo model trained on source rec
 3. Power maps
 4. Coherence networks
 5. Coherence maps
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/p9ucj>`_ for the expected output.
 """
 
 #%%

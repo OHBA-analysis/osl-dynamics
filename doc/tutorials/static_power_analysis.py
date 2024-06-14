@@ -6,6 +6,8 @@ In this tutorial we will perform static power analysis on source space MEG data.
 
 1. Getting the data
 2. Calculating power from spectra
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/uvmpa>`_ for the expected output.
 """
 
 #%%

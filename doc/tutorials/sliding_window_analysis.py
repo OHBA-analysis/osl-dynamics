@@ -9,6 +9,8 @@ This tutorial covers:
 1. Getting the Data
 2. Estimating Networks using a Sliding Window
 3. Clustering the Networks
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/bkn32>`_ for the expected output.
 """
 
 #%%

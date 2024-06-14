@@ -6,6 +6,8 @@ MEG data is useful because it has a high temporal resolution. We can take advant
 
 1. Getting the data
 2. Calculating spectral for each subject
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/d9jpu>`_ for the expected output.
 """
 
 #%%

@@ -6,6 +6,8 @@ In this tutorial we analyse DyNeMo mixing coefficients. This tutorial covers:
 
 1. Summarizing the mixing coefficient time course
 2. Binarizing the mixing coefficeint time course
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/zktn6>`_ for the expected output.
 """
 
 #%%

@@ -9,6 +9,8 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 3. Loading Data in NumPy Format
 4. Loading Data in MATLAB Format
 5. Loading Data in fif Format
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/dvfku>`_ for the expected output.
 """
 
 #%%

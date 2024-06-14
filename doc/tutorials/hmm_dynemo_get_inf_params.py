@@ -3,6 +3,8 @@ HMM/DyNeMo: Get Inferred Parameters
 ===================================
 
 In this tutorial we will get the inferred parameters from a dynamic network model (HMM/DyNeMo).
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/gq2zw>`_ for the expected output.
 """
 
 #%%

@@ -3,6 +3,8 @@ Time-Delay Embedding
 ====================
 
 In this tutorial we will explore the impact of different settings for time-delay embedding (`n_embeddings`) and the number of principal component analysis (PCA) components (`n_pca_components`).
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/z65tn>`_ for the expected output.
 """
 
 #%%

@@ -8,6 +8,8 @@ In this tutorial we will go through common ways to prepare M/EEG data. This tuto
 2. Time-Delay Embedding (and Principal Component Analysis)
 3. Amplitude Envelope
 4. Saving and Loading Prepared Data
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/m83ze>`_ for the expected output.
 """
 
 #%%

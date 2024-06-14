@@ -10,6 +10,8 @@ In this tutorial we will plot networks from an HMM trained on source reconstruct
 4. Coherence networks
 5. Coherence maps
 6. Coherence vs Power
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/nyemq>`_ for the expected output.
 """
 
 #%%
