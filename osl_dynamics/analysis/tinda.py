@@ -550,29 +550,35 @@ def tinda(
 
     return fo_density, fo_sum, stats
 
+
 def circle_angles(order):
-   """ Compute the phase differences between states in a circular plot.
-   
+    """Compute the phase differences between states in a circular plot.
+
     Parameters
     ----------
     order : list
         List of state orders (in order of counterclockwise
         rotation).
-        
+
     Returns
     -------
     angleplot : array_like
         Array of phase differences between states in a circular plot.
-   
-   """
-   K = len(order)
-   disttoplot_manual = np.zeros(K, dtype=complex)
-   for i3 in range(K):
-        disttoplot_manual[order[i3]] = np.exp(1j*(i3+1)/K*2*np.pi)
-         
-   angleplot = np.exp(1j*(np.angle(disttoplot_manual[:, np.newaxis]).T - np.angle(disttoplot_manual[:, np.newaxis])))
-   return angleplot
 
+    """
+    K = len(order)
+    disttoplot_manual = np.zeros(K, dtype=complex)
+    for i3 in range(K):
+        disttoplot_manual[order[i3]] = np.exp(1j * (i3 + 1) / K * 2 * np.pi)
+
+    angleplot = np.exp(
+        1j
+        * (
+            np.angle(disttoplot_manual[:, np.newaxis]).T
+            - np.angle(disttoplot_manual[:, np.newaxis])
+        )
+    )
+    return angleplot
 
 
 def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
@@ -607,7 +613,7 @@ def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
 
     # make sure there are no nans:
     fo_density[np.isnan(fo_density)] = 0
-    
+
     # Compute different metrics to optimise
     metric = []
     metric.append(np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2))
@@ -639,7 +645,7 @@ def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
             if tmpv < v:
                 v = tmpv
                 ix = tmpix
-        best_sequence.append(np.roll(ix, -np.where([iix==0 for iix in ix])[0][0]))
+        best_sequence.append(np.roll(ix, -np.where([iix == 0 for iix in ix])[0][0]))
     # Return the best sequence for the chosen metric (in order of counterclockwise
     # rotation)
     return best_sequence[metric_to_use]
@@ -647,24 +653,38 @@ def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
 
 def compute_cycle_strength(angleplot, asym, relative=True, whichstate=None):
     if len(asym.shape) == 3:
-        tmp = np.stack([angleplot*asym[:,:,i] for i in range(asym.shape[2])], axis=-1)
+        tmp = np.stack(
+            [angleplot * asym[:, :, i] for i in range(asym.shape[2])], axis=-1
+        )
     else:
-        tmp = angleplot*asym
+        tmp = angleplot * asym
     if whichstate is not None:
         # Note that we are counting each (i,j) double because for the rotational
         # momentum per state we take into account (i,j) and (j,i) for all j and one
         # particular i.
-        tmp = np.squeeze(tmp[whichstate,:,]) + np.squeeze(tmp[:,whichstate])
+        tmp = np.squeeze(
+            tmp[
+                whichstate,
+                :,
+            ]
+        ) + np.squeeze(tmp[:, whichstate])
         cycle_strength = np.imag(np.nansum(tmp, axis=0))
     else:
-        cycle_strength = np.imag(np.nansum(tmp, axis=(0,1)))
+        cycle_strength = np.imag(np.nansum(tmp, axis=(0, 1)))
 
     # positive rotational momentum should indicate clockwise cycle
-    cycle_strength = -cycle_strength 
-    
-    if relative: # normalise by the theoretical maximum
-        cycle_strength = cycle_strength/np.abs(compute_cycle_strength(angleplot, np.sign(np.imag(angleplot)), relative=False, whichstate=whichstate))
-        
+    cycle_strength = -cycle_strength
+
+    if relative:  # normalise by the theoretical maximum
+        cycle_strength = cycle_strength / np.abs(
+            compute_cycle_strength(
+                angleplot,
+                np.sign(np.imag(angleplot)),
+                relative=False,
+                whichstate=whichstate,
+            )
+        )
+
     return cycle_strength
 
 
