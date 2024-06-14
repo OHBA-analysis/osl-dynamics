@@ -9,7 +9,7 @@ Citation
 
 If you find this toolbox useful, please cite:
 
-    **Gohil C., Huang R., Roberts E., van Es M.W.J., Quinn A.J., Vidaurre D., Woolrich M.W. (2023) osl-dynamics: A toolbox for modelling fast dynamic brain activity. eLife 12:RP91949 https://doi.org/10.7554/eLife.91949.2**
+    **Chetan Gohil, Rukuang Huang, Evan Roberts, Mats WJ van Es, Andrew J Quinn, Diego Vidaurre, Mark W Woolrich (2024) osl-dynamics, a toolbox for modeling fast dynamic brain activity eLife 12:RP91949.**
 
 Installation
 ============
@@ -51,11 +51,11 @@ If you have already installed `OSL <https://github.com/OHBA-analysis/osl>`_ you 
 
     conda activate osl
     cd osl-dynamics
-    pip install tensorflow==2.9.1
-    pip install tensorflow-probability==0.17
+    pip install tensorflow==2.11.0
+    pip install tensorflow-probability==0.19.0
     pip install -e .
 
-Note, if you're using a Mac computer you need to install TensorFlow with ``pip install tensorflow-macos==2.9.1`` instead of ``tensorflow==2.9.1``.
+Note, if you're using a Mac computer you need to install TensorFlow with ``pip install tensorflow-macos==2.11.0`` instead of ``tensorflow==2.11.0``.
 
 Removing osl-dynamics
 ---------------------

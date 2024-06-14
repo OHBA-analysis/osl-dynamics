@@ -92,7 +92,7 @@ There are three common choices for preparing the data:
 
 #. **Calculate time-delay embedded data, followed by principal component analysis and standardization**. Time-delay embedding is described in the 'What is time-delay embedding?' section below. **This is the recommended approach for studying source-space M/EEG data**.
 
-The :doc:`Preparing Data tutorial <tutorials_build/data_preparation>` covers how to prepare data using the three options.
+The :doc:`Preparing Data tutorial <tutorials_build/data_prepare_meg>` covers how to prepare data using the three options.
 
 What is time-delay embedding?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -117,7 +117,7 @@ However, we find with electrophysiological data that there aren't very many narr
 
 In summary, increasing the number of embeddings will increase your ability to resolve smaller differences in the power spectrum in different HMM/DyNeMo states/modes.
 
-See the :doc:`Preparing Data tutorial <tutorials_build/data_preparation>` for example code comparing different TDE settings.
+See the :doc:`Preparing Data tutorial <tutorials_build/data_prepare_meg>` for example code comparing different TDE settings.
 
 What is the minimum number of channels/lags required for time-delay embedding?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -126,7 +126,7 @@ Time-delay embedding (TDE) can be applied to any number of channels down to one.
 
 It is helpful to consider an example to understand how to make the choice for the number of lags. If your data is sampled at 250 Hz and you TDE a channel with 15 embeddings (±7 lags), you estimate 15 data points in your auto-correlation function, which is equivalent to a power spectrum estimated at 15 evenly distribution frequencies across the range -125 Hz to 125 Hz. Your frequency resolution is therefore approximately 17 Hz. The HMM/DyNeMo will be able to learn states with different activity in the 0-17 Hz band, 17-34 Hz, band, 34-51 Hz, etc. The choice for the number embeddings must be sufficiently large enough for you to resolve the frequency ranges you are interested.
 
-See the :doc:`Preparing Data tutorial <tutorials_build/data_preparation>` for example code comparing different TDE settings.
+See the :doc:`Preparing Data tutorial <tutorials_build/data_prepare_meg>` for example code comparing different TDE settings.
 
 Why doesn't the number of time points in my inferred alphas match the original data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -138,7 +138,7 @@ The process of preparing the data before training a model can lead to the loss a
 
 Note, we have a separate time series for each subject, so we lose these data points from each subject separately. In addition to the data point lost above, before we train a model we separate the time series into sequences. We lose the data points **at the end** that do not form a complete sequence.
 
-The alphas inferred by a model are learnt using the shortened data, which causes the mismatch. The :doc:`HMM: Training on Real Data tutorial <tutorials_build/hmm_training_real_data>` goes through code for how to align the inferred alphas to the original data.
+The alphas inferred by a model are learnt using the shortened data, which causes the mismatch. The :doc:`HMM: Training on Real Data tutorial <tutorials_build/hmm_training>` goes through code for how to align the inferred alphas to the original data.
 
 Note, you can trim data using the :code:`Data.trim_time_series` method, example use::
 
@@ -277,7 +277,7 @@ It is common to look at four summary statistics:
 - The **mean interval**, which is the average duration between successive state visits.
 - The **switching rate**, which is the average number of visits to a state per second.
 
-Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <tutorials_build/hmm_summary_stats_analysis>` for example code of how to calculate these quantities.
+Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <tutorials_build/hmm_summary_stats>` for example code of how to calculate these quantities.
 
 Often, we are interested in comparing two groups or conditions. E.g. we might find static alpha (8-12 Hz) power is increased for one group/condition. Let's speculate there are segments in our data where alpha power bursts occur - this would be identified by the HMM as a state with high alpha power that only activates for particular segments. The increase in alpha power seen for a group/condition can arise in many ways, maybe the alpha bursts are longer in duration, maybe they're more frequency, maybe the dynamics are unchanged but the alpha state just has more alpha power in it. The different summary statistics can potentially help interpret which of these options it is.
 

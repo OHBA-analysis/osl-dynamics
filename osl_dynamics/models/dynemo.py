@@ -2,17 +2,6 @@
 
 See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
 /dynemo.html>`_ for a description of this model.
-
-See Also
---------
-- C. Gohil, et al., "Mixtures of large-scale functional brain network modes".
-  `Neuroimage 263, 119595 (2022) <https://www.sciencedirect.com/science\
-  /article/pii/S1053811922007108>`_.
-- Tutorials demonstrating DyNeMo's ability to learn `long-range temporal
-  structure <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
-  /dynemo_long_range_dep_simulation.html>`_ and a `soft mixture of modes
-  <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build\
-  /dynemo_soft_mix_simulation.html>`_.
 """
 
 import os

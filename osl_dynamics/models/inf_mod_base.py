@@ -585,7 +585,7 @@ class VariationalInferenceModelBase(ModelBase):
         if not self.config.multiple_dynamics:
             return_names = ["ll_loss", "kl_loss", "theta"]
         else:
-            return_names = ["ll_loss", "kl_loss", "mean_theta", "fc_theta"]
+            return_names = ["ll_loss", "kl_loss", "power_theta", "fc_theta"]
         predictions_dict = dict(zip(return_names, predictions))
 
         return predictions_dict
@@ -686,8 +686,8 @@ class VariationalInferenceModelBase(ModelBase):
 
         Returns
         -------
-        mean_theta : list or np.ndarray
-            Mode mixing logits for mean with shape (n_sessions, n_samples,
+        power_theta : list or np.ndarray
+            Mode mixing logits for power with shape (n_sessions, n_samples,
             n_modes) or (n_samples, n_modes).
         fc_theta : list or np.ndarray
             Mode mixing logits for FC with shape (n_sessions, n_samples,
@@ -718,32 +718,32 @@ class VariationalInferenceModelBase(ModelBase):
             iterator = range(n_datasets)
             _logger.info("Getting mode logits")
 
-        mean_theta = []
+        power_theta = []
         fc_theta = []
         for i in iterator:
             predictions = self.predict(dataset[i], **kwargs)
-            mean_theta_ = predictions["mean_theta"]
+            power_theta_ = predictions["power_theta"]
             fc_theta_ = predictions["fc_theta"]
             if remove_edge_effects:
                 trim = step_size // 2  # throw away 25%
-                mean_theta_ = (
-                    [mean_theta_[0, :-trim]]
-                    + list(mean_theta_[1:-1, trim:-trim])
-                    + [mean_theta_[-1, trim:]]
+                power_theta_ = (
+                    [power_theta_[0, :-trim]]
+                    + list(power_theta_[1:-1, trim:-trim])
+                    + [power_theta_[-1, trim:]]
                 )
                 fc_theta_ = (
                     [fc_theta_[0, :-trim]]
                     + list(fc_theta_[1:-1, trim:-trim])
                     + [fc_theta_[-1, trim:]]
                 )
-            mean_theta.append(np.concatenate(mean_theta_))
+            power_theta.append(np.concatenate(power_theta_))
             fc_theta.append(np.concatenate(fc_theta_))
 
-        if concatenate or len(mean_theta) == 1:
-            mean_theta = np.concatenate(mean_theta)
+        if concatenate or len(power_theta) == 1:
+            power_theta = np.concatenate(power_theta)
             fc_theta = np.concatenate(fc_theta)
 
-        return mean_theta, fc_theta
+        return power_theta, fc_theta
 
     def get_alpha(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
@@ -830,11 +830,11 @@ class VariationalInferenceModelBase(ModelBase):
             Prediction data. This can be a list of datasets, one for each
             session.
         concatenate : bool, optional
-            Should we concatenate alpha/gamma for each session?
+            Should we concatenate alpha/beta for each session?
         remove_edge_effects : bool, optional
             Edge effects can arise due to separating the data into sequences.
             We can remove these by predicting overlapping :code:`alpha`/
-            :code:`gamma` and disregarding the :code:`alpha`/:code:`gamma` near
+            :code:`beta` and disregarding the :code:`alpha`/:code:`beta` near
             the ends. Passing :code:`True` does this by using sequences with 50%
             overlap and throwing away the first and last 25% of predictions.
 
@@ -843,8 +843,8 @@ class VariationalInferenceModelBase(ModelBase):
         alpha : list or np.ndarray
             Alpha time course with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
-        gamma : list or np.ndarray
-            Gamma time course with shape (n_sessions, n_samples, n_modes) or
+        beta : list or np.ndarray
+            Beta time course with shape (n_sessions, n_samples, n_modes) or
             (n_samples, n_modes).
         """
         if self.is_multi_gpu:
@@ -864,7 +864,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         dataset = self.make_dataset(dataset, step_size=step_size)
         alpha_layer = self.model.get_layer("alpha")
-        gamma_layer = self.model.get_layer("gamma")
+        beta_layer = self.model.get_layer("beta")
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
@@ -875,13 +875,13 @@ class VariationalInferenceModelBase(ModelBase):
             _logger.info("Getting mode time courses")
 
         alpha = []
-        gamma = []
+        beta = []
         for i in iterator:
             predictions = self.predict(dataset[i], **kwargs)
-            mean_theta = predictions["mean_theta"]
+            power_theta = predictions["power_theta"]
             fc_theta = predictions["fc_theta"]
-            alpha_ = alpha_layer(mean_theta)
-            gamma_ = gamma_layer(fc_theta)
+            alpha_ = alpha_layer(power_theta)
+            beta_ = beta_layer(fc_theta)
             if remove_edge_effects:
                 trim = step_size // 2  # throw away 25%
                 alpha_ = (
@@ -889,19 +889,19 @@ class VariationalInferenceModelBase(ModelBase):
                     + list(alpha_[1:-1, trim:-trim])
                     + [alpha_[-1, trim:]]
                 )
-                gamma_ = (
-                    [gamma_[0, :-trim]]
-                    + list(gamma_[1:-1, trim:-trim])
-                    + [gamma_[-1, trim:]]
+                beta_ = (
+                    [beta_[0, :-trim]]
+                    + list(beta_[1:-1, trim:-trim])
+                    + [beta_[-1, trim:]]
                 )
             alpha.append(np.concatenate(alpha_))
-            gamma.append(np.concatenate(gamma_))
+            beta.append(np.concatenate(beta_))
 
         if concatenate or len(alpha) == 1:
             alpha = np.concatenate(alpha)
-            gamma = np.concatenate(gamma)
+            beta = np.concatenate(beta)
 
-        return alpha, gamma
+        return alpha, beta
 
     def losses(self, dataset, **kwargs):
         """Calculates the log-likelihood and KL loss for a dataset.

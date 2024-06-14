@@ -312,6 +312,193 @@ def train_dynemo(
         save(f"{inf_params_dir}/covs.npy", covs)
 
 
+def train_mdynemo(
+    data,
+    output_dir,
+    config_kwargs,
+    init_kwargs=None,
+    fit_kwargs=None,
+    corrs_init_kwargs=None,
+    save_inf_params=True,
+):
+    """Train `MDyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
+        /osl_dynamics/models/mdynemo/index.html>`_. This function will:
+    
+    1. Build an :code:`mdynemo.Model` object.
+    2. Initialize the mode correlations using sliding window and KMeans.
+    3. Initialize the parameters of the model using
+        :code:`Model.random_subset_initialization`.
+    4. Perform full training.
+    5. Save the inferred parameters (mode time courses, means, stds and corrs)
+        if :code:`save_inf_params=True`.
+
+    This function will create two directories:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+
+    Parameters
+    ----------
+    data : osl_dynamics.data.Data
+        Data object for training the model.
+    output_dir : str
+        Path to output directory.
+    config_kwargs : dict
+        Keyword arguments to pass to `mdynemo.Config <https://osl-dynamics\
+        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/mdynemo\
+        /index.html#osl_dynamics.models.mdynemo.Config>`_. Defaults to::
+
+            {
+                'n_channels': data.n_channels,
+                'sequence_length': 200,
+                'inference_n_units': 64,
+                'inference_normalization': 'layer',
+                'model_n_units': 64,
+                'model_normalization': 'layer',
+                'do_kl_annealing': True,
+                'kl_annealing_curve': 'tanh',
+                'kl_annealing_sharpness': 10,
+                'n_kl_annealing_epochs': 20,
+                'batch_size': 128,
+                'learning_rate': 0.01,
+                'lr_decay': 0.1,
+                'n_epochs': 40,
+            }.
+    init_kwargs : dict, optional
+        Keyword arguments to pass to :code:`Model.random_subset_initialization`.
+        Defaults to::
+
+            {'n_init': 5, 'n_epochs': 5, 'take': 1}.
+    fit_kwargs : dict, optional
+        Keyword arguments to pass to the :code:`Model.fit`.
+    corrs_init_kwargs : dict, optional
+        Keyword arguments to pass to the mode correlations
+        initialisation. Defaults to::
+
+            {
+                'window_length': data.sampling_frequency * 2,
+                'step_size': data.sampling_frequency // 25,
+                'random_state': None,
+                'n_init': 'auto',
+                'init': 'k-means++',
+            }.
+    save_inf_params : bool, optional
+        Should we save the inferred parameters?
+    """
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    from osl_dynamics.models import mdynemo
+    from osl_dynamics.analysis import connectivity
+    from sklearn.cluster import KMeans
+
+    init_kwargs = {} if init_kwargs is None else init_kwargs
+    fit_kwargs = {} if fit_kwargs is None else fit_kwargs
+    corrs_init_kwargs = {} if corrs_init_kwargs is None else corrs_init_kwargs
+
+    # Directories
+    model_dir = output_dir + "/model"
+    inf_params_dir = output_dir + "/inf_params"
+
+    _logger.info("Building model")
+    default_config_kwargs = {
+        "n_channels": data.n_channels,
+        "sequence_length": 200,
+        "inference_n_units": 64,
+        "inference_normalization": "layer",
+        "model_n_units": 64,
+        "model_normalization": "layer",
+        "do_kl_annealing": True,
+        "kl_annealing_curve": "tanh",
+        "kl_annealing_sharpness": 10,
+        "n_kl_annealing_epochs": 20,
+        "batch_size": 128,
+        "learning_rate": 0.01,
+        "lr_decay": 0.1,
+        "n_epochs": 40,
+    }
+    config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
+    _logger.info(f"Using config_kwargs: {config_kwargs}")
+    config = mdynemo.Config(**config_kwargs)
+    config.pca_components = data.pca_components
+
+    # KMeans to intialise corrs
+    _logger.info("Initialising corrs")
+    default_corrs_init_kwargs = {
+        "window_length": data.sampling_frequency * 2,
+        "step_size": data.sampling_frequency // 25,
+        "random_state": None,
+        "n_init": "auto",
+        "init": "k-means++",
+    }
+    corrs_init_kwargs = override_dict_defaults(
+        default_corrs_init_kwargs, corrs_init_kwargs
+    )
+    _logger.info(f"Using corrs_init_kwargs: {corrs_init_kwargs}")
+    tv_corr = connectivity.sliding_window_connectivity(
+        data.time_series(),
+        window_length=corrs_init_kwargs["window_length"],
+        step_size=corrs_init_kwargs["step_size"],
+        conn_type="corr",
+        concatenate=True,
+        n_jobs=data.n_jobs,
+    )
+    tv_corr = np.reshape(tv_corr, (tv_corr.shape[0], -1))
+    kmeans = KMeans(
+        n_clusters=config.n_corr_modes,
+        n_init=corrs_init_kwargs["n_init"],
+        init=corrs_init_kwargs["init"],
+        random_state=corrs_init_kwargs["random_state"],
+    ).fit(tv_corr)
+    initial_corrs = kmeans.cluster_centers_.reshape(
+        config.n_corr_modes, data.n_channels, data.n_channels
+    )
+    initial_corrs = array_ops.cov2corr(initial_corrs)
+    config.initial_corrs = (
+        config.pca_components @ initial_corrs @ config.pca_components.T
+    )
+
+    model = mdynemo.Model(config)
+    model.summary()
+
+    # Initialisation
+    default_init_kwargs = {"n_init": 5, "n_epochs": 5, "take": 1}
+    init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
+    _logger.info(f"Using init_kwargs: {init_kwargs}")
+    init_history = model.random_subset_initialization(data, **init_kwargs)
+
+    # Keyword arguments for the fit method
+    default_fit_kwargs = {}
+    fit_kwargs = override_dict_defaults(default_fit_kwargs, fit_kwargs)
+    _logger.info(f"Using fit_kwargs: {fit_kwargs}")
+
+    # Training
+    history = model.fit(data, **fit_kwargs)
+
+    # Add free energy to the history object
+    history["free_energy"] = model.free_energy(data)
+
+    # Save trained model
+    model.save(model_dir)
+    save(f"{model_dir}/init_history.pkl", init_history)
+    save(f"{model_dir}/history.pkl", history)
+
+    if save_inf_params:
+        del model
+        model = mdynemo.Model.load(model_dir)
+        os.makedirs(inf_params_dir, exist_ok=True)
+
+        # Get the inferred parameters
+        alpha, beta = model.get_mode_time_courses(data)
+        means, stds, corrs = model.get_means_stds_corrs()
+
+        save(f"{inf_params_dir}/alp.pkl", alpha)
+        save(f"{inf_params_dir}/bet.pkl", beta)
+        save(f"{inf_params_dir}/means.npy", means)
+        save(f"{inf_params_dir}/stds.npy", stds)
+        save(f"{inf_params_dir}/corrs.npy", corrs)
+
+
 def train_hive(
     data,
     output_dir,

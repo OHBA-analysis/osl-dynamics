@@ -388,7 +388,7 @@ class MDyn_HMM_MVN(Simulation):
             stay_prob=stay_prob,
             n_states=self.n_states,
         )
-        self.gamma_hmm = HMM(
+        self.beta_hmm = HMM(
             trans_prob=trans_prob,
             stay_prob=stay_prob,
             n_states=self.n_states,
@@ -399,9 +399,9 @@ class MDyn_HMM_MVN(Simulation):
 
         # Simulate state time courses
         alpha = self.alpha_hmm.generate_states(self.n_samples)
-        gamma = self.gamma_hmm.generate_states(self.n_samples)
+        beta = self.beta_hmm.generate_states(self.n_samples)
 
-        self.state_time_course = np.array([alpha, gamma])
+        self.state_time_course = np.array([alpha, beta])
 
         # Simulate data
         self.time_series = self.obs_mod.simulate_data(self.state_time_course)
@@ -538,6 +538,9 @@ class MSess_HMM_MVN(Simulation):
         Number of channels.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
+    embedding_vectors : np.ndarray, optional
+        Embedding vectors for each state, shape should be
+        (n_states, embeddings_dim).
     n_sessions : int, optional
         Number of sessions.
     embeddings_dim : int
@@ -570,6 +573,7 @@ class MSess_HMM_MVN(Simulation):
         n_modes=None,
         n_channels=None,
         n_covariances_act=1,
+        embedding_vectors=None,
         n_sessions=None,
         embeddings_dim=None,
         spatial_embeddings_dim=None,
@@ -590,6 +594,7 @@ class MSess_HMM_MVN(Simulation):
             n_modes=n_states,
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
+            embedding_vectors=embedding_vectors,
             n_sessions=n_sessions,
             embeddings_dim=embeddings_dim,
             spatial_embeddings_dim=spatial_embeddings_dim,

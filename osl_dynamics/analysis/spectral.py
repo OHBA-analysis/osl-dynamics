@@ -197,7 +197,7 @@ def welch_spectra(
             for i in range(len(alpha)):
                 if alpha[i].shape[0] != data[i].shape[0]:
                     raise ValueError(
-                        "items in data and alpha must have the same shape."
+                        "items in data and alpha must have the number of samples."
                     )
 
     elif isinstance(data, list):
@@ -205,7 +205,7 @@ def welch_spectra(
 
     if isinstance(data, np.ndarray):
         if alpha is not None and alpha.shape[0] != data.shape[0]:
-            raise ValueError("data and alpha must have the same shape.")
+            raise ValueError("data and alpha must have the number of samples.")
 
         if data.ndim == 2:
             data = [data]
@@ -387,7 +387,7 @@ def multitaper_spectra(
             for i in range(len(alpha)):
                 if alpha[i].shape[0] != data[i].shape[0]:
                     raise ValueError(
-                        "items in data and alpha must have the same shape."
+                        "items in data and alpha must have the same number of samples."
                     )
 
     elif isinstance(data, list):
@@ -395,7 +395,7 @@ def multitaper_spectra(
 
     if isinstance(data, np.ndarray):
         if alpha is not None and alpha.shape[0] != data.shape[0]:
-            raise ValueError("data and alpha must have the same shape.")
+            raise ValueError("data and alpha must have the number of samples.")
 
         if data.ndim == 2:
             data = [data]
@@ -589,11 +589,13 @@ def regression_spectra(
         # Check the number of samples in data and alpha
         for i in range(len(alpha)):
             if alpha[i].shape[0] != data[i].shape[0]:
-                raise ValueError("items in data and alpha must have the same shape.")
+                raise ValueError(
+                    "items in data and alpha must have the number of samples."
+                )
 
     if isinstance(data, np.ndarray):
         if alpha.shape[0] != data.shape[0]:
-            raise ValueError("data and alpha must have the same shape.")
+            raise ValueError("data and alpha must have the number of samples.")
 
         if data.ndim == 2:
             data = [data]

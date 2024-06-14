@@ -151,7 +151,7 @@ def load_tfrecord_dataset(
     validation_split=None,
     concatenate=True,
     drop_last_batch=False,
-    buffer_size=100000,
+    buffer_size=4000,
     keep=None,
 ):
     """Load a TFRecord dataset.
@@ -279,17 +279,15 @@ def load_tfrecord_dataset(
             return full_dataset.prefetch(tf.data.AUTOTUNE)
 
         else:
-            # Calculate how many batches should be in the training dataset
-            dataset_size = dtf.get_n_batches(full_dataset)
-            training_dataset_size = round((1.0 - validation_split) * dataset_size)
-
             # Split the dataset into training and validation datasets
-            training_dataset = full_dataset.take(training_dataset_size)
-            validation_dataset = full_dataset.skip(training_dataset_size)
+            training_dataset, validation_dataset = tf.keras.utils.split_dataset(
+                full_dataset,
+                right_size=validation_split,
+            )
             _logger.info(
-                f"{training_dataset_size} batches in training dataset, "
-                + f"{dataset_size - training_dataset_size} batches in the validation "
-                + "dataset."
+                f"{len(training_dataset)} batches in training dataset, "
+                f"{len(validation_dataset)} batches in the validation "
+                "dataset."
             )
             return training_dataset.prefetch(
                 tf.data.AUTOTUNE
@@ -326,18 +324,14 @@ def load_tfrecord_dataset(
             training_datasets = []
             validation_datasets = []
             for i, ds in enumerate(full_datasets):
-                # Calculate how many batches should be in the training dataset
-                dataset_size = dtf.get_n_batches(ds)
-                training_dataset_size = round((1.0 - validation_split) * dataset_size)
-
-                # Split the dataset into training and validation datasets
-                training_datasets.append(ds.take(training_dataset_size))
-                validation_datasets.append(ds.skip(training_dataset_size))
+                tds, vds = tf.keras.utils.split_dataset(
+                    full_datasets[i],
+                    right_size=validation_split,
+                )
                 _logger.info(
                     f"Session {i}: "
-                    + f"{training_dataset_size} batches in training dataset, "
-                    + f"{dataset_size - training_dataset_size} batches in the validation "
-                    + "dataset."
+                    f"{len(tds)} batches in training dataset, "
+                    f"{len(vds)} batches in the validation dataset."
                 )
 
             return training_datasets, validation_datasets

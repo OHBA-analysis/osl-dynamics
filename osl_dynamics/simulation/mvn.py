@@ -251,9 +251,9 @@ class MDyn_MVN(MVN):
             observation_error=observation_error,
         )
 
-        # Get the std and FC from self.covariance
+        # Get the stds and corrs from self.covariance
         self.stds = array_ops.cov2std(self.covariances)
-        self.fcs = array_ops.cov2corr(self.covariances)
+        self.corrs = array_ops.cov2corr(self.covariances)
 
     def simulate_data(self, state_time_courses):
         """Simulates data.
@@ -284,14 +284,14 @@ class MDyn_MVN(MVN):
         for time_courses in np.unique(state_time_courses, axis=0):
             # Extract the different time courses
             alpha = time_courses[:, 0]
-            gamma = time_courses[:, 1]
+            beta = time_courses[:, 1]
 
-            # Mean, standard deviation, FC for this combination of time courses
+            # Mean, standard deviation, corr for this combination of time courses
             mu = np.sum(self.means * alpha[:, np.newaxis], axis=0)
             G = np.diag(np.sum(self.stds * alpha[:, np.newaxis], axis=0))
-            F = np.sum(self.fcs * gamma[:, np.newaxis, np.newaxis], axis=0)
+            F = np.sum(self.corrs * beta[:, np.newaxis, np.newaxis], axis=0)
 
-            # Calculate covariance matrix from the standard deviation and FC
+            # Calculate covariance matrix from the standard deviation and corr
             sigma = G @ F @ G
 
             # Generate data for the time points that this combination of states
@@ -341,13 +341,13 @@ class MDyn_MVN(MVN):
         for time_courses in np.unique(state_time_courses, axis=0):
             # Extract the different time courses
             alpha = time_courses[:, 0]
-            gamma = time_courses[:, 1]
+            beta = time_courses[:, 1]
 
-            # Mean, standard deviation, FC for this combination of time courses
+            # Mean, standard deviation, corr for this combination of time courses
             G = np.diag(np.sum(self.stds * alpha[:, np.newaxis], axis=0))
-            F = np.sum(self.fcs * gamma[:, np.newaxis, np.newaxis], axis=0)
+            F = np.sum(self.corrs * beta[:, np.newaxis, np.newaxis], axis=0)
 
-            # Calculate covariance matrix from the standard deviation and FC
+            # Calculate covariance matrix from the standard deviation and corr
             sigma = G @ F @ G
 
             inst_covs[np.all(state_time_courses == time_courses, axis=(1, 2))] = sigma
@@ -375,6 +375,9 @@ class MSess_MVN(MVN):
         Number of channels.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
+    embedding_vectors : np.ndarray, optional
+        Embedding vectors for each session, shape should be
+        (n_sessions, embeddings_dim).
     n_sessions : int, optional
         Number of sessions.
     embeddings_dim : int, optional
@@ -400,6 +403,7 @@ class MSess_MVN(MVN):
         n_modes=None,
         n_channels=None,
         n_covariances_act=1,
+        embedding_vectors=None,
         n_sessions=None,
         embeddings_dim=None,
         spatial_embeddings_dim=None,
@@ -415,6 +419,12 @@ class MSess_MVN(MVN):
         self.embeddings_scale = embeddings_scale
         self.n_groups = n_groups
         self.between_group_scale = between_group_scale
+
+        if embedding_vectors is not None:
+            n_sessions = embedding_vectors.shape[0]
+            self.n_sessions = n_sessions
+            embeddings_dim = embedding_vectors.shape[1]
+            self.embeddings_dim = embeddings_dim
 
         # Both the session means and covariances were passed as numpy arrays
         if isinstance(session_means, np.ndarray) and isinstance(
@@ -468,8 +478,8 @@ class MSess_MVN(MVN):
             self.n_modes = session_means.shape[1]
             self.n_channels = session_means.shape[2]
 
-            self.validate_embedding_parameters()
-            self.create_embeddings()
+            self.validate_embedding_parameters(embedding_vectors)
+            self.create_embeddings(embedding_vectors)
 
             self.group_means = None
             self.session_means = session_means
@@ -486,8 +496,8 @@ class MSess_MVN(MVN):
             self.n_channels = session_covariances.shape[2]
 
             if not session_means == "zero":
-                self.validate_embedding_parameters()
-                self.create_embeddings()
+                self.validate_embedding_parameters(embedding_vectors)
+                self.create_embeddings(embedding_vectors)
 
             self.group_means = super().create_means(session_means)
             self.session_means = self.create_session_means(session_means)
@@ -509,8 +519,8 @@ class MSess_MVN(MVN):
             self.n_modes = n_modes
             self.n_channels = n_channels
 
-            self.validate_embedding_parameters()
-            self.create_embeddings()
+            self.validate_embedding_parameters(embedding_vectors)
+            self.create_embeddings(embedding_vectors)
 
             self.group_means = super().create_means(session_means)
             self.session_means = self.create_session_means(session_means)
@@ -518,51 +528,55 @@ class MSess_MVN(MVN):
             self.group_covariances = super().create_covariances(session_covariances)
             self.session_covariances = self.create_session_covariances()
 
-    def validate_embedding_parameters(self):
-        if self.embeddings_dim is None:
-            raise ValueError(
-                "Session means or covariances not passed, please pass "
-                "'embeddings_dim'."
-            )
-        if self.spatial_embeddings_dim is None:
-            raise ValueError(
-                "Session means or covariances not passed, please pass "
-                "'spatial_embeddings_dim'."
-            )
-        if self.embeddings_scale is None:
-            raise ValueError(
-                "Session means or covariances not passed, please pass "
-                "'embeddings_scale'."
-            )
-        if self.n_groups is None:
-            raise ValueError(
-                "Session means or covariances not passed, please pass 'n_groups'."
-            )
-        if self.between_group_scale is None:
-            raise ValueError(
-                "Session means or covariances not passed, please pass "
-                "'between_group_scale'."
+    def validate_embedding_parameters(self, embedding_vectors):
+        if embedding_vectors is None:
+            if self.embeddings_dim is None:
+                raise ValueError(
+                    "Session means or covariances not passed, please pass "
+                    "'embeddings_dim'."
+                )
+            if self.spatial_embeddings_dim is None:
+                raise ValueError(
+                    "Session means or covariances not passed, please pass "
+                    "'spatial_embeddings_dim'."
+                )
+            if self.embeddings_scale is None:
+                raise ValueError(
+                    "Session means or covariances not passed, please pass "
+                    "'embeddings_scale'."
+                )
+            if self.n_groups is None:
+                raise ValueError(
+                    "Session means or covariances not passed, please pass 'n_groups'."
+                )
+            if self.between_group_scale is None:
+                raise ValueError(
+                    "Session means or covariances not passed, please pass "
+                    "'between_group_scale'."
+                )
+
+    def create_embeddings(self, embedding_vectors):
+        if embedding_vectors is None:
+            # Assign groups to sessions
+            assigned_groups = np.random.choice(self.n_groups, self.n_sessions)
+            self.group_centroids = np.random.normal(
+                scale=self.between_group_scale,
+                size=[self.n_groups, self.embeddings_dim],
             )
 
-    def create_embeddings(self):
-        # Assign groups to sessions
-        assigned_groups = np.random.choice(self.n_groups, self.n_sessions)
-        self.group_centroids = np.random.normal(
-            scale=self.between_group_scale,
-            size=[self.n_groups, self.embeddings_dim],
-        )
+            embeddings = np.zeros([self.n_sessions, self.embeddings_dim])
+            for i in range(self.n_groups):
+                group_mask = assigned_groups == i
+                embeddings[group_mask] = np.random.multivariate_normal(
+                    mean=self.group_centroids[i],
+                    cov=self.embeddings_scale * np.eye(self.embeddings_dim),
+                    size=[np.sum(group_mask)],
+                )
 
-        embeddings = np.zeros([self.n_sessions, self.embeddings_dim])
-        for i in range(self.n_groups):
-            group_mask = assigned_groups == i
-            embeddings[group_mask] = np.random.multivariate_normal(
-                mean=self.group_centroids[i],
-                cov=self.embeddings_scale * np.eye(self.embeddings_dim),
-                size=[np.sum(group_mask)],
-            )
-
-        self.assigned_groups = assigned_groups
-        self.embeddings = embeddings
+            self.assigned_groups = assigned_groups
+            self.embeddings = embeddings
+        else:
+            self.embeddings = embedding_vectors
 
     def create_linear_transform(self, input_dim, output_dim, scale=0.1):
         linear_transform = np.random.normal(

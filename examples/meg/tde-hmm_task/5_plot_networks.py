@@ -30,7 +30,7 @@ os.makedirs(networks_dir, exist_ok=True)
 
 # Source reconstruction files
 mask_file = "MNI152_T1_8mm_brain.nii.gz"
-parcellation_file = "fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz"
+parcellation_file = "Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz"
 
 #%% Load spectra
 
