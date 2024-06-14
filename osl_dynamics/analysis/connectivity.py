@@ -830,6 +830,8 @@ def save(
             },
         )
     """
+    # Suppress INFO messages from nibabel
+    logging.getLogger("nibabel.global").setLevel(logging.ERROR)
 
     # Validation
     connectivity_map = np.copy(connectivity_map)

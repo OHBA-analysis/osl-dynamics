@@ -10,6 +10,8 @@ In this tutorial we will plot networks from an HMM trained on source reconstruct
 4. Coherence networks
 5. Coherence maps
 6. Coherence vs Power
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/nyemq>`_ for the expected output.
 """
 
 #%%
@@ -23,6 +25,7 @@ import numpy as np
 f = np.load("results/spectra/f.npy")
 psd = np.load("results/spectra/psd.npy")
 coh = np.load("results/spectra/coh.npy")
+w = np.load("results/spectra/w.npy")
 
 #%%
 # PSDs
@@ -42,12 +45,13 @@ print(psd.shape)
 from osl_dynamics.utils import plotting
 
 # Average over subjects and channels
-psd_mean = np.mean(psd, axis=(0,2))
+gpsd = np.average(psd, axis=0, weights=w)
+psd_mean = np.mean(gpsd, axis=1)
 print(psd_mean.shape)
 
 # Plot
 n_states = psd_mean.shape[0]
-plotting.plot_line(
+fig, ax = plotting.plot_line(
     [f] * n_states,
     psd_mean,
     labels=[f"State {i}" for i in range(1, n_states + 1)],
@@ -71,7 +75,7 @@ print(p.shape)
 # We have a power map for each state and subject. Let's calculate the group average.
 
 
-p_mean = np.mean(p, axis=0)
+p_mean = np.average(p, axis=0, weights=w)
 print(p_mean.shape)
 
 #%%
@@ -83,6 +87,7 @@ fig, ax = power.save(
     p_mean,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    plot_kwargs={"symmetric_cbar": True},
 )
 
 #%%
@@ -94,6 +99,7 @@ fig, ax = power.save(
     p_mean,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    plot_kwargs={"symmetric_cbar": True},
     subtract_mean=True,
 )
 
@@ -122,25 +128,26 @@ print(c.shape)
 # Coherence networks are often noisy so averaging over a large number of subjects (20+) is typically needed to get clean coherence networks. Let's average the coherence networks over all subjects.
 
 
-mean_c = np.mean(c, axis=0)
+mean_c = np.average(c, axis=0, weights=w)
 print(mean_c.shape)
 
 #%%
 # We now see `c_mean` is a (states, channels, channels) array.
 #
-# Let's have a look at the coherence networks. The `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ function can be used to display a connectivity matrix (or set of connectivity matrices).
+# Let's have a look at the coherence networks. The `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ function can be used to display a connectivity matrix (or set of connectivity matrices). Note, we display them relative to the mean across states.
 
 
+mean_c -= np.mean(mean_c, axis=0)
 connectivity.save(
     mean_c,
     parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
 )
 
 #%%
-# We can see there are a lot of connections. We need a method to select the most important edges. When we were studying the power maps, we displayed the power relative to the mean across states. With the coherence networks we want to do something similar. We want to select the edges that are significantly different to the mean across states. osl-dynamics has a function called `connectivity.threshold <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.threshold>`_ that makes this easy. If we wanted the top 3% of connections that show the largest value above the mean across states, we could get this with:
+# We can see there are a lot of connections. We want to select the most extreme edeges. osl-dynamics has a function called `connectivity.threshold <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.threshold>`_ that makes this easy.
 
 
-thres_mean_c = connectivity.threshold(mean_c, percentile=97, subtract_mean=True)
+thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True)
 print(thres_mean_c.shape)
 
 #%%
@@ -153,11 +160,6 @@ connectivity.save(
 )
 
 #%%
-# Alternatively, we could visualise the coherence networks relative to the mean across states and select edges irrespective of the sign using::
-#
-#     mean_c -= np.mean(mean_c, axis=0, keepdims=True)
-#     thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True)
-#
 # Non-negative matrix factorization (NNMF)
 # ****************************************
 # In the above code, we integrated over all frequencies to calculate the power maps and coherence networks. We expect brain activity to occur with phase-locking networks with oscillations at different frequencies. A data-driven approach for finding the frequency bands (referred to as 'spectral components') for phase-locked networks is to apply non-negative matrix factorization (NNMF) to the coherence spectra for each subject. osl-dynamics has a function that can do this: `analysis.spectral.decompose_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.decompose_spectra>`_. Let's use this function to separate our coherence spectra (`coh`) into two frequency bands.
@@ -193,11 +195,12 @@ c = connectivity.mean_coherence_from_spectra(f, coh, wb_comp)
 print(c.shape)
 
 # Average over subjects
-mean_c = np.mean(c, axis=0)
+mean_c = np.average(c, axis=0, weights=w)
 print(mean_c.shape)
 
 # Threshold each network and look for the top 3% of connections relative to the mean
-thres_mean_c = connectivity.threshold(mean_c, percentile=97, subtract_mean=True)
+mean_c -= np.mean(mean_c, axis=0, keepdims=True)
+thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True)
 print(thres_mean_c.shape)
 
 #%%
@@ -211,32 +214,6 @@ connectivity.save(
 )
 
 #%%
-# Data-driven thresholding: Gaussian Mixture Model (GMM)
-# ******************************************************
-# In the above plots we arbitrarily selected a percentile to plot. However, different coherence networks would have a differing number of interesting connections. One approach to improve the thresholding in a data driven way is to use a two-component GMM to select edges. This was described in more detail in the `Static AEC Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/static_aec_analysis.html>`_.
-#
-# Let's look at the coherence maps we get using a GMM to threshold. We will look at the first spectral component.
-
-
-# Threshold each network using a HMM
-thres_mean_c = connectivity.gmm_threshold(
-    mean_c,
-    p_value=0.01,
-    subtract_mean=True,
-    show=True,
-)
-print(thres_mean_c.shape)
-
-# Plot
-connectivity.save(
-    thres_mean_c,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
-    component=0,
-)
-
-#%%
-# The GMM is particularly sensitive to the distribution of connections, if we have noisy coherence networks this might not work very well. Generally specifying the threshold using a percentile is more robust.
-#
 # Coherence maps
 # ^^^^^^^^^^^^^^
 # We can display the coherence as a spatial map rather than a graphical network by averaging the edges for each parcel.
@@ -247,8 +224,8 @@ mean_c_map = connectivity.mean_connections(mean_c)
 fig, ax = power.save(
     mean_c_map,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz.nii.gz",
-    subtract_mean=True,  # just for visualisation
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    plot_kwargs={"symmetric_cbar": True},
 )
 
 #%%
@@ -299,7 +276,7 @@ print(mean_c.shape)
 # Now we can make a scatter plot of coherence vs power for each state.
 
 
-plotting.plot_scatter(
+fig, ax = plotting.plot_scatter(
     mean_p,
     mean_c,
     labels=[f"State {i}" for i in range(1, mean_p.shape[0] + 1)],
@@ -326,7 +303,7 @@ print(mean_p.shape)
 print(mean_c.shape)
 
 # Plot
-plotting.plot_scatter(
+fig, ax = plotting.plot_scatter(
     mean_p,
     mean_c,
     x_label="Power (a.u.)",
