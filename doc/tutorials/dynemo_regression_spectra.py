@@ -6,6 +6,28 @@ In this tutorial we calculate subject and mode-specific spectra using a trained 
 """
 
 #%%
+# Download source data
+# ^^^^^^^^^^^^^^^^^^^^
+# In this tutorial, we'll download example data from `OSF <https://osf.io/by2tc/>`_.
+
+
+import os
+
+def get_data(name, rename):
+    if rename is None:
+        rename = name
+    if os.path.exists(rename):
+        return f"{name} already downloaded. Skipping.."
+    os.system(f"osf -p by2tc fetch data/{name}.zip")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {rename}"
+
+# Download the dataset (approximately 720 GB)
+get_data("notts_mrc_meguk_glasser", rename="source_data")
+
+#%%
 # Load the source data
 # ^^^^^^^^^^^^^^^^^^^^
 # We load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
@@ -13,7 +35,7 @@ In this tutorial we calculate subject and mode-specific spectra using a trained 
 
 from osl_dynamics.data import Data
 
-data = Data("notts_mrc_meguk_glasser")
+data = Data("source_data", n_jobs=4)
 
 #%%
 # Trim data
@@ -35,7 +57,7 @@ trimmed_data = data.trim_time_series(n_embeddings=15, sequence_length=100)  # ne
 
 import pickle
 
-alpha = pickle.load(open("results/inf_parmas/alp.pkl", "rb"))
+alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
 
 #%%
 # `alpha` is a list of numpy arrays that contains a `(n_samples, n_modes)` time series, which is the mixing coefficients at each time point. Each item of the list corresponds to a subject.
@@ -51,7 +73,7 @@ for a, x in zip(alpha, trimmed_data):
 #
 # Reweight the mixing coefficients
 # ********************************
-# The mixing coefficients inferred by DyNeMo do not account so the magnitude of each mode covariance. Before calculate the mode spectra, we reweight the mixing coefficients using the trace of each mode covariance. First, let's load the inferred mode covariances.
+# The mixing coefficients inferred by DyNeMo do not account for the 'size' of each mode covariance. Before calculate the mode spectra, we reweight the mixing coefficients using the trace of each mode covariance. First, let's load the inferred mode covariances.
 
 
 import numpy as np
@@ -73,23 +95,14 @@ alpha = modes.reweight_alphas(alpha, covs)
 #
 # Power spectra and coherences
 # ****************************
-# We want to calculate the power spectrum and coherence of each mode. A linear regression approach where we regress the spectrogram (time-varying spectra) with the inferred mixing coefficients. We do this with the `analysis.spectral.regression_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.regression_spectra>`_ function in osl-dynamics. Let's first run this function, then we'll discuss its output. The arguments we need to pass to this function are:
-#
-# - `data`. This is the source reconstructed data aligned to the mixing coefficients.
-# - `alpha`. This is the mixing coefficient time series.
-# - `sampling_frequency` in Hz.
-# - `frequency_range`. This is the frequency range we're interested in.
-# - `window_length`. This is the length of the data segment (window) we use to calculate the spectrogram.
-# - `step_size`. This is the number of samples we slide the window along the data when calculating the spectrogram.
-# - `n_sub_windows`. To calculate the coherence we need to split the window into sub-windows and average the cross specrta. This is the number of sub-windows.
-# - `return_coef_int`. We split a linear regression to the spectrogram. We may want to receive the regression coefficients and intercept separately.
+# We want to calculate the power spectrum and coherence of each mode. A linear regression approach where we regress the spectrogram (time-varying spectra) with the inferred mixing coefficients. We do this with the `analysis.spectral.regression_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.regression_spectra>`_ function in osl-dynamics. Let's first run this function, then we'll discuss its output.
 
 
 from osl_dynamics.analysis import spectral
 
 # Calculate regression spectra for each mode and subject (will take a few minutes)
-f, psd, coh = spectral.regression_spectra(
-    data=data,
+f, psd, coh, w = spectral.regression_spectra(
+    data=trimmed_data,
     alpha=alpha,
     sampling_frequency=250,
     frequency_range=[1, 45],
@@ -97,28 +110,28 @@ f, psd, coh = spectral.regression_spectra(
     step_size=20,
     n_sub_windows=8,
     return_coef_int=True,
+    return_weights=True,
+    n_jobs=2,
 )
 
 #%%
-# Note, there is a `n_jobs` argument that can be used to calculate the regression spectra for each subject in parallel.
-#
 # To understand the `f`, `psd` and `coh` numpy arrays it is useful to print their shape.
 
 
 print(f.shape)
 print(psd.shape)
 print(coh.shape)
+print(w.shape)
 
 #%%
-# We can see the `f` array is 1D, it corresponds to the frequency axis. The `psd` array corresponds to the PSDs and is (subjects, states, channels, frequencies) and the `coh` array corresponds to the pairwise coherence and is (subjects, states, channels, channels, frequencies).
+# We can see the `f` array is 1D, it corresponds to the frequency axis. The `psd` array corresponds to the PSDs and is (subjects, 2, states, channels, frequencies), the second dimension corresponds to the regression coefficients and intercept for each subject. The `coh` array corresponds to the pairwise coherence and is (subjects, states, channels, channels, frequencies). `w` is an array containing weights for each subject when calculating a group average.
 #
 # Calculating the spectrum can be time consuming so it is useful to save it as a numpy file, which can be loaded very quickly.
 
-
-import os
 
 os.makedirs("results/spectra", exist_ok=True)
 np.save("results/spectra/f.npy", f)
 np.save("results/spectra/psd.npy", psd)
 np.save("results/spectra/coh.npy", coh)
+np.save("results/spectra/w.npy", w)
 

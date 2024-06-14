@@ -2,7 +2,9 @@
 Sliding Window Analysis
 =======================
 
-In this tutorial we will use a sliding window technique, which is a common approach for studying network dynamics, to analyse source space MEG data. fMRI data can easily be substituted. This tutorial covers:
+In this tutorial we will use a sliding window technique, which is a common approach for studying network dynamics, to analyse source space MEG data. fMRI data can easily be substituted.
+
+This tutorial covers:
 
 1. Getting the Data
 2. Estimating Networks using a Sliding Window
@@ -26,16 +28,19 @@ In this tutorial we will use a sliding window technique, which is a common appro
 
 import os
 
-def get_data(name):
-    if os.path.exists(name):
+def get_data(name, rename):
+    if rename is None:
+        rename = name
+    if os.path.exists(rename):
         return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch data/{name}.zip")
-    os.system(f"unzip -o {name}.zip -d {name}")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
     os.remove(f"{name}.zip")
-    return f"Data downloaded to: {name}"
+    return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 720 MB)
-get_data("notts_mrc_meguk_glasser")
+# Download the dataset (approximately 720 GB)
+get_data("notts_mrc_meguk_glasser", rename="source_data")
 
 #%%
 # Load the data
@@ -45,7 +50,7 @@ get_data("notts_mrc_meguk_glasser")
 
 from osl_dynamics.data import Data
 
-data = Data("notts_mrc_meguk_glasser")
+data = Data("source_data", n_jobs=4)
 
 # Display some summary information
 print(data)

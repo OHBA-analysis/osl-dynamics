@@ -50,6 +50,7 @@ print(data)
 # The prepare method
 # ^^^^^^^^^^^^^^^^^^
 # The `Data <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_ class has many methods available for manipulating the data. See the docs for a full list. We will describe two common approaches for preparing the data:
+#
 # - TDE-PCA
 # - Amplitude Envelope.
 #

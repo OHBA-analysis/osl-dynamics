@@ -51,12 +51,14 @@ data.prepare({
 #
 # Saving and Loading Prepared Data
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
 # Saving prepared data
 # ********************
 # For large datasets, preparing the data can sometimes be time consuming. In this case it is useful to save the data after preparing it. Then we can just load the prepared data before training a model. To save prepared data we can use the `save` method. We simply need to pass the output directory to write the data to.
 
 
 data.save("prepared_data")
+
 
 #%%
 # This method has created a directory called `prepared_data`. Let's list its contents.

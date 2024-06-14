@@ -37,6 +37,7 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 #
 # Getting Example Data
 # ^^^^^^^^^^^^^^^^^^^^
+#
 # Download the dataset
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/zxb6c/>`_.
@@ -61,6 +62,7 @@ os.listdir("example_loading_data")
 
 #%%
 # We can see there are three directories in `example_loading_data`:
+#
 # - `numpy_format`, which contains `.npy` files.
 # - `matlab_format`, which contains `.mat` files.
 # - `fif_format`, which contains directories with `.fif` files.

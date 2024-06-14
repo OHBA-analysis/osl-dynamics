@@ -23,16 +23,19 @@ This tutorial covers how to train a DyNeMo model. We will use MEG data in this t
 
 import os
 
-def get_data(name):
+def get_data(name, rename):
+    if rename is None:
+        rename = name
     if os.path.exists(name):
         return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch data/{name}.zip")
+    os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {name}"
 
 # Download the dataset (approximately 1.7 GB)
-get_data("notts_mrc_meguk_glasser_prepared")
+get_data("notts_mrc_meguk_glasser_prepared", rename="prepared_data")
 
 #%%
 # Load the data
@@ -42,10 +45,7 @@ get_data("notts_mrc_meguk_glasser_prepared")
 
 from osl_dynamics.data import Data
 
-data = Data(
-    "notts_mrc_meguk_glasser_prepared",
-    n_jobs=4,
-)
+data = Data("prepared_data", n_jobs=4)
 print(data)
 
 #%%
@@ -96,6 +96,7 @@ config = Config(
     learning_rate=0.01,
     n_epochs=20,
 )
+
 
 #%%
 # Building the model
@@ -148,6 +149,7 @@ model.save("results/model")
 #     model = load("results/model")
 #
 # It's also useful to save the variational free energy to compare different runs.
+
 
 import pickle
 

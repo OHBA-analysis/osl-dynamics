@@ -64,8 +64,7 @@ data.tde(n_embeddings=5)
 #%%
 # See the `Data loading tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details regarding how to load data using the `Data <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_ class. In the above code we chose `n_embeddings=5`. This means for every original channel, we add `n_embeddings - 1 = 4` extra channels. In our three channel example, the operation we do is:
 #
-# .. math::
-#     \begin{pmatrix} x(t) \\ y(x) \\ z(t) \end{pmatrix} \rightarrow \begin{pmatrix} x(t-2) \\ x(t-1) \\ x(t) \\ x(t+1) \\ x(t+2) \\ y(t-2) \\ y(t-1) \\ y(t) \\ y(t+1) \\ y(t+2) \\ z(t-2) \\ z(t-1) \\ z(t) \\ z(t+1) \\ z(t+2) \end{pmatrix}
+# :math:`\begin{pmatrix} x(t) \\ y(t) \\ z(t) \end{pmatrix} \rightarrow \begin{pmatrix} x(t-2) \\ x(t-1) \\ x(t) \\ x(t+1) \\ x(t+2) \\ y(t-2) \\ y(t-1) \\ y(t) \\ y(t+1) \\ y(t+2) \\ z(t-2) \\ z(t-1) \\ z(t) \\ z(t+1) \\ z(t+2) \end{pmatrix}`
 #
 # We should expect a total of `n_embeddings * 3` channels, in our example this is `5 * 3 = 15`. We can verify this by printing the Data object.
 
@@ -327,7 +326,7 @@ print(data)
 
 #%%
 # We can see we have data for two subjects.
-
+#
 # Apply TDE and PCA
 # *****************
 # Both TDE and PCA can be done in one step using the `tde_pca` method. We often also want to standardize (z-transform) the data before training a model. Both of these steps can be done with the `prepare` method.

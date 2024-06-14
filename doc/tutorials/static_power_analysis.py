@@ -25,26 +25,29 @@ In this tutorial we will perform static power analysis on source space MEG data.
 
 import os
 
-def get_data(name):
-    if os.path.exists(name):
+def get_data(name, rename):
+    if rename is None:
+        rename = name
+    if os.path.exists(rename):
         return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch data/{name}.zip")
-    os.system(f"unzip -o {name}.zip -d {name}")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
     os.remove(f"{name}.zip")
-    return f"Data downloaded to: {name}"
+    return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 720 MB)
-get_data("notts_mrc_meguk_glasser")
+# Download the dataset (approximately 720 GB)
+get_data("notts_mrc_meguk_glasser", rename="source_data")
 
 #%%
 # Load the data
-# *************
+# ^^^^^^^^^^^^^
 # We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
 
 
 from osl_dynamics.data import Data
 
-data = Data("notts_mrc_meguk_glasser")
+data = Data("source_data", n_jobs=4)
 print(data)
 
 #%%
@@ -55,8 +58,6 @@ ts = data.time_series()
 
 #%%
 # `ts` a list of numpy arrays. Each numpy array is a `(n_samples, n_channels)` time series for each subject.
-#
-# # Calculating power from spectra
 #
 # Calculate spectra
 # ^^^^^^^^^^^^^^^^^
@@ -100,11 +101,10 @@ print(psd.shape)
 #
 # A useful property of a power spectrum is that the integral over a frequency range gives the power (or equivalently the variance of activity over the frequency range). osl-dynamics has a `analysis.power <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html>`_ module for performing power analyses.
 #
-# Let's say we are interested in alpha (10 Hz) power. We can calculate alpha power by integrating a power spectrum over a frequency range near 10 Hz. Typically, 8-12 Hz power is referred to as the 'alpha band'. Other common frequency bands are:
+# Let's say we are interested in alpha (10 Hz) power. We can calculate alpha power by integrating a power spectrum over a frequency range near 10 Hz. Typically, 7-13 Hz power is referred to as the 'alpha band'. Other common frequency bands are:
 #
 # - Delta: 1-4 Hz.
 # - Theta: 4-7 Hz.
-# - Alpha: 7-13 Hz.
 # - Beta: 13-30 Hz.
 # - Gamma: 30+ Hz.
 #

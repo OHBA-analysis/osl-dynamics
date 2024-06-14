@@ -20,7 +20,7 @@ In this tutorial we calculate summary statistics for dynamics:
 
 import pickle
 
-alpha = pickle.load(open("results/inf_params/alpha.pkl", "rb"))
+alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
 
 #%%
 # Let's also plot the state probabilities for the first few seconds of the first subject to get a feel for what they look like. We can use the `utils.plotting.plot_alpha <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_ function to do this.
@@ -29,7 +29,7 @@ alpha = pickle.load(open("results/inf_params/alpha.pkl", "rb"))
 from osl_dynamics.utils import plotting
 
 # Plot the state probability time course for the first subject (8 seconds)
-plotting.plot_alpha(alpha[0], n_samples=2000)
+fig, ax = plotting.plot_alpha(alpha[0], n_samples=2000)
 
 #%%
 # When looking at the state probability time course you want to see a good number of transitions between states.
@@ -43,7 +43,7 @@ from osl_dynamics.inference import modes
 stc = modes.argmax_time_courses(alpha)
 
 # Plot the state time course for the first subject (8 seconds)
-plotting.plot_alpha(stc[0], n_samples=2000)
+fig, ax = plotting.plot_alpha(stc[0], n_samples=2000)
 
 #%%
 # We can see this time series is completely binarised, only one state is active at each time point.
@@ -77,7 +77,7 @@ print(np.mean(fo, axis=0))
 
 
 # Plot the distribution of fractional occupancy (FO) across subjects
-plotting.plot_violin(fo.T, x_label="State", y_label="Fractional Occupancy")
+fig, ax = plotting.plot_violin(fo.T, x_label="State", y_label="Fractional Occupancy")
 
 #%%
 # We can see there is a lot of variation across subjects.
@@ -97,7 +97,7 @@ lt *= 1000
 print(np.mean(lt, axis=0))
 
 # Plot distribution across subjects
-plotting.plot_violin(lt.T, x_label="State", y_label="Mean Lifetime (ms)")
+fig, ax = plotting.plot_violin(lt.T, x_label="State", y_label="Mean Lifetime (ms)")
 
 #%%
 # Mean interval
@@ -112,7 +112,7 @@ intv = modes.mean_intervals(stc, sampling_frequency=250)
 print(np.mean(intv, axis=0))
 
 # Plot distribution across subjects
-plotting.plot_violin(intv.T, x_label="State", y_label="Mean Interval (s)")
+fig, ax = plotting.plot_violin(intv.T, x_label="State", y_label="Mean Interval (s)")
 
 #%%
 # Switching rate
@@ -121,11 +121,11 @@ plotting.plot_violin(intv.T, x_label="State", y_label="Mean Interval (s)")
 
 
 # Calculate the switching rate (Hz)
-sr = modes.switching_rate(stc, sampling_frequency=250)
+sr = modes.switching_rates(stc, sampling_frequency=250)
 
 # Print the group average
 print(np.mean(sr, axis=0))
 
 # Plot distribution across subjects
-plotting.plot_violin(sr.T, x_label="State", y_label="Switching Rate (Hz)")
+fig, ax = plotting.plot_violin(sr.T, x_label="State", y_label="Switching Rate (Hz)")
 
