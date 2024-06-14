@@ -3,6 +3,8 @@ Network Response
 ================
 
 In this tutorial we will cover how to do statistical significance testing for a 'network response'. This is the average state/mode time course epoched around events of interest. We test is the response is significantly different from zero.
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/kjqzd>`_ for the expected output.
 """
 
 #%%

@@ -9,6 +9,8 @@ In this tutorial we discuss how to prepare fMRI data. This tutorial covers:
 3. Saving and loading prepared data
 
 fMRI data needs to be preprocessed in a particular way to train a dynamic network model (HMM/DyNeMo), see this `paper <https://www.sciencedirect.com/science/article/pii/S1053811922001550>`_ for further details. This is make sure we infer good dynamics (state switching) in the data. We advise training a model on the group-ICA time courses (which are prepared by standardizing the data) or using an anatomical parcellation (which is prepared using a full rank PCA).
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/p6f9c>`_ for the expected output.
 """
 
 #%%
@@ -51,12 +53,14 @@ data.prepare({
 #
 # Saving and Loading Prepared Data
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
 # Saving prepared data
 # ********************
 # For large datasets, preparing the data can sometimes be time consuming. In this case it is useful to save the data after preparing it. Then we can just load the prepared data before training a model. To save prepared data we can use the `save` method. We simply need to pass the output directory to write the data to.
 
 
 data.save("prepared_data")
+
 
 #%%
 # This method has created a directory called `prepared_data`. Let's list its contents.

@@ -6,6 +6,8 @@ MEG data is useful because it has a high temporal resolution. We can take advant
 
 1. Getting the data
 2. Calculating spectral for each subject
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/d9jpu>`_ for the expected output.
 """
 
 #%%
@@ -25,16 +27,19 @@ MEG data is useful because it has a high temporal resolution. We can take advant
 
 import os
 
-def get_data(name):
-    if os.path.exists(name):
+def get_data(name, rename):
+    if rename is None:
+        rename = name
+    if os.path.exists(rename):
         return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch data/{name}.zip")
-    os.system(f"unzip -o {name}.zip -d {name}")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
     os.remove(f"{name}.zip")
-    return f"Data downloaded to: {name}"
+    return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 720 MB)
-get_data("notts_mrc_meguk_glasser")
+# Download the dataset (approximately 720 GB)
+get_data("notts_mrc_meguk_glasser", rename="source_data")
 
 #%%
 # Load the data
@@ -44,7 +49,7 @@ get_data("notts_mrc_meguk_glasser")
 
 from osl_dynamics.data import Data
 
-data = Data("notts_mrc_meguk_glasser")
+data = Data("source_data", n_jobs=4)
 print(data)
 
 #%%
@@ -62,7 +67,7 @@ ts = data.time_series()
 #
 # Calculate power spectra
 # ***********************
-# Using the data we just loaded, we want to calculate the power spectra for each channel (ROI) for each subject. We will use the `osl-dynamics.analysis.static.power_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/static/index.html#osl_dynamics.analysis.static.power_spectra>`_ function to do this. This function implements Welch's methods for calculating power spectra.
+# Using the data we just loaded, we want to calculate the power spectra for each channel (ROI) for each subject. We will use the `osl-dynamics.analysis.static.welch_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/static/index.html#osl_dynamics.analysis.static.welch_spectra>`_ function to do this. This function implements Welch's methods for calculating power spectra.
 #
 # To use this function we need to specify at least two arguments:
 #
@@ -84,7 +89,7 @@ f, psd = static.welch_spectra(
 )
 
 #%%
-# `osl-dynamics.analysis.static.power_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/static/index.html#osl_dynamics.analysis.static.welch_spectra>`_ returns two numpy arrays: `f`, which is the frequency axis of the power spectra in Hz, and `p`, which contains the power spectra.
+# We have two numpy arrays: `f`, which is the frequency axis of the power spectra in Hz, and `p`, which contains the power spectra.
 #
 # Calculating power spectra can be time consuming. We will want to use the power spectra many times to make different plots. We don't want to have to calculate them repeatedly, so often it is convinent to save the `f` and `p` numpy arrays so we can load them later (instead of calculating them again). Let's save the spectra.
 
@@ -119,7 +124,7 @@ print(psd.shape)
 
 from osl_dynamics.utils import plotting
 
-plotting.plot_line(
+fig, ax = plotting.plot_line(
     [f] * psd.shape[1],
     psd[0],
     x_label="Frequency (Hz)",
@@ -130,7 +135,7 @@ plotting.plot_line(
 # Each line in this plot is a ROI. We can see there's a lot of activity in the 1-20 Hz range. Let's zoom into the 1-45 Hz range.
 
 
-plotting.plot_line(
+fig, ax = plotting.plot_line(
     [f] * psd.shape[1],
     psd[0],
     x_label="Frequency (Hz)",
@@ -148,7 +153,7 @@ plotting.plot_line(
 psd_mean = np.mean(psd, axis=1)
 
 # Plot the mean power spectrum for the first subject
-plotting.plot_line(
+fig, ax = plotting.plot_line(
     [f],
     [psd_mean[0]],
     x_label="Frequency (Hz)",
@@ -164,7 +169,7 @@ plotting.plot_line(
 psd_std = np.std(psd, axis=1)
 
 # Plot with one sigma shaded
-plotting.plot_line(
+fig, ax = plotting.plot_line(
     [f],
     [psd_mean[0]],
     errors=[[psd_mean[0] - psd_std[0]], [psd_mean[0] + psd_std[0]]],
@@ -177,7 +182,7 @@ plotting.plot_line(
 # Finally, let's plot the average power spectrum for each subject in the same figure.
 
 
-plotting.plot_line(
+fig, ax = plotting.plot_line(
     [f] * psd.shape[0],
     psd_mean,
     x_label="Frequency (Hz)",
@@ -186,4 +191,4 @@ plotting.plot_line(
 )
 
 #%%
-# We can see there's quite a bit of variation in the static power spectrum for each subject. Some subjects have a pronounced alpha (around 10 Hz) peak. Some subjects has significant beta (around 20 Hz) activity, others don't.
+# We can see there's quite a bit of variation in the static power spectrum for each subject. Some subjects have a pronounced alpha (around 10 Hz) peak. Some subjects have high beta (around 20 Hz) activity, others don't.

@@ -6,6 +6,8 @@ In this tutorial we will perform static AEC analysis on source space MEG data. T
 
 1. Getting the data
 2. Calculating AEC networks
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/j56q3>`_ for the expected output.
 """
 
 #%%
@@ -25,16 +27,19 @@ In this tutorial we will perform static AEC analysis on source space MEG data. T
 
 import os
 
-def get_data(name):
-    if os.path.exists(name):
+def get_data(name, rename):
+    if rename is None:
+        rename = name
+    if os.path.exists(rename):
         return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch data/{name}.zip")
-    os.system(f"unzip -o {name}.zip -d {name}")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
     os.remove(f"{name}.zip")
-    return f"Data downloaded to: {name}"
+    return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 150 MB)
-get_data("notts_mrc_meguk_glasser")
+# Download the dataset (approximately 720 GB)
+get_data("notts_mrc_meguk_glasser", rename="source_data")
 
 #%%
 # Load the data
@@ -44,7 +49,7 @@ get_data("notts_mrc_meguk_glasser")
 
 from osl_dynamics.data import Data
 
-data = Data("notts_mrc_meguk_glasser")
+data = Data("source_data", n_jobs=4)
 print(data)
 
 #%%
@@ -114,6 +119,7 @@ from osl_dynamics.utils import plotting
 
 # Just plot the first 5
 fig, ax = plotting.plot_matrices(aec[:5], titles=[f"Subject {i+1}" for i in range(5)])
+
 
 #%%
 # The diagonal is full of ones and is a lot larger then the off-diagonal values. This means our colour scale doesn't show the off-diagonal structure very well. We can zero the diagonal to improve this.
@@ -249,9 +255,6 @@ plot_dist(group_aec)
 
 
 # Fit a two-component Gaussian mixture model to the connectivity matrix
-#
-# We pass the standardize=False argument because we don't want to alter the
-# distribution before fitting the GMM.
 percentile = connectivity.fit_gmm(group_aec, show=True)
 print("Percentile:", percentile)
 

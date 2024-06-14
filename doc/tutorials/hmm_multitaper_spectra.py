@@ -3,7 +3,31 @@ HMM: Multitaper Spectra
 =======================
 
 In this tutorial we calculate subject and state-specific multitaper spectra using a trained HMM and **source space** data. Here, we should **not** use the prepared (e.g. TDE-PCA) data.
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/ktjzn>`_ for the expected output.
 """
+
+#%%
+# Download source data
+# ^^^^^^^^^^^^^^^^^^^^
+# In this tutorial, we'll download example data from `OSF <https://osf.io/by2tc/>`_.
+
+
+import os
+
+def get_data(name, rename):
+    if rename is None:
+        rename = name
+    if os.path.exists(rename):
+        return f"{name} already downloaded. Skipping.."
+    os.system(f"osf -p by2tc fetch data/{name}.zip")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {rename}"
+
+# Download the dataset (approximately 720 GB)
+get_data("notts_mrc_meguk_glasser", rename="source_data")
 
 #%%
 # Load the source data
@@ -13,7 +37,7 @@ In this tutorial we calculate subject and state-specific multitaper spectra usin
 
 from osl_dynamics.data import Data
 
-data = Data("notts_mrc_meguk_glasser")
+data = Data("source_data", n_jobs=4)
 print(data)
 
 #%%
@@ -55,45 +79,41 @@ for a, x in zip(alpha, trimmed_data):
 #
 # Power spectra and coherences
 # ****************************
-# We want to calculate the power spectrum and coherence of each state. This is done by using standard calculation methods (in our case the multitaper for spectrum estimation) to the time points identified as belonging to a particular state. The `analysis.spectra.multitaper_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.multitaper_spectra>`_ function does this for us. Let's first run this function, then we'll discuss its output. The arguments we need to pass to this function are:
-#
-# - `data`. This is the source reconstructed data aligned to the state time course.
-# - `alpha`. This is the state time course or probabilities (either can be used). Here we'll use the state probabilities.
-# - `sampling_frequency` in Hz.
-# - `frequency_range`. This is the frequency range we're interested in.
+# We want to calculate the power spectrum and coherence of each state. This is done by using standard calculation methods (in our case the multitaper for spectrum estimation) to the time points identified as belonging to a particular state. The `analysis.spectra.multitaper_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.multitaper_spectra>`_ function does this for us. Let's first run this function, then we'll discuss its output.
 
 
 from osl_dynamics.analysis import spectral
 
 # Calculate multitaper spectra for each state and subject (will take a few minutes)
-f, psd, coh = spectral.multitaper_spectra(
+f, psd, coh, w = spectral.multitaper_spectra(
     data=trimmed_data,
     alpha=alpha,
     sampling_frequency=250,
     frequency_range=[1, 45],
+    return_weights=True,
+    n_jobs=4,
 )
 
 #%%
-# Note, there is a `n_jobs` argument that can be used to calculate the multitaper spectrum for each subject in parallel.
-#
 # To understand the `f`, `psd` and `coh` numpy arrays it is useful to print their shape.
 
 
 print(f.shape)
 print(psd.shape)
 print(coh.shape)
+print(w.shape)
 
 #%%
-# We can see the `f` array is 1D, it corresponds to the frequency axis for each spectra. The `psd` array corresponds to the PSDs and is (subjects, states, channels, frequencies) and the `coh` array corresponds to the pairwise coherences and is (subjects, states, channels, channels, frequencies).
+# We can see the `f` array is 1D, it corresponds to the frequency axis for each spectra. The `psd` array corresponds to the PSDs and is (subjects, states, channels, frequencies) and the `coh` array corresponds to the pairwise coherences and is (subjects, states, channels, channels, frequencies). `w` is an array containing weights for each subject when calculating a group average.
 #
 # Calculating the spectrum can be time consuming so it is useful to save it as a numpy file, which can be loaded very quickly.
 
 
-import os
 import numpy as np
 
 os.makedirs("results/spectra", exist_ok=True)
 np.save("results/spectra/f.npy", f)
 np.save("results/spectra/psd.npy", psd)
 np.save("results/spectra/coh.npy", coh)
+np.save("results/spectra/w.npy", w)
 

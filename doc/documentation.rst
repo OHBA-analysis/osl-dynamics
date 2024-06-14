@@ -38,7 +38,7 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 - :doc:`tutorials_build/sliding_window_analysis`.
 - :doc:`tutorials_build/hmm_training`.
 - :doc:`tutorials_build/dynemo_training`.
-- :doc:`tutorials_build/hmm_dynemo_get_params`.
+- :doc:`tutorials_build/hmm_dynemo_get_inf_params`.
 
 **HMM post-hoc analysis tutorials**:
 

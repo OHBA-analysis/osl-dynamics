@@ -3,6 +3,8 @@ Group Contrast
 ==============
 
 In this tutorial we will cover how to do statistical significance testing with GLM permutations.
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/85wzx>`_ for the expected output.
 """
 
 #%%

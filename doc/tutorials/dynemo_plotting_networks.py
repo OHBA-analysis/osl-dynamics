@@ -9,6 +9,8 @@ In this tutorial we will plot networks from a DyNeMo model trained on source rec
 3. Power maps
 4. Coherence networks
 5. Coherence maps
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/p9ucj>`_ for the expected output.
 """
 
 #%%
@@ -22,6 +24,8 @@ import numpy as np
 f = np.load("results/spectra/f.npy")
 psd = np.load("results/spectra/psd.npy")
 coh = np.load("results/spectra/coh.npy")
+w = np.load("results/spectra/w.npy")
+
 
 #%%
 # PSDs
@@ -51,9 +55,9 @@ print(psd_coefs_mean.shape)
 
 # Plot
 n_modes = psd_coefs_mean.shape[0]
-plotting.plot_line(
+fig, ax = plotting.plot_line(
     [f] * n_modes,
-    psd_coef_mean,
+    psd_coefs_mean,
     labels=[f"Mode {i}" for i in range(1, n_modes + 1)],
     x_label="Frequency (Hz)",
     y_label="PSD (a.u.)",
@@ -71,12 +75,11 @@ from osl_dynamics.analysis import power
 p = power.variance_from_spectra(f, psd_coefs)
 print(p.shape)
 
-
 #%%
 # We can see `p` is a (subjects, modes, channels) array. Let's average over subjects.
 
 
-mean_p = np.mean(p, axis=0)
+mean_p = np.average(p, axis=0, weights=w)
 print(mean_p.shape)
 
 #%%
@@ -87,7 +90,8 @@ print(mean_p.shape)
 fig, ax = power.save(
     mean_p,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz.nii.gz",
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    plot_kwargs={"symmetric_cbar": True},
     subtract_mean=True,  # just for visualisation
 )
 
@@ -110,13 +114,12 @@ from osl_dynamics.analysis import connectivity
 c = connectivity.mean_coherence_from_spectra(f, coh)
 print(c.shape)
 
-
 #%%
 # We now have a (subjects, modes, channels, channels) array. Next we need to average over subjects and threshold the coherence networks.
 
 
 # Average over subjects
-mean_c = np.mean(c, axis=0)
+mean_c = np.average(c, axis=0, weights=w)
 
 # Threshold the top 3% relative to the mean
 thres_mean_c = connectivity.threshold(mean_c, percentile=97, subtract_mean=True)
@@ -127,7 +130,8 @@ thres_mean_c = connectivity.threshold(mean_c, percentile=97, subtract_mean=True)
 
 connectivity.save(
     thres_mean_c,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz.nii.gz",
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    plot_kwargs={"edge_vmin": 0, "edge_vmax": np.max(thres_mean_c), "edge_cmap": "Reds"},
 )
 
 #%%
@@ -143,6 +147,8 @@ mean_c_map = connectivity.mean_connections(mean_c)
 fig, ax = power.save(
     mean_c_map,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz.nii.gz",
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    plot_kwargs={"symmetric_cbar": True},
     subtract_mean=True,  # just for visualisation
 )
+

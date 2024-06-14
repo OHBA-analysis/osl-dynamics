@@ -9,6 +9,8 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 3. Loading Data in NumPy Format
 4. Loading Data in MATLAB Format
 5. Loading Data in fif Format
+
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/dvfku>`_ for the expected output.
 """
 
 #%%
@@ -37,6 +39,7 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 #
 # Getting Example Data
 # ^^^^^^^^^^^^^^^^^^^^
+#
 # Download the dataset
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/zxb6c/>`_.
@@ -61,6 +64,7 @@ os.listdir("example_loading_data")
 
 #%%
 # We can see there are three directories in `example_loading_data`:
+#
 # - `numpy_format`, which contains `.npy` files.
 # - `matlab_format`, which contains `.mat` files.
 # - `fif_format`, which contains directories with `.fif` files.
