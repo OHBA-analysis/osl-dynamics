@@ -1,8 +1,5 @@
 """Multi-dynamic Adversarial Generator Encoder (MAGE).
 
-See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
-/mage.html>`_ for a description of this model.
-
 See Also
 --------
 U. Pervaiz, et al., "Multi-dynamic modelling reveals strongly time-varying

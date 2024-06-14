@@ -18,7 +18,7 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # ^^^^^^^^^^^^^^^^^^^^^^
 # **This is the recommended data to train an HMM/DyNeMo on.**
 #
-# The first step is to load the data into osl-dynamics using the Data object, see the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details. In this tutorial, we will simulate some random data (for 2 subjects). You should substitute this with your preprocessed fMRI data.
+# The first step is to load the group-ICA (source) time courses into osl-dynamics using the Data object, see the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details. In this tutorial, we will simulate some random data (for 2 subjects). You should substitute this with your preprocessed fMRI data.
 
 
 import numpy as np
@@ -40,7 +40,7 @@ data.prepare({"standardize": {}})
 #
 # Anatomically parcellated data
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Alternatively, if you have defined regions of interest (ROIs) using an anatomical parcellation, it is important to apply PCA to infer good dynamics (state switching). Below we apply a full rank PCA to the data.
+# Alternatively, if you have defined regions of interest (ROIs) using an anatomical parcellation and loaded these into osl-dynamics instead of the group-ICA time courses, it is important to apply PCA to infer good dynamics (state switching). Below we apply a full rank PCA to the data.
 
 
 data.prepare({
