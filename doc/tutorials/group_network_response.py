@@ -56,3 +56,5 @@ fig, ax = plotting.plot_evoked_response(
     pvalues,
 )
 
+#%%
+# Note, this function also has a `covariates` argument that can be used to account for confounds.

@@ -47,6 +47,8 @@ print(group_diff.shape)
 print(pvalues.shape)
 
 #%%
+# Note, any multidimensional array can be passed to `group_diff_max_stat_perm`, e.g. (subjects, features1, featues2, ...), as long as the first dimension corresponds to the subjects. This function also has a `covariates` argument that can be used to account for confounds.
+#
 # Let's see which features came out as significant based on the p-value.
 
 
