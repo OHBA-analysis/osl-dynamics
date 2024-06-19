@@ -2,9 +2,12 @@
 
 """
 
+import logging
 import numpy as np
 
 from osl_dynamics.utils import misc
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def get_n_sequences(arr, sequence_length, step_size=None):
