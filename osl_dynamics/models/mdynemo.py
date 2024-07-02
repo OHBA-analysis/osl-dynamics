@@ -148,6 +148,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use. :code:`'adam'` is recommended.
+    loss_calc : str
+        How should we collapse the time dimension in the loss?
+        Either :code:`'mean'` or :code:`'sum'`.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -736,6 +739,7 @@ def _model_structure(config):
     )
     kl_div_layer_power = KLDivergenceLayer(
         config.theta_std_epsilon,
+        config.loss_calc,
         name="power_kl_div",
     )
 
@@ -757,6 +761,7 @@ def _model_structure(config):
     )
     fc_kl_div_layer = KLDivergenceLayer(
         config.theta_std_epsilon,
+        config.loss_calc,
         name="fc_kl_div",
     )
 

@@ -1093,6 +1093,8 @@ class KLDivergenceLayer(layers.Layer):
     ----------
     epsilon : float
         Error added to the standard deviations for numerical stability.
+    calculation : str
+        Operation for reducting the time dimension. Either 'mean' or 'sum'.
     clip_start : int, optional
         Index to clip the sequences inputted to this layer.
         Default is no clipping.
@@ -1100,10 +1102,11 @@ class KLDivergenceLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, clip_start=0, **kwargs):
+    def __init__(self, epsilon, calculation, clip_start=0, **kwargs):
         super().__init__(**kwargs)
         self.clip_start = clip_start
         self.epsilon = epsilon
+        self.calculation = calculation
 
     def call(self, inputs, **kwargs):
         inference_mu, inference_sigma, model_mu, model_sigma = inputs
@@ -1131,10 +1134,15 @@ class KLDivergenceLayer(layers.Layer):
             posterior, prior, allow_nan_stats=False
         )
 
-        # Sum the KL loss for each mode and time point and average over batches
-        kl_loss = tf.reduce_sum(kl_loss, axis=2)
-        kl_loss = tf.reduce_sum(kl_loss, axis=1)
-        kl_loss = tf.reduce_mean(kl_loss, axis=0)
+        if self.calculation == "sum":
+            # Sum the KL loss for each mode and time point and average over batches
+            kl_loss = tf.reduce_sum(kl_loss, axis=2)
+            kl_loss = tf.reduce_sum(kl_loss, axis=1)
+            kl_loss = tf.reduce_mean(kl_loss, axis=0)
+        else:
+            # Sum the KL loss for each mode, average time points and batches
+            kl_loss = tf.reduce_sum(kl_loss, axis=2)
+            kl_loss = tf.reduce_mean(kl_loss, axis=(0, 1))
 
         return kl_loss
 
@@ -1300,6 +1308,8 @@ class CategoricalKLDivergenceLayer(layers.Layer):
 
     Parameters
     ----------
+    calculation : str
+        Operation for reducting the time dimension. Either 'mean' or 'sum'.
     clip_start : int, optional
         Index to clip the sequences inputted to this layer.
         Default is no clipping.
@@ -1307,8 +1317,9 @@ class CategoricalKLDivergenceLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, clip_start=0, **kwargs):
+    def __init__(self, calculation, clip_start=0, **kwargs):
         super().__init__(**kwargs)
+        self.calculation = calculation
         self.clip_start = clip_start
 
     def call(self, inputs, **kwargs):
@@ -1327,10 +1338,14 @@ class CategoricalKLDivergenceLayer(layers.Layer):
             posterior, prior, allow_nan_stats=False
         )
 
-        # Sum the KL loss for each time point and average over batches
-        kl_loss = tf.reduce_sum(kl_loss, axis=1)
-        kl_loss = tf.reduce_mean(kl_loss, axis=0)
-
+        if self.calculation == "sum":
+            # Sum the KL loss for each time point and average over batches
+            kl_loss = tf.reduce_sum(kl_loss, axis=1)
+            kl_loss = tf.reduce_mean(kl_loss, axis=0)
+        else:
+            # Average over time and batches
+            kl_loss = tf.reduce_mean(kl_loss, axis=(0, 1))
+            
         return kl_loss
 
 
