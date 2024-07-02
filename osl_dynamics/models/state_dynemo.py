@@ -219,7 +219,7 @@ class Model(SimplifiedDyNeMo):
         ll_loss_layer = CategoricalLogLikelihoodLossLayer(
             config.n_states,
             config.covariances_epsilon,
-            config.log_calc,
+            config.loss_calc,
             name="ll_loss",
         )
         zero_layer = ZeroLayer(shape=(1,))
