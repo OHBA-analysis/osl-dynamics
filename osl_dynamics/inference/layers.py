@@ -978,19 +978,6 @@ class MixMatricesLayer(layers.Layer):
         return C
 
 
-class ConcatVectorsMatricesLayer(layers.Layer):
-    """Layer to concatenate vectors and matrices."""
-
-    def call(self, inputs, **kwargs):
-        """
-        This method takes a (..., m, n) tensor and (..., m, n, n) tensor.
-        """
-        m, C = inputs
-        m = tf.expand_dims(m, axis=-1)
-        C_m = tf.concat([C, m], axis=3)
-        return C_m
-
-
 class LogLikelihoodLossLayer(layers.Layer):
     """Layer to calculate the negative log-likelihood.
 
@@ -1045,45 +1032,6 @@ class LogLikelihoodLossLayer(layers.Layer):
         self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
-
-
-class AdversarialLogLikelihoodLossLayer(layers.Layer):
-    """Layer to calculate the negative log-likelihood for SAGE/MAGE.
-
-    This layer will add the negative log-likelihood to the loss.
-
-    Parameters
-    ----------
-    n_channels : int
-        Number of channels.
-    kwargs : keyword arguments, optional
-        Keyword arguments to pass to the base class.
-    """
-
-    def __init__(self, n_channels, **kwargs):
-        super().__init__(**kwargs)
-        self.n_channels = n_channels
-        self.__name__ = self._name  # needed to avoid error
-
-    def call(self, y_true, y_pred):
-        sigma = y_pred[:, :, :, : self.n_channels]
-        mu = y_pred[:, :, :, self.n_channels]
-
-        # Multivariate normal distribution
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma),
-            allow_nan_stats=False,
-        )
-
-        # Calculate the log-likelihood
-        ll_loss = mvn.log_prob(y_true)
-
-        # Sum over time dimension and average over the batch dimension
-        ll_loss = tf.reduce_sum(ll_loss, axis=1)
-        ll_loss = tf.reduce_mean(ll_loss, axis=0)
-
-        return -ll_loss
 
 
 class KLDivergenceLayer(layers.Layer):
