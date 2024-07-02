@@ -1345,7 +1345,7 @@ class CategoricalKLDivergenceLayer(layers.Layer):
         else:
             # Average over time and batches
             kl_loss = tf.reduce_mean(kl_loss, axis=(0, 1))
-            
+
         return kl_loss
 
 
