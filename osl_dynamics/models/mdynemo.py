@@ -652,7 +652,9 @@ def _model_structure(config):
     pca_stds_layer = MatMulLayer(name="pca_stds")
     pca_corrs_layer = MatMulLayer(name="pca_corrs")
     ll_loss_layer = LogLikelihoodLossLayer(
-        np.maximum(config.stds_epsilon, config.corrs_epsilon), name="ll_loss"
+        np.maximum(config.stds_epsilon, config.corrs_epsilon),
+        config.loss_calc,
+        name="ll_loss",
     )
 
     # Data flow

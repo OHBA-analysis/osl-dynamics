@@ -955,7 +955,7 @@ def _model_structure(config):
     gamma, xi = hidden_state_inference_layer(ll)
 
     # Loss
-    ll_loss_layer = SumLogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
     ll_loss = ll_loss_layer([ll, gamma])
 
     # ---------

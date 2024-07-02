@@ -503,7 +503,7 @@ class Model(HMM):
             name="log_rates",
         )
         ll_loss_layer = CategoricalPoissonLogLikelihoodLossLayer(
-            config.n_states, name="ll_loss"
+            config.n_states, config.loss_calc, name="ll_loss"
         )
 
         # Data flow

@@ -704,6 +704,7 @@ class Model(VariationalInferenceModelBase):
         mix_covs_layer = MixMatricesLayer(name="mix_covs")
         ll_loss_layer = LogLikelihoodLossLayer(
             config.covariances_epsilon,
+            config.loss_calc,
             name="ll_loss",
         )
 

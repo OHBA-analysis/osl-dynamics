@@ -905,6 +905,7 @@ def _model_structure(config):
     )
     ll_loss_layer = LogLikelihoodLossLayer(
         config.covariances_epsilon,
+        config.loss_calc,
         name="ll_loss",
     )
 

@@ -240,6 +240,7 @@ class Model(DyNeMo):
         # Calculate losses
         ll_loss_layer = LogLikelihoodLossLayer(
             config.covariances_epsilon,
+            config.loss_calc,
             name="ll_loss",
         )
         zero_layer = ZeroLayer(shape=(1,))

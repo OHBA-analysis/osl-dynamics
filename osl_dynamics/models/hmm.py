@@ -1630,7 +1630,10 @@ class Model(ModelBase):
                 name="covs",
             )
         ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-            config.n_states, config.covariances_epsilon, name="ll_loss"
+            config.n_states,
+            config.covariances_epsilon,
+            config.loss_calc,
+            name="ll_loss",
         )
 
         # Data flow
