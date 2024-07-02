@@ -989,7 +989,7 @@ class LogLikelihoodLossLayer(layers.Layer):
     epsilon : float
         Error added to the covariance matrices for numerical stability.
     calculation : str
-        Operation for reducting the time dimension. Either 'mean' or 'sum'.
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
@@ -1042,7 +1042,7 @@ class KLDivergenceLayer(layers.Layer):
     epsilon : float
         Error added to the standard deviations for numerical stability.
     calculation : str
-        Operation for reducting the time dimension. Either 'mean' or 'sum'.
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     clip_start : int, optional
         Index to clip the sequences inputted to this layer.
         Default is no clipping.
@@ -1257,7 +1257,7 @@ class CategoricalKLDivergenceLayer(layers.Layer):
     Parameters
     ----------
     calculation : str
-        Operation for reducting the time dimension. Either 'mean' or 'sum'.
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     clip_start : int, optional
         Index to clip the sequences inputted to this layer.
         Default is no clipping.
@@ -1307,7 +1307,7 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
     epsilon : float
         Error added to the covariances for numerical stability.
     calculation : str
-        Operation for reducting the time dimension. Either 'mean' or 'sum'.
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
@@ -1366,7 +1366,7 @@ class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
     n_states : int
         Number of states.
     calculation : str
-        Operation for reducting the time dimension. Either 'mean' or 'sum'.
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
@@ -1633,16 +1633,28 @@ class StaticLossScalingFactorLayer(layers.Layer):
     .. math::
         \text{static_loss_scaling_factor} = \frac{1}{\text{batch_size} \times
         \text{n_batches}}
+
+    Parameters
+    ----------
+    sequence_length : int
+        Length of the sequence.
+    calculation : str
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
+        If 'mean', scaling factor is divided by the sequence length.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, sequence_length, calculation, **kwargs):
         super().__init__(**kwargs)
         self.n_batches = 1
+        self.sequence_length = sequence_length
+        self.calculation = calculation
 
     def call(self, inputs, **kwargs):
         # Note that inputs.shape[0] must be the batch size
         batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
         static_loss_scaling_factor = 1 / (batch_size * self.n_batches)
+        if self.calculation == "mean":
+            static_loss_scaling_factor /= self.sequence_length
         return static_loss_scaling_factor
 
 
@@ -1918,7 +1930,7 @@ class SumLogLikelihoodLossLayer(layers.Layer):
     Parameters
     ----------
     calculation : str
-        Operation for reducting the time dimension. Either 'mean' or 'sum'.
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the keras.layers.Layer.
     """

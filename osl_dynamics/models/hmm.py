@@ -1599,7 +1599,9 @@ class Model(ModelBase):
 
         # Static loss scaling factor
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            name="static_loss_scaling_factor"
+            config.sequence_length,
+            config.loss_calc,
+            name="static_loss_scaling_factor",
         )
         static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
