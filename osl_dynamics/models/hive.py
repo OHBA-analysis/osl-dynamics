@@ -129,6 +129,9 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use.
+    loss_calc : str
+        How should we collapse the time dimension in the loss?
+        Either :code:`'mean'` or :code:`'sum'`.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -624,7 +627,9 @@ def _model_structure(config):
 
     # Static loss scaling factor
     static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-        name="static_loss_scaling_factor"
+        config.sequence_length,
+        config.loss_calc,
+        name="static_loss_scaling_factor",
     )
     static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
@@ -955,7 +960,7 @@ def _model_structure(config):
     gamma, xi = hidden_state_inference_layer(ll)
 
     # Loss
-    ll_loss_layer = SumLogLikelihoodLossLayer(name="ll_loss")
+    ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
     ll_loss = ll_loss_layer([ll, gamma])
 
     # ---------

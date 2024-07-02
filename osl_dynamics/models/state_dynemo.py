@@ -89,6 +89,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use. :code:`'adam'` is recommended.
+    loss_calc : str
+        How should we collapse the time dimension in the loss?
+        Either :code:`'mean'` or :code:`'sum'`.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -156,7 +159,9 @@ class Model(SimplifiedDyNeMo):
         )
 
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            name="static_loss_scaling_factor"
+            config.sequence_length,
+            config.loss_calc,
+            name="static_loss_scaling_factor",
         )
         static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
 
@@ -212,7 +217,10 @@ class Model(SimplifiedDyNeMo):
 
         # Calculate losses
         ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-            config.n_states, config.covariances_epsilon, name="ll_loss"
+            config.n_states,
+            config.covariances_epsilon,
+            config.loss_calc,
+            name="ll_loss",
         )
         zero_layer = ZeroLayer(shape=(1,))
 

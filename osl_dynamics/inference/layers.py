@@ -978,19 +978,6 @@ class MixMatricesLayer(layers.Layer):
         return C
 
 
-class ConcatVectorsMatricesLayer(layers.Layer):
-    """Layer to concatenate vectors and matrices."""
-
-    def call(self, inputs, **kwargs):
-        """
-        This method takes a (..., m, n) tensor and (..., m, n, n) tensor.
-        """
-        m, C = inputs
-        m = tf.expand_dims(m, axis=-1)
-        C_m = tf.concat([C, m], axis=3)
-        return C_m
-
-
 class LogLikelihoodLossLayer(layers.Layer):
     """Layer to calculate the negative log-likelihood.
 
@@ -1001,13 +988,16 @@ class LogLikelihoodLossLayer(layers.Layer):
     ----------
     epsilon : float
         Error added to the covariance matrices for numerical stability.
+    calculation : str
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, **kwargs):
+    def __init__(self, epsilon, calculation, **kwargs):
         super().__init__(**kwargs)
         self.epsilon = epsilon
+        self.calculation = calculation
 
     def call(self, inputs):
         """
@@ -1028,9 +1018,13 @@ class LogLikelihoodLossLayer(layers.Layer):
         # Calculate the log-likelihood
         ll_loss = mvn.log_prob(x)
 
-        # Sum over time dimension and average over the batch dimension
-        ll_loss = tf.reduce_sum(ll_loss, axis=1)
-        ll_loss = tf.reduce_mean(ll_loss, axis=0)
+        if self.calculation == "sum":
+            # Sum over time dimension and average over the batch dimension
+            ll_loss = tf.reduce_sum(ll_loss, axis=1)
+            ll_loss = tf.reduce_mean(ll_loss, axis=0)
+        else:
+            # Average over time and batches
+            ll_loss = tf.reduce_mean(ll_loss, axis=(0, 1))
 
         # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
@@ -1040,45 +1034,6 @@ class LogLikelihoodLossLayer(layers.Layer):
         return tf.expand_dims(nll_loss, axis=-1)
 
 
-class AdversarialLogLikelihoodLossLayer(layers.Layer):
-    """Layer to calculate the negative log-likelihood for SAGE/MAGE.
-
-    This layer will add the negative log-likelihood to the loss.
-
-    Parameters
-    ----------
-    n_channels : int
-        Number of channels.
-    kwargs : keyword arguments, optional
-        Keyword arguments to pass to the base class.
-    """
-
-    def __init__(self, n_channels, **kwargs):
-        super().__init__(**kwargs)
-        self.n_channels = n_channels
-        self.__name__ = self._name  # needed to avoid error
-
-    def call(self, y_true, y_pred):
-        sigma = y_pred[:, :, :, : self.n_channels]
-        mu = y_pred[:, :, :, self.n_channels]
-
-        # Multivariate normal distribution
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma),
-            allow_nan_stats=False,
-        )
-
-        # Calculate the log-likelihood
-        ll_loss = mvn.log_prob(y_true)
-
-        # Sum over time dimension and average over the batch dimension
-        ll_loss = tf.reduce_sum(ll_loss, axis=1)
-        ll_loss = tf.reduce_mean(ll_loss, axis=0)
-
-        return -ll_loss
-
-
 class KLDivergenceLayer(layers.Layer):
     """Layer to calculate a KL divergence between two Normal distributions.
 
@@ -1086,6 +1041,8 @@ class KLDivergenceLayer(layers.Layer):
     ----------
     epsilon : float
         Error added to the standard deviations for numerical stability.
+    calculation : str
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     clip_start : int, optional
         Index to clip the sequences inputted to this layer.
         Default is no clipping.
@@ -1093,10 +1050,11 @@ class KLDivergenceLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, clip_start=0, **kwargs):
+    def __init__(self, epsilon, calculation, clip_start=0, **kwargs):
         super().__init__(**kwargs)
         self.clip_start = clip_start
         self.epsilon = epsilon
+        self.calculation = calculation
 
     def call(self, inputs, **kwargs):
         inference_mu, inference_sigma, model_mu, model_sigma = inputs
@@ -1124,10 +1082,15 @@ class KLDivergenceLayer(layers.Layer):
             posterior, prior, allow_nan_stats=False
         )
 
-        # Sum the KL loss for each mode and time point and average over batches
-        kl_loss = tf.reduce_sum(kl_loss, axis=2)
-        kl_loss = tf.reduce_sum(kl_loss, axis=1)
-        kl_loss = tf.reduce_mean(kl_loss, axis=0)
+        if self.calculation == "sum":
+            # Sum the KL loss for each mode and time point and average over batches
+            kl_loss = tf.reduce_sum(kl_loss, axis=2)
+            kl_loss = tf.reduce_sum(kl_loss, axis=1)
+            kl_loss = tf.reduce_mean(kl_loss, axis=0)
+        else:
+            # Sum the KL loss for each mode, average time points and batches
+            kl_loss = tf.reduce_sum(kl_loss, axis=2)
+            kl_loss = tf.reduce_mean(kl_loss, axis=(0, 1))
 
         return kl_loss
 
@@ -1293,6 +1256,8 @@ class CategoricalKLDivergenceLayer(layers.Layer):
 
     Parameters
     ----------
+    calculation : str
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     clip_start : int, optional
         Index to clip the sequences inputted to this layer.
         Default is no clipping.
@@ -1300,8 +1265,9 @@ class CategoricalKLDivergenceLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, clip_start=0, **kwargs):
+    def __init__(self, calculation, clip_start=0, **kwargs):
         super().__init__(**kwargs)
+        self.calculation = calculation
         self.clip_start = clip_start
 
     def call(self, inputs, **kwargs):
@@ -1320,9 +1286,13 @@ class CategoricalKLDivergenceLayer(layers.Layer):
             posterior, prior, allow_nan_stats=False
         )
 
-        # Sum the KL loss for each time point and average over batches
-        kl_loss = tf.reduce_sum(kl_loss, axis=1)
-        kl_loss = tf.reduce_mean(kl_loss, axis=0)
+        if self.calculation == "sum":
+            # Sum the KL loss for each time point and average over batches
+            kl_loss = tf.reduce_sum(kl_loss, axis=1)
+            kl_loss = tf.reduce_mean(kl_loss, axis=0)
+        else:
+            # Average over time and batches
+            kl_loss = tf.reduce_mean(kl_loss, axis=(0, 1))
 
         return kl_loss
 
@@ -1336,14 +1306,17 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         Number of states.
     epsilon : float
         Error added to the covariances for numerical stability.
+    calculation : str
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, n_states, epsilon, **kwargs):
+    def __init__(self, n_states, epsilon, calculation, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
         self.epsilon = epsilon
+        self.calculation = calculation
 
     def call(self, inputs, **kwargs):
         x, mu, sigma, probs, session_id = inputs
@@ -1368,9 +1341,13 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
             a = mvn.log_prob(x)
             ll_loss += probs[:, :, i] * a
 
-        # Sum over time dimension and average over the batch dimension
-        ll_loss = tf.reduce_sum(ll_loss, axis=1)
-        ll_loss = tf.reduce_mean(ll_loss, axis=0)
+        if self.calculation == "sum":
+            # Sum over time dimension and average over the batch dimension
+            ll_loss = tf.reduce_sum(ll_loss, axis=1)
+            ll_loss = tf.reduce_mean(ll_loss, axis=0)
+        else:
+            # Average over time and batches
+            ll_loss = tf.reduce_mean(ll_loss, axis=(0, 1))
 
         # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
@@ -1388,13 +1365,16 @@ class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
     ----------
     n_states : int
         Number of states.
+    calculation : str
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, n_states, **kwargs):
+    def __init__(self, n_states, calculation, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
+        self.calculation = calculation
 
     def call(self, inputs, **kwargs):
         x, log_rate, probs, session_id = inputs
@@ -1415,9 +1395,13 @@ class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
             a = tf.reduce_sum(a, axis=-1)
             ll_loss += probs[:, :, i] * a
 
-        # Sum over time dimension and average over the batch dimension
-        ll_loss = tf.reduce_sum(ll_loss, axis=1)
-        ll_loss = tf.reduce_mean(ll_loss, axis=0)
+        if self.calculation == "sum":
+            # Sum over time dimension and average over the batch dimension
+            ll_loss = tf.reduce_sum(ll_loss, axis=1)
+            ll_loss = tf.reduce_mean(ll_loss, axis=0)
+        else:
+            # Average over time and batches
+            ll_loss = tf.reduce_mean(ll_loss, axis=(0, 1))
 
         # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
@@ -1649,16 +1633,28 @@ class StaticLossScalingFactorLayer(layers.Layer):
     .. math::
         \text{static_loss_scaling_factor} = \frac{1}{\text{batch_size} \times
         \text{n_batches}}
+
+    Parameters
+    ----------
+    sequence_length : int
+        Length of the sequence.
+    calculation : str
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
+        If 'mean', scaling factor is divided by the sequence length.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, sequence_length, calculation, **kwargs):
         super().__init__(**kwargs)
         self.n_batches = 1
+        self.sequence_length = sequence_length
+        self.calculation = calculation
 
     def call(self, inputs, **kwargs):
         # Note that inputs.shape[0] must be the batch size
         batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
         static_loss_scaling_factor = 1 / (batch_size * self.n_batches)
+        if self.calculation == "mean":
+            static_loss_scaling_factor /= self.sequence_length
         return static_loss_scaling_factor
 
 
@@ -1893,7 +1889,7 @@ class SeparateLogLikelihoodLayer(layers.Layer):
     epsilon : float
         Error added to the covariance matrices for numerical stability.
     kwargs : keyword arguments, optional
-        Keyword arguments to pass to the normalization layer.
+        Keyword arguments to pass to the keras.layers.Layer.
     """
 
     def __init__(self, n_states, epsilon, **kwargs):
@@ -1929,15 +1925,31 @@ class SeparateLogLikelihoodLayer(layers.Layer):
 
 
 class SumLogLikelihoodLossLayer(layers.Layer):
-    """Layer for summing log-likelihoods."""
+    """Layer for summing log-likelihoods.
+
+    Parameters
+    ----------
+    calculation : str
+        Operation for reducing the time dimension. Either 'mean' or 'sum'.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the keras.layers.Layer.
+    """
+
+    def __init__(self, calculation, **kwargs):
+        super().__init__(**kwargs)
+        self.calculation = calculation
 
     def call(self, inputs, **kwargs):
         ll, gamma = inputs
         ll_loss = tf.reduce_sum(gamma * ll, axis=-1)
 
-        # Sum over time dimension and average over the batch dimension
-        ll_loss = tf.reduce_sum(ll_loss, axis=1)
-        ll_loss = tf.reduce_mean(ll_loss, axis=0)
+        if self.calculation == "sum":
+            # Sum over time dimension and average over the batch dimension
+            ll_loss = tf.reduce_sum(ll_loss, axis=1)
+            ll_loss = tf.reduce_mean(ll_loss, axis=0)
+        else:
+            # Average over time and batches
+            ll_loss = tf.reduce_mean(ll_loss, axis=(0, 1))
 
         nll_loss = -ll_loss
         self.add_loss(nll_loss)

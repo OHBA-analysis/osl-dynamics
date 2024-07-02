@@ -45,6 +45,7 @@ class BaseModelConfig:
     gradient_clip: float = None
     n_epochs: int = None
     optimizer: tf.keras.optimizers.Optimizer = "adam"
+    loss_calc: str = "mean"
     multi_gpu: bool = False
     strategy: str = None
 
@@ -72,6 +73,9 @@ class BaseModelConfig:
 
         if self.lr_decay < 0:
             raise ValueError("lr_decay must be non-negative.")
+
+        if self.loss_calc not in ["mean", "sum"]:
+            raise ValueError("loss_calc must be 'mean' or 'sum'.")
 
         # Strategy for distributed learning
         if self.multi_gpu:

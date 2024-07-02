@@ -140,6 +140,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use. :code:`'adam'` is recommended.
+    loss_calc : str
+        How should we collapse the time dimension in the loss?
+        Either :code:`'mean'` or :code:`'sum'`.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -636,7 +639,9 @@ class Model(VariationalInferenceModelBase):
 
         # Static loss scaling factor
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            name="static_loss_scaling_factor"
+            config.sequence_length,
+            config.loss_calc,
+            name="static_loss_scaling_factor",
         )
         static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
 
@@ -704,6 +709,7 @@ class Model(VariationalInferenceModelBase):
         mix_covs_layer = MixMatricesLayer(name="mix_covs")
         ll_loss_layer = LogLikelihoodLossLayer(
             config.covariances_epsilon,
+            config.loss_calc,
             name="ll_loss",
         )
 
@@ -742,7 +748,9 @@ class Model(VariationalInferenceModelBase):
         mod_sigma_layer = layers.Dense(
             config.n_modes, activation="softplus", name="mod_sigma"
         )
-        kl_div_layer = KLDivergenceLayer(config.theta_std_epsilon, name="kl_div")
+        kl_div_layer = KLDivergenceLayer(
+            config.theta_std_epsilon, config.loss_calc, name="kl_div"
+        )
         kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
         # Data flow
