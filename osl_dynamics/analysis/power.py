@@ -281,21 +281,21 @@ def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
 
     # Load the parcellation
     parcellation = nib.load(parcellation_file)
-    parcellation_grid = parcellation.get_fdata()
 
+    # Make sure parcellation is 4D and contains 1 for voxel assignment
+    # to a parcel and 0 otherwise
+    parcellation_grid = parcellation.get_fdata()
     if parcellation_grid.ndim == 3:
-        # Make sure parcellation is 4D and contains 1 for
-        # voxel assignment to a parcel and 0 otherwise
         unique_values = np.unique(parcellation_grid)[1:]
         parcellation_grid = np.array(
             [(parcellation_grid == value).astype(int) for value in unique_values]
         )
         parcellation_grid = np.rollaxis(parcellation_grid, 0, 4)
+        parcellation = nib.Nifti1Image(
+            parcellation_grid, parcellation.affine, parcellation.header
+        )
 
     # Make sure the parcellation grid matches the mask file
-    parcellation = nib.Nifti1Image(
-        parcellation_grid, parcellation.affine, parcellation.header
-    )
     parcellation = image.resample_to_img(parcellation, mask)
     parcellation_grid = parcellation.get_fdata()
 
