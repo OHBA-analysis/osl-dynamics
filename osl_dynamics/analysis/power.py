@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import nibabel as nib
-from nilearn import plotting
+from nilearn import image, plotting
 from tqdm.auto import trange
 from pqdm.threads import pqdm
 import matplotlib.pyplot as plt
@@ -281,6 +281,22 @@ def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
 
     # Load the parcellation
     parcellation = nib.load(parcellation_file)
+
+    # Make sure parcellation is 4D and contains 1 for voxel assignment
+    # to a parcel and 0 otherwise
+    parcellation_grid = parcellation.get_fdata()
+    if parcellation_grid.ndim == 3:
+        unique_values = np.unique(parcellation_grid)[1:]
+        parcellation_grid = np.array(
+            [(parcellation_grid == value).astype(int) for value in unique_values]
+        )
+        parcellation_grid = np.rollaxis(parcellation_grid, 0, 4)
+        parcellation = nib.Nifti1Image(
+            parcellation_grid, parcellation.affine, parcellation.header
+        )
+
+    # Make sure the parcellation grid matches the mask file
+    parcellation = image.resample_to_img(parcellation, mask)
     parcellation_grid = parcellation.get_fdata()
 
     # Make a 2D array of voxel weights for each parcel
