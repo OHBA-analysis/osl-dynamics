@@ -45,6 +45,7 @@ from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.simulation import HMM
 from osl_dynamics.utils.misc import set_logging_level
+from osl_dynamics import array_ops
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -1271,6 +1272,75 @@ class Model(ModelBase):
             alpha = np.concatenate(alpha)
 
         return alpha
+
+    def get_viterbi_path(self, dataset, concatenate=False):
+        """Get the Viterbi path with the Viterbi algorithm.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for
+            each session.
+        concatenate : bool, optional
+            Should we concatenate the Viterbi path for each session?
+
+        Returns
+        -------
+        viterbi_path : list or np.ndarray
+            Viterbi path with shape (n_sessions, n_samples) or (n_samples,).
+        """
+        P_0 = self.state_probs_t0
+        P = self.trans_prob
+        n_states = P.shape[0]
+
+        log_P_0 = np.log(P_0 + EPS)
+        log_P = np.log(P + EPS)
+
+        def _viterbi_path(x):
+            # x.shape = (batch_size, sequence_length, n_channels)
+            batch_size = x.shape[0]
+            sequence_length = x.shape[1]
+
+            log_b = self.get_log_likelihood(x)
+            log_b = log_b.reshape(batch_size * sequence_length, n_states)
+
+            log_prob = np.empty((batch_size * sequence_length, n_states), dtype=float)
+            prev = np.empty((batch_size * sequence_length, n_states), dtype=int)
+
+            log_prob[0] = log_P_0 + log_b[0]
+            for t in range(1, batch_size * sequence_length):
+                place_holder = log_prob[t - 1] + log_P.T + log_b[t]
+                log_prob[t] = np.max(place_holder, axis=1)
+                prev[t] = np.argmax(place_holder, axis=1)
+
+            # Backtrack
+            path = np.empty(batch_size * sequence_length, dtype=int)
+            path[-1] = np.argmax(log_prob[-1])
+            for t in range(batch_size * sequence_length - 2, -1, -1):
+                path[t] = prev[t + 1, path[t + 1]]
+
+            return path
+
+        dataset = self.make_dataset(dataset)
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting Viterbi path")
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting Viterbi path")
+
+        viterbi_path = []
+        for i in iterator:
+            path = []
+            for data in dataset[i]:
+                x = data["data"]
+                path.append(_viterbi_path(x))
+            viterbi_path.append(array_ops.get_one_hot(np.concatenate(path), n_states))
+
+        if concatenate or len(viterbi_path) == 1:
+            viterbi_path = np.concatenate(viterbi_path)
+
+        return viterbi_path
 
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
