@@ -45,6 +45,7 @@ from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.simulation import HMM
 from osl_dynamics.utils.misc import set_logging_level
+from osl_dynamics import array_ops
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -1331,10 +1332,10 @@ class Model(ModelBase):
         viterbi_path = []
         for i in iterator:
             path = []
-            for j, data in enumerate(dataset[i]):
+            for data in dataset[i]:
                 x = data["data"]
                 path.append(_viterbi_path(x))
-            viterbi_path.append(np.concatenate(path))
+            viterbi_path.append(array_ops.get_one_hot(np.concatenate(path), n_states))
 
         if concatenate or len(viterbi_path) == 1:
             viterbi_path = np.concatenate(viterbi_path)
