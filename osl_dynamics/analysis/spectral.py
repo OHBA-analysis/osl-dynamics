@@ -823,45 +823,32 @@ def rescale_regression_coefs(
 
 
 def coherence_spectra(cpsd, keepdims=False):
-    """Calculates coherences from cross power spectral densities.
+    """Calculate coherence from cross power spectral densities.
 
     Parameters
     ----------
     cpsd : np.ndarray
         Cross power spectra.
-        Shape is (n_channels, n_channels, n_freq) or
-        (n_modes, n_channels, n_channels, n_freq).
+        Shape is (..., n_channels, n_channels, n_freq).
     keepdims: bool, optional
         Should we squeeze any axis of length 1?
 
     Returns
     -------
     coh : np.ndarray
-        Coherence spectra. Shape is (..., n_channels, n_channels, n_freq).
+        Coherence spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
     """
-    error_message = (
-        "cpsd must be a numpy array with shape "
-        "(n_channels, n_channels, n_freq) or "
-        "(n_modes, n_channels, n_channels, n_freq)."
-    )
-    cpsd = array_ops.validate(
-        cpsd,
-        correct_dimensionality=4,
-        allow_dimensions=[3],
-        error_message=error_message,
-    )
+    n_channels = cpsd.shape[-2]
 
-    n_modes, n_channels, n_channels, n_freq = cpsd.shape
-    coh = np.empty(
-        [n_modes, n_channels, n_channels, n_freq],
-        dtype=np.float32,
-    )
-    for i in range(n_modes):
-        for j in range(n_channels):
-            for k in range(n_channels):
-                coh[i, j, k] = abs(cpsd[i, j, k]) / np.sqrt(
-                    cpsd[i, j, j].real * cpsd[i, k, k].real
-                )
+    # Calculate coherency spectrum
+    coh = np.empty_like(cpsd, dtype=np.float32)
+    for j in range(n_channels):
+        for k in range(n_channels):
+            Pxy = cpsd[..., j, k, :]
+            Pxx = cpsd[..., j, j, :].real
+            Pyy = cpsd[..., k, k, :].real
+            coh[..., j, k, :] = abs(Pxy) / np.sqrt(Pxx * Pyy)
 
     # Zero nan values
     coh = np.nan_to_num(coh)
