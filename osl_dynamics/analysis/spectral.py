@@ -1364,10 +1364,7 @@ def _welch(
         Only returned is :code:`calc_coh=True`.
     """
     if alpha is None:
-        stc = np.ones([data.shape[0], 1], dtype=np.float32)
-    else:
-        # Calculate state time course (Viterbi path) from probabilities
-        stc = modes.argmax_time_courses(alpha)
+        alpha = np.ones([data.shape[0], 1], dtype=np.float32)
 
     # Indices for the upper triangle of a channels by channels matrix
     n_channels = data.shape[-1]
@@ -1379,9 +1376,9 @@ def _welch(
 
     psd = []
     coh = []
-    for i in range(stc.shape[-1]):
+    for i in range(alpha.shape[-1]):
         # Calculate spectrogram for this state's data
-        x = data * stc[..., i][..., np.newaxis]
+        x = data * alpha[..., i][..., np.newaxis]
         _, f, p = _welch_spectrogram(
             data=x,
             sampling_frequency=sampling_frequency,
@@ -1691,14 +1688,12 @@ def _multitaper(
         Shape is (..., n_channels, n_channels, n_freq).
         Only returned is :code:`calc_coh=True`.
     """
+    if alpha is None:
+        alpha = np.ones([n_samples, 1], dtype=np.float32)
+
     n_samples = data.shape[0]
     n_channels = data.shape[-1]
-
-    if alpha is None:
-        stc = np.ones([n_samples, 1], dtype=np.float32)
-    else:
-        # Calculate state time course (Viterbi path) from probabilities
-        stc = modes.argmax_time_courses(alpha)
+    n_states = alpha.shape[-1]
 
     # Indices for the upper triangle of a channels by channels matrix
     m, n = np.triu_indices(n_channels)
@@ -1707,11 +1702,17 @@ def _multitaper(
     if standardize:
         data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 
+    # Rescaling for the PSD to account for how much time each
+    # state was active. Note, we using the same scaling as the
+    # the multitaper calculation in the HMM-MAR toolbox
+    sum_alpha2 = np.sum(alpha**2, axis=0)
+    scaling = n_samples / sum_alpha2
+
     psd = []
     coh = []
-    for i in range(stc.shape[-1]):
+    for i in range(n_states):
         # Calculate spectrogram for this state's data
-        x = data * stc[..., i][..., np.newaxis]
+        x = data * alpha[:, i][..., np.newaxis]
         _, f, p = _multitaper_spectrogram(
             data=x,
             sampling_frequency=sampling_frequency,
@@ -1726,6 +1727,9 @@ def _multitaper(
         # Average over the time dimension
         p = np.mean(p, axis=0)
         n_freq = p.shape[-1]
+
+        # Rescale
+        p *= scaling[i]
 
         if calc_coh:
             # Create a channels by channels matrix for cross PSDs
@@ -1754,19 +1758,15 @@ def _multitaper(
         else:
             psd.append(p)
 
-    # Rescale PSDs to account for the number of time points
-    # each state was active
-    fo = np.sum(stc, axis=0) / stc.shape[0]
-    for i in range(len(fo)):
-        psd[i] /= fo[i]
-        if np.isnan(psd[i]).any():
-            psd[i] = np.nan_to_num(psd[i])  # zero out nan values
-            _logger.warn(
-                "PSD contains NaN values. This may indicate a potentially "
-                "poor HMM fit. You should consider running the model again "
-                "or selecting the model run with the lowest free energy after "
-                "training multiple times."
-            )
+    # Check for nans
+    if np.isnan(psd).any():
+        psd = np.nan_to_num(psd)  # zero out nan values
+        _logger.warn(
+            "PSD contains NaN values. This may indicate a potentially "
+            "poor HMM fit. You should consider running the model again "
+            "or selecting the model run with the lowest free energy after "
+            "training multiple times."
+        )
 
     if not keepdims:
         # Squeeze any axes of length 1
