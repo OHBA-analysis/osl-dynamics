@@ -823,7 +823,14 @@ def rescale_regression_coefs(
 
 
 def coherence_spectra(cpsd, keepdims=False):
-    """Calculate coherence from cross power spectral densities.
+    r"""Calculate coherence from cross power spectral densities.
+
+    We calculate the coherence as:
+
+    .. math::
+        C_{xy}(f) = \frac{|P_{xy}(f)|}{\sqrt{P_{xx}(f) P_{yy}(f)}}
+
+    where :math:`x,y` are different channels.
 
     Parameters
     ----------
@@ -841,7 +848,7 @@ def coherence_spectra(cpsd, keepdims=False):
     """
     n_channels = cpsd.shape[-2]
 
-    # Calculate coherency spectrum
+    # Calculate coherency spectrum
     coh = np.empty_like(cpsd, dtype=np.float32)
     for j in range(n_channels):
         for k in range(n_channels):
@@ -857,6 +864,45 @@ def coherence_spectra(cpsd, keepdims=False):
         coh = np.squeeze(coh)
 
     return coh
+
+
+def partial_coherence_spectra(cpsd, keepdims=False):
+    r"""Calculate partial coherence from cross power spectral densities.
+
+    We calculate the partial coherence as:
+
+    .. math::
+        PC_{xy}(f) = \
+            \frac{|P^{-1}_{xy}(f)|}{\sqrt{P^{-1}_{xx}(f) P^{-1}_{yy}(f)}}
+
+    where :math:`x,y` are different channels and :math:`P^{-1}(f)`
+    is the inverse of the cross spectral density matrix.
+
+
+    Parameters
+    ----------
+    cpsd : np.ndarray
+        Cross power spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
+    keepdims: bool, optional
+        Should we squeeze any axis of length 1?
+
+    Returns
+    -------
+    pcoh : np.ndarray
+        Partial coherence spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
+    """
+    # Calculate inverse cross spectra
+    # (Need to move axis for compatibility with np.linalg.pinv)
+    cpsd = np.moveaxis(cpsd, -1, 0)
+    icpsd = np.linalg.pinv(cpsd)
+    icpsd = np.moveaxis(icpsd, 0, -1)
+
+    # The partial coherence calculation is the same as the
+    # coherence calculation except we input the inverse cross
+    # spectral densities
+    return coherence_spectra(icpsd, keepdims=keepdims)
 
 
 def decompose_spectra(
