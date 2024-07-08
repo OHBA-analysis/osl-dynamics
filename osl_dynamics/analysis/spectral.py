@@ -1366,17 +1366,26 @@ def _welch(
     if alpha is None:
         alpha = np.ones([data.shape[0], 1], dtype=np.float32)
 
-    # Indices for the upper triangle of a channels by channels matrix
+    n_samples = data.shape[0]
     n_channels = data.shape[-1]
+    n_states = alpha.shape[-1]
+
+    # Indices for the upper triangle of a channels by channels matrix
     m, n = np.triu_indices(n_channels)
 
     # Standardise before calculating spectra
     if standardize:
         data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 
+    # Rescaling for the PSD to account for how much time each
+    # state was active. Note, we using the same scaling as the
+    # the multitaper calculation in the HMM-MAR toolbox
+    sum_alpha2 = np.sum(alpha**2, axis=0)
+    scaling = n_samples / sum_alpha2
+
     psd = []
     coh = []
-    for i in range(alpha.shape[-1]):
+    for i in range(n_states):
         # Calculate spectrogram for this state's data
         x = data * alpha[..., i][..., np.newaxis]
         _, f, p = _welch_spectrogram(
@@ -1388,8 +1397,9 @@ def _welch(
             calc_cpsd=calc_coh,
         )
 
-        # Average over the time dimension
+        # Average over the time dimension and rescale
         p = np.mean(p, axis=0)
+        p *= scaling[i]
 
         if calc_coh:
             # Create a channels by channels matrix for cross PSDs
@@ -1409,19 +1419,15 @@ def _welch(
         else:
             psd.append(p)
 
-    # Rescale PSDs to account for the number of time points
-    # each state was active
-    fo = np.sum(stc, axis=0) / stc.shape[0]
-    for i in range(len(fo)):
-        psd[i] /= fo[i]
-        if np.isnan(psd[i]).any():
-            psd[i] = np.nan_to_num(psd[i])  # zero out nan values
-            _logger.warn(
-                "PSD contains NaN values. This may indicate a potentially "
-                "poor HMM fit. You should consider running the model again "
-                "or selecting the model run with the lowest free energy after "
-                "training multiple times."
-            )
+    # Check for nans
+    if np.isnan(psd).any():
+        psd = np.nan_to_num(psd)  # zero out nan values
+        _logger.warn(
+            "PSD contains NaN values. This may indicate a potentially "
+            "poor HMM fit. You should consider running the model again "
+            "or selecting the model run with the lowest free energy after "
+            "training multiple times."
+        )
 
     if not keepdims:
         # Squeeze any axes of length 1
@@ -1724,12 +1730,10 @@ def _multitaper(
             n_tapers=n_tapers,
         )
 
-        # Average over the time dimension
+        # Average over the time dimension and rescale
         p = np.mean(p, axis=0)
-        n_freq = p.shape[-1]
-
-        # Rescale
         p *= scaling[i]
+        n_freq = p.shape[-1]
 
         if calc_coh:
             # Create a channels by channels matrix for cross PSDs
