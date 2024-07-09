@@ -894,7 +894,7 @@ def partial_coherence_spectra(cpsd, keepdims=False):
     # Calculate inverse cross spectra
     # (Need to move axis for compatibility with np.linalg.pinv)
     cpsd = np.moveaxis(cpsd, -1, 0)
-    icpsd = np.linalg.pinv(cpsd)
+    icpsd = np.linalg.inv(cpsd)
     icpsd = np.moveaxis(icpsd, 0, -1)
 
     # The partial coherence calculation is the same as the
@@ -907,8 +907,8 @@ def partial_directed_coherence_spectra(
     f,
     cpsd,
     sampling_frequency,
-    n_iterations=100,
-    tol=1e-10,
+    n_iterations=50,
+    tol=1e-7,
     keepdims=False,
 ):
     r"""Calculate partial directed coherence from cross power spectra.
@@ -948,22 +948,15 @@ def partial_directed_coherence_spectra(
         Shape is (..., n_channels, n_channels, n_freq).
     """
 
-    def _plus_operator(g, m, fs, freq):
+    def _plus_operator(g):
         # Helper function for _wilson_factorization
-        N = freq.shape[0] - 1
-        gam = np.zeros([m, m, 2 * N]) * (1 + 1j)
-        for i in range(m):
-            for j in range(m):
-                gam[i, j, :] = np.fft.ifft(g[i, j, :])
-        gamp = gam.copy()
+        N = g.shape[-1] // 2 + 1
+        gam = np.fft.ifft(g)
         beta0 = 0.5 * gam[:, :, 0]
+        gamp = gam.copy()
         gamp[:, :, 0] = np.triu(beta0)
-        gamp[:, :, len(freq) :] = 0
-        gp = np.zeros([m, m, 2 * N]) * (1 + 1j)
-        for i in range(m):
-            for j in range(m):
-                gp[i, j, :] = np.fft.fft(gamp[i, j, :])
-        return gp
+        gamp[:, :, N:] = 0
+        return np.fft.fft(gamp)
 
     def _wilson_factorization(
         S, freq=f, fs=sampling_frequency, Niterations=n_iterations, tol=tol
@@ -972,62 +965,37 @@ def partial_directed_coherence_spectra(
         # https://github.com/ViniciusLima94/pyGC/blob/master/pygc/non_parametric.py
         #
         # Returns:
-        # - Left spectral factor: Snew (channels, channels, frequencies)
-        # - Transfer function: Hnew (channels, channels, frequencies)
-        # - Noise covariance: Znew (channels, channels)
+        # - Transfer function: H (channels, channels, frequencies)
         m = S.shape[0]
         N = freq.shape[0] - 1
-        Sarr = np.zeros([m, m, 2 * N]) * (1 + 1j)
-        f_ind = 0
-        for f in freq:
-            Sarr[:, :, f_ind] = S[:, :, f_ind]
-            if f_ind > 0:
-                Sarr[:, :, 2 * N - f_ind] = S[:, :, f_ind].T
-            f_ind += 1
-        gam = np.zeros([m, m, 2 * N])
-        for i in range(m):
-            for j in range(m):
-                gam[i, j, :] = (np.fft.ifft(Sarr[i, j, :])).real
+        Sarr = np.zeros([m, m, 2 * N], dtype=complex)
+        Sarr[:, :, :N] = S[:, :, :N]
+        Sarr[:, :, N:] = S[:, :, 1:].transpose(1, 0, 2)[:, :, ::-1]
+        gam = np.fft.ifft(Sarr).real
         gam0 = gam[:, :, 0]
         h = np.linalg.cholesky(gam0).T
-        psi = np.ones([m, m, 2 * N]) * (1 + 1j)
-        for i in range(0, Sarr.shape[2]):
-            psi[:, :, i] = h
+        psi = np.tile(h[:, :, np.newaxis], (1, 1, 2 * N)).astype(complex)
         I = np.eye(m)
-        g = np.zeros([m, m, 2 * N]) * (1 + 1j)
-        for iteration in range(Niterations):
-            for i in range(Sarr.shape[2]):
-                g[:, :, i] = (
-                    np.matmul(
-                        np.matmul(np.linalg.inv(psi[:, :, i]), Sarr[:, :, i]),
-                        np.conj(np.linalg.inv(psi[:, :, i])).T,
-                    )
-                    + I
-                )
-            gp = _plus_operator(g, m, fs, freq)
+        g = np.zeros([m, m, 2 * N], dtype=complex)
+        for _ in range(Niterations):
+            for i in range(2 * N):
+                inv_psi = np.linalg.inv(psi[:, :, i])
+                g[:, :, i] = inv_psi @ Sarr[:, :, i] @ np.conj(inv_psi).T + I
+            gp = _plus_operator(g)
             psiold = psi.copy()
             psierr = 0
-            for i in range(Sarr.shape[2]):
-                psi[:, :, i] = np.matmul(psi[:, :, i], gp[:, :, i])
-                psierr += (
-                    np.linalg.norm(psi[:, :, i] - psiold[:, :, i], 1) / Sarr.shape[2]
-                )
+            for i in range(2 * N):
+                psi[:, :, i] = psi[:, :, i] @ gp[:, :, i]
+                psierr += np.linalg.norm(psi[:, :, i] - psiold[:, :, i], 1)
+            psierr /= 2 * N
             if psierr < tol:
                 break
-        Snew = np.zeros([m, m, N + 1]) * (1 + 1j)
+        A0 = np.fft.ifft(psi).real[:, :, 0]
+        inv_A0 = np.linalg.inv(A0)
+        H = np.zeros([m, m, N + 1], dtype=complex)
         for i in range(N + 1):
-            Snew[:, :, i] = np.matmul(psi[:, :, i], np.conj(psi[:, :, i]).T)
-        gamtmp = np.zeros([m, m, 2 * N]) * (1 + 1j)
-        for i in range(m):
-            for j in range(m):
-                gamtmp[i, j, :] = np.fft.ifft(psi[i, j, :]).real
-        A0 = gamtmp[:, :, 0]
-        A0inv = np.linalg.inv(A0)
-        Znew = np.matmul(A0, A0.T).real
-        Hnew = np.zeros([m, m, N + 1]) * (1 + 1j)
-        for i in range(N + 1):
-            Hnew[:, :, i] = np.matmul(psi[:, :, i], A0inv)
-        return Snew, Hnew, Znew
+            H[:, :, i] = psi[:, :, i] @ inv_A0
+        return H
 
     def _calc_pdc(cpsd):
         # Calculate partial directed coherence from a single cross spectrum.
@@ -1039,7 +1007,7 @@ def partial_directed_coherence_spectra(
         # - pdc (n_channels, n_channels, n_freq) array
 
         # Calculate transfer function using Wilson's factorisation method
-        _, H, _ = _wilson_factorization(cpsd)
+        H = _wilson_factorization(cpsd)
 
         # Calculate coefficient matrix
         # Note, we need to reshape for compatibility with np.linalg.inv
