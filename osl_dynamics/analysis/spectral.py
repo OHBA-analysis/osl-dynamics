@@ -1582,7 +1582,7 @@ def _welch(
                 dtype=np.complex64,
             )
             cpsd[m, n] = p
-            cpsd[n, m] = p
+            cpsd[n, m] = np.conj(p)
 
             # Unpack PSDs
             psd.append(cpsd[range(n_channels), range(n_channels)].real)
@@ -1915,7 +1915,7 @@ def _multitaper(
                 dtype=np.complex64,
             )
             cpsd[m, n] = p
-            cpsd[n, m] = p
+            cpsd[n, m] = np.conj(p)
 
             # Unpack PSDs
             psd.append(cpsd[range(n_channels), range(n_channels)].real)
@@ -1929,7 +1929,7 @@ def _multitaper(
                 dtype=np.complex64,
             )
             cpsd[m, n] = p
-            cpsd[n, m] = p
+            cpsd[n, m] = np.conj(p)
             psd.append(cpsd)
 
         else:
