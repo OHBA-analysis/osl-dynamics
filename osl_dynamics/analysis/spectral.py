@@ -12,7 +12,6 @@ from tqdm.auto import trange
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression
-from osl_dynamics.inference import modes
 from osl_dynamics.utils.misc import nextpow2
 
 _logger = logging.getLogger("osl-dynamics")
@@ -877,7 +876,6 @@ def partial_coherence_spectra(cpsd, keepdims=False):
 
     where :math:`x,y` are different channels and :math:`P^{-1}(f)`
     is the inverse of the cross spectral density matrix.
-
 
     Parameters
     ----------
