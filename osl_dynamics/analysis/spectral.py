@@ -910,7 +910,6 @@ def partial_directed_coherence_spectra(
     n_iterations=100,
     tol=1e-10,
     keepdims=False,
-    n_jobs=1,
 ):
     r"""Calculate partial directed coherence from cross power spectra.
 
@@ -920,8 +919,10 @@ def partial_directed_coherence_spectra(
         PDC_{ij}(f) = \frac{|A_{ij}(f)|}{\sqrt{\sum_m |A_{mj}(f)|^2}}
 
     where :math:`i,j` are different channels and :math:`A(f) = H^{-1}(f)`
-    is the inverse of the transfer function, which calculated by factorizing
-    the cross spectral density matrix.
+    is the inverse of the transfer function, which is calculated by
+    factorizing the cross spectral density matrix.
+
+    By default this function will use all cores available.
 
     Parameters
     ----------
@@ -939,8 +940,6 @@ def partial_directed_coherence_spectra(
         Tolerance for the Wilson factorization of the cross spectra.
     keepdims: bool, optional
         Should we squeeze any axis of length 1?
-    n_jobs : int, optional
-        Number of parallel jobs.
 
     Returns
     -------
@@ -949,44 +948,124 @@ def partial_directed_coherence_spectra(
         Shape is (..., n_channels, n_channels, n_freq).
     """
 
+    def _plus_operator(g, m, fs, freq):
+        # Helper function for _wilson_factorization
+        N = freq.shape[0] - 1
+        gam = np.zeros([m, m, 2 * N]) * (1 + 1j)
+        for i in range(m):
+            for j in range(m):
+                gam[i, j, :] = np.fft.ifft(g[i, j, :])
+        gamp = gam.copy()
+        beta0 = 0.5 * gam[:, :, 0]
+        gamp[:, :, 0] = np.triu(beta0)
+        gamp[:, :, len(freq) :] = 0
+        gp = np.zeros([m, m, 2 * N]) * (1 + 1j)
+        for i in range(m):
+            for j in range(m):
+                gp[i, j, :] = np.fft.fft(gamp[i, j, :])
+        return gp
+
+    def _wilson_factorization(
+        S, freq=f, fs=sampling_frequency, Niterations=n_iterations, tol=tol
+    ):
+        # Algorithm for the Wilson Factorization of the spectral matrix. From:
+        # https://github.com/ViniciusLima94/pyGC/blob/master/pygc/non_parametric.py
+        #
+        # Returns:
+        # - Left spectral factor: Snew (channels, channels, frequencies)
+        # - Transfer function: Hnew (channels, channels, frequencies)
+        # - Noise covariance: Znew (channels, channels)
+        m = S.shape[0]
+        N = freq.shape[0] - 1
+        Sarr = np.zeros([m, m, 2 * N]) * (1 + 1j)
+        f_ind = 0
+        for f in freq:
+            Sarr[:, :, f_ind] = S[:, :, f_ind]
+            if f_ind > 0:
+                Sarr[:, :, 2 * N - f_ind] = S[:, :, f_ind].T
+            f_ind += 1
+        gam = np.zeros([m, m, 2 * N])
+        for i in range(m):
+            for j in range(m):
+                gam[i, j, :] = (np.fft.ifft(Sarr[i, j, :])).real
+        gam0 = gam[:, :, 0]
+        h = np.linalg.cholesky(gam0).T
+        psi = np.ones([m, m, 2 * N]) * (1 + 1j)
+        for i in range(0, Sarr.shape[2]):
+            psi[:, :, i] = h
+        I = np.eye(m)
+        g = np.zeros([m, m, 2 * N]) * (1 + 1j)
+        for iteration in range(Niterations):
+            for i in range(Sarr.shape[2]):
+                g[:, :, i] = (
+                    np.matmul(
+                        np.matmul(np.linalg.inv(psi[:, :, i]), Sarr[:, :, i]),
+                        np.conj(np.linalg.inv(psi[:, :, i])).T,
+                    )
+                    + I
+                )
+            gp = _plus_operator(g, m, fs, freq)
+            psiold = psi.copy()
+            psierr = 0
+            for i in range(Sarr.shape[2]):
+                psi[:, :, i] = np.matmul(psi[:, :, i], gp[:, :, i])
+                psierr += (
+                    np.linalg.norm(psi[:, :, i] - psiold[:, :, i], 1) / Sarr.shape[2]
+                )
+            if psierr < tol:
+                break
+        Snew = np.zeros([m, m, N + 1]) * (1 + 1j)
+        for i in range(N + 1):
+            Snew[:, :, i] = np.matmul(psi[:, :, i], np.conj(psi[:, :, i]).T)
+        gamtmp = np.zeros([m, m, 2 * N]) * (1 + 1j)
+        for i in range(m):
+            for j in range(m):
+                gamtmp[i, j, :] = np.fft.ifft(psi[i, j, :]).real
+        A0 = gamtmp[:, :, 0]
+        A0inv = np.linalg.inv(A0)
+        Znew = np.matmul(A0, A0.T).real
+        Hnew = np.zeros([m, m, N + 1]) * (1 + 1j)
+        for i in range(N + 1):
+            Hnew[:, :, i] = np.matmul(psi[:, :, i], A0inv)
+        return Snew, Hnew, Znew
+
+    def _calc_pdc(cpsd):
+        # Calculate partial directed coherence from a single cross spectrum.
+        #
+        # Inputs:
+        # - cpsd (n_channels, n_channels, n_freq) array
+        #
+        # Returns:
+        # - pdc (n_channels, n_channels, n_freq) array
+
+        # Calculate transfer function using Wilson's factorisation method
+        _, H, _ = _wilson_factorization(cpsd)
+
+        # Calculate coefficient matrix
+        # Note, we need to reshape for compatibility with np.linalg.inv
+        H = np.moveaxis(H, -1, 0)
+        A = np.linalg.inv(H)
+        A = np.moveaxis(A, 0, -1)
+
+        # Calculate partial directed coherence
+        pdc = np.abs(A) / np.sqrt(np.sum(np.abs(A) ** 2, axis=0, keepdims=True))
+        return pdc.astype(np.float32)
+
     # _calc_pdc works on 3D data, we flatten the input here
     original_shape = cpsd.shape
     flattened_cpsd = cpsd.reshape((-1, *original_shape[-3:]))
 
     # Create keyword arguments to pass to _calc_pdc
-    kwargs = [
-        {
-            "f": f,
-            "cpsd": S,
-            "sampling_frequency": sampling_frequency,
-            "n_iterations": n_iterations,
-            "tol": tol,
-        }
-        for S in flattened_cpsd
-    ]
+    kwargs = [{"cpsd": S} for S in flattened_cpsd]
 
     # Main calculation
     if len(kwargs) == 1:
-        # We only have one array so we don't need to parallelise
-        # the calculation
         _logger.info("Calculating PDC")
         results = [_calc_pdc(**kwargs[0])]
-
-    elif n_jobs == 1:
-        # We have multiple arrays but we're running in serial
+    else:
         results = []
         for i in trange(len(kwargs), desc="Calculating PDC"):
             results.append(_calc_pdc(**kwargs[i]))
-
-    else:
-        # Calculate in parallel
-        _logger.info("Calculating PDC")
-        results = pqdm(
-            kwargs,
-            _calc_pdc,
-            n_jobs=n_jobs,
-            argument_type="kwargs",
-        )
 
     # Put the results back into the original shape
     pdc = np.array(results).reshape(original_shape)
@@ -2040,123 +2119,3 @@ def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
         mean_window_alpha[i] = np.mean(a_sub_window, axis=0)
 
     return mean_window_alpha
-
-
-def _calc_pdc(f, cpsd, sampling_frequency, n_iterations=100, tol=1e-10):
-    """Calculate partial directed coherence from a single cross spectrum.
-
-    Parameters
-    ----------
-    f : np.ndarray
-        Frequency axis. Shape must be (n_freq,).
-    cpsd : np.ndarray
-        Cross spectral density matrix.
-        Shape must be (n_channels, n_channels, n_freq).
-    sampling_frequency : float
-        Sampling frequency in Hz.
-    n_iterations : int, optional
-        Number of iterations for Wilson factorization.
-    tol : float, optional
-        Tolerance for Wilson factorization.
-
-    Returns
-    -------
-    pdc : np.ndarray
-        Partial directed coherence.
-        Shape is (n_channels, n_channels, n_freq).
-    """
-
-    def _plus_operator(g, m, fs, freq):
-        # Helper function for wilson_factorization
-        N = freq.shape[0] - 1
-        gam = np.zeros([m, m, 2 * N]) * (1 + 1j)
-        for i in range(m):
-            for j in range(m):
-                gam[i, j, :] = np.fft.ifft(g[i, j, :])
-        gamp = gam.copy()
-        beta0 = 0.5 * gam[:, :, 0]
-        gamp[:, :, 0] = np.triu(beta0)
-        gamp[:, :, len(freq) :] = 0
-        gp = np.zeros([m, m, 2 * N]) * (1 + 1j)
-        for i in range(m):
-            for j in range(m):
-                gp[i, j, :] = np.fft.fft(gamp[i, j, :])
-        return gp
-
-    def _wilson_factorization(
-        S, freq=f, fs=sampling_frequency, Niterations=n_iterations, tol=tol
-    ):
-        # Algorithm for the Wilson Factorization of the spectral matrix.
-        # From: https://github.com/ViniciusLima94/pyGC/blob/master/pygc/non_parametric.py
-        #
-        # Returns:
-        # - Left spectral factor: Snew (channels, channels, frequencies)
-        # - Transfer function: Hnew (channels, channels, frequencies)
-        # - Noise covariance: Znew (channels, channels)
-        m = S.shape[0]
-        N = freq.shape[0] - 1
-        Sarr = np.zeros([m, m, 2 * N]) * (1 + 1j)
-        f_ind = 0
-        for f in freq:
-            Sarr[:, :, f_ind] = S[:, :, f_ind]
-            if f_ind > 0:
-                Sarr[:, :, 2 * N - f_ind] = S[:, :, f_ind].T
-            f_ind += 1
-        gam = np.zeros([m, m, 2 * N])
-        for i in range(m):
-            for j in range(m):
-                gam[i, j, :] = (np.fft.ifft(Sarr[i, j, :])).real
-        gam0 = gam[:, :, 0]
-        h = np.linalg.cholesky(gam0).T
-        psi = np.ones([m, m, 2 * N]) * (1 + 1j)
-        for i in range(0, Sarr.shape[2]):
-            psi[:, :, i] = h
-        I = np.eye(m)
-        g = np.zeros([m, m, 2 * N]) * (1 + 1j)
-        for iteration in range(Niterations):
-            for i in range(Sarr.shape[2]):
-                g[:, :, i] = (
-                    np.matmul(
-                        np.matmul(np.linalg.inv(psi[:, :, i]), Sarr[:, :, i]),
-                        np.conj(np.linalg.inv(psi[:, :, i])).T,
-                    )
-                    + I
-                )
-            gp = _plus_operator(g, m, fs, freq)
-            psiold = psi.copy()
-            psierr = 0
-            for i in range(Sarr.shape[2]):
-                psi[:, :, i] = np.matmul(psi[:, :, i], gp[:, :, i])
-                psierr += (
-                    np.linalg.norm(psi[:, :, i] - psiold[:, :, i], 1) / Sarr.shape[2]
-                )
-            if psierr < tol:
-                break
-        Snew = np.zeros([m, m, N + 1]) * (1 + 1j)
-        for i in range(N + 1):
-            Snew[:, :, i] = np.matmul(psi[:, :, i], np.conj(psi[:, :, i]).T)
-        gamtmp = np.zeros([m, m, 2 * N]) * (1 + 1j)
-        for i in range(m):
-            for j in range(m):
-                gamtmp[i, j, :] = np.fft.ifft(psi[i, j, :]).real
-        A0 = gamtmp[:, :, 0]
-        A0inv = np.linalg.inv(A0)
-        Znew = np.matmul(A0, A0.T).real
-        Hnew = np.zeros([m, m, N + 1]) * (1 + 1j)
-        for i in range(N + 1):
-            Hnew[:, :, i] = np.matmul(psi[:, :, i], A0inv)
-        return Snew, Hnew, Znew
-
-    # Calculate transfer function using Wilson's factorisation method
-    _, H, _ = _wilson_factorization(cpsd)
-
-    # Calculate coefficient matrix
-    # Note, we need to reshape for compatibility with np.linalg.inv
-    H = np.moveaxis(H, -1, 0)
-    A = np.linalg.inv(H)
-    A = np.moveaxis(A, 0, -1)
-
-    # Calculate partial directed coherence
-    pdc = np.abs(A) / np.sqrt(np.sum(np.abs(A) ** 2, axis=0, keepdims=True))
-
-    return pdc.astype(np.float32)
