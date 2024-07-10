@@ -17,7 +17,7 @@ The recommended installation of the latest version via pip is described :doc:`he
 Do I need a GPU?
 ~~~~~~~~~~~~~~~~
 
-No, osl-dynamics can be used on solely on CPUs, however, using the package on a computer with a GPU will be much faster (could expect a speed up of 10x). Note, `Google colab <https://colab.research.google.com/>`_ offers free GPU access - see 'How do I use osl-dynamics on Google colab?' below.
+No, osl-dynamics can be used on solely on CPUs, however, using the package on a computer with a GPU will be much faster (could expect a speed up of 10x). Note, `Google colab <https://colab.research.google.com/>`_ offers free GPU access.
 
 The GPU use in this package is via the TensorFlow package, which is used by osl-dynamics to create and train the models (HMM, DyNeMo, etc).
 

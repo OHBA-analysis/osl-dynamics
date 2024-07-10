@@ -50,14 +50,14 @@ Note, if you're using a Mac computer you need to install TensorFlow with `pip in
 
 ### TensorFlow versions
 
-osl-dynamics can be used with the following TensorFlow versions:
+osl-dynamics has been tested with the following versions:
 
 | tensorflow  | tensorflow-probability |
 | ------------- | ------------- |
 | 2.11 | 0.19  |
 | 2.12 | 0.19  |
 | 2.13 | 0.20  |
-| 2.14 | 0.21  |
+| 2.14 | 0.22  |
 | 2.15 | 0.22  |
 
 ### Removing osl-dynamics
