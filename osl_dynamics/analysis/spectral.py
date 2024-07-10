@@ -950,13 +950,13 @@ def partial_directed_coherence_spectra(
 
     def _plus_operator(g):
         # Helper function for _wilson_factorization
-        N = g.shape[-1] // 2 + 1
-        gam = np.fft.ifft(g)
-        beta0 = 0.5 * gam[:, :, 0]
+        N = g.shape[0] // 2 + 1
+        gam = np.fft.ifft(g, axis=0)
+        beta0 = 0.5 * gam[0]
         gamp = gam.copy()
-        gamp[:, :, 0] = np.triu(beta0)
-        gamp[:, :, N:] = 0
-        return np.fft.fft(gamp)
+        gamp[0] = np.triu(beta0)
+        gamp[N:] = 0
+        return np.fft.fft(gamp, axis=0)
 
     def _wilson_factorization(
         S, freq=f, fs=sampling_frequency, Niterations=n_iterations, tol=tol
@@ -964,60 +964,46 @@ def partial_directed_coherence_spectra(
         # Algorithm for the Wilson Factorization of the spectral matrix. From:
         # https://github.com/ViniciusLima94/pyGC/blob/master/pygc/non_parametric.py
         #
+        # Args:
+        # - Cross spectra: S (frequencies, channels, channels)
+        #
         # Returns:
-        # - Transfer function: H (channels, channels, frequencies)
-        m = S.shape[0]
+        # - Transfer function: H (frequencies, channels, channels)
+        m = S.shape[-1]
         N = freq.shape[0] - 1
-        Sarr = np.zeros([m, m, 2 * N], dtype=complex)
-        Sarr[:, :, :N] = S[:, :, :N]
-        Sarr[:, :, N:] = S[:, :, 1:].transpose(1, 0, 2)[:, :, ::-1]
-        gam = np.fft.ifft(Sarr).real
-        gam0 = gam[:, :, 0]
-        h = np.linalg.cholesky(gam0).T
-        psi = np.tile(h[:, :, np.newaxis], (1, 1, 2 * N)).astype(complex)
-        I = np.eye(m)
-        g = np.zeros([m, m, 2 * N], dtype=complex)
+        Sarr = np.zeros([2 * N, m, m], dtype=complex)
+        Sarr[:N] = S[:N]
+        Sarr[N:] = S[1:].transpose(0, 2, 1)[::-1]
+        gam = np.fft.ifft(Sarr, axis=0).real
+        h = np.linalg.cholesky(gam[0]).T
+        psi = np.tile(h[np.newaxis, ...], (2 * N, 1, 1)).astype(complex)
+        I = np.eye(m)[np.newaxis, ...]
         for _ in range(Niterations):
-            for i in range(2 * N):
-                inv_psi = np.linalg.inv(psi[:, :, i])
-                g[:, :, i] = inv_psi @ Sarr[:, :, i] @ np.conj(inv_psi).T + I
+            inv_psi = np.linalg.inv(psi)
+            g = inv_psi @ Sarr @ np.conj(inv_psi).transpose(0, 2, 1) + I
             gp = _plus_operator(g)
             psiold = psi.copy()
-            psierr = 0
-            for i in range(2 * N):
-                psi[:, :, i] = psi[:, :, i] @ gp[:, :, i]
-                psierr += np.linalg.norm(psi[:, :, i] - psiold[:, :, i], 1)
-            psierr /= 2 * N
+            psi = psi @ gp
+            psierr = np.mean(np.linalg.norm(psi - psiold, 1, axis=1)) / (2 * N)
             if psierr < tol:
                 break
-        A0 = np.fft.ifft(psi).real[:, :, 0]
-        inv_A0 = np.linalg.inv(A0)
-        H = np.zeros([m, m, N + 1], dtype=complex)
-        for i in range(N + 1):
-            H[:, :, i] = psi[:, :, i] @ inv_A0
-        return H
+        A = np.fft.ifft(psi, axis=0).real
+        inv_A0 = np.linalg.inv(A[0])
+        return psi[: N + 1] @ inv_A0
 
     def _calc_pdc(cpsd):
         # Calculate partial directed coherence from a single cross spectrum.
         #
-        # Inputs:
+        # Args:
         # - cpsd (n_channels, n_channels, n_freq) array
         #
         # Returns:
         # - pdc (n_channels, n_channels, n_freq) array
-
-        # Calculate transfer function using Wilson's factorisation method
-        H = _wilson_factorization(cpsd)
-
-        # Calculate coefficient matrix
-        # Note, we need to reshape for compatibility with np.linalg.inv
-        H = np.moveaxis(H, -1, 0)
+        S = np.moveaxis(cpsd, -1, 0)
+        H = _wilson_factorization(S)
         A = np.linalg.inv(H)
-        A = np.moveaxis(A, 0, -1)
-
-        # Calculate partial directed coherence
-        pdc = np.abs(A) / np.sqrt(np.sum(np.abs(A) ** 2, axis=0, keepdims=True))
-        return pdc.astype(np.float32)
+        pdc = np.abs(A) / np.sqrt(np.sum(np.abs(A) ** 2, axis=1, keepdims=True))
+        return np.moveaxis(pdc, 0, -1).astype(np.float32)
 
     # _calc_pdc works on 3D data, we flatten the input here
     original_shape = cpsd.shape
