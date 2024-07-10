@@ -146,6 +146,33 @@ class ConcatenateLayer(layers.Layer):
         return tf.concat(inputs, axis=self.axis)
 
 
+class SplitLayer(layers.Layer):
+    """Wrapper for `tf.split \
+    <https://www.tensorflow.org/api_docs/python/tf/split>`_.
+
+    Parameters
+    ----------
+    num_or_size_splits : int or list
+        Split to apply.
+    axis : int
+        Axis to split along.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the base class.
+    """
+
+    def __init__(self, num_or_size_splits, axis, **kwargs):
+        super().__init__(**kwargs)
+        self.num_or_size_splits = num_or_size_splits
+        self.axis = axis
+
+    def call(self, inputs, **kwargs):
+        return tf.split(
+            inputs,
+            num_or_size_splits=self.num_or_size_splits,
+            axis=self.axis,
+        )
+
+
 class MatMulLayer(layers.Layer):
     """Wrapper for `tf.matmul \
     <https://www.tensorflow.org/api_docs/python/tf/linalg/matmul>`_.

@@ -1660,22 +1660,16 @@ class Model(ModelBase):
 
         config = self.config
 
-        # Inputs
+        # Definition of layers
         inputs = layers.Input(
             shape=(config.sequence_length, config.n_channels + config.n_states),
             name="inputs",
         )
-        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
-
-        # Static loss scaling factor
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
             config.sequence_length,
             config.loss_calc,
             name="static_loss_scaling_factor",
         )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-
-        # Definition of layers
         means_layer = VectorsLayer(
             config.n_states,
             config.n_channels,
@@ -1712,6 +1706,8 @@ class Model(ModelBase):
         )
 
         # Data flow
+        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
         mu = means_layer(
             data, static_loss_scaling_factor=static_loss_scaling_factor
         )  # data not used

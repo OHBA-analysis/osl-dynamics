@@ -490,14 +490,11 @@ class Model(HMM):
 
         config = self.config
 
-        # Inputs
+        # Definition of layers
         inputs = layers.Input(
             shape=(config.sequence_length, config.n_channels + config.n_states),
             name="inputs",
         )
-        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
-
-        # Definition of layers
         log_rates_layer = VectorsLayer(
             config.n_states,
             config.n_channels,
@@ -510,6 +507,7 @@ class Model(HMM):
         )
 
         # Data flow
+        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
         log_rates = log_rates_layer(data)  # data not used
         ll_loss = ll_loss_layer([data, log_rates, gamma, None])
 
