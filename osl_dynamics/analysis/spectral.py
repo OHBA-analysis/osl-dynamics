@@ -12,7 +12,6 @@ from tqdm.auto import trange
 
 from osl_dynamics import array_ops
 from osl_dynamics.analysis import regression
-from osl_dynamics.inference import modes
 from osl_dynamics.utils.misc import nextpow2
 
 _logger = logging.getLogger("osl-dynamics")
@@ -823,45 +822,39 @@ def rescale_regression_coefs(
 
 
 def coherence_spectra(cpsd, keepdims=False):
-    """Calculates coherences from cross power spectral densities.
+    r"""Calculate coherence from cross power spectral densities.
+
+    We calculate the coherence as:
+
+    .. math::
+        C_{xy}(f) = \frac{|P_{xy}(f)|}{\sqrt{P_{xx}(f) P_{yy}(f)}}
+
+    where :math:`x,y` are different channels.
 
     Parameters
     ----------
     cpsd : np.ndarray
         Cross power spectra.
-        Shape is (n_channels, n_channels, n_freq) or
-        (n_modes, n_channels, n_channels, n_freq).
+        Shape is (..., n_channels, n_channels, n_freq).
     keepdims: bool, optional
         Should we squeeze any axis of length 1?
 
     Returns
     -------
     coh : np.ndarray
-        Coherence spectra. Shape is (..., n_channels, n_channels, n_freq).
+        Coherence spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
     """
-    error_message = (
-        "cpsd must be a numpy array with shape "
-        "(n_channels, n_channels, n_freq) or "
-        "(n_modes, n_channels, n_channels, n_freq)."
-    )
-    cpsd = array_ops.validate(
-        cpsd,
-        correct_dimensionality=4,
-        allow_dimensions=[3],
-        error_message=error_message,
-    )
+    n_channels = cpsd.shape[-2]
 
-    n_modes, n_channels, n_channels, n_freq = cpsd.shape
-    coh = np.empty(
-        [n_modes, n_channels, n_channels, n_freq],
-        dtype=np.float32,
-    )
-    for i in range(n_modes):
-        for j in range(n_channels):
-            for k in range(n_channels):
-                coh[i, j, k] = abs(cpsd[i, j, k]) / np.sqrt(
-                    cpsd[i, j, j].real * cpsd[i, k, k].real
-                )
+    # Calculate coherency spectrum
+    coh = np.empty_like(cpsd, dtype=np.float32)
+    for j in range(n_channels):
+        for k in range(n_channels):
+            Pxy = cpsd[..., j, k, :]
+            Pxx = cpsd[..., j, j, :].real
+            Pyy = cpsd[..., k, k, :].real
+            coh[..., j, k, :] = abs(Pxy) / np.sqrt(Pxx * Pyy)
 
     # Zero nan values
     coh = np.nan_to_num(coh)
@@ -870,6 +863,172 @@ def coherence_spectra(cpsd, keepdims=False):
         coh = np.squeeze(coh)
 
     return coh
+
+
+def partial_coherence_spectra(cpsd, keepdims=False):
+    r"""Calculate partial coherence from cross power spectral densities.
+
+    We calculate the partial coherence as:
+
+    .. math::
+        PC_{xy}(f) = \
+            \frac{|P^{-1}_{xy}(f)|}{\sqrt{P^{-1}_{xx}(f) P^{-1}_{yy}(f)}}
+
+    where :math:`x,y` are different channels and :math:`P^{-1}(f)`
+    is the inverse of the cross spectral density matrix.
+
+    Parameters
+    ----------
+    cpsd : np.ndarray
+        Cross power spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
+    keepdims: bool, optional
+        Should we squeeze any axis of length 1?
+
+    Returns
+    -------
+    pcoh : np.ndarray
+        Partial coherence spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
+    """
+    # Calculate inverse cross spectra
+    # (Need to move axis for compatibility with np.linalg.pinv)
+    cpsd = np.moveaxis(cpsd, -1, 0)
+    icpsd = np.linalg.inv(cpsd)
+    icpsd = np.moveaxis(icpsd, 0, -1)
+
+    # The partial coherence calculation is the same as the
+    # coherence calculation except we input the inverse cross
+    # spectral densities
+    return coherence_spectra(icpsd, keepdims=keepdims)
+
+
+def partial_directed_coherence_spectra(
+    f,
+    cpsd,
+    sampling_frequency,
+    n_iterations=50,
+    tol=1e-7,
+    keepdims=False,
+):
+    r"""Calculate partial directed coherence from cross power spectra.
+
+    We calculate the partial directed coherence as:
+
+    .. math::
+        PDC_{ij}(f) = \frac{|A_{ij}(f)|}{\sqrt{\sum_m |A_{mj}(f)|^2}}
+
+    where :math:`i,j` are different channels and :math:`A(f) = H^{-1}(f)`
+    is the inverse of the transfer function, which is calculated by
+    factorizing the cross spectral density matrix.
+
+    By default this function will use all cores available.
+
+    Parameters
+    ----------
+    f : np.ndarray
+        Frequency axis. Shape is (n_freq,).
+    cpsd : np.ndarray
+        Cross power spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
+    sampling_frequency : float
+        Sampling frequency (Hz).
+    n_iterations : int, optional
+        Number of iterations in the Wilson factorization of the cross
+        spectra.
+    tol : float, optional
+        Tolerance for the Wilson factorization of the cross spectra.
+    keepdims: bool, optional
+        Should we squeeze any axis of length 1?
+
+    Returns
+    -------
+    pdc : np.ndarray
+        Partial directed coherence spectra.
+        Shape is (..., n_channels, n_channels, n_freq).
+    """
+
+    def _plus_operator(g):
+        # Helper function for _wilson_factorization
+        N = g.shape[0] // 2 + 1
+        gam = np.fft.ifft(g, axis=0)
+        beta0 = 0.5 * gam[0]
+        gamp = gam.copy()
+        gamp[0] = np.triu(beta0)
+        gamp[N:] = 0
+        return np.fft.fft(gamp, axis=0)
+
+    def _wilson_factorization(
+        S, freq=f, fs=sampling_frequency, Niterations=n_iterations, tol=tol
+    ):
+        # Algorithm for the Wilson Factorization of the spectral matrix. From:
+        # https://github.com/ViniciusLima94/pyGC/blob/master/pygc/non_parametric.py
+        #
+        # Args:
+        # - Cross spectra: S (frequencies, channels, channels)
+        #
+        # Returns:
+        # - Transfer function: H (frequencies, channels, channels)
+        m = S.shape[-1]
+        N = freq.shape[0] - 1
+        Sarr = np.zeros([2 * N, m, m], dtype=complex)
+        Sarr[:N] = S[:N]
+        Sarr[N:] = S[1:].transpose(0, 2, 1)[::-1]
+        gam = np.fft.ifft(Sarr, axis=0).real
+        h = np.linalg.cholesky(gam[0]).T
+        psi = np.tile(h[np.newaxis, ...], (2 * N, 1, 1)).astype(complex)
+        I = np.eye(m)[np.newaxis, ...]
+        for _ in range(Niterations):
+            inv_psi = np.linalg.inv(psi)
+            g = inv_psi @ Sarr @ np.conj(inv_psi).transpose(0, 2, 1) + I
+            gp = _plus_operator(g)
+            psiold = psi.copy()
+            psi = psi @ gp
+            psierr = np.mean(np.linalg.norm(psi - psiold, 1, axis=1)) / (2 * N)
+            if psierr < tol:
+                break
+        A = np.fft.ifft(psi, axis=0).real
+        inv_A0 = np.linalg.inv(A[0])
+        return psi[: N + 1] @ inv_A0
+
+    def _calc_pdc(cpsd):
+        # Calculate partial directed coherence from a single cross spectrum.
+        #
+        # Args:
+        # - cpsd (n_channels, n_channels, n_freq) array
+        #
+        # Returns:
+        # - pdc (n_channels, n_channels, n_freq) array
+        S = np.moveaxis(cpsd, -1, 0)
+        H = _wilson_factorization(S)
+        A = np.linalg.inv(H)
+        pdc = np.abs(A) / np.sqrt(np.sum(np.abs(A) ** 2, axis=1, keepdims=True))
+        return np.moveaxis(pdc, 0, -1).astype(np.float32)
+
+    # _calc_pdc works on 3D data, we flatten the input here
+    original_shape = cpsd.shape
+    flattened_cpsd = cpsd.reshape((-1, *original_shape[-3:]))
+
+    # Create keyword arguments to pass to _calc_pdc
+    kwargs = [{"cpsd": S} for S in flattened_cpsd]
+
+    # Main calculation
+    if len(kwargs) == 1:
+        _logger.info("Calculating PDC")
+        results = [_calc_pdc(**kwargs[0])]
+    else:
+        results = []
+        for i in trange(len(kwargs), desc="Calculating PDC"):
+            results.append(_calc_pdc(**kwargs[i]))
+
+    # Put the results back into the original shape
+    pdc = np.array(results).reshape(original_shape)
+
+    if not keepdims:
+        # Remove any axes that are of length 1
+        pdc = np.squeeze(pdc)
+
+    return pdc
 
 
 def decompose_spectra(
@@ -1186,8 +1345,7 @@ def _welch_spectrogram(
         (channels + 1) / 2, freq) if :code:`calc_cpsd=True`, otherwise
         it is (time, channels, freq).
     """
-    n_samples = data.shape[0]
-    n_channels = data.shape[1]
+    n_samples, n_channels = data.shape
 
     # Validation
     if window_length is None:
@@ -1363,11 +1521,10 @@ def _welch(
         Shape is (..., n_channels, n_channels, n_freq).
         Only returned is :code:`calc_coh=True`.
     """
-    if alpha is None:
-        alpha = np.ones([data.shape[0], 1], dtype=np.float32)
+    n_samples, n_channels = data.shape
 
-    n_samples = data.shape[0]
-    n_channels = data.shape[-1]
+    if alpha is None:
+        alpha = np.ones([n_samples, 1], dtype=np.float32)
     n_states = alpha.shape[-1]
 
     # Indices for the upper triangle of a channels by channels matrix
@@ -1409,7 +1566,7 @@ def _welch(
                 dtype=np.complex64,
             )
             cpsd[m, n] = p
-            cpsd[n, m] = p
+            cpsd[n, m] = np.conj(p)
 
             # Unpack PSDs
             psd.append(cpsd[range(n_channels), range(n_channels)].real)
@@ -1499,8 +1656,7 @@ def _multitaper_spectrogram(
         (channels + 1) / 2, freq) if :code:`calc_cpsd=True`, otherwise
         it is (time, channels, freq).
     """
-    n_samples = data.shape[0]
-    n_channels = data.shape[1]
+    n_samples, n_channels = data.shape
 
     # Validation
     if window_length is None:
@@ -1694,11 +1850,10 @@ def _multitaper(
         Shape is (..., n_channels, n_channels, n_freq).
         Only returned is :code:`calc_coh=True`.
     """
+    n_samples, n_channels = data.shape
+
     if alpha is None:
         alpha = np.ones([n_samples, 1], dtype=np.float32)
-
-    n_samples = data.shape[0]
-    n_channels = data.shape[-1]
     n_states = alpha.shape[-1]
 
     # Indices for the upper triangle of a channels by channels matrix
@@ -1742,7 +1897,7 @@ def _multitaper(
                 dtype=np.complex64,
             )
             cpsd[m, n] = p
-            cpsd[n, m] = p
+            cpsd[n, m] = np.conj(p)
 
             # Unpack PSDs
             psd.append(cpsd[range(n_channels), range(n_channels)].real)
@@ -1756,7 +1911,7 @@ def _multitaper(
                 dtype=np.complex64,
             )
             cpsd[m, n] = p
-            cpsd[n, m] = p
+            cpsd[n, m] = np.conj(p)
             psd.append(cpsd)
 
         else:
@@ -1872,8 +2027,7 @@ def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
     mean_window_alpha : np.ndarray
         Mean for each window.
     """
-    n_samples = alpha.shape[0]
-    n_modes = alpha.shape[1]
+    n_samples, n_modes = alpha.shape
 
     # Pad alphas
     alpha = np.pad(alpha, window_length // 2)[
