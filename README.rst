@@ -42,6 +42,16 @@ Windows
 
 If you are using a Windows computer, we recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions `here <https://ubuntu.com/wsl>`_. Then following the instructions above in the Ubuntu terminal.
 
+TensorFlow Versions
+-------------------
+
+osl-dynamics can be used with the following TensorFlow versions
+
+|  R |  Python |    Matlab |
+| --------- |:---|:---------|:-----|
+| library(tidyverse) |import numpy as np|
+
+
 Within an osl environment
 -------------------------
 
