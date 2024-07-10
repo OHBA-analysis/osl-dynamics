@@ -9,16 +9,25 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from io import StringIO
 from contextlib import contextmanager
+from packaging import version
 
 import yaml
 import numpy as np
 import tensorflow as tf
 from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
-from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
+
+if version.parse(tf.__version__) < version.parse("2.13"):
+    from tensorflow.python.distribute.distribution_strategy_context import get_strategy
+elif version.parse(tf.__version__) < version.parse("2.16"):
+    from tensorflow.python.distribute.distribute_lib import get_strategy
+else:
+    raise ImportError(
+        f"Unsupported TensorFlow version: {tf.__version__}. Please use <= 2.15."
+    )
 
 import osl_dynamics
 from osl_dynamics import data

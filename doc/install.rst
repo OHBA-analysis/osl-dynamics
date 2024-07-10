@@ -63,6 +63,28 @@ Windows Instructions
 
 If you are using a Windows computer, we recommend first installing linux (Ubuntu) as a Windows Subsystem by following the instructions `here <https://ubuntu.com/wsl>`_. Then following the instructions above in the Ubuntu terminal.
 
+TensorFlow Versions
+-------------------
+
+osl-dynamics has been tested with the following versions:
+
+.. list-table::
+   :widths: 25 25
+   :header-rows: 1
+
+   * - tensorflow
+     - tensorflow-probability
+   * - 2.11
+     - 0.19
+   * - 2.12
+     - 0.19
+   * - 2.13
+     - 0.20
+   * - 2.14
+     - 0.22
+   * - 2.15
+     - 0.22
+
 Training Speed
 --------------
 
