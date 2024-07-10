@@ -22,8 +22,12 @@ from tqdm.keras import TqdmCallback
 
 if version.parse(tf.__version__) < version.parse("2.12"):
     from tensorflow.python.distribute.distribution_strategy_context import get_strategy
-else:
+elif version.parse(tf.__version__) < version.parse("2.16"):
     from tensorflow.python.distribute.distribute_lib import get_strategy
+else:
+    raise ImportError(
+        f"Unsupported TensorFlow version: {tf.__version__}. Please use <= 2.15."
+    )
 
 import osl_dynamics
 from osl_dynamics import data
