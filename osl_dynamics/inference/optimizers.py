@@ -8,6 +8,8 @@ import tensorflow as tf
 
 if version.parse(tf.__version__) < version.parse("2.12"):
     from keras.optimizers.optimizer_v2.optimizer_v2 import OptimizerV2 as Optimizer
+elif version.parse(tf.__version__) < version.parse("2.13"):
+    from keras.optimizers.legacy.optimizer_v2 import OptimizerV2 as Optimizer
 else:
     from keras.optimizers.legacy import Optimizer
 

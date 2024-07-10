@@ -20,7 +20,7 @@ from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
 
-if version.parse(tf.__version__) < version.parse("2.12"):
+if version.parse(tf.__version__) < version.parse("2.13"):
     from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 elif version.parse(tf.__version__) < version.parse("2.16"):
     from tensorflow.python.distribute.distribute_lib import get_strategy
