@@ -1345,8 +1345,7 @@ def _welch_spectrogram(
         (channels + 1) / 2, freq) if :code:`calc_cpsd=True`, otherwise
         it is (time, channels, freq).
     """
-    n_samples = data.shape[0]
-    n_channels = data.shape[1]
+    n_samples, n_channels = data.shape
 
     # Validation
     if window_length is None:
@@ -1522,11 +1521,10 @@ def _welch(
         Shape is (..., n_channels, n_channels, n_freq).
         Only returned is :code:`calc_coh=True`.
     """
-    if alpha is None:
-        alpha = np.ones([data.shape[0], 1], dtype=np.float32)
+    n_samples, n_channels = data.shape
 
-    n_samples = data.shape[0]
-    n_channels = data.shape[-1]
+    if alpha is None:
+        alpha = np.ones([n_samples, 1], dtype=np.float32)
     n_states = alpha.shape[-1]
 
     # Indices for the upper triangle of a channels by channels matrix
@@ -1658,8 +1656,7 @@ def _multitaper_spectrogram(
         (channels + 1) / 2, freq) if :code:`calc_cpsd=True`, otherwise
         it is (time, channels, freq).
     """
-    n_samples = data.shape[0]
-    n_channels = data.shape[1]
+    n_samples, n_channels = data.shape
 
     # Validation
     if window_length is None:
@@ -1853,11 +1850,10 @@ def _multitaper(
         Shape is (..., n_channels, n_channels, n_freq).
         Only returned is :code:`calc_coh=True`.
     """
+    n_samples, n_channels = data.shape
+
     if alpha is None:
         alpha = np.ones([n_samples, 1], dtype=np.float32)
-
-    n_samples = data.shape[0]
-    n_channels = data.shape[-1]
     n_states = alpha.shape[-1]
 
     # Indices for the upper triangle of a channels by channels matrix
@@ -2031,8 +2027,7 @@ def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
     mean_window_alpha : np.ndarray
         Mean for each window.
     """
-    n_samples = alpha.shape[0]
-    n_modes = alpha.shape[1]
+    n_samples, n_modes = alpha.shape
 
     # Pad alphas
     alpha = np.pad(alpha, window_length // 2)[
