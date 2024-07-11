@@ -2,8 +2,6 @@
 
 """
 
-from copy import deepcopy
-
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -211,7 +209,8 @@ def reinitialize_layer_weights(layer):
             #
             # We need to create a new initializer to get new
             # random values
-            new_initializer = deepcopy(initializer)
+            config = initializer.get_config()
+            new_initializer = initializer_type.from_config(config)
 
         # Get the variable (i.e. weights) we want to re-initialize
         if key == "recurrent_initializer":

@@ -45,10 +45,12 @@ from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.simulation import HMM
 from osl_dynamics.utils.misc import set_logging_level
+from osl_dynamics import array_ops
 
 _logger = logging.getLogger("osl-dynamics")
 
 warnings.filterwarnings("ignore", category=NumbaWarning)
+logging.getLogger("numba.core.transforms").setLevel(logging.ERROR)
 
 EPS = sys.float_info.epsilon
 
@@ -115,6 +117,9 @@ class Config(BaseModelConfig):
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use.
+    loss_calc : str
+        How should we collapse the time dimension in the loss?
+        Either :code:`'mean'` or :code:`'sum'`.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -188,7 +193,16 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, use_tqdm=False, verbose=1, **kwargs):
+    def fit(
+        self,
+        dataset,
+        epochs=None,
+        use_tqdm=False,
+        checkpoint_freq=None,
+        save_filepath=None,
+        verbose=1,
+        **kwargs,
+    ):
         """Fit model to a dataset.
 
         Iterates between:
@@ -205,6 +219,10 @@ class Model(ModelBase):
             Number of epochs.
         use_tqdm : bool, optional
             Should we use :code:`tqdm` to display a progress bar?
+        checkpoint_freq : int, optional
+            Frequency (in epochs) of saving model checkpoints.
+        save_filepath : str, optional
+            Path to save the model.
         verbose : int, optional
             Verbosity level. :code:`0=silent`.
         kwargs : keyword arguments, optional
@@ -219,6 +237,16 @@ class Model(ModelBase):
         """
         if epochs is None:
             epochs = self.config.n_epochs
+
+        if checkpoint_freq is not None:
+            checkpoint = tf.train.Checkpoint(
+                model=self.model, optimizer=self.model.optimizer
+            )
+            if save_filepath is None:
+                save_filepath = "tmp"
+            self.save_config(save_filepath)
+            checkpoint_dir = f"{save_filepath}/checkpoints"
+            checkpoint_prefix = f"{checkpoint_dir}/ckpt"
 
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
@@ -289,6 +317,13 @@ class Model(ModelBase):
             history["loss"].append(np.mean(loss))
             history["rho"].append(self.rho)
             history["lr"].append(lr)
+
+            # Save model checkpoint
+            if checkpoint_freq is not None and (n + 1) % checkpoint_freq == 0:
+                checkpoint.save(file_prefix=checkpoint_prefix)
+
+        if checkpoint_freq is not None:
+            np.save(f"{save_filepath}/trans_prob.npy", self.trans_prob)
 
         if use_tqdm:
             _range.close()
@@ -1268,6 +1303,75 @@ class Model(ModelBase):
 
         return alpha
 
+    def get_viterbi_path(self, dataset, concatenate=False):
+        """Get the Viterbi path with the Viterbi algorithm.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for
+            each session.
+        concatenate : bool, optional
+            Should we concatenate the Viterbi path for each session?
+
+        Returns
+        -------
+        viterbi_path : list or np.ndarray
+            Viterbi path with shape (n_sessions, n_samples) or (n_samples,).
+        """
+        P_0 = self.state_probs_t0
+        P = self.trans_prob
+        n_states = P.shape[0]
+
+        log_P_0 = np.log(P_0 + EPS)
+        log_P = np.log(P + EPS)
+
+        def _viterbi_path(x):
+            # x.shape = (batch_size, sequence_length, n_channels)
+            batch_size = x.shape[0]
+            sequence_length = x.shape[1]
+
+            log_b = self.get_log_likelihood(x)
+            log_b = log_b.reshape(batch_size * sequence_length, n_states)
+
+            log_prob = np.empty((batch_size * sequence_length, n_states), dtype=float)
+            prev = np.empty((batch_size * sequence_length, n_states), dtype=int)
+
+            log_prob[0] = log_P_0 + log_b[0]
+            for t in range(1, batch_size * sequence_length):
+                place_holder = log_prob[t - 1] + log_P.T + log_b[t]
+                log_prob[t] = np.max(place_holder, axis=1)
+                prev[t] = np.argmax(place_holder, axis=1)
+
+            # Backtrack
+            path = np.empty(batch_size * sequence_length, dtype=int)
+            path[-1] = np.argmax(log_prob[-1])
+            for t in range(batch_size * sequence_length - 2, -1, -1):
+                path[t] = prev[t + 1, path[t + 1]]
+
+            return path
+
+        dataset = self.make_dataset(dataset)
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting Viterbi path")
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting Viterbi path")
+
+        viterbi_path = []
+        for i in iterator:
+            path = []
+            for data in dataset[i]:
+                x = data["data"]
+                path.append(_viterbi_path(x))
+            viterbi_path.append(array_ops.get_one_hot(np.concatenate(path), n_states))
+
+        if concatenate or len(viterbi_path) == 1:
+            viterbi_path = np.concatenate(viterbi_path)
+
+        return viterbi_path
+
     def get_n_params_generative_model(self):
         """Get the number of trainable parameters in the generative model.
 
@@ -1586,20 +1690,16 @@ class Model(ModelBase):
 
         config = self.config
 
-        # Inputs
+        # Definition of layers
         inputs = layers.Input(
             shape=(config.sequence_length, config.n_channels + config.n_states),
             name="inputs",
         )
-        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
-
-        # Static loss scaling factor
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            name="static_loss_scaling_factor"
+            config.sequence_length,
+            config.loss_calc,
+            name="static_loss_scaling_factor",
         )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-
-        # Definition of layers
         means_layer = VectorsLayer(
             config.n_states,
             config.n_channels,
@@ -1629,10 +1729,15 @@ class Model(ModelBase):
                 name="covs",
             )
         ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-            config.n_states, config.covariances_epsilon, name="ll_loss"
+            config.n_states,
+            config.covariances_epsilon,
+            config.loss_calc,
+            name="ll_loss",
         )
 
         # Data flow
+        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
         mu = means_layer(
             data, static_loss_scaling_factor=static_loss_scaling_factor
         )  # data not used

@@ -23,6 +23,9 @@ from osl_dynamics.utils.parcellation import Parcellation
 
 _logger = logging.getLogger("osl-dynamics")
 
+# Suppress matplotlib warnings
+logging.getLogger("matplotlib.category").setLevel(logging.ERROR)
+
 
 def set_style(params):
     """Sets matplotlib's style.

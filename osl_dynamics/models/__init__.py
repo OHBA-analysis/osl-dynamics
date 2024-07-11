@@ -7,8 +7,6 @@ import yaml
 from osl_dynamics.models import (
     dynemo,
     simplified_dynemo,
-    mage,
-    sage,
     mdynemo,
     state_dynemo,
     hmm,
@@ -21,8 +19,6 @@ from osl_dynamics.utils import misc
 models = {
     "DyNeMo": dynemo.Model,
     "Simplified-DyNeMo": simplified_dynemo.Model,
-    "MAGE": mage.Model,
-    "SAGE": sage.Model,
     "M-DyNeMo": mdynemo.Model,
     "State-DyNeMo": state_dynemo.Model,
     "HMM": hmm.Model,

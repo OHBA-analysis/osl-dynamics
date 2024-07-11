@@ -14,12 +14,10 @@ How do I install osl-dynamics?
 
 The recommended installation of the latest version via pip is described :doc:`here <install>`.
 
-To have access to the very latest code (that is activately being developed), then install from source using the instructions on the GitHub `readme <https://github.com/OHBA-analysis/osl-dynamics>`_.
-
 Do I need a GPU?
 ~~~~~~~~~~~~~~~~
 
-No, osl-dynamics can be used on solely on CPUs, however, using the package on a computer with a GPU will be much faster (could expect a speed up of 10x). Note, `Google colab <https://colab.research.google.com/>`_ offers free GPU access - see 'How do I use osl-dynamics on Google colab?' below.
+No, osl-dynamics can be used on solely on CPUs, however, using the package on a computer with a GPU will be much faster (could expect a speed up of 10x). Note, `Google colab <https://colab.research.google.com/>`_ offers free GPU access.
 
 The GPU use in this package is via the TensorFlow package, which is used by osl-dynamics to create and train the models (HMM, DyNeMo, etc).
 
@@ -33,23 +31,6 @@ Note:
 - There's no official TensorFlow package in pip which supports GPU use on a MacOS, however, you can install tensorflow-metal following the instructions `here <https://developer.apple.com/metal/tensorflow-plugin/>`_, which will allow TensorFlow to take advantage of hardware inside your Mac.
 
 - If you're installing osl-dynamics on a computing cluster you know has GPUs, then you may only need to ensure you have the correct CUDA/cuDNN libraries installed/loaded and you will automatically use the available GPUs. You could also consider installing a GPU-enabled version of TensorFlow called :code:`tensorflow-gpu` via conda or pip.
-
-How do I use osl-dynamics on Google colab?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-All you need to do is install osl-dynamics (and some additional packages) via pip at the start of your Google colab script. This can be done with::
-
-    !pip install nilearn==0.9.2
-    !pip install nibabel==5.0.1
-    !pip install numpy==1.23.5
-    !pip install osl-dynamics
-
-Note, you will need to restart your runtime to ensure Google colab is using the packages you just installed.
-
-How do I use osl-dynamics on the Oxford BMRC cluster?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-See the readme `here <https://github.com/OHBA-analysis/osl-dynamics/blob/main/doc/using_bmrc.rst>`_.
 
 Data
 ----
@@ -92,7 +73,7 @@ There are three common choices for preparing the data:
 
 #. **Calculate time-delay embedded data, followed by principal component analysis and standardization**. Time-delay embedding is described in the 'What is time-delay embedding?' section below. **This is the recommended approach for studying source-space M/EEG data**.
 
-The :doc:`Preparing Data tutorial <tutorials_build/data_preparation>` covers how to prepare data using the three options.
+The :doc:`Preparing Data tutorial <tutorials_build/data_prepare_meg>` covers how to prepare data using the three options.
 
 What is time-delay embedding?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -113,20 +94,9 @@ See the 'What is time-delay embedding' question for a description of what happen
 
 A choice we have to make is how many lagged version of each channel we add. The number of lagged channels we add (i.e. the number of embeddings) determines how many points in the auto-correlation function (and therefore power spectrum) we encode into the covariance matrix of the data. I.e. if we include more embeddings, we add more off-diagonal elements into the covariance matrix, which corresponds to specifying more data points in the auto-correlation function and therefore power spectrum. In other words, having more embeddings allows you to pick up on smaller differences in the frequency of oscillations in your data - the resolution of the power spectrum has increased.
 
-However, we find with electrophysiological data that there aren't very many narrowband peaks in the power spectrum. Therefore, having a very high resolution power spectrum doesn't affect the state/mode decomposition with the HMM/DyNeMo - rather the HMM/DyNeMo states/modes are more driven by differences in total power instead of frequency specific power (although the frequency content does have some effect, it's not the main driver). Consequently, you will likely find the states/modes you infer with the HMM/DyNeMo aren't very sensitive to the number of embeddings. We have found :code:`n_embeddings=15` generally works quite well.
+However, we find with electrophysiological data that there aren't very many narrowband peaks in the power spectrum. Therefore, having a very high resolution power spectrum doesn't affect the state/mode decomposition with the HMM/DyNeMo - rather the HMM/DyNeMo states/modes are more driven by differences in total power instead of frequency specific power (although the frequency content does have some effect, it's not the main driver). Consequently, you will likely find the states/modes you infer with the HMM/DyNeMo aren't very sensitive to the number of embeddings.
 
-In summary, increasing the number of embeddings will increase your ability to resolve smaller differences in the power spectrum in different HMM/DyNeMo states/modes.
-
-See the :doc:`Preparing Data tutorial <tutorials_build/data_preparation>` for example code comparing different TDE settings.
-
-What is the minimum number of channels/lags required for time-delay embedding?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Time-delay embedding (TDE) can be applied to any number of channels down to one. The number of lags (i.e. embeddings) determines the frequencies you are able to resolve (see 'How does the choice of number of lags (embeddings) affect the model when doing time-delay embedding?').
-
-It is helpful to consider an example to understand how to make the choice for the number of lags. If your data is sampled at 250 Hz and you TDE a channel with 15 embeddings (±7 lags), you estimate 15 data points in your auto-correlation function, which is equivalent to a power spectrum estimated at 15 evenly distribution frequencies across the range -125 Hz to 125 Hz. Your frequency resolution is therefore approximately 17 Hz. The HMM/DyNeMo will be able to learn states with different activity in the 0-17 Hz band, 17-34 Hz, band, 34-51 Hz, etc. The choice for the number embeddings must be sufficiently large enough for you to resolve the frequency ranges you are interested.
-
-See the :doc:`Preparing Data tutorial <tutorials_build/data_preparation>` for example code comparing different TDE settings.
+The number of embeddings should be chosen for a particular sampling frequency. See the :doc:`Time-Delay Embedding tutorial <tutorials_build/data_time_delay_embedding>` for example code comparing different TDE settings.
 
 Why doesn't the number of time points in my inferred alphas match the original data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -137,8 +107,6 @@ The process of preparing the data before training a model can lead to the loss a
 - Smoothing after a Hilbert transform. When we prepare amplitude envelope data, we usually apply a smoothing window. The length of the window is specified using the :code:`n_window`. When we smooth the data with the window we lose :code:`n_window // 2` data points from each end of the time series.
 
 Note, we have a separate time series for each subject, so we lose these data points from each subject separately. In addition to the data point lost above, before we train a model we separate the time series into sequences. We lose the data points **at the end** that do not form a complete sequence.
-
-The alphas inferred by a model are learnt using the shortened data, which causes the mismatch. The :doc:`HMM: Training on Real Data tutorial <tutorials_build/hmm_training_real_data>` goes through code for how to align the inferred alphas to the original data.
 
 Note, you can trim data using the :code:`Data.trim_time_series` method, example use::
 
@@ -277,7 +245,7 @@ It is common to look at four summary statistics:
 - The **mean interval**, which is the average duration between successive state visits.
 - The **switching rate**, which is the average number of visits to a state per second.
 
-Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <tutorials_build/hmm_summary_stats_analysis>` for example code of how to calculate these quantities.
+Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <tutorials_build/hmm_summary_stats>` for example code of how to calculate these quantities.
 
 Often, we are interested in comparing two groups or conditions. E.g. we might find static alpha (8-12 Hz) power is increased for one group/condition. Let's speculate there are segments in our data where alpha power bursts occur - this would be identified by the HMM as a state with high alpha power that only activates for particular segments. The increase in alpha power seen for a group/condition can arise in many ways, maybe the alpha bursts are longer in duration, maybe they're more frequency, maybe the dynamics are unchanged but the alpha state just has more alpha power in it. The different summary statistics can potentially help interpret which of these options it is.
 
@@ -329,4 +297,4 @@ How can I cite the package?
 
 Please cite the preprint:
 
-    **Gohil C., Huang R., Roberts E., van Es M.W.J., Quinn A.J., Vidaurre D., Woolrich M.W. (2023) osl-dynamics: A toolbox for modelling fast dynamic brain activity. eLife 12:RP91949 https://doi.org/10.7554/eLife.91949.2**
+    **Chetan Gohil, Rukuang Huang, Evan Roberts, Mats WJ van Es, Andrew J Quinn, Diego Vidaurre, Mark W Woolrich (2024) osl-dynamics, a toolbox for modeling fast dynamic brain activity eLife 12:RP91949.**

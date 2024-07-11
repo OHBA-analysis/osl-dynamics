@@ -11,12 +11,6 @@ Each subject performed 6 runs.
 
 import os
 
-# We will download example data hosted on osf.io/by2tc.
-# Note, osfclient must be installed. This can be installed with pip:
-#
-#     pip install osfclient
-
-
 def get_data(name, output_dir):
     if os.path.exists(output_dir):
         print(f"{output_dir} already downloaded. Skipping..")
@@ -26,9 +20,8 @@ def get_data(name, output_dir):
     os.remove(f"{name}.zip")
     print(f"Data downloaded to: {output_dir}")
 
-
-# Download the dataset (approximately 2 GB)
+# We will download example data hosted on osf.io/by2tc.
 #
 # This will unzip the wakeman_henson.zip file into a
 # directory called "data"
-get_data("wakeman_henson", output_dir="data")
+get_data("wakeman_henson_glasser", output_dir="data")

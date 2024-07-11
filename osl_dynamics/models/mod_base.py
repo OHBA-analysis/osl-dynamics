@@ -9,16 +9,25 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from io import StringIO
 from contextlib import contextmanager
+from packaging import version
 
 import yaml
 import numpy as np
 import tensorflow as tf
 from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
-from tensorflow.python.distribute.distribution_strategy_context import get_strategy
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
 from tqdm.auto import tqdm as tqdm_auto
 from tqdm.keras import TqdmCallback
+
+if version.parse(tf.__version__) < version.parse("2.13"):
+    from tensorflow.python.distribute.distribution_strategy_context import get_strategy
+elif version.parse(tf.__version__) < version.parse("2.16"):
+    from tensorflow.python.distribute.distribute_lib import get_strategy
+else:
+    raise ImportError(
+        f"Unsupported TensorFlow version: {tf.__version__}. Please use <= 2.15."
+    )
 
 import osl_dynamics
 from osl_dynamics import data
@@ -45,6 +54,7 @@ class BaseModelConfig:
     gradient_clip: float = None
     n_epochs: int = None
     optimizer: tf.keras.optimizers.Optimizer = "adam"
+    loss_calc: str = "mean"
     multi_gpu: bool = False
     strategy: str = None
 
@@ -72,6 +82,9 @@ class BaseModelConfig:
 
         if self.lr_decay < 0:
             raise ValueError("lr_decay must be non-negative.")
+
+        if self.loss_calc not in ["mean", "sum"]:
+            raise ValueError("loss_calc must be 'mean' or 'sum'.")
 
         # Strategy for distributed learning
         if self.multi_gpu:
@@ -156,6 +169,7 @@ class ModelBase:
         use_tqdm=False,
         tqdm_class=None,
         save_best_after=None,
+        checkpoint_freq=None,
         save_filepath=None,
         **kwargs,
     ):
@@ -175,6 +189,8 @@ class ModelBase:
         save_best_after : int, optional
             Epoch number after which we should save the best model. The best
             model is that which achieves the lowest loss.
+        checkpoint_freq : int, optional
+            Frequency (in epochs) at which to create checkpoints.
         save_filepath : str, optional
             Path to save the best model to.
         additional_callbacks : list, optional
@@ -224,6 +240,16 @@ class ModelBase:
                 filepath=save_filepath,
             )
             additional_callbacks.append(save_best_callback)
+
+        if checkpoint_freq is not None:
+            if save_filepath is None:
+                save_filepath = f"tmp"
+            self.save_config(save_filepath)
+            checkpoint_callback = callbacks.CheckpointCallback(
+                save_freq=checkpoint_freq,
+                checkpoint_dir=f"{save_filepath}/checkpoints",
+            )
+            additional_callbacks.append(checkpoint_callback)
 
         # Update arguments/keyword arguments to pass to the fit method
         args, kwargs = replace_argument(
@@ -591,13 +617,15 @@ class ModelBase:
         return config_dict, version
 
     @classmethod
-    def load(cls, dirname, single_gpu=True):
+    def load(cls, dirname, from_checkpoint=True, single_gpu=True):
         """Load model from :code:`dirname`.
 
         Parameters
         ----------
         dirname : str
             Directory where :code:`config.yml` and weights are stored.
+        from_checkpoint : bool, optional
+            Should we load the model from a checkpoint?
         single_gpu : bool, optional
             Should we compile the model on a single GPU?
 
@@ -628,8 +656,20 @@ class ModelBase:
         model = cls(config)
         model.osld_version = version
 
-        # Restore weights
-        model.load_weights(f"{dirname}/weights").expect_partial()
+        # Restore model
+        if from_checkpoint:
+            checkpoint = tf.train.Checkpoint(
+                model=model.model, optimizer=model.model.optimizer
+            )
+            checkpoint.restore(
+                tf.train.latest_checkpoint(f"{dirname}/checkpoints")
+            ).expect_partial()
+
+            # For HMM, also need to load the trans prob
+            if config["model_name"] == "HMM":
+                model.trans_prob = np.load(f"{dirname}/trans_prob.npy")
+        else:
+            model.load_weights(f"{dirname}/weights").expect_partial()
 
         return model
 

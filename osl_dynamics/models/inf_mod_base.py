@@ -112,7 +112,7 @@ class VariationalInferenceModelBase(ModelBase):
             decay_start_epoch = self.config.n_kl_annealing_epochs
         else:
             decay_start_epoch = 0
-        learning_rate = self.config.learning_rate
+        learning_rate = self.model.optimizer.learning_rate.numpy()
 
         def lr_scheduler(epoch, lr):
             if epoch < decay_start_epoch:

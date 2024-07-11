@@ -1,13 +1,5 @@
 """Functions to calculate and save network power maps.
 
-Note
-----
-This module is used in the following tutorials:
-
-- `Static Power Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/static_power_analysis.html>`_
-- `HMM Power Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/hmm_power_analysis.html>`_
 """
 
 import os
@@ -16,8 +8,9 @@ from pathlib import Path
 
 import numpy as np
 import nibabel as nib
-from nilearn import plotting
+from nilearn import image, plotting
 from tqdm.auto import trange
+from pqdm.threads import pqdm
 import matplotlib.pyplot as plt
 
 from osl_dynamics import array_ops, files
@@ -27,7 +20,7 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def sliding_window_power(
-    data, window_length, step_size=None, power_type="mean", concatenate=False
+    data, window_length, step_size=None, power_type="mean", concatenate=False, n_jobs=1
 ):
     """Calculate sliding window power.
 
@@ -46,6 +39,8 @@ def sliding_window_power(
     concatenate : bool, optional
         Should we concatenate the sliding window power from each array
         into one big time series?
+    n_jobs : int, optional
+        Number of jobs to run in parallel. Default is 1.
 
     Returns
     -------
@@ -69,25 +64,45 @@ def sliding_window_power(
         if data.ndim != 3:
             data = [data]
 
-    # Calculate sliding window power for each array
-    sliding_window_power = []
-    for i in trange(len(data), desc="Calculating sliding window power"):
-        ts = data[i]
-        n_samples = ts.shape[0]
-        n_channels = ts.shape[1]
+    # Helper function to calculate power
+    def _swp(x):
+        n_samples = x.shape[0]
+        n_channels = x.shape[1]
         n_windows = (n_samples - window_length - 1) // step_size + 1
 
+        # Preallocate an array fo hold moving average values
         swp = np.empty([n_windows, n_channels], dtype=np.float32)
-        for j in range(n_windows):
-            window_ts = ts[j * step_size : j * step_size + window_length]
-            swp[j] = metric(window_ts, axis=0)
+        for i in range(n_windows):
+            window_ts = x[i * step_size : i * step_size + window_length]
+            swp[i] = metric(window_ts, axis=0)
 
-        sliding_window_power.append(swp)
+        return swp
 
-    if concatenate or len(sliding_window_power) == 1:
-        sliding_window_power = np.concatenate(sliding_window_power)
+    # Setup keyword arguments to pass to the helper function
+    kwargs = [{"x": x} for x in data]
 
-    return sliding_window_power
+    if len(data) == 1:
+        _logger.info("Sliding window power")
+        results = [_swp(**kwargs[0])]
+
+    elif n_jobs == 1:
+        results = []
+        for i in trange(len(data), desc="Sliding window power"):
+            results.append(_swp(**kwargs[i]))
+
+    else:
+        _logger.info(f"Sliding window power")
+        results = pqdm(
+            kwargs,
+            _swp,
+            argument_type="kwargs",
+            n_jobs=n_jobs,
+        )
+
+    if concatenate or len(results) == 1:
+        results = np.concatenate(results)
+
+    return results
 
 
 def variance_from_spectra(
@@ -247,6 +262,9 @@ def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
         Value at each voxel. Shape is (x, y, z), where :code:`x`,
         :code:`y` and :code:`z` correspond to 3D voxel locations.
     """
+    # Suppress INFO messages from nibabel
+    logging.getLogger("nibabel.global").setLevel(logging.ERROR)
+
     # Validation
     mask_file = files.check_exists(mask_file, files.mask.directory)
     parcellation_file = files.check_exists(
@@ -263,6 +281,22 @@ def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
 
     # Load the parcellation
     parcellation = nib.load(parcellation_file)
+
+    # Make sure parcellation is 4D and contains 1 for voxel assignment
+    # to a parcel and 0 otherwise
+    parcellation_grid = parcellation.get_fdata()
+    if parcellation_grid.ndim == 3:
+        unique_values = np.unique(parcellation_grid)[1:]
+        parcellation_grid = np.array(
+            [(parcellation_grid == value).astype(int) for value in unique_values]
+        )
+        parcellation_grid = np.rollaxis(parcellation_grid, 0, 4)
+        parcellation = nib.Nifti1Image(
+            parcellation_grid, parcellation.affine, parcellation.header
+        )
+
+    # Make sure the parcellation grid matches the mask file
+    parcellation = image.resample_to_img(parcellation, mask)
     parcellation_grid = parcellation.get_fdata()
 
     # Make a 2D array of voxel weights for each parcel
@@ -304,6 +338,7 @@ def save(
     show_plots=True,
     combined=False,
     titles=None,
+    n_rows=1,
 ):
     """Saves power maps.
 
@@ -346,6 +381,8 @@ def save(
         Note if :code:`True` is passed, the individual images will be deleted.
     titles : list, optional
         List of titles for each power plot. Only used if :code:`combined=True`.
+    n_rows : int, optional
+        Number of rows in the combined image. Only used if :code:`combined=True`.
 
     Returns
     -------
@@ -471,13 +508,18 @@ def save(
                     plt.close(fig)
 
             if combined:
+                n_columns = -(n_modes // -n_rows)
+
                 titles = titles or [None] * n_modes
                 # Combine images into a single image
-                fig, axes = plt.subplots(1, n_modes, figsize=(n_modes * 5, 5))
-                for i, ax in enumerate(axes):
-                    ax.imshow(plt.imread(output_files[i]))
+                fig, axes = plt.subplots(
+                    n_rows, n_columns, figsize=(n_columns * 5, n_rows * 5)
+                )
+                for i, ax in enumerate(axes.flatten()):
                     ax.axis("off")
-                    ax.set_title(titles[i], fontsize=20)
+                    if i < n_modes:
+                        ax.imshow(plt.imread(output_files[i]))
+                        ax.set_title(titles[i], fontsize=20)
                 fig.tight_layout()
                 fig.savefig(filename)
 

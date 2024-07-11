@@ -21,7 +21,6 @@ os.makedirs("figures", exist_ok=True)
 # GPU settings
 tf_ops.gpu_growth()
 
-set_random_seed(1234)
 # Settings
 config = Config(
     n_states=5,

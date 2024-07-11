@@ -78,6 +78,9 @@ class Config(BaseModelConfig):
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use.
+    loss_calc : str
+        How should we collapse the time dimension in the loss?
+        Either :code:`'mean'` or :code:`'sum'`.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
@@ -487,14 +490,11 @@ class Model(HMM):
 
         config = self.config
 
-        # Inputs
+        # Definition of layers
         inputs = layers.Input(
             shape=(config.sequence_length, config.n_channels + config.n_states),
             name="inputs",
         )
-        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
-
-        # Definition of layers
         log_rates_layer = VectorsLayer(
             config.n_states,
             config.n_channels,
@@ -503,10 +503,11 @@ class Model(HMM):
             name="log_rates",
         )
         ll_loss_layer = CategoricalPoissonLogLikelihoodLossLayer(
-            config.n_states, name="ll_loss"
+            config.n_states, config.loss_calc, name="ll_loss"
         )
 
         # Data flow
+        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
         log_rates = log_rates_layer(data)  # data not used
         ll_loss = ll_loss_layer([data, log_rates, gamma, None])
 

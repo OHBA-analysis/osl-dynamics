@@ -9,12 +9,6 @@ Nottingham site. 65 subjects are part of this dataset.
 
 import os
 
-# We will download example data hosted on osf.io/by2tc.
-# Note, osfclient must be installed. This can be installed with pip:
-#
-#     pip install osfclient
-
-
 def get_data(name, output_dir):
     if os.path.exists(output_dir):
         print(f"{output_dir} already downloaded. Skipping..")
@@ -24,14 +18,13 @@ def get_data(name, output_dir):
     os.remove(f"{name}.zip")
     print(f"Data downloaded to: {output_dir}")
 
-
-# Download datasets for burst detection and dynamic network analysis
+# We will download example data hosted on osf.io/by2tc.
 # (approximately 708 MB)
 #
-# This will unzip the notts_mrc_meguk.zip file into a
+# This will unzip the notts_mrc_meguk_giles.zip file into a
 # directory called "training_data". There are two subdirectories:
 # - "bursts", which contains single channel data for the burst
 #   detection pipeline.
 # - "networks", which contains multi-channel data for the dynamic
 #   network analysis pipelines.
-get_data("notts_mrc_meguk", output_dir="training_data")
+get_data("notts_mrc_meguk_giles", output_dir="training_data")

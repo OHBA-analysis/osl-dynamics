@@ -1,26 +1,16 @@
 """Functions to calculate and plot network connectivity.
 
-Note
-----
-This module is used in the following tutorials:
-
-- `Static AEC Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/static_aec_analysis.html>`_.
-- `Sliding Window Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/sliding_window_analysis.html>`_.
-- `HMM Coherence Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/hmm_coherence_analysis.html>`_.
-- `DyNeMo Plotting Networks <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/dynemo_plotting_networks.html>`_.
 """
 
 import os
+import logging
 from pathlib import Path
 
 import numpy as np
 from nilearn import plotting
 from scipy import stats
 from tqdm.auto import trange
+from pqdm.threads import pqdm
 import matplotlib.pyplot as plt
 
 from osl_dynamics import array_ops
@@ -29,6 +19,8 @@ from osl_dynamics.analysis.spectral import get_frequency_args_range
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.parcellation import Parcellation
 
+_logger = logging.getLogger("osl-dynamics")
+
 
 def sliding_window_connectivity(
     data,
@@ -36,6 +28,7 @@ def sliding_window_connectivity(
     step_size=None,
     conn_type="corr",
     concatenate=False,
+    n_jobs=1,
 ):
     """Calculate sliding window connectivity.
 
@@ -56,6 +49,8 @@ def sliding_window_connectivity(
     concatenate : bool, optional
         Should we concatenate the sliding window connectivities from each
         array into one big time series?
+    n_jobs : int, optional
+        Number of parallel jobs to run. Default is 1.
 
     Returns
     -------
@@ -79,29 +74,47 @@ def sliding_window_connectivity(
         if data.ndim != 3:
             data = [data]
 
-    # Calculate sliding window connectivity for each array
-    sliding_window_conn = []
-    for i in trange(len(data), desc="Calculating connectivity"):
-        ts = data[i]
-        n_samples = ts.shape[0]
-        n_channels = ts.shape[1]
+    # Helper function to calculate connectivity
+    def _swc(x):
+        n_samples = x.shape[0]
+        n_channels = x.shape[1]
         n_windows = (n_samples - window_length - 1) // step_size + 1
 
         # Preallocate an array to hold moving average values
         swc = np.empty([n_windows, n_channels, n_channels], dtype=np.float32)
 
         # Compute connectivity matrix for each window
-        for j in range(n_windows):
-            window_ts = ts[j * step_size : j * step_size + window_length]
-            swc[j] = metric(window_ts, rowvar=False)
+        for i in range(n_windows):
+            window_ts = x[i * step_size : i * step_size + window_length]
+            swc[i] = metric(window_ts, rowvar=False)
 
-        # Add to list to return
-        sliding_window_conn.append(swc)
+        return swc
 
-    if concatenate or len(sliding_window_conn) == 1:
-        sliding_window_conn = np.concatenate(sliding_window_conn)
+    # Setup keyword arguments to pass to the helper function
+    kwargs = [{"x": x} for x in data]
 
-    return sliding_window_conn
+    if len(data) == 1:
+        _logger.info("Sliding window connectivity")
+        results = [_swc(**kwargs[0])]
+
+    elif n_jobs == 1:
+        results = []
+        for i in trange(len(data), desc="Sliding window connectivity"):
+            results.append(_swc(**kwargs[i]))
+
+    else:
+        _logger.info("Sliding window connectivity")
+        results = pqdm(
+            kwargs,
+            _swc,
+            argument_type="kwargs",
+            n_jobs=n_jobs,
+        )
+
+    if concatenate or len(results) == 1:
+        results = np.concatenate(results)
+
+    return results
 
 
 def covariance_from_spectra(
@@ -764,6 +777,7 @@ def save(
     axes=None,
     combined=False,
     titles=None,
+    n_rows=1,
 ):
     """Save connectivity maps as image files.
 
@@ -801,6 +815,8 @@ def save(
     titles : list, optional
         List of titles for each connectivity map. Only used if
         :code:`combined=True`.
+    n_rows : int, optional
+        Number of rows in the combined image. Only used if :code:`combined=True`.
 
     Examples
     --------
@@ -814,6 +830,8 @@ def save(
             },
         )
     """
+    # Suppress INFO messages from nibabel
+    logging.getLogger("nibabel.global").setLevel(logging.ERROR)
 
     # Validation
     connectivity_map = np.copy(connectivity_map)
@@ -887,12 +905,14 @@ def save(
         if filename is None:
             raise ValueError("filename must be passed to save the combined image.")
 
+        n_columns = -(n_modes // -n_rows)
         titles = titles or [None] * n_modes
-        fig, axes = plt.subplots(1, n_modes, figsize=(n_modes * 10, 5))
-        for i, ax in enumerate(axes):
-            ax.imshow(plt.imread(output_files[i]))
+        fig, axes = plt.subplots(n_rows, n_columns, figsize=(n_columns * 5, n_rows * 5))
+        for i, ax in enumerate(axes.flatten()):
             ax.axis("off")
-            ax.set_title(titles[i], fontsize=20)
+            if i < n_modes:
+                ax.imshow(plt.imread(output_files[i]))
+                ax.set_title(titles[i], fontsize=20)
         fig.tight_layout()
         fig.savefig(filename)
 

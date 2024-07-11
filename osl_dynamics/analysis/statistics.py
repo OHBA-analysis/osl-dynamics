@@ -1,15 +1,5 @@
 """Functions to perform statistical significance testing.
 
-Note
-----
-This module is used in the following tutorials:
-
-- `Static Power Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/static_power_analysis.html>`_
-- `HMM Summary Statistics Analysis <https://osl-dynamics.readthedocs.io/en\
-  /latest/tutorials_build/hmm_summary_stats_analysis.html>`_.
-- `HMM Evoked Response Analysis <https://osl-dynamics.readthedocs.io/en/latest\
-  /tutorials_build/hmm_evoked_response_analysis.html>`_
 """
 
 import logging
@@ -90,7 +80,7 @@ def evoked_response_max_stat_perm(
         Number of permutations.
     covariates : dict, optional
         Covariates (extra regressors) to add to the GLM fit. These will be
-        z-transformed. Must be of shape (n_subjects,).
+        z-transformed. Must a dict with values of shape (n_subjects,).
     metric : str, optional
         Metric to use to build the null distribution. Can be :code:`'tstats'` or
         :code:`'copes'`.
@@ -198,7 +188,7 @@ def group_diff_max_stat_perm(
         Number of permutations.
     covariates : dict, optional
         Covariates (extra regressors) to add to the GLM fit. These will be
-        z-transformed. Must be of shape (n_subjects,).
+        z-transformed. Must be a dict with values of shape (n_subjects,).
     metric : str, optional
         Metric to use to build the null distribution. Can be :code:`'tstats'` or
         :code:`'copes'`.
@@ -337,8 +327,8 @@ def paired_diff_max_stat_perm(data, n_perm, metric="tstats", n_jobs=1):
 
     # Create design matrix
     DC = glm.design.DesignConfig()
-    DC.add_regressor(name="Group_mean", rtype="Constant")
-    DC.add_contrast(name="Group_mean", values=[1])
+    DC.add_regressor(name="Mean", rtype="Constant")
+    DC.add_contrast(name="Mean", values=[1])
     design = DC.design_from_datainfo(data.info)
 
     # Fit model and get t-statistics

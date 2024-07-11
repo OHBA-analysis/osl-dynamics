@@ -4,57 +4,57 @@ Static: Amplitude Envelope Correlation (AEC) Analysis
 
 In this tutorial we will perform static AEC analysis on source space MEG data. This tutorial covers:
 
-1. Getting the Data
-2. Calculating AEC Networks
-3. Network Analysis
+1. Getting the data
+2. Calculating AEC networks
 
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/quwyp>`_ for the expected output.
+Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/j56q3>`_ for the expected output.
 """
 
 #%%
-# Getting the Data
+# Getting the data
 # ^^^^^^^^^^^^^^^^
-# We will use task MEG data that has already been source reconstructed. The experiment was a visuomotor task. This dataset is:
+# We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - From 10 subjects.
-# - Parcellated to 42 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz`.
+# - From 51 subjects.
+# - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
 #
 # Download the dataset
 # ********************
-# We will download example data hosted on `OSF <https://osf.io/by2tc/>`_. Note, `osfclient` must be installed. This can be done in jupyter notebook by running::
-#
-#     !pip install osfclient
+# We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
+
 
 import os
 
-def get_data(name):
-    if os.path.exists(name):
+def get_data(name, rename):
+    if rename is None:
+        rename = name
+    if os.path.exists(rename):
         return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch data/{name}.zip")
-    os.system(f"unzip -o {name}.zip -d {name}")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
     os.remove(f"{name}.zip")
-    return f"Data downloaded to: {name}"
+    return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 150 MB)
-get_data("notts_task_10_subj")
-
-# List the contents of the downloaded directory containing the dataset
-os.listdir("notts_task_10_subj")
+# Download the dataset (approximately 720 GB)
+get_data("notts_mrc_meguk_glasser", rename="source_data")
 
 #%%
 # Load the data
 # *************
 # We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
 
+
 from osl_dynamics.data import Data
 
-data = Data("notts_task_10_subj")
+data = Data("source_data", n_jobs=4)
 print(data)
 
 #%%
 # For static analysis we just need the time series for the parcellated data. We can access this using the `time_series` method.
+
 
 ts = data.time_series()
 
@@ -68,6 +68,7 @@ ts = data.time_series()
 # Calculate AEC
 # *************
 # AEC can be calculated from the parcellated time series directly. First, we need to prepare the parcellated data. Previously we loaded the data using the `Data class <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_. Fortunately, the Data class has a `prepare` method that makes this easy. Let's prepare the data for calculate the AEC network for activity in the alpha band (8-12 Hz).
+
 
 # Before we can prepare the data we must specify the sampling frequency
 # (this is needed to bandpass filter the data)
@@ -94,6 +95,7 @@ ts = data.time_series()
 #
 # Next, we want to calculate the correlation between amplitude envelopes. osl-dynamics has the `analysis.static.functional_connectivity <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/static/index.html#osl_dynamics.analysis.static.functional_connectivity>`_ function for this.
 
+
 from osl_dynamics.analysis import static
 
 # Calculate the correlation between amplitude envelope time series
@@ -102,25 +104,26 @@ aec = static.functional_connectivity(ts)
 #%%
 # We can understand the `aec` array by printing its shape.
 
+
 print(aec.shape)
 
 #%%
 # We can see it is a subject by ROIs by ROIs array. It contains all pairwise connections between ROIs.
 #
-# Network Analysis
-# ^^^^^^^^^^^^^^^^
-# Now that we have the AEC network for each subject, let's start by visualising them.
-#
 # Visualising networks
-# ********************
+# ^^^^^^^^^^^^^^^^^^^^
 # A common approach for plotting a network is as a matrix. We can do this with the `plotting.plot_matrices <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_matrices>`_ function in osl-dynamics.
+
 
 from osl_dynamics.utils import plotting
 
-plotting.plot_matrices(aec, titles=[f"Subject {i+1}" for i in range(len(aec))])
+# Just plot the first 5
+fig, ax = plotting.plot_matrices(aec[:5], titles=[f"Subject {i+1}" for i in range(5)])
+
 
 #%%
 # The diagonal is full of ones and is a lot larger then the off-diagonal values. This means our colour scale doesn't show the off-diagonal structure very well. We can zero the diagonal to improve this.
+
 
 import numpy as np
 
@@ -128,26 +131,29 @@ mat = np.copy(aec)  # we don't want to change the original aec array
 for m in mat:
     np.fill_diagonal(m, 0)
 
-plotting.plot_matrices(mat, titles=[f"Subject {i+1}" for i in range(len(aec))])
+# Just plot first 5
+fig, ax = plotting.plot_matrices(mat[:5], titles=[f"Subject {i+1}" for i in range(5)])
 
 #%%
 # We can now see the off-diagonal structure a bit better. We also see there is a lot of variability between subjects.
 #
 # Another way we can visualise the network is a glass brain plot. We can do this using the `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ function in osl-dynamics. This function is a wrapper for the nilearn function `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_. Let's use `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ to plot the first subject's AEC network.
 
+
 from osl_dynamics.analysis import connectivity
 
 connectivity.save(
     aec[0],
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
 )
 
 #%%
 # If we wanted to save the plot to an image file we could pass the `filename` argument. If we wanted to pass any arguments to nilearn's `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_ function, we could use the `plot_kwargs` arguement. Let's pass some extra arguments to `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_ to adjust the color bar and color map.
 
+
 connectivity.save(
     aec[0],
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
     plot_kwargs={"edge_vmin": 0, "edge_vmax": 0.4, "edge_cmap": "Reds"},
 )
 
@@ -158,6 +164,7 @@ connectivity.save(
 # ************************************************
 # We can use the `connectivity.threshold <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.threshold>`_ function in osl-dynamics to select the strongest connections. The easiest way to threshold is to pass the `percentile` argument, let's select the top 5% of connections.
 
+
 thres_aec = connectivity.threshold(aec, percentile=95)
 
 #%%
@@ -165,15 +172,16 @@ thres_aec = connectivity.threshold(aec, percentile=95)
 #
 # Subject-specific networks
 # *************************
-# Next, let's plot the AEC network for the first 3 subjects, thresholding the top 5%.
+# Next, let's plot the AEC network for the first 5 subjects, thresholding the top 5%.
+
 
 # Keep the top 5% of connections
 thres_aec = connectivity.threshold(aec, percentile=95)
 
 # Plot
 connectivity.save(
-    thres_aec[:3],
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+    thres_aec[:5],
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
     plot_kwargs={"edge_vmin": 0, "edge_vmax": 0.5, "edge_cmap": "Reds"},
 )
 
@@ -184,6 +192,7 @@ connectivity.save(
 # ***********************
 # Estimating subject-specific connectivity networks is often very noisy. Cleaner networks come out when we average over groups as this removes noise. Let's plot the group average AEC network.
 
+
 # Average over the group
 group_aec = np.mean(aec, axis=0)
 
@@ -193,17 +202,18 @@ thres_group_aec = connectivity.threshold(group_aec, percentile=95)
 # Plot
 connectivity.save(
     thres_group_aec,
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
     plot_kwargs={"edge_vmin": 0, "edge_vmax": 0.5, "edge_cmap": "Reds"},
 )
 
 #%%
-# Note, we can also plot an AEC network as a 3D glass brain plot using the `connectivity.save_interactive` method.
+# Note, we can also plot an AEC network as a 3D glass brain plot using `connectivity.save_interactive <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save_interactive>`_.
+
 
 # Display the network
 connectivity.save_interactive(
     thres_group_aec,
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
 )
 
 #%%
@@ -212,6 +222,7 @@ connectivity.save_interactive(
 # Data-driven thresholding
 # ************************
 # Another option is rather than specifying a percentile by hand, we can use a Gaussian Mixture Model (GMM) fit with two components (an 'on' and an 'off' component) to determine a threshold for selecting connections. The way this works is we fit two Gaussians to the distribution of connections. To understand this, let's first examine the distribution of connections.
+
 
 import matplotlib.pyplot as plt
 
@@ -228,6 +239,7 @@ plot_dist(group_aec)
 #%%
 # We see there is a cluster of connections between AEC=0 and 0.4 and another at AEC=1. The AEC=1 connections are on the diagonal of the connectivity matrix. Let's remove these to examine the distribution of off-diagonal elements, which is what we're interested in.
 
+
 # Fill diagonal with nan values
 # (nan is prefered to zeros because a zeo value will be included in the distribution, nans won't)
 np.fill_diagonal(group_aec, np.nan)
@@ -241,15 +253,14 @@ plot_dist(group_aec)
 #%%
 # We can see there is a peak around AEC=0.05 and a long tail for higher values. We want the connections around the AEC=0.05 peak to be captured by a Gaussian and the long tail to be captured by another Gaussian. Let's fit a two component Gaussian to this distribution. Fortunately, osl-dynamics has a function to do this for us: `analysis.connectivity.fit_gmm <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.fit_gmm>`_. This function returns the threshold (as a percentile) that determines the Gaussian component a connection belows to.
 
+
 # Fit a two-component Gaussian mixture model to the connectivity matrix
-#
-# We pass the standardize=False argument because we don't want to alter the
-# distribution before fitting the GMM.
 percentile = connectivity.fit_gmm(group_aec, show=True)
 print("Percentile:", percentile)
 
 #%%
 # Let's now use the data-driven threshold to select connections in our network.
+
 
 # Threshold
 thres_group_aec = connectivity.threshold(group_aec, percentile=percentile)
@@ -257,12 +268,13 @@ thres_group_aec = connectivity.threshold(group_aec, percentile=percentile)
 # Display the network
 connectivity.save_interactive(
     thres_group_aec,
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
     plot_kwargs={"edge_cmap": "Reds", "symmetric_cmap": False},
 )
 
 #%%
 # We can a lot more connections now. We can be more extreme with the connections we choose by enforcing the likelihood a of a connection belonging to the 'off' component is below a certain p-value. For example, if we wanted to show the connections belonging to the 'on' GMM component, that had a likelihood of less than 0.01 of belonging to the 'off' component, we could do the following:
+
 
 # Fit a two-component Gaussian mixture model to the connectivity matrix
 # ensuring the threshold is beyond a p-value of 0.01 of belonging to the off component
@@ -272,13 +284,14 @@ print("Percentile:", percentile)
 #%%
 # We can see the threshold has moved much more to the right now. Let's example the network with this threshold.
 
+
 # Threshold
 thres_group_aec = connectivity.threshold(group_aec, percentile=percentile)
 
 # Display the network
 connectivity.save_interactive(
     thres_group_aec,
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
     plot_kwargs={"edge_cmap": "Reds", "symmetric_cmap": False},
 )
 
@@ -286,94 +299,3 @@ connectivity.save_interactive(
 # Note, osl-dynamics has a wrapper function to return the thresholded network directly (so you don't need to threshold yourself): `connectivity.gmm_threshold <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.gmm_threshold>`_. Using this function, we can threshold connectivity matrix in one line::
 #
 #     thres_aec_mean = connectivity.gmm_threshold(aec_mean, p_value=0.01)
-#
-# Comparing groups
-# ****************
-# We could also average over sub-groups. For example, these sub-groups can be healthy vs diseased participants. Let's use the same grouping as the `Static Power Analysis tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/static_power_analysis.html>`_.
-
-# Group assignments:
-# - 1 is group 1
-# - 2 is group 2
-assignments = np.array([1, 1, 2, 1, 1, 1, 1, 2, 1, 2])
-
-# Get AEC networks for each group
-aec1 = aec[assignments == 1]
-aec2 = aec[assignments == 2]
-print(aec1.shape)
-print(aec2.shape)
-
-# Average the sub-groups
-group1_aec = np.mean(aec1, axis=0)
-group2_aec = np.mean(aec2, axis=0)
-
-# Threshold top 5%
-thres_group1_aec = connectivity.threshold(group1_aec, percentile=95)
-thres_group2_aec = connectivity.threshold(group2_aec, percentile=95)
-
-# Plot
-conn_maps = np.array([thres_group1_aec, thres_group2_aec])
-connectivity.save(
-    conn_maps,
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
-    plot_kwargs={"edge_vmin": 0, "edge_vmax": conn_maps.max(), "edge_cmap": "Reds"},
-)
-
-#%%
-# We can see group 2 has much stronger AEC connections in the occipital lobe.
-#
-# Statistical Significance Testing
-# ********************************
-# Let's see if the difference in AEC is significant. We'll use a maximum statistic permutations test for this. We'll use the osl-dynamics function: `analysis.statistics.group_diff_max_stat_perm <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/statistics/index.html#osl_dynamics.analysis.statistics.group_diff_max_stat_perm>`_.
-#
-
-from osl_dynamics.analysis import statistics
-
-def mat_to_vec(mat):
-    m, n = np.triu_indices(aec.shape[-1], k=1)  # upper triangle excluding diagonal
-    vec = mat[..., m, n]
-    return vec
-
-# Convert the AEC matrix into a vector
-aec_vec = mat_to_vec(aec)
-
-# Do statistical significance testing
-diff, pvalues = statistics.group_diff_max_stat_perm(
-    aec_vec,
-    assignments,
-    n_perm=100,
-)
-
-# Are there any significant edges?
-print("Number of significant edges:", np.sum(pvalues < 0.05))
-
-#%%
-# Unfortunately, no edges came out as significant with a p-value < 0.05. This is expect because we have a very small dataset. However, there are some with a p-value < 0.1. Let's plot edges with p-value < 0.1.
-
-def vec_to_mat(vec):
-    c = int((1 + np.sqrt( 1 + 8*vec.shape[-1]) / 2))
-    m, n = np.triu_indices(c, k=1)
-    mat = np.zeros([c, c])
-    mat[m, n] = vec
-    mat[n, m] = vec
-    return mat
-
-# Zero non-significant edges
-sig_diff = diff.copy()
-sig_diff[pvalues > 0.1] = 0
-
-# Convert back to a matrix
-aec_diff = vec_to_mat(sig_diff)
-
-# Plot
-connectivity.save(
-    aec_diff,
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
-)
-
-#%%
-# We can see there's some connections between the right temporal and occiptal lobe.
-#
-# Wrap Up
-# ^^^^^^^
-# - We have shown how to calculate AEC networks and visual them.
-# - We performed a signifance test to compare two groups of subjects.

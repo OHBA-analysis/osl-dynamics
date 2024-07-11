@@ -25,7 +25,22 @@ class Parcellation:
             return
         self.file = files.check_exists(file, files.parcellation.directory)
 
-        self.parcellation = nib.load(self.file)
+        parcellation = nib.load(self.file)
+
+        if parcellation.ndim == 3:
+            # Make sure parcellation is 4D and contains 1 for
+            # voxel assignment to a parcel and 0 otherwise
+            parcellation_grid = parcellation.get_fdata()
+            unique_values = np.unique(parcellation_grid)[1:]
+            parcellation_grid = np.array(
+                [(parcellation_grid == value).astype(int) for value in unique_values]
+            )
+            parcellation_grid = np.rollaxis(parcellation_grid, 0, 4)
+            parcellation = nib.Nifti1Image(
+                parcellation_grid, parcellation.affine, parcellation.header
+            )
+
+        self.parcellation = parcellation
         self.dims = self.parcellation.shape[:3]
         self.n_parcels = self.parcellation.shape[3]
 

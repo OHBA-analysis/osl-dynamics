@@ -12,7 +12,7 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     ::
 
-        conda create --name osld python=3.10
+        conda create --name osld python=3.10.14
         conda activate osld
 
     Note, this environment must be activated every time you want to use osl-dynamics.
@@ -23,7 +23,7 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     ::
 
-        pip install tensorflow==2.9.1
+        pip install tensorflow==2.11.0
 
     If you have GPU resources you may need to install additional libraries (CUDA/cuDNN), see https://www.tensorflow.org/install/pip for detailed instructions.
 
@@ -31,19 +31,19 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
     ::
 
-        pip install tensorflow-macos==2.9.1
+        pip install tensorflow-macos==2.11.0
 
     If pip can not find the package, then you can try installing TensorFlow with conda:
 
     ::
 
-        conda install tensorflow=2.9.1
+        conda install tensorflow=2.11.0
 
     After you have installed TensorFlow, install the tensorflow-probability addon with:
 
     ::
 
-        pip install tensorflow-probability==0.17
+        pip install tensorflow-probability==0.19.0
 
 #. Finally, install osl-dynamics:
 
@@ -62,6 +62,28 @@ Windows Instructions
 --------------------
 
 If you are using a Windows computer, we recommend first installing linux (Ubuntu) as a Windows Subsystem by following the instructions `here <https://ubuntu.com/wsl>`_. Then following the instructions above in the Ubuntu terminal.
+
+TensorFlow Versions
+-------------------
+
+osl-dynamics has been tested with the following versions:
+
+.. list-table::
+   :widths: 25 25
+   :header-rows: 1
+
+   * - tensorflow
+     - tensorflow-probability
+   * - 2.11
+     - 0.19
+   * - 2.12
+     - 0.19
+   * - 2.13
+     - 0.20
+   * - 2.14
+     - 0.22
+   * - 2.15
+     - 0.22
 
 Training Speed
 --------------
