@@ -1,5 +1,8 @@
 """Example script for training Single-Channel DyNeMo on simulated data.
 
+Note, this model is a work in progress and has not been fully validated.
+
+This example script achieves a dice ~= 0.8.
 """
 
 print("Importing packages")
@@ -28,21 +31,24 @@ stc = hmm.generate_states(n_samples)
 t = np.arange(n_samples) / sampling_frequency
 x = np.random.normal(0, 0.02, size=n_samples)
 
-# State 1 - background, no oscillatory activity
+# State 1 - theta bursts
+indices = stc[:, 0] == 1
+phi = np.random.uniform(0, 2 * np.pi)
+x[indices] += 2 * np.sin(2 * np.pi * 5 * t[indices] + phi)
 
 # State 2 - alpha bursts
 indices = stc[:, 1] == 1
 phi = np.random.uniform(0, 2 * np.pi)
-x[indices] = 2 * np.sin(2 * np.pi * 10 * t[indices] + phi)
+x[indices] += 2 * np.sin(2 * np.pi * 10 * t[indices] + phi)
 
 # State 3 - beta bursts
 indices = stc[:, 2] == 1
 phi = np.random.uniform(0, 2 * np.pi)
-x[indices] = np.sin(2 * np.pi * 20 * t[indices] + phi)
+x[indices] += np.sin(2 * np.pi * 20 * t[indices] + phi)
 
 # Create Data object and prepare data
 data = Data(x)
-data.tde(n_embeddings=7)
+data.tde(n_embeddings=5)
 data.standardize()
 
 # Build model
@@ -67,7 +73,7 @@ config = Config(
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=50,
     batch_size=16,
-    learning_rate=0.01,
+    learning_rate=0.001,
     n_epochs=100,
 )
 model = Model(config)
