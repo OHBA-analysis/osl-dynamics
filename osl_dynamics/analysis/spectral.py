@@ -719,9 +719,13 @@ def regression_spectra(
         p = P[i, :, :, range(n_channels), range(n_channels)].real
         psd[i] = np.rollaxis(p, axis=0, start=3)
 
-        # Coherences
-        p = np.sum(P[i], axis=0)  # sum coefs and intercept
-        coh[i] = coherence_spectra(p, keepdims=True)
+        # Calculate coherence
+        for k in range(n_channels):
+            for l in range(n_channels):
+                Pxy = P[i, 0, :, k, l]  # regression coefficients
+                Pxx = P[i, 1, :, k, k].real  # regression intercept
+                Pyy = P[i, 1, :, l, l].real  # regression intercept
+                coh[i, :, k, l] = np.abs(Pxy) / np.sqrt(Pxx * Pyy)
 
     if not return_coef_int:
         # Sum coefficients and intercept
