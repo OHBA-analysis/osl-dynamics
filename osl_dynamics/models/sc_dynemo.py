@@ -1,4 +1,9 @@
-"""Single-channel Dynamic Network Modes (SC-DyNeMo)."""
+"""Single-channel Dynamic Network Modes (SC-DyNeMo).
+
+Note
+----
+This model is a work in progress. It has not been fully validated.
+"""
 
 from dataclasses import dataclass
 
