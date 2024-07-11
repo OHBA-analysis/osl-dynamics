@@ -3,6 +3,7 @@
 """
 
 import numpy as np
+import tensorflow as tf
 from tensorflow import tanh
 from tensorflow.keras import callbacks
 
@@ -267,3 +268,28 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
             validation is performed.
         """
         self.model.load_weights(self.filepath)
+
+
+class CheckpointCallback(callbacks.Callback):
+    """Callback to create checkpoints during training.
+
+    Parameters
+    ----------
+    save_freq : int
+        Frequency (in epochs) at which to save the model.
+    """
+
+    def __init__(self, save_freq, checkpoint_dir):
+        super().__init__()
+        self.save_freq = save_freq
+        self.checkpoint = None
+        self.checkpoint_dir = checkpoint_dir
+        self.checkpoint_prefix = f"{checkpoint_dir}/ckpt"
+
+    def on_epoch_end(self, epoch, logs=None):
+        if self.checkpoint is None:
+            self.checkpoint = tf.train.Checkpoint(
+                model=self.model, optimizer=self.model.optimizer
+            )
+        if (epoch + 1) % self.save_freq == 0:
+            self.checkpoint.save(file_prefix=self.checkpoint_prefix)

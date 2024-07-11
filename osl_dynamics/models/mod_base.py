@@ -169,6 +169,7 @@ class ModelBase:
         use_tqdm=False,
         tqdm_class=None,
         save_best_after=None,
+        checkpoint_freq=None,
         save_filepath=None,
         **kwargs,
     ):
@@ -188,6 +189,8 @@ class ModelBase:
         save_best_after : int, optional
             Epoch number after which we should save the best model. The best
             model is that which achieves the lowest loss.
+        checkpoint_freq : int, optional
+            Frequency (in epochs) at which to create checkpoints.
         save_filepath : str, optional
             Path to save the best model to.
         additional_callbacks : list, optional
@@ -237,6 +240,16 @@ class ModelBase:
                 filepath=save_filepath,
             )
             additional_callbacks.append(save_best_callback)
+
+        if checkpoint_freq is not None:
+            if save_filepath is None:
+                save_filepath = f"tmp"
+            self.save_config(save_filepath)
+            checkpoint_callback = callbacks.CheckpointCallback(
+                save_freq=checkpoint_freq,
+                checkpoint_dir=f"{save_filepath}/checkpoints",
+            )
+            additional_callbacks.append(checkpoint_callback)
 
         # Update arguments/keyword arguments to pass to the fit method
         args, kwargs = replace_argument(
@@ -604,13 +617,15 @@ class ModelBase:
         return config_dict, version
 
     @classmethod
-    def load(cls, dirname, single_gpu=True):
+    def load(cls, dirname, from_checkpoint=True, single_gpu=True):
         """Load model from :code:`dirname`.
 
         Parameters
         ----------
         dirname : str
             Directory where :code:`config.yml` and weights are stored.
+        from_checkpoint : bool, optional
+            Should we load the model from a checkpoint?
         single_gpu : bool, optional
             Should we compile the model on a single GPU?
 
@@ -641,8 +656,20 @@ class ModelBase:
         model = cls(config)
         model.osld_version = version
 
-        # Restore weights
-        model.load_weights(f"{dirname}/weights").expect_partial()
+        # Restore model
+        if from_checkpoint:
+            checkpoint = tf.train.Checkpoint(
+                model=model.model, optimizer=model.model.optimizer
+            )
+            checkpoint.restore(
+                tf.train.latest_checkpoint(f"{dirname}/checkpoints")
+            ).expect_partial()
+
+            # For HMM, also need to load the trans prob
+            if config["model_name"] == "HMM":
+                model.trans_prob = np.load(f"{dirname}/trans_prob.npy")
+        else:
+            model.load_weights(f"{dirname}/weights").expect_partial()
 
         return model
 
