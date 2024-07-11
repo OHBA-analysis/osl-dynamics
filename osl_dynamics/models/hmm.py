@@ -199,7 +199,7 @@ class Model(ModelBase):
         epochs=None,
         use_tqdm=False,
         checkpoint_freq=None,
-        model_dir=None,
+        save_filepath=None,
         verbose=1,
         **kwargs,
     ):
@@ -221,6 +221,8 @@ class Model(ModelBase):
             Should we use :code:`tqdm` to display a progress bar?
         checkpoint_freq : int, optional
             Frequency (in epochs) of saving model checkpoints.
+        save_filepath : str, optional
+            Path to save the model.
         verbose : int, optional
             Verbosity level. :code:`0=silent`.
         kwargs : keyword arguments, optional
@@ -240,10 +242,10 @@ class Model(ModelBase):
             checkpoint = tf.train.Checkpoint(
                 model=self.model, optimizer=self.model.optimizer
             )
-            if model_dir is None:
-                model_dir = "tmp"
-            self.save_config(model_dir)
-            checkpoint_dir = f"{model_dir}/checkpoints"
+            if save_filepath is None:
+                save_filepath = "tmp"
+            self.save_config(save_filepath)
+            checkpoint_dir = f"{save_filepath}/checkpoints"
             checkpoint_prefix = f"{checkpoint_dir}/ckpt"
 
         # Make a TensorFlow Dataset
@@ -321,7 +323,7 @@ class Model(ModelBase):
                 checkpoint.save(file_prefix=checkpoint_prefix)
 
         if checkpoint_freq is not None:
-            np.save(f"{model_dir}/trans_prob.npy", self.trans_prob)
+            np.save(f"{save_filepath}/trans_prob.npy", self.trans_prob)
 
         if use_tqdm:
             _range.close()
