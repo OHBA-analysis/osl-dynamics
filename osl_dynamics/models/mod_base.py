@@ -617,7 +617,7 @@ class ModelBase:
         return config_dict, version
 
     @classmethod
-    def load(cls, dirname, from_checkpoint=True, single_gpu=True):
+    def load(cls, dirname, from_checkpoint=False, single_gpu=True):
         """Load model from :code:`dirname`.
 
         Parameters
@@ -666,7 +666,7 @@ class ModelBase:
             ).expect_partial()
 
             # For HMM, also need to load the trans prob
-            if config["model_name"] == "HMM":
+            if config_dict["model_name"] == "HMM":
                 model.trans_prob = np.load(f"{dirname}/trans_prob.npy")
         else:
             model.load_weights(f"{dirname}/weights").expect_partial()
