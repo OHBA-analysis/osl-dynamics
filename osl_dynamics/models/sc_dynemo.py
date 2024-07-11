@@ -107,7 +107,6 @@ class Model(DynemoModel):
 
     where :math:`p` is the embedding dimension.
 
-
     Parameters
     ----------
     config : Config

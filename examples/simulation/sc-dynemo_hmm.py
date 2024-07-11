@@ -21,7 +21,6 @@ hmm = HMM(
     trans_prob="sequence",
     stay_prob=0.9,
     n_states=3,
-    random_seed=123,
 )
 stc = hmm.generate_states(n_samples)
 
