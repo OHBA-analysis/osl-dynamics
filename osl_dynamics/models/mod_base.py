@@ -664,6 +664,10 @@ class ModelBase:
             checkpoint.restore(
                 tf.train.latest_checkpoint(f"{dirname}/checkpoints")
             ).expect_partial()
+
+            # For HMM, also need to load the trans prob
+            if config["model_name"] == "HMM":
+                model.trans_prob = np.load(f"{dirname}/trans_prob.npy")
         else:
             model.load_weights(f"{dirname}/weights").expect_partial()
 

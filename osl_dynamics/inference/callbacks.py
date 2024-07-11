@@ -3,9 +3,9 @@
 """
 
 import numpy as np
+import tensorflow as tf
 from tensorflow import tanh
 from tensorflow.keras import callbacks
-import tensorflow as tf
 
 from osl_dynamics import inference
 

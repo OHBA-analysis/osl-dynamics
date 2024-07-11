@@ -193,7 +193,16 @@ class Model(ModelBase):
         self.set_trans_prob(self.config.initial_trans_prob)
         self.set_state_probs_t0(self.config.state_probs_t0)
 
-    def fit(self, dataset, epochs=None, use_tqdm=False, verbose=1, **kwargs):
+    def fit(
+        self,
+        dataset,
+        epochs=None,
+        use_tqdm=False,
+        checkpoint_freq=None,
+        model_dir=None,
+        verbose=1,
+        **kwargs,
+    ):
         """Fit model to a dataset.
 
         Iterates between:
@@ -210,6 +219,8 @@ class Model(ModelBase):
             Number of epochs.
         use_tqdm : bool, optional
             Should we use :code:`tqdm` to display a progress bar?
+        checkpoint_freq : int, optional
+            Frequency (in epochs) of saving model checkpoints.
         verbose : int, optional
             Verbosity level. :code:`0=silent`.
         kwargs : keyword arguments, optional
@@ -224,6 +235,16 @@ class Model(ModelBase):
         """
         if epochs is None:
             epochs = self.config.n_epochs
+
+        if checkpoint_freq is not None:
+            checkpoint = tf.train.Checkpoint(
+                model=self.model, optimizer=self.model.optimizer
+            )
+            if model_dir is None:
+                model_dir = "tmp"
+            self.save_config(model_dir)
+            checkpoint_dir = f"{model_dir}/checkpoints"
+            checkpoint_prefix = f"{checkpoint_dir}/ckpt"
 
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
@@ -294,6 +315,13 @@ class Model(ModelBase):
             history["loss"].append(np.mean(loss))
             history["rho"].append(self.rho)
             history["lr"].append(lr)
+
+            # Save model checkpoint
+            if checkpoint_freq is not None and (n + 1) % checkpoint_freq == 0:
+                checkpoint.save(file_prefix=checkpoint_prefix)
+
+        if checkpoint_freq is not None:
+            np.save(f"{model_dir}/trans_prob.npy", self.trans_prob)
 
         if use_tqdm:
             _range.close()
