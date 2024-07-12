@@ -33,6 +33,14 @@ OSL Dynamics can be installed in three steps. Open a Terminal and execute the fo
 
         pip install tensorflow-macos==2.11.0
 
+    You may also need to install the following package to get your GPUs working on a Mac:
+
+    ::
+
+        pip install tensorflow-metal==0.7.0
+
+    See https://developer.apple.com/metal/tensorflow-plugin/ for further details.
+
     If pip can not find the package, then you can try installing TensorFlow with conda:
 
     ::
@@ -84,6 +92,20 @@ osl-dynamics has been tested with the following versions:
      - 0.22
    * - 2.15
      - 0.22
+
+Test your GPUs are working
+--------------------------
+
+You can use the following to check if TensorFlow is using any GPUs you have available:
+
+::
+
+    conda activate osld
+    python
+    >> import tensorflow as tf
+    >> print(tf.test.is_gpu_available())
+
+This should print :code:`True` if you have GPUs available (and :code:`False` otherwise).
 
 Training Speed
 --------------
