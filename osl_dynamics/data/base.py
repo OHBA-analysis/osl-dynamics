@@ -1007,6 +1007,7 @@ class Data:
                         flips = new_flips
                         metric = new_metric
                 if metric > best_metric:
+                    best_metric = metric
                     best_flips = flips
             return array * best_flips[np.newaxis, ...]
 
