@@ -1023,6 +1023,7 @@ class Data:
             metric = _calc_metric(covs)
             metric_sum = np.sum(metric, axis=1)
             argmedian = np.argsort(metric_sum)[len(metric_sum) // 2]
+            _logger.info(f"Using session {argmedian} as template")
             template_cov = covs[argmedian]
 
         if template_data is not None:
