@@ -899,8 +899,9 @@ class Data:
         Parameters
         ----------
         template_data : np.ndarray or str, optional
-            Data in (samples, channels) format to align the sign of channels
-            to. If :code:`str`, must be the path to a :code:`.npy` file.
+            Data to align the sign of channels to.
+            If :code:`str`, the file will be read in the same way as the
+            inputs to the Data object.
         template_cov : np.ndarray or str, optional
             Covariance to align the sign of channels. This must be the
             covariance of the time-delay embedded data.
@@ -940,7 +941,16 @@ class Data:
             max_flips = self.n_channels
 
         if isinstance(template_data, str):
-            template_data = np.load(template_data)
+            template_data = rw.load_data(
+                template_data,
+                self.data_field,
+                self.picks,
+                self.reject_by_annotation,
+                memmap_location=None,
+                mmap_mode="r",
+            )
+            if not self.time_axis_first:
+                template_data = template_data.T
 
         if isinstance(template_cov, str):
             template_cov = np.load(template_cov)
