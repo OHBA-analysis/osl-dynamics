@@ -962,19 +962,20 @@ class Data:
                 array = processing.standardize(array, create_copy=False)
             return np.cov(array.T)
 
-        def _calc_corr(M1, M2):
-            M1 = np.abs(M1)
-            M2 = np.abs(M2)
-            i, j = np.triu_indices(M1.shape[0], k=n_embeddings)
-            M1 = M1[i, j]
-            M2 = M2[i, j]
+        def _calc_corr(M1, M2, mode=None):
+            if mode == "abs":
+                M1 = np.abs(M1)
+                M2 = np.abs(M2)
+            m, n = np.triu_indices(M1.shape[0], k=n_embeddings)
+            M1 = M1[m, n]
+            M2 = M2[m, n]
             return np.corrcoef([M1, M2])[0, 1]
 
         def _calc_metrics(covs):
             metric = np.zeros([self.n_sessions, self.n_sessions])
             for i in tqdm(range(self.n_sessions), desc="Comparing sessions"):
                 for j in range(i + 1, self.n_sessions):
-                    metric[i, j] = _calc_corr(covs[i], covs[j])
+                    metric[i, j] = _calc_corr(covs[i], covs[j], mode="abs")
                     metric[j, i] = metric[i, j]
             return metric
 
