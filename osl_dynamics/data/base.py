@@ -993,7 +993,7 @@ class Data:
             flips = flips.T @ flips
             return cov * flips
 
-        def _find_and_apply_flips(cov, tcov, array):
+        def _find_and_apply_flips(cov, tcov, array, ind):
             best_flips = np.ones(self.n_channels)
             best_metric = 0
             for n in range(n_init):
@@ -1009,6 +1009,10 @@ class Data:
                 if metric > best_metric:
                     best_metric = metric
                     best_flips = flips
+                _logger.info(
+                    f"Session {ind}, Init {n}, best correlation with template: "
+                    f"{best_metric:.3f}"
+                )
             return array * best_flips[np.newaxis, ...]
 
         # What data do we use?
@@ -1042,14 +1046,16 @@ class Data:
             template_cov = _calc_cov(template_data)
 
         # Perform the sign flipping
+        _logger.info("Aligning channel signs across sessions")
         tcovs = [template_cov] * self.n_sessions
+        indices = range(self.n_sessions)
         self.arrays = pqdm(
-            array=zip(covs, tcovs, arrays),
+            array=zip(covs, tcovs, arrays, indices),
             function=_find_and_apply_flips,
-            desc="Sign flipping",
             n_jobs=self.n_jobs,
             argument_type="args",
             total=self.n_sessions,
+            disable=True,
         )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
