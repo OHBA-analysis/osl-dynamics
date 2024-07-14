@@ -928,7 +928,7 @@ class Data:
         """
         if template_data is not None and template_cov is not None:
             raise ValueError(
-                "Please only of the arguments template_data or template_cov "
+                "Only pass one of the arguments template_data or template_cov, "
                 "not both."
             )
 
