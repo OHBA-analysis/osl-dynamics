@@ -1019,10 +1019,10 @@ class Data:
             raise e
 
         # Calculate/get template covariances
-        if template_cov is not None:
-            metric = _calc_metric(covs)
-            metric_sum = np.sum(metric, axis=1)
-            argmedian = np.argsort(metric_sum)[len(metric_sum) // 2]
+        if template_cov is None:
+            metrics = _calc_metrics(covs)
+            metrics_sum = np.sum(metrics, axis=1)
+            argmedian = np.argsort(metrics_sum)[len(metrics_sum) // 2]
             _logger.info(f"Using session {argmedian} as template")
             template_cov = covs[argmedian]
 
