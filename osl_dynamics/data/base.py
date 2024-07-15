@@ -881,6 +881,191 @@ class Data:
 
         return self
 
+    def align_channel_signs(
+        self,
+        template_data=None,
+        template_cov=None,
+        n_init=3,
+        n_iter=2500,
+        max_flips=20,
+        n_embeddings=1,
+        standardize=True,
+        use_raw=False,
+    ):
+        """Align the sign of each channel across sessions.
+
+        If no template data/covariance is passed, we use the median session.
+
+        Parameters
+        ----------
+        template_data : np.ndarray or str, optional
+            Data to align the sign of channels to.
+            If :code:`str`, the file will be read in the same way as the
+            inputs to the Data object.
+        template_cov : np.ndarray or str, optional
+            Covariance to align the sign of channels. This must be the
+            covariance of the time-delay embedded data.
+            If :code:`str`, must be the path to a :code:`.npy` file.
+        n_init : int, optional
+            Number of initializations.
+        n_iter : int, optional
+            Number of sign flipping iterations per subject to perform.
+        max_flips : int, optional
+            Maximum number of channels to flip in an iteration.
+        n_embeddings : int, optional
+            We may want to compare the covariance of time-delay embedded data
+            when aligning the signs. This is the number of embeddings. The
+            returned data is not time-delay embedded.
+        standardize : bool, optional
+            Should we standardize the data before comparing across sessions?
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
+        """
+        if template_data is not None and template_cov is not None:
+            raise ValueError(
+                "Only pass one of the arguments template_data or template_cov, "
+                "not both."
+            )
+
+        if self.n_channels < max_flips:
+            _logger.warning(
+                f"max_flips={max_flips} cannot be greater than "
+                f"n_channels={self.n_channels}. "
+                f"Setting max_flips={self.n_channels}."
+            )
+            max_flips = self.n_channels
+
+        if isinstance(template_data, str):
+            template_data = rw.load_data(
+                template_data,
+                self.data_field,
+                self.picks,
+                self.reject_by_annotation,
+                memmap_location=None,
+                mmap_mode="r",
+            )
+            if not self.time_axis_first:
+                template_data = template_data.T
+
+        if isinstance(template_cov, str):
+            template_cov = np.load(template_cov)
+
+        # Helper functions
+        def _calc_cov(array):
+            array = processing.time_embed(array, n_embeddings)
+            if standardize:
+                array = processing.standardize(array, create_copy=False)
+            return np.cov(array.T)
+
+        def _calc_corr(M1, M2, mode=None):
+            if mode == "abs":
+                M1 = np.abs(M1)
+                M2 = np.abs(M2)
+            m, n = np.triu_indices(M1.shape[0], k=n_embeddings)
+            M1 = M1[m, n]
+            M2 = M2[m, n]
+            return np.corrcoef([M1, M2])[0, 1]
+
+        def _calc_metrics(covs):
+            metric = np.zeros([self.n_sessions, self.n_sessions])
+            for i in tqdm(range(self.n_sessions), desc="Comparing sessions"):
+                for j in range(i + 1, self.n_sessions):
+                    metric[i, j] = _calc_corr(covs[i], covs[j], mode="abs")
+                    metric[j, i] = metric[i, j]
+            return metric
+
+        def _randomly_flip(flips, max_flips):
+            n_channels_to_flip = np.random.choice(max_flips, size=1)
+            random_channels_to_flip = np.random.choice(
+                self.n_channels, size=n_channels_to_flip, replace=False
+            )
+            new_flips = np.copy(flips)
+            new_flips[random_channels_to_flip] *= -1
+            return new_flips
+
+        def _apply_flips(cov, flips):
+            flips = np.repeat(flips, n_embeddings)[np.newaxis, ...]
+            flips = flips.T @ flips
+            return cov * flips
+
+        def _find_and_apply_flips(cov, tcov, array, ind):
+            best_flips = np.ones(self.n_channels)
+            best_metric = 0
+            for n in range(n_init):
+                flips = np.ones(self.n_channels)
+                metric = _calc_corr(cov, tcov)
+                for j in range(n_iter):
+                    new_flips = _randomly_flip(flips, max_flips)
+                    new_cov = _apply_flips(cov, new_flips)
+                    new_metric = _calc_corr(new_cov, tcov)
+                    if new_metric > metric:
+                        flips = new_flips
+                        metric = new_metric
+                if metric > best_metric:
+                    best_metric = metric
+                    best_flips = flips
+                _logger.info(
+                    f"Session {ind}, Init {n}, best correlation with template: "
+                    f"{best_metric:.3f}"
+                )
+            return array * best_flips[np.newaxis, ...]
+
+        # What data do we use?
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+
+        # Calculate covariance of each session
+        covs = pqdm(
+            array=zip(arrays),
+            function=_calc_cov,
+            desc="Calculating covariances",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_sessions,
+        )
+        if any([isinstance(e, Exception) for e in covs]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
+
+        # Calculate/get template covariances
+        if template_cov is None:
+            metrics = _calc_metrics(covs)
+            metrics_sum = np.sum(metrics, axis=1)
+            argmedian = np.argsort(metrics_sum)[len(metrics_sum) // 2]
+            _logger.info(f"Using session {argmedian} as template")
+            template_cov = covs[argmedian]
+
+        if template_data is not None:
+            template_cov = _calc_cov(template_data)
+
+        # Perform the sign flipping
+        _logger.info("Aligning channel signs across sessions")
+        tcovs = [template_cov] * self.n_sessions
+        indices = range(self.n_sessions)
+        self.arrays = pqdm(
+            array=zip(covs, tcovs, arrays, indices),
+            function=_find_and_apply_flips,
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_sessions,
+            disable=True,
+        )
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
+
+        return self
+
     def prepare(self, methods):
         """Prepare data.
 
