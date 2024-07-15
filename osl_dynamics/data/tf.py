@@ -151,7 +151,6 @@ def load_tfrecord_dataset(
     tfrecord_dir,
     batch_size,
     shuffle=True,
-    validation_split=None,
     concatenate=True,
     drop_last_batch=False,
     buffer_size=4000,
@@ -167,8 +166,6 @@ def load_tfrecord_dataset(
         Number sequences in each mini-batch which is used to train the model.
     shuffle : bool, optional
         Should we shuffle sequences (within a batch) and batches.
-    validation_split : float, optional
-        Ratio to split the dataset into a training and validation set.
     concatenate : bool, optional
         Should we concatenate the datasets for each array?
     drop_last_batch : bool, optional
@@ -182,9 +179,8 @@ def load_tfrecord_dataset(
 
     Returns
     -------
-    dataset : tf.data.Dataset or tuple
-        Dataset for training or evaluating the model along with the validation
-        set if :code:`validation_split` was passed.
+    dataset : tf.data.TFRecordDataset
+        Dataset.
     """
     import tensorflow as tf  # moved here to avoid slow imports
 
@@ -277,24 +273,7 @@ def load_tfrecord_dataset(
                 batch_size, drop_remainder=drop_last_batch
             )
 
-        if validation_split is None:
-            # Return the dataset
-            return full_dataset.prefetch(tf.data.AUTOTUNE)
-
-        else:
-            # Split the dataset into training and validation datasets
-            training_dataset, validation_dataset = tf.keras.utils.split_dataset(
-                full_dataset,
-                right_size=validation_split,
-            )
-            _logger.info(
-                f"{len(training_dataset)} batches in training dataset, "
-                f"{len(validation_dataset)} batches in the validation "
-                "dataset."
-            )
-            return training_dataset.prefetch(
-                tf.data.AUTOTUNE
-            ), validation_dataset.prefetch(tf.data.AUTOTUNE)
+        return full_dataset.prefetch(tf.data.AUTOTUNE)
 
     # Otherwise create a dataset for each array separately
     else:
@@ -318,26 +297,7 @@ def load_tfrecord_dataset(
 
             full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
 
-        if validation_split is None:
-            # Return the full dataset for each array
-            return full_datasets
-
-        else:
-            # Split the dataset for each array separately
-            training_datasets = []
-            validation_datasets = []
-            for i, ds in enumerate(full_datasets):
-                tds, vds = tf.keras.utils.split_dataset(
-                    full_datasets[i],
-                    right_size=validation_split,
-                )
-                _logger.info(
-                    f"Session {i}: "
-                    f"{len(tds)} batches in training dataset, "
-                    f"{len(vds)} batches in the validation dataset."
-                )
-
-            return training_datasets, validation_datasets
+        return full_datasets
 
 
 def _validate_tf_dataset(dataset):

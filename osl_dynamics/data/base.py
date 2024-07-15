@@ -213,7 +213,6 @@ class Data:
         # Store the current kept arrays
         current_keep = self.keep
         try:
-            # validation
             if isinstance(keep, int):
                 keep = [keep]
             if not isinstance(keep, list):
@@ -1260,7 +1259,6 @@ class Data:
         sequence_length,
         batch_size,
         shuffle=True,
-        validation_split=None,
         concatenate=True,
         step_size=None,
         drop_last_batch=False,
@@ -1276,8 +1274,6 @@ class Data:
             model.
         shuffle : bool, optional
             Should we shuffle sequences (within a batch) and batches.
-        validation_split : float, optional
-            Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
             Should we concatenate the datasets for each array?
         step_size : int, optional
@@ -1288,9 +1284,8 @@ class Data:
 
         Returns
         -------
-        dataset : tf.data.Dataset or tuple
-            Dataset for training or evaluating the model along with the
-            validation set if :code:`validation_split` was passed.
+        dataset : tf.data.Dataset
+            Dataset.
         """
         import tensorflow as tf  # moved here to avoid slow imports
 
@@ -1346,25 +1341,7 @@ class Data:
                     self.batch_size, drop_remainder=drop_last_batch
                 )
 
-            if validation_split is None:
-                # Return the full dataset
-                return full_dataset.prefetch(tf.data.AUTOTUNE)
-
-            else:
-                # Split the full dataset into a training and validation dataset
-                training_dataset, validation_dataset = tf.keras.utils.split_dataset(
-                    full_dataset,
-                    right_size=validation_split,
-                )
-                _logger.info(
-                    f"{len(training_dataset)} batches in training dataset, "
-                    f"{len(validation_dataset)} batches in the validation "
-                    "dataset."
-                )
-
-                return training_dataset.prefetch(
-                    tf.data.AUTOTUNE
-                ), validation_dataset.prefetch(tf.data.AUTOTUNE)
+            return full_dataset.prefetch(tf.data.AUTOTUNE)
 
         # Otherwise create a dataset for each array separately
         else:
@@ -1383,27 +1360,7 @@ class Data:
 
                 full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
 
-            if validation_split is None:
-                # Return the full dataset for each array
-                return full_datasets
-
-            else:
-                # Split the dataset for each array separately
-                training_datasets = []
-                validation_datasets = []
-                for i in range(len(full_datasets)):
-                    tds, vds = tf.keras.utils.split_dataset(
-                        full_datasets[i],
-                        right_size=validation_split,
-                    )
-                    training_datasets.append(tds.prefetch(tf.data.AUTOTUNE))
-                    validation_datasets.append(vds.prefetch(tf.data.AUTOTUNE))
-                    _logger.info(
-                        f"Session {i}: "
-                        f"{len(tds)} batches in training dataset, "
-                        f"{len(vds)} batches in the validation dataset."
-                    )
-                return training_datasets, validation_datasets
+            return full_datasets
 
     def save_tfrecord_dataset(
         self,
@@ -1524,7 +1481,6 @@ class Data:
         sequence_length,
         batch_size,
         shuffle=True,
-        validation_split=None,
         concatenate=True,
         step_size=None,
         drop_last_batch=False,
@@ -1541,8 +1497,6 @@ class Data:
             Number sequences in each mini-batch which is used to train the model.
         shuffle : bool, optional
             Should we shuffle sequences (within a batch) and batches.
-        validation_split : float, optional
-            Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
             Should we concatenate the datasets for each array?
         step_size : int, optional
@@ -1558,8 +1512,8 @@ class Data:
 
         Returns
         -------
-        dataset : tf.data.Dataset
-            Dataset for training or evaluating the model.
+        dataset : tf.data.TFRecordDataset
+            Dataset.
         """
         import tensorflow as tf  # moved here to avoid slow imports
 
@@ -1576,7 +1530,6 @@ class Data:
             tfrecord_dir=tfrecord_dir,
             batch_size=batch_size,
             shuffle=shuffle,
-            validation_split=validation_split,
             concatenate=concatenate,
             drop_last_batch=drop_last_batch,
             buffer_size=self.buffer_size,
