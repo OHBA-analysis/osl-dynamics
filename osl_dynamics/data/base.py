@@ -1291,8 +1291,6 @@ class Data:
             Dataset for training or evaluating the model along with the
             validation set if :code:`validation_split` was passed.
         """
-        import tensorflow as tf  # moved here to avoid slow imports
-
         self.sequence_length = sequence_length
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
@@ -1340,12 +1338,16 @@ class Data:
                         self.batch_size, drop_remainder=drop_last_batch
                     )
 
+                _logger.info(f"{len(full_dataset)} batches in dataset")
+
+                import tensorflow as tf  # moved here to avoid slow imports
+
                 return full_dataset.prefetch(tf.data.AUTOTUNE)
 
             # Otherwise create a dataset for each array separately
             else:
                 full_datasets = []
-                for ds in datasets:
+                for i, ds in enumerate(datasets):
                     if shuffle:
                         # Shuffle sequences
                         ds = ds.shuffle(self.buffer_size)
@@ -1356,6 +1358,10 @@ class Data:
                     if shuffle:
                         # Shuffle batches
                         ds = ds.shuffle(self.buffer_size)
+
+                    _logger.info(f"Session {i}: {len(ds)} batches in dataset")
+
+                    import tensorflow as tf  # moved here to avoid slow imports
 
                     full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
 
@@ -1375,6 +1381,12 @@ class Data:
             # Number of sequences that should be in the validation set
             n_val_sequences = (validation_split * n_sequences).astype(int)
 
+            if np.all(n_val_sequences == 0):
+                raise ValueError(
+                    "No full sequences could be assigned to the validation set. "
+                    "Consider reducing the sequence_length."
+                )
+
             X_train = []
             X_val = []
             for i in range(self.n_sessions):
@@ -1392,7 +1404,13 @@ class Data:
                 X_train.append(x_train)
                 X_val.append(x_val)
 
-            return _create_dataset(X_train), _create_dataset(X_val)
+            _logger.info("Training dataset")
+            training_dataset = _create_dataset(X_train)
+
+            _logger.info("Validation dataset")
+            validation_dataset = _create_dataset(X_val)
+
+            return training_dataset, validation_dataset
 
         else:
             return _create_dataset(X)
