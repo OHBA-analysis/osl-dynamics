@@ -1338,8 +1338,6 @@ class Data:
                         self.batch_size, drop_remainder=drop_last_batch
                     )
 
-                _logger.info(f"{len(full_dataset)} batches in dataset")
-
                 import tensorflow as tf  # moved here to avoid slow imports
 
                 return full_dataset.prefetch(tf.data.AUTOTUNE)
@@ -1358,8 +1356,6 @@ class Data:
                     if shuffle:
                         # Shuffle batches
                         ds = ds.shuffle(self.buffer_size)
-
-                    _logger.info(f"Session {i}: {len(ds)} batches in dataset")
 
                     import tensorflow as tf  # moved here to avoid slow imports
 
@@ -1404,13 +1400,7 @@ class Data:
                 X_train.append(x_train)
                 X_val.append(x_val)
 
-            _logger.info("Training dataset")
-            training_dataset = _create_dataset(X_train)
-
-            _logger.info("Validation dataset")
-            validation_dataset = _create_dataset(X_val)
-
-            return training_dataset, validation_dataset
+            return _create_dataset(X_train), _create_dataset(X_val)
 
         else:
             return _create_dataset(X)
