@@ -1294,6 +1294,7 @@ class Data:
         self.sequence_length = sequence_length
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
+        self.validation_split = validation_split
 
         n_sequences = self.count_sequences(self.sequence_length)
 
@@ -1410,6 +1411,7 @@ class Data:
         tfrecord_dir,
         sequence_length,
         step_size=None,
+        validation_split=None,
         overwrite=False,
     ):
         """Save the data as TFRecord files.
@@ -1423,18 +1425,21 @@ class Data:
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
+        validation_split : float, optional
+            Ratio to split the dataset into a training and validation set.
         overwrite : bool, optional
             Should we overwrite the existing TFRecord datasets if there is a need?
         """
         os.makedirs(tfrecord_dir, mode=0o700, exist_ok=True)
-        tfrecord_paths = (
+        tfrecord_path = (
             f"{tfrecord_dir}"
-            "/dataset_{array:0{v}d}-of-{n_session:0{v}d}"
+            "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}"
             f".{self._identifier}.tfrecord"
         )
 
         self.sequence_length = sequence_length
         self.step_size = step_size or sequence_length
+        self.validation_split = validation_split
 
         def _check_rewrite():
             if not os.path.exists(f"{tfrecord_dir}/tfrecord_config.pkl"):
@@ -1464,16 +1469,24 @@ class Data:
 
             return False
 
+        # Number of sequences
         n_sequences = self.count_sequences(self.sequence_length)
+        if validation_split is not None:
+            n_val_sequences = (validation_split * n_sequences).astype(int)
+            if np.all(n_val_sequences == 0):
+                raise ValueError(
+                    "No full sequences could be assigned to the validation set. "
+                    "Consider reducing the sequence_length."
+                )
 
         # TFRecords we need to save
         tfrecord_filenames = []
         tfrecords_to_save = []
         rewrite = _check_rewrite()
-
         for i in self.keep:
-            filepath = tfrecord_paths.format(
+            filepath = tfrecord_path.format(
                 array=i,
+                val="{val}",
                 n_session=self.n_sessions - 1,
                 v=len(str(self.n_sessions - 1)),
             )
@@ -1483,18 +1496,47 @@ class Data:
 
         # Function for saving a single TFRecord
         def _save_tfrecord(i, filepath):
-            # Get time series data and ensure an integer multiple of
-            # sequence length
-            array = self.arrays[i][: n_sequences[i] * sequence_length]
+            # Trim data to be an integer multiple of the sequence length
+            x = self.arrays[i][: n_sequences[i] * sequence_length]
 
-            # Save the dataset
-            data = self._create_data_dict(i, array)
-            dtf.save_tfrecord(
-                data,
-                self.sequence_length,
-                self.step_size,
-                filepath,
-            )
+            if validation_split is not None:
+                # Randomly pick sequences
+                val_sequences = np.random.choice(
+                    n_sequences[i], size=n_val_sequences[i], replace=False
+                )
+                mask = np.zeros(n_sequences[i], dtype=bool)
+                mask[val_sequences] = True
+
+                # Split data
+                x = x.reshape(-1, sequence_length, self.n_channels)
+                x_train = x[~mask].reshape(-1, self.n_channels)
+                x_val = x[mask].reshape(-1, self.n_channels)
+
+                # Save datasets
+                X_train = self._create_data_dict(i, x_train)
+                dtf.save_tfrecord(
+                    X_train,
+                    self.sequence_length,
+                    self.step_size,
+                    filepath.format(val=0),
+                )
+                X_val = self._create_data_dict(i, x_val)
+                dtf.save_tfrecord(
+                    X_val,
+                    self.sequence_length,
+                    self.step_size,
+                    filepath.format(val=1),
+                )
+
+            else:
+                # Save the dataset
+                X = self._create_data_dict(i, x)
+                dtf.save_tfrecord(
+                    X,
+                    self.sequence_length,
+                    self.step_size,
+                    filepath.format(val=0),
+                )
 
         # Save TFRecords
         if len(tfrecords_to_save) > 0:
@@ -1514,6 +1556,7 @@ class Data:
                 "sequence_length": self.sequence_length,
                 "n_channels": self.n_channels,
                 "step_size": self.step_size,
+                "validation_split": self.validation_split,
                 "session_labels": [label.name for label in self.session_labels],
                 "n_sessions": self.n_sessions,
             }
@@ -1524,6 +1567,7 @@ class Data:
         sequence_length,
         batch_size,
         shuffle=True,
+        validation_split=None,
         concatenate=True,
         step_size=None,
         drop_last_batch=False,
@@ -1540,6 +1584,8 @@ class Data:
             Number sequences in each mini-batch which is used to train the model.
         shuffle : bool, optional
             Should we shuffle sequences (within a batch) and batches.
+        validation_split : float, optional
+            Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
             Should we concatenate the datasets for each array?
         step_size : int, optional
@@ -1555,11 +1601,10 @@ class Data:
 
         Returns
         -------
-        dataset : tf.data.TFRecordDataset
-            Dataset.
+        dataset : tf.data.TFRecordDataset or tuple of tf.data.TFRecordDataset
+            Dataset for training or evaluating the model along with the
+            validation set if :code:`validation_split` was passed.
         """
-        import tensorflow as tf  # moved here to avoid slow imports
-
         tfrecord_dir = tfrecord_dir or self.store_dir
 
         # Save and load the TFRecord files
@@ -1567,6 +1612,7 @@ class Data:
             tfrecord_dir=tfrecord_dir,
             sequence_length=sequence_length,
             step_size=step_size,
+            validation_split=validation_split,
             overwrite=overwrite,
         )
         return dtf.load_tfrecord_dataset(
