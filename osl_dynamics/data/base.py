@@ -1431,11 +1431,6 @@ class Data:
             Should we overwrite the existing TFRecord datasets if there is a need?
         """
         os.makedirs(tfrecord_dir, mode=0o700, exist_ok=True)
-        tfrecord_path = (
-            f"{tfrecord_dir}"
-            "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}"
-            f".{self._identifier}.tfrecord"
-        )
 
         self.sequence_length = sequence_length
         self.step_size = step_size or sequence_length
@@ -1452,14 +1447,16 @@ class Data:
                 return False
 
             # Check if we need to rewrite the TFRecord datasets
-
             tfrecord_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
+
             if tfrecord_config["sequence_length"] != self.sequence_length:
                 _logger.warning("Sequence length has changed. Rewriting TFRecords.")
                 return True
+
             if tfrecord_config["step_size"] != self.step_size:
                 _logger.warning("Step size has changed. Rewriting TFRecords.")
                 return True
+
             for label in self.session_labels.keys():
                 if label not in tfrecord_config["session_labels"]:
                     _logger.warning(
@@ -1479,6 +1476,13 @@ class Data:
                     "Consider reducing the sequence_length."
                 )
 
+        # Path to TFRecord file
+        tfrecord_path = (
+            f"{tfrecord_dir}"
+            "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}"
+            f".{self._identifier}.tfrecord"
+        )
+
         # TFRecords we need to save
         tfrecord_filenames = []
         tfrecords_to_save = []
@@ -1491,7 +1495,11 @@ class Data:
                 v=len(str(self.n_sessions - 1)),
             )
             tfrecord_filenames.append(filepath)
-            if rewrite or not os.path.exists(filepath):
+            if (
+                rewrite
+                or not os.path.exists(filepath.format(val=0))
+                or not os.path.exists(filepath.format(val=1))
+            ):
                 tfrecords_to_save.append((i, filepath))
 
         # Function for saving a single TFRecord
