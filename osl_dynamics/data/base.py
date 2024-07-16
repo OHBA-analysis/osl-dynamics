@@ -1259,6 +1259,7 @@ class Data:
         sequence_length,
         batch_size,
         shuffle=True,
+        validation_split=None,
         concatenate=True,
         step_size=None,
         drop_last_batch=False,
@@ -1274,6 +1275,8 @@ class Data:
             model.
         shuffle : bool, optional
             Should we shuffle sequences (within a batch) and batches.
+        validation_split : float, optional
+            Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
             Should we concatenate the datasets for each array?
         step_size : int, optional
@@ -1284,8 +1287,9 @@ class Data:
 
         Returns
         -------
-        dataset : tf.data.Dataset
-            Dataset.
+        dataset : tf.data.Dataset or tuple of tf.data.Dataset
+            Dataset for training or evaluating the model along with the
+            validation set if :code:`validation_split` was passed.
         """
         import tensorflow as tf  # moved here to avoid slow imports
 
@@ -1295,72 +1299,103 @@ class Data:
 
         n_sequences = self.count_sequences(self.sequence_length)
 
-        datasets = []
+        def _create_dataset(X):
+            # X is a list of np.ndarray
+
+            # Create datasets for each array
+            datasets = []
+            for i in range(len(X)):
+                data = self._create_data_dict(i, X[i])
+                dataset = dtf.create_dataset(
+                    data,
+                    self.sequence_length,
+                    self.step_size,
+                )
+                datasets.append(dataset)
+
+            # Create a dataset from all the arrays concatenated
+            if concatenate:
+                if shuffle:
+                    # Do a perfect shuffle then concatenate across arrays
+                    random.shuffle(datasets)
+                    full_dataset = dtf.concatenate_datasets(datasets)
+
+                    # Shuffle sequences
+                    full_dataset = full_dataset.shuffle(self.buffer_size)
+
+                    # Group into mini-batches
+                    full_dataset = full_dataset.batch(
+                        self.batch_size, drop_remainder=drop_last_batch
+                    )
+
+                    # Shuffle mini-batches
+                    full_dataset = full_dataset.shuffle(self.buffer_size)
+
+                else:
+                    # Concatenate across arrays
+                    full_dataset = dtf.concatenate_datasets(datasets)
+
+                    # Group into mini-batches
+                    full_dataset = full_dataset.batch(
+                        self.batch_size, drop_remainder=drop_last_batch
+                    )
+
+                return full_dataset.prefetch(tf.data.AUTOTUNE)
+
+            # Otherwise create a dataset for each array separately
+            else:
+                full_datasets = []
+                for ds in datasets:
+                    if shuffle:
+                        # Shuffle sequences
+                        ds = ds.shuffle(self.buffer_size)
+
+                    # Group into batches
+                    ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
+
+                    if shuffle:
+                        # Shuffle batches
+                        ds = ds.shuffle(self.buffer_size)
+
+                    full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
+
+                return full_datasets
+
+        # Trim data to be an integer multiple of the sequence length
+        X = []
         for i in range(self.n_sessions):
             if i not in self.keep:
-                # We don't want to include this file in the dataset
+                # We don't want to include this session
                 continue
+            x = self.arrays[i]
+            n = n_sequences[i]
+            X.append(x[: n * sequence_length])
 
-            # Get time series data and ensure an integer multiple of sequence
-            # length
-            array = self.arrays[i][: n_sequences[i] * sequence_length]
+        if validation_split is not None:
+            # Number of sequences that should be in the validation set
+            n_val_sequences = (validation_split * n_sequences).astype(int)
 
-            # Create dataset
-            data = self._create_data_dict(i, array)
-            dataset = dtf.create_dataset(
-                data,
-                self.sequence_length,
-                self.step_size,
-            )
-            datasets.append(dataset)
-
-        # Create a dataset from all the arrays concatenated
-        if concatenate:
-            if shuffle:
-                # Do a perfect shuffle then concatenate across arrays
-                random.shuffle(datasets)
-                full_dataset = dtf.concatenate_datasets(datasets)
-
-                # Shuffle sequences
-                full_dataset = full_dataset.shuffle(self.buffer_size)
-
-                # Group into mini-batches
-                full_dataset = full_dataset.batch(
-                    self.batch_size, drop_remainder=drop_last_batch
+            X_train = []
+            X_val = []
+            for i in range(self.n_sessions):
+                # Randomly pick sequences
+                val_sequences = np.random.choice(
+                    n_sequences[i], size=n_val_sequences[i], replace=False
                 )
+                mask = np.zeros(n_sequences[i], dtype=bool)
+                mask[val_sequences] = True
 
-                # Shuffle mini-batches
-                full_dataset = full_dataset.shuffle(self.buffer_size)
+                # Split data
+                x = X[i].reshape(-1, sequence_length, self.n_channels)
+                x_train = x[~mask].reshape(-1, self.n_channels)
+                x_val = x[mask].reshape(-1, self.n_channels)
+                X_train.append(x_train)
+                X_val.append(x_val)
 
-            else:
-                # Concatenate across arrays
-                full_dataset = dtf.concatenate_datasets(datasets)
+            return _create_dataset(X_train), _create_dataset(X_val)
 
-                # Group into mini-batches
-                full_dataset = full_dataset.batch(
-                    self.batch_size, drop_remainder=drop_last_batch
-                )
-
-            return full_dataset.prefetch(tf.data.AUTOTUNE)
-
-        # Otherwise create a dataset for each array separately
         else:
-            full_datasets = []
-            for ds in datasets:
-                if shuffle:
-                    # Shuffle sequences
-                    ds = ds.shuffle(self.buffer_size)
-
-                # Group into batches
-                ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
-
-                if shuffle:
-                    # Shuffle batches
-                    ds = ds.shuffle(self.buffer_size)
-
-                full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
-
-            return full_datasets
+            return _create_dataset(X)
 
     def save_tfrecord_dataset(
         self,
