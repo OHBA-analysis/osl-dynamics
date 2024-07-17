@@ -213,7 +213,6 @@ class Data:
         # Store the current kept arrays
         current_keep = self.keep
         try:
-            # validation
             if isinstance(keep, int):
                 keep = [keep]
             if not isinstance(keep, list):
@@ -1288,128 +1287,133 @@ class Data:
 
         Returns
         -------
-        dataset : tf.data.Dataset or tuple
+        dataset : tf.data.Dataset or tuple of tf.data.Dataset
             Dataset for training or evaluating the model along with the
             validation set if :code:`validation_split` was passed.
         """
-        import tensorflow as tf  # moved here to avoid slow imports
-
         self.sequence_length = sequence_length
         self.batch_size = batch_size
         self.step_size = step_size or sequence_length
+        self.validation_split = validation_split
 
         n_sequences = self.count_sequences(self.sequence_length)
 
-        datasets = []
-        for i in range(self.n_sessions):
-            if i not in self.keep:
-                # We don't want to include this file in the dataset
-                continue
+        def _create_dataset(X):
+            # X is a list of np.ndarray
 
-            # Get time series data and ensure an integer multiple of sequence
-            # length
-            array = self.arrays[i][: n_sequences[i] * sequence_length]
-
-            # Create dataset
-            data = self._create_data_dict(i, array)
-            dataset = dtf.create_dataset(
-                data,
-                self.sequence_length,
-                self.step_size,
-            )
-            datasets.append(dataset)
-
-        # Create a dataset from all the arrays concatenated
-        if concatenate:
-            if shuffle:
-                # Do a perfect shuffle then concatenate across arrays
-                random.shuffle(datasets)
-                full_dataset = dtf.concatenate_datasets(datasets)
-
-                # Shuffle sequences
-                full_dataset = full_dataset.shuffle(self.buffer_size)
-
-                # Group into mini-batches
-                full_dataset = full_dataset.batch(
-                    self.batch_size, drop_remainder=drop_last_batch
+            # Create datasets for each array
+            datasets = []
+            for i in range(len(X)):
+                data = self._create_data_dict(i, X[i])
+                dataset = dtf.create_dataset(
+                    data,
+                    self.sequence_length,
+                    self.step_size,
                 )
+                datasets.append(dataset)
 
-                # Shuffle mini-batches
-                full_dataset = full_dataset.shuffle(self.buffer_size)
+            # Create a dataset from all the arrays concatenated
+            if concatenate:
+                if shuffle:
+                    # Do a perfect shuffle then concatenate across arrays
+                    random.shuffle(datasets)
+                    full_dataset = dtf.concatenate_datasets(datasets)
 
-            else:
-                # Concatenate across arrays
-                full_dataset = dtf.concatenate_datasets(datasets)
+                    # Shuffle sequences
+                    full_dataset = full_dataset.shuffle(self.buffer_size)
 
-                # Group into mini-batches
-                full_dataset = full_dataset.batch(
-                    self.batch_size, drop_remainder=drop_last_batch
-                )
+                    # Group into mini-batches
+                    full_dataset = full_dataset.batch(
+                        self.batch_size, drop_remainder=drop_last_batch
+                    )
 
-            if validation_split is None:
-                # Return the full dataset
+                    # Shuffle mini-batches
+                    full_dataset = full_dataset.shuffle(self.buffer_size)
+
+                else:
+                    # Concatenate across arrays
+                    full_dataset = dtf.concatenate_datasets(datasets)
+
+                    # Group into mini-batches
+                    full_dataset = full_dataset.batch(
+                        self.batch_size, drop_remainder=drop_last_batch
+                    )
+
+                import tensorflow as tf  # moved here to avoid slow imports
+
                 return full_dataset.prefetch(tf.data.AUTOTUNE)
 
+            # Otherwise create a dataset for each array separately
             else:
-                # Split the full dataset into a training and validation dataset
-                training_dataset, validation_dataset = tf.keras.utils.split_dataset(
-                    full_dataset,
-                    right_size=validation_split,
-                )
-                _logger.info(
-                    f"{len(training_dataset)} batches in training dataset, "
-                    f"{len(validation_dataset)} batches in the validation "
-                    "dataset."
-                )
+                full_datasets = []
+                for i, ds in enumerate(datasets):
+                    if shuffle:
+                        # Shuffle sequences
+                        ds = ds.shuffle(self.buffer_size)
 
-                return training_dataset.prefetch(
-                    tf.data.AUTOTUNE
-                ), validation_dataset.prefetch(tf.data.AUTOTUNE)
+                    # Group into batches
+                    ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
 
-        # Otherwise create a dataset for each array separately
-        else:
-            full_datasets = []
-            for ds in datasets:
-                if shuffle:
-                    # Shuffle sequences
-                    ds = ds.shuffle(self.buffer_size)
+                    if shuffle:
+                        # Shuffle batches
+                        ds = ds.shuffle(self.buffer_size)
 
-                # Group into batches
-                ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
+                    import tensorflow as tf  # moved here to avoid slow imports
 
-                if shuffle:
-                    # Shuffle batches
-                    ds = ds.shuffle(self.buffer_size)
+                    full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
 
-                full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
-
-            if validation_split is None:
-                # Return the full dataset for each array
                 return full_datasets
 
-            else:
-                # Split the dataset for each array separately
-                training_datasets = []
-                validation_datasets = []
-                for i in range(len(full_datasets)):
-                    tds, vds = tf.keras.utils.split_dataset(
-                        full_datasets[i],
-                        right_size=validation_split,
-                    )
-                    training_datasets.append(tds.prefetch(tf.data.AUTOTUNE))
-                    validation_datasets.append(vds.prefetch(tf.data.AUTOTUNE))
-                    _logger.info(
-                        f"Session {i}: "
-                        f"{len(tds)} batches in training dataset, "
-                        f"{len(vds)} batches in the validation dataset."
-                    )
-                return training_datasets, validation_datasets
+        # Trim data to be an integer multiple of the sequence length
+        X = []
+        for i in range(self.n_sessions):
+            if i not in self.keep:
+                # We don't want to include this session
+                continue
+            x = self.arrays[i]
+            n = n_sequences[i]
+            X.append(x[: n * sequence_length])
+
+        if validation_split is not None:
+            # Number of sequences that should be in the validation set
+            n_val_sequences = (validation_split * n_sequences).astype(int)
+
+            if np.all(n_val_sequences == 0):
+                raise ValueError(
+                    "No full sequences could be assigned to the validation set. "
+                    "Consider reducing the sequence_length."
+                )
+
+            X_train = []
+            X_val = []
+            for i in range(self.n_sessions):
+                if i not in self.keep:
+                    continue
+
+                # Randomly pick sequences
+                val_indx = np.random.choice(
+                    n_sequences[i], size=n_val_sequences[i], replace=False
+                )
+                train_indx = np.setdiff1d(np.arange(n_sequences[i]), val_indx)
+
+                # Split data
+                x = X[i].reshape(-1, sequence_length, self.n_channels)
+                x_train = x[train_indx].reshape(-1, self.n_channels)
+                x_val = x[val_indx].reshape(-1, self.n_channels)
+                X_train.append(x_train)
+                X_val.append(x_val)
+
+            return _create_dataset(X_train), _create_dataset(X_val)
+
+        else:
+            return _create_dataset(X)
 
     def save_tfrecord_dataset(
         self,
         tfrecord_dir,
         sequence_length,
         step_size=None,
+        validation_split=None,
         overwrite=False,
     ):
         """Save the data as TFRecord files.
@@ -1423,18 +1427,16 @@ class Data:
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
+        validation_split : float, optional
+            Ratio to split the dataset into a training and validation set.
         overwrite : bool, optional
             Should we overwrite the existing TFRecord datasets if there is a need?
         """
         os.makedirs(tfrecord_dir, mode=0o700, exist_ok=True)
-        tfrecord_paths = (
-            f"{tfrecord_dir}"
-            "/dataset_{array:0{v}d}-of-{n_session:0{v}d}"
-            f".{self._identifier}.tfrecord"
-        )
 
         self.sequence_length = sequence_length
         self.step_size = step_size or sequence_length
+        self.validation_split = validation_split
 
         def _check_rewrite():
             if not os.path.exists(f"{tfrecord_dir}/tfrecord_config.pkl"):
@@ -1447,14 +1449,16 @@ class Data:
                 return False
 
             # Check if we need to rewrite the TFRecord datasets
-
             tfrecord_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
+
             if tfrecord_config["sequence_length"] != self.sequence_length:
                 _logger.warning("Sequence length has changed. Rewriting TFRecords.")
                 return True
+
             if tfrecord_config["step_size"] != self.step_size:
                 _logger.warning("Step size has changed. Rewriting TFRecords.")
                 return True
+
             for label in self.session_labels.keys():
                 if label not in tfrecord_config["session_labels"]:
                     _logger.warning(
@@ -1464,37 +1468,84 @@ class Data:
 
             return False
 
+        # Number of sequences
         n_sequences = self.count_sequences(self.sequence_length)
+        if validation_split is not None:
+            n_val_sequences = (validation_split * n_sequences).astype(int)
+            if np.all(n_val_sequences == 0):
+                raise ValueError(
+                    "No full sequences could be assigned to the validation set. "
+                    "Consider reducing the sequence_length."
+                )
+
+        # Path to TFRecord file
+        tfrecord_path = (
+            f"{tfrecord_dir}"
+            "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}"
+            f".{self._identifier}.tfrecord"
+        )
 
         # TFRecords we need to save
         tfrecord_filenames = []
         tfrecords_to_save = []
         rewrite = _check_rewrite()
-
         for i in self.keep:
-            filepath = tfrecord_paths.format(
+            filepath = tfrecord_path.format(
                 array=i,
+                val="{val}",
                 n_session=self.n_sessions - 1,
                 v=len(str(self.n_sessions - 1)),
             )
             tfrecord_filenames.append(filepath)
-            if rewrite or not os.path.exists(filepath):
+            if (
+                rewrite
+                or not os.path.exists(filepath.format(val=0))
+                or not os.path.exists(filepath.format(val=1))
+            ):
                 tfrecords_to_save.append((i, filepath))
 
         # Function for saving a single TFRecord
         def _save_tfrecord(i, filepath):
-            # Get time series data and ensure an integer multiple of
-            # sequence length
-            array = self.arrays[i][: n_sequences[i] * sequence_length]
+            # Trim data to be an integer multiple of the sequence length
+            x = self.arrays[i][: n_sequences[i] * sequence_length]
 
-            # Save the dataset
-            data = self._create_data_dict(i, array)
-            dtf.save_tfrecord(
-                data,
-                self.sequence_length,
-                self.step_size,
-                filepath,
-            )
+            if validation_split is not None:
+                # Randomly pick sequences
+                val_indx = np.random.choice(
+                    n_sequences[i], size=n_val_sequences[i], replace=False
+                )
+                train_indx = np.setdiff1d(np.arange(n_sequences[i]), val_indx)
+
+                # Split data
+                x = x.reshape(-1, sequence_length, self.n_channels)
+                x_train = x[train_indx].reshape(-1, self.n_channels)
+                x_val = x[val_indx].reshape(-1, self.n_channels)
+
+                # Save datasets
+                X_train = self._create_data_dict(i, x_train)
+                dtf.save_tfrecord(
+                    X_train,
+                    self.sequence_length,
+                    self.step_size,
+                    filepath.format(val=0),
+                )
+                X_val = self._create_data_dict(i, x_val)
+                dtf.save_tfrecord(
+                    X_val,
+                    self.sequence_length,
+                    self.step_size,
+                    filepath.format(val=1),
+                )
+
+            else:
+                # Save the dataset
+                X = self._create_data_dict(i, x)
+                dtf.save_tfrecord(
+                    X,
+                    self.sequence_length,
+                    self.step_size,
+                    filepath.format(val=0),
+                )
 
         # Save TFRecords
         if len(tfrecords_to_save) > 0:
@@ -1514,6 +1565,7 @@ class Data:
                 "sequence_length": self.sequence_length,
                 "n_channels": self.n_channels,
                 "step_size": self.step_size,
+                "validation_split": self.validation_split,
                 "session_labels": [label.name for label in self.session_labels],
                 "n_sessions": self.n_sessions,
             }
@@ -1558,11 +1610,10 @@ class Data:
 
         Returns
         -------
-        dataset : tf.data.Dataset
-            Dataset for training or evaluating the model.
+        dataset : tf.data.TFRecordDataset or tuple of tf.data.TFRecordDataset
+            Dataset for training or evaluating the model along with the
+            validation set if :code:`validation_split` was passed.
         """
-        import tensorflow as tf  # moved here to avoid slow imports
-
         tfrecord_dir = tfrecord_dir or self.store_dir
 
         # Save and load the TFRecord files
@@ -1570,13 +1621,13 @@ class Data:
             tfrecord_dir=tfrecord_dir,
             sequence_length=sequence_length,
             step_size=step_size,
+            validation_split=validation_split,
             overwrite=overwrite,
         )
         return dtf.load_tfrecord_dataset(
             tfrecord_dir=tfrecord_dir,
             batch_size=batch_size,
             shuffle=shuffle,
-            validation_split=validation_split,
             concatenate=concatenate,
             drop_last_batch=drop_last_batch,
             buffer_size=self.buffer_size,
