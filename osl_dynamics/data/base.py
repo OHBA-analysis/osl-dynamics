@@ -1387,17 +1387,19 @@ class Data:
             X_train = []
             X_val = []
             for i in range(self.n_sessions):
+                if i not in self.keep:
+                    continue
+
                 # Randomly pick sequences
-                val_sequences = np.random.choice(
+                val_indx = np.random.choice(
                     n_sequences[i], size=n_val_sequences[i], replace=False
                 )
-                mask = np.zeros(n_sequences[i], dtype=bool)
-                mask[val_sequences] = True
+                train_indx = np.setdiff1d(np.arange(n_sequences[i]), val_indx)
 
                 # Split data
                 x = X[i].reshape(-1, sequence_length, self.n_channels)
-                x_train = x[~mask].reshape(-1, self.n_channels)
-                x_val = x[mask].reshape(-1, self.n_channels)
+                x_train = x[train_indx].reshape(-1, self.n_channels)
+                x_val = x[val_indx].reshape(-1, self.n_channels)
                 X_train.append(x_train)
                 X_val.append(x_val)
 
@@ -1509,16 +1511,15 @@ class Data:
 
             if validation_split is not None:
                 # Randomly pick sequences
-                val_sequences = np.random.choice(
+                val_indx = np.random.choice(
                     n_sequences[i], size=n_val_sequences[i], replace=False
                 )
-                mask = np.zeros(n_sequences[i], dtype=bool)
-                mask[val_sequences] = True
+                train_indx = np.setdiff1d(np.arange(n_sequences[i]), val_indx)
 
                 # Split data
                 x = x.reshape(-1, sequence_length, self.n_channels)
-                x_train = x[~mask].reshape(-1, self.n_channels)
-                x_val = x[mask].reshape(-1, self.n_channels)
+                x_train = x[train_indx].reshape(-1, self.n_channels)
+                x_val = x[val_indx].reshape(-1, self.n_channels)
 
                 # Save datasets
                 X_train = self._create_data_dict(i, x_train)
