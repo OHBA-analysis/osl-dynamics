@@ -1534,7 +1534,6 @@ class Model(ModelBase):
             # Get the posterior
             alpha = self.get_alpha(training_data, concatenate=False)
 
-        # Validation
         if isinstance(alpha, np.ndarray):
             alpha = [alpha]
 
@@ -1548,6 +1547,9 @@ class Model(ModelBase):
                 data.append(np.concatenate(subject_data))
         else:
             data = training_data.time_series(prepared=True, concatenate=False)
+
+        if isinstance(data, np.ndarray):
+            data = [data]
 
         if len(alpha) != len(data):
             raise ValueError(
