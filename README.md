@@ -147,9 +147,9 @@ python examples/simulation/dynemo_hmm-mvn.py
 ```
 twine upload dist/*
 ```
-You will need to enter the username and password that you used to register with [https://pypi.org](https://pypi.org).
+You will need to enter the username and password that you used to register with [https://pypi.org](https://pypi.org). You may need to setup 2FA and/or an API token, see API token instructions in your PyPI account settings.
 
-7. Tag the commit uploaded to PyPI with the version number using the 'Create a new release' link on the right of the GitHub repo webpage.
+7. Tag the commit uploaded to PyPI with the version number using the 'Create a new release' link on the right of the GitHub repo webpage. You will need to untick 'Set as a pre-release' and tick 'Set as the latest release'.
 
 8. Change the version to `X.Y.devZ` in `setup.cfg` and commit the new dev version to `main`.
 
@@ -157,6 +157,10 @@ The uploaded distribution will then be available to be installed with:
 ```
 pip install osl-dynamics
 ```
+
+9. Optional: draft a new release (click 'Releases' on the right panel on the GitHub homepage, then 'Draft a new release') to help keep note of changes for the next release.
+
+10. Activate the new version in the [readthedocs](https://readthedocs.org/projects/osl-dynamics) project.
 
 ## Editing Source Code
 
