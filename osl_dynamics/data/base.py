@@ -1065,6 +1065,78 @@ class Data:
 
         return self
 
+    def remove_bad_segments(
+        self,
+        window_length=None,
+        significance_level=0.05,
+        maximum_fraction=0.1,
+        use_raw=False,
+    ):
+        """Automated bad segment removal using the G-ESD algorithm.
+
+        Parameters
+        ----------
+        window_length : int, optional
+            Window length to used to calculate statistics.
+            Defaults to twice the sampling frequency.
+        significance_level : float, optional
+            Significance level (p-value) to consider as an outlier.
+        maximum_fraction : float, optional
+            Maximum fraction of time series to mark as bad.
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object.
+        """
+        self.gesd_window_length = window_length
+        self.gesd_significance_level = significance_level
+        self.gesd_maximum_fraction = maximum_fraction
+
+        if window_length is None:
+            if self.sampling_frequency is None:
+                raise ValueError(
+                    "window_length must be passed. Alternatively, set the "
+                    "sampling frequency to use "
+                    "window_length=2*sampling_frequency. The sampling "
+                    "frequency can be set using Data.set_sampling_frequency() "
+                    "or pass Data(..., sampling_frequency=...) when creating "
+                    "the Data object."
+                )
+            else:
+                window_length = 2 * self.sampling_frequency
+
+        # Function to remove bad segments to a single array
+        def _apply(array, prepared_data_file):
+            array = processing.remove_bad_segments(
+                array, window_length, significance_level, maximum_fraction
+            )
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
+
+        # Run in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
+        self.arrays = pqdm(
+            args,
+            function=_apply,
+            desc="Bad segment removal",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            total=self.n_sessions,
+        )
+        if any([isinstance(e, Exception) for e in self.arrays]):
+            for i, e in enumerate(self.arrays):
+                if isinstance(e, Exception):
+                    e.args = (f"array {i}: {e}",)
+                    _logger.exception(e, exc_info=False)
+            raise e
+
+        return self
+
     def prepare(self, methods):
         """Prepare data.
 
