@@ -97,12 +97,20 @@ class BaseModelConfig:
             raise ValueError("Either n_modes or n_states must be passed.")
 
         if self.n_modes is not None:
+            if self.n_modes == 1:
+                raise ValueError(
+                    "n_modes must be two or greater. Consider static analysis."
+                )
             if self.n_modes < 1:
-                raise ValueError("n_modes must be one or greater.")
+                raise ValueError("n_modes must be two or greater.")
 
         if self.n_states is not None:
+            if self.n_states == 1:
+                raise ValueError(
+                    "n_states must be two or greater. Consider static analysis."
+                )
             if self.n_states < 1:
-                raise ValueError("n_states must be one or greater.")
+                raise ValueError("n_states must be two or greater.")
 
         if self.n_channels is None:
             raise ValueError("n_channels must be passed.")
