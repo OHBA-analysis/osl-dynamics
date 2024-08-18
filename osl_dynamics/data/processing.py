@@ -239,7 +239,7 @@ def remove_bad_segments(
         n_out = int(np.ceil(len(X) * p_out))
         if np.any(np.isnan(X)):
             y = np.where(np.isnan(X))[0]
-            idx1, x2 = gesd(X[np.isfinite(X)], alpha, n_out, outlier_side)
+            idx1, x2 = _gesd(X[np.isfinite(X)], alpha, n_out, outlier_side)
             idx = np.zeros_like(X).astype(bool)
             idx[y[idx1]] = True
         n = len(X)
