@@ -1012,7 +1012,7 @@ class Data:
                     f"Session {ind}, Init {n}, best correlation with template: "
                     f"{best_metric:.3f}"
                 )
-            return array * best_flips[np.newaxis, ...]
+            return array * best_flips[np.newaxis, ...].astype(np.float32)
 
         # What data do we use?
         arrays = self.raw_data_arrays if use_raw else self.arrays
