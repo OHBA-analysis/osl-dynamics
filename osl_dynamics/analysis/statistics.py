@@ -5,8 +5,10 @@
 import logging
 
 import numpy as np
-from scipy import stats
+from scipy import stats, sparse
 from sklearn.linear_model import LinearRegression
+from pqdm.processes import pqdm
+from tqdm.auto import trange
 
 import glmtools as glm
 
@@ -305,6 +307,7 @@ class OLS:
 
     def __init__(self, contrasts, include_mean=True, covariates=None):
         self.n_targets = None
+        self.target_dims = None
         _, _, self.contrasts = _validate_dimensions(contrasts=contrasts)
         self.n_contrasts, self.n_features = contrasts.shape
 
@@ -341,9 +344,11 @@ class OLS:
         return n_features
 
     def _validate_y(self, y):
-        # TODO: Deal with more than 2D y
         y = np.array(y)
+        self.target_dims = y.shape[1:] if self.target_dims is None else self.target_dims
+        y = y.reshape(y.shape[0], -1)
         _, y, _ = _validate_dimensions(y=y)
+
         if self.n_samples is None:
             self.n_samples = y.shape[0]
 
@@ -357,16 +362,18 @@ class OLS:
 
     def fit(self, y, standardize_features=True):
         # Validate y
-        self._validate_y(y)
+        y = self._validate_y(y)
         X = self.build_X()
         if standardize_features:
             X = self.standardize_features(X)
 
         betas, copes, varcopes = osl_fit(X, y, self.contrasts)
-        self.betas = betas
-        self.copes = copes
-        self.varcopes = varcopes
-        self.tstats = self.get_tstats(copes, varcopes)
+        self.betas = betas.reshape((self.n_features, *self.target_dims))
+        self.copes = copes.reshape((self.n_contrasts, *self.target_dims))
+        self.varcopes = varcopes.reshape((self.n_contrasts, *self.target_dims))
+        self.tstats = self.get_tstats(copes, varcopes).reshape(
+            (self.n_contrasts, *self.target_dims)
+        )
 
     def build_X(self):
         """
@@ -450,6 +457,13 @@ class OLS:
         return names
 
     @property
+    def tstats(self):
+        """
+        T-statistics.
+        """
+        return self.get_tstats(self.copes, self.varcopes)
+
+    @property
     def design_matrix(self):
         """
         Design matrix X.
@@ -472,6 +486,116 @@ class OLS:
             "varcopes": self.varcopes,
             "tstats": self.tstats,
         }
+
+
+class MaxStatPermutation(OLS):
+    def __init__(
+        self,
+        contrasts,
+        contrast_idx,
+        n_perm,
+        include_mean=True,
+        covariates=None,
+        n_jobs=1,
+    ):
+        super().__init__(contrasts, include_mean, covariates)
+        self.contrast_idx = contrast_idx
+        self.n_perm = n_perm
+        self.n_jobs = n_jobs
+
+    def _get_permute_feature_idx(self):
+        """
+        Get indices of features to permute.
+        This is where the contrast is non-zero.
+        """
+        return np.where(self.contrasts[self.contrast_idx] != 0.0)[0]
+
+    def permute_X(self, X):
+        permute_idx = self._get_permute_feature_idx()
+        X_copy = np.copy(X)
+        signs = np.random.choice([-1, 1], self.n_samples)
+        X_copy[:, permute_idx] = X_copy[:, permute_idx] * signs[:, None]
+        return X_copy
+
+    def fit(self, y, standardize_features=True):
+        """
+        Fit the OLS model and run permutations.
+        """
+        y = self._validate_y(y)
+        # Fit the unpermuted model
+        super().fit(y, standardize_features)
+
+        # Build keyword arguments for parallel processing
+        X = self.build_X()
+        kwargs = []
+        for _ in range(self.n_perm):
+            kwargs.append(
+                {
+                    "X": self.permute_X(X),
+                    "y": y,
+                    "contrasts": self.contrasts[self.contrast_idx],
+                }
+            )
+
+        # Run permutations
+        if len(kwargs) == 1:
+            _logger.info("Running permutation test")
+            results = [osl_fit(**kwargs[0])]
+        elif self.n_jobs == 1:
+            results = []
+            for i in trange(self.n_perm, desc="Running permutation test"):
+                results.append(osl_fit(**kwargs[i]))
+        else:
+            _logger.info(f"Running permutation test with {self.n_jobs} jobs")
+            results = pqdm(
+                kwargs,
+                osl_fit,
+                argument_type="kwargs",
+                n_jobs=self.n_jobs,
+            )
+
+        # Unpack results
+        null_copes, null_tstats = [], []
+        for result in results:
+            _, cope, varcope = result
+            null_copes.append(cope)
+            null_tstats.append(self.get_tstats(cope, varcope))
+
+        self.null_copes = null_copes.reshape((self.n_perm, *self.target_dims))
+        self.null_tstats = null_tstats.reshape((self.n_perm, *self.target_dims))
+
+        # Take maximum statistic
+        self.null_max_copes = np.max(np.abs(self.null_copes), axis=self.target_dims)
+        self.null_max_tstats = np.max(self.null_tstats, axis=self.target_dims)
+
+    def get_pvalues(self, metric="copes"):
+        if metric == "copes":
+            obs_stat = np.abs(self.copes[self.contrast_idx])
+            percentiles = stats.percentileofscore(self.null_max_copes, obs_stat)
+        elif metric == "tstats":
+            obs_stat = np.abs(self.tstats[self.contrast_idx])
+            percentiles = stats.percentileofscore(self.null_max_tstats, obs_stat)
+        else:
+            raise ValueError(f"metric must be 'copes' or 'tstats', got {metric}")
+
+        return 1 - percentiles / 100
+
+    @property
+    def summary(self):
+        summary = super().summary
+        summary["n_perm"] = self.n_perm
+        summary["contrast_idx"] = self.contrast_idx
+        summary["n_jobs"] = self.n_jobs
+        summary["pvalues"] = {
+            "copes": self.get_pvalues("copes"),
+            "tstats": self.get_pvalues("tstats"),
+        }
+        return summary
+
+
+# --------- #
+# Old codes #
+# --------- #
 
 
 def _check_glm_data(data, covariates, assignments=None):
