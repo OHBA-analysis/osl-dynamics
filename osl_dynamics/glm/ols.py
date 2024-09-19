@@ -120,7 +120,7 @@ def get_varcopes(X, y, contrasts, predictor):
         )
 
     xxt = X.T @ X
-    xxt_inv = np.linalg.inv(xxt)
+    xxt_inv = np.linalg.pinv(xxt)
     c_xxt_inv_ct = np.diag(contrasts @ xxt_inv @ contrasts.T)  # Shape is (n_contrasts,)
 
     # Get estimate of standard error
@@ -158,7 +158,7 @@ def osl_fit(X, y, contrasts):
 
     lr = LinearRegression(fit_intercept=False)
     lr.fit(X, y)
-    betas = lr.coef_
+    betas = lr.coef_.T
     copes = contrasts @ betas
     varcopes = get_varcopes(X, y, contrasts, lr)
 

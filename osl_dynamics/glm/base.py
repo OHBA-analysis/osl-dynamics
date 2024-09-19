@@ -1,8 +1,11 @@
+from typing import List, Dict
+from dataclasses import dataclass
 import numpy as np
 
 from osl_dynamics.glm.ols import osl_fit, get_degree_of_freedom
 
 
+# Helper functions for validation
 def _validate_name(name):
     if not isinstance(name, str):
         raise ValueError(f"name must be a string, got {type(name)}")
@@ -30,6 +33,59 @@ def _validate_type(feature_type):
     return feature_type
 
 
+@dataclass
+class DesignConfig:
+    """
+    Configuration class for Design.
+
+    Parameters
+    ----------
+    features : List[Dict]
+        List of dictionaries containing feature information.
+        Each dictionary should contain the following keys:
+            - name: str
+                Feature name.
+            - values: np.ndarray or list
+                Feature values. Must be 1D.
+            - feature_type: str
+                Feature type. Must be 'constant', 'continuous', or 'categorical'.
+    contrasts : List[Dict]
+        List of dictionaries containing contrast information.
+        Each dictionary should contain the following keys:
+            - name: str
+                Contrast name.
+            - values: np.ndarray or list
+                Contrast values. Must be 1D.
+    standardize_features : bool
+        Whether to standardize continuous features. Default is True.
+    """
+
+    features: List[Dict] = None
+    contrasts: List[Dict] = None
+    standardize_features: bool = True
+
+    def create_design(self):
+        """
+        Create a Design object from the configuration.
+
+        Returns
+        -------
+        design : osl_dynamics.glm.base.Design
+            Design object.
+        """
+        design = Design(standardize_features=self.standardize_features)
+        for feature in self.features:
+            design.add_feature(
+                feature["name"], feature["values"], feature["feature_type"]
+            )
+
+        for contrast in self.contrasts:
+            design.add_contrast(contrast["name"], contrast["values"])
+
+        design.validate()
+        return design
+
+
 class Feature:
     """
     Base class for feature objects.
@@ -44,7 +100,7 @@ class Feature:
         Feature type. Must be 'constant', 'continuous', or 'categorical'.
     """
 
-    def __init__(self, values, name, feature_type):
+    def __init__(self, name, values, feature_type):
         self.name = _validate_name(name)
         self.values = _validate_values(values)
         self.feature_type = _validate_type(feature_type)
@@ -73,9 +129,9 @@ class Contrast:
         Contrast name.
     """
 
-    def __init__(self, values, name):
-        self.values = _validate_values(values)
+    def __init__(self, name, values):
         self.name = _validate_name(name)
+        self.values = _validate_values(values)
         self.n_features = len(self.values)
         self.contrast_type = self._get_contrast_type()
 
@@ -94,7 +150,18 @@ class Contrast:
 
 
 class Design:
-    """ """
+    """
+    Base class for design objects.
+
+    Parameters
+    ----------
+    features : List[Feature], optional
+        List of Feature objects. Default is None.
+    contrasts : List[Contrast], optional
+        List of Contrast objects. Default is None.
+    standardize_features : bool, optional
+        Whether to standardize continuous features. Default is True.
+    """
 
     def __init__(self, features=None, contrasts=None, standardize_features=True):
         self.features = [] if features is None else features
@@ -103,15 +170,40 @@ class Design:
         self.n_features = None
         self.standardize_features = standardize_features
 
-    def add_feature(self, values, name, feature_type):
-        feature = Feature(values, name, feature_type)
+    def add_feature(self, name, values, feature_type):
+        """
+        Add a feature to the design.
+
+        Parameters
+        ----------
+        name : str
+            Feature name.
+        values : np.ndarray or list
+            Feature values. Must be 1D.
+        feature_type : str
+            Feature type. Must be 'constant', 'continuous', or 'categorical'.
+        """
+        feature = Feature(name, values, feature_type)
         self.features.append(feature)
 
-    def add_contrast(self, values, name):
-        contrast = Contrast(values, name)
+    def add_contrast(self, name, values):
+        """
+        Add a contrast to the design.
+
+        Parameters
+        ----------
+        name : str
+            Contrast name.
+        values : np.ndarray or list
+            Contrast values. Must be 1D.
+        """
+        contrast = Contrast(name, values)
         self.contrasts.append(contrast)
 
     def validate(self):
+        """
+        Validate the design.
+        """
         self._validate_features()
         self._validate_contrasts()
 
@@ -122,6 +214,14 @@ class Design:
             )
 
     def build_X(self):
+        """
+        Build the design matrix.
+
+        Returns
+        -------
+        X : np.ndarray
+            Design matrix. Shape is (n_samples, n_features).
+        """
         self.validate()
         # Initialise X
         X = np.zeros((self.n_samples, self.n_features))
@@ -134,6 +234,14 @@ class Design:
         return X
 
     def build_contrast_array(self):
+        """
+        Build the contrast array.
+
+        Returns
+        -------
+        contrast_array : np.ndarray
+            Contrast array. Shape is (n_contrasts, n_features).
+        """
         self.validate()
         # Initialise contrasts array
         contrast_array = np.zeros((self.n_contrasts, self.n_features))
@@ -142,6 +250,19 @@ class Design:
         return contrast_array
 
     def _standardize_features(self, X):
+        """
+        Standardize continuous features.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Design matrix. Shape is (n_samples, n_features).
+
+        Returns
+        -------
+        X_copy : np.ndarray
+            Standardized design matrix.
+        """
         X_copy = X.copy()
         # Standardise continuous features
         cts_indx = np.where(np.array(self.feature_types) == "continuous")[0]
@@ -152,6 +273,7 @@ class Design:
         return X_copy
 
     def _validate_features(self):
+        # TODO: Deal with rows with NaNs.
         if self.features is None:
             raise ValueError("No features found.")
 
@@ -178,7 +300,9 @@ class Design:
                 raise ValueError(
                     f"Expected Contrast object, got {type(contrast)} in contrasts."
                 )
-            if contrast.n_features != self.n_features:
+            if self.n_features is None:
+                self.n_features = contrast.n_features
+            elif contrast.n_features != self.n_features:
                 raise ValueError(
                     f"All contrasts must have the same number of features as the design matrix, got {contrast.n_features} features in {contrast.name} and {self.n_features} features in the design matrix."
                 )
@@ -208,6 +332,7 @@ class Design:
         return get_degree_of_freedom(self.build_X())
 
     def summary(self):
+        """Get a summary of the design."""
         return {
             "n_samples": self.n_samples,
             "n_features": self.n_features,
@@ -221,7 +346,14 @@ class Design:
 
 
 class GLM:
-    """"""
+    """
+    Base class for GLM objects.
+
+    Parameters
+    ----------
+    design : osl_dynamics.glm.base.Design
+        Design object.
+    """
 
     def __init__(self, design):
         self.design = design
@@ -231,6 +363,14 @@ class GLM:
         self.target_dims = None
 
     def fit(self, y):
+        """
+        Fit the GLM model.
+
+        Parameters
+        ----------
+        y : np.ndarray or list
+            Target values. Shape is (n_samples, *target_dims).
+        """
         y_flatten = self._validate_y(y)
         betas, copes, varcopes = osl_fit(X=self.X, y=y_flatten, contrasts=self.c)
         self.betas = betas.reshape((self.n_features, *self.target_dims))
@@ -238,6 +378,9 @@ class GLM:
         self.varcopes = varcopes.reshape((self.n_contrasts, *self.target_dims))
 
     def _validate_y(self, y):
+        """
+        Validate the target values and flatten the target dimensions.
+        """
         if isinstance(y, list):
             y = np.array(y).copy()
 
@@ -262,6 +405,21 @@ class GLM:
         return y_copy
 
     def get_tstats(self, copes, varcopes):
+        """
+        Get t-statistics.
+
+        Parameters
+        ----------
+        copes : np.ndarray
+            Contrast parameter estimates. Shape is (n_contrasts, *target_dims).
+        varcopes : np.ndarray
+            Variance of contrast parameter estimates. Shape is (n_contrasts, *target_dims).
+
+        Returns
+        -------
+        tstats : np.ndarray
+            t-statistics. Shape is (n_contrasts, *target_dims).
+        """
         # TODO: Deal with division by zero and NaNs
         return copes / np.sqrt(varcopes)
 
@@ -302,6 +460,7 @@ class GLM:
         return self.get_tstats(self.copes, self.varcopes)
 
     def summary(self):
+        """Get a summary of the GLM."""
         sum = self.design.summary()
         sum["n_targets"] = self.n_targets
         sum["target_dims"] = self.target_dims
