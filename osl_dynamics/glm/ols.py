@@ -1,5 +1,9 @@
+import logging
+
 import numpy as np
 from sklearn.linear_model import LinearRegression
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def _validate_dimensions(X=None, y=None, contrasts=None):
@@ -155,6 +159,8 @@ def osl_fit(X, y, contrasts):
         Variance of the copes. Shape is (n_contrasts, n_targets).
     """
     _validate_dimensions(X=X, y=y, contrasts=contrasts)
+    # TODO: Other imputation methods
+    X, y = remove_nan_rows(X, y)
 
     lr = LinearRegression(fit_intercept=False)
     lr.fit(X, y)
@@ -163,3 +169,36 @@ def osl_fit(X, y, contrasts):
     varcopes = get_varcopes(X, y, contrasts, lr)
 
     return betas, copes, varcopes
+
+
+def remove_nan_rows(X, y):
+    """
+    Remove rows with NaN values.
+
+    Parameters
+    ----------
+    X : np.ndarray
+        Design matrix. Shape is (n_samples, n_features).
+    y : np.ndarray
+        Target variable. Shape is (n_samples, n_targets).
+
+    Returns
+    -------
+    X_copy : np.ndarray
+        Design matrix without NaN rows. Shape is (n_samples', n_features).
+    y_copy : np.ndarray
+        Target variable without NaN rows. Shape is (n_samples', n_targets).
+    """
+    X_copy = X.copy()
+    y_copy = y.copy()
+
+    X_nan_rows = np.any(np.isnan(X_copy), axis=1)
+    y_nan_rows = np.any(np.isnan(y_copy), axis=1)
+    nan_rows = np.logical_or(X_nan_rows, y_nan_rows)
+
+    if np.sum(nan_rows) > 0:
+        _logger.info(f"Removing {np.sum(nan_rows)} rows with NaN values.")
+    X_copy = X_copy[~nan_rows]
+    y_copy = y_copy[~nan_rows]
+
+    return X_copy, y_copy

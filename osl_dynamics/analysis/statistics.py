@@ -4,8 +4,7 @@
 
 import numpy as np
 
-from osl_dynamics.glm.base import DesignConfig
-from osl_dynamics.glm.permutation import MaxStatPermutation
+from osl_dynamics.glm import DesignConfig, MaxStatPermutation
 
 
 def evoked_response_max_stat_perm(
