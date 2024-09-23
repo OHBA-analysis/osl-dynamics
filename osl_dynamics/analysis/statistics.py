@@ -61,7 +61,7 @@ def evoked_response_max_stat_perm(
 
 
 def group_diff_max_stat_perm(
-    data, assignments, n_perm, covariates=None, metric="copes", n_jobs=1
+    data, assignments, n_perm, covariates=None, metric="tstats", n_jobs=1
 ):
     """
     Statistical significance testing for difference between two groups.
