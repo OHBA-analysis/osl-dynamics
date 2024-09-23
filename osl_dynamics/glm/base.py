@@ -106,9 +106,6 @@ class Feature:
         self.feature_type = _validate_type(feature_type)
         self.n_samples = len(self.values)
 
-    def get_name(self):
-        return self.name
-
     def summary(self):
         return {
             "name": self.name,
