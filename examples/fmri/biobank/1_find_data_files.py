@@ -3,19 +3,19 @@
 """
 
 import os
-import mat73
+import scipy.io
 from tqdm.auto import trange
 
-#%% Subject IDs
+# %% Subject IDs
 
 # Load matlab file containing subject IDs
-mat = mat73.loadmat(
+mat = scipy.io.loadmat(
     "/gpfs3/well/win-biobank/projects/imaging/data/data3/ANALYSIS/workspace13d.mat",
     only_include="subject_IDs_unique",
 )
 subject_IDs = mat["subject_IDs_unique"]
-
-#%% Paths to files
+exit()
+# %% Paths to files
 
 # Get paths to files that exist (this takes about 30 seconds)
 paths = []
@@ -28,7 +28,7 @@ for i in trange(subject_IDs.shape[0], desc="Finding files"):
 
 print("Found", len(paths), "files")
 
-#%% Save
+# %% Save
 
 with open("data_files.txt", "w") as file:
     for path in paths:

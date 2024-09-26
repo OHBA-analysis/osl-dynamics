@@ -6,7 +6,6 @@ import logging
 from os import listdir, path
 
 import mne
-import mat73
 import numpy as np
 import scipy.io
 
@@ -274,7 +273,7 @@ def load_matlab(filename, field):
 
 
 def loadmat(filename, return_dict=False):
-    """Wrapper for scipy.io.loadmat or mat73.loadmat.
+    """Wrapper for scipy.io.loadmat
 
     Parameters
     ----------
@@ -293,7 +292,7 @@ def loadmat(filename, return_dict=False):
     try:
         mat = scipy.io.loadmat(filename, simplify_cells=True)
     except NotImplementedError:
-        mat = mat73.loadmat(filename)
+        raise NotImplementedError("MATLAB v7.3 files are not supported.")
 
     if not return_dict:
         # Check if there's only one key in the MATLAB file
