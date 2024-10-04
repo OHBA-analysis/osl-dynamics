@@ -1569,11 +1569,11 @@ class Data:
                 v=len(str(self.n_sessions - 1)),
             )
             tfrecord_filenames.append(filepath)
-            if (
-                rewrite
-                or not os.path.exists(filepath.format(val=0))
-                or not os.path.exists(filepath.format(val=1))
-            ):
+
+            rewrite_ = rewrite or not os.path.exists(filepath.format(val=0))
+            if validation_split is not None:
+                rewrite_ = rewrite_ or not os.path.exists(filepath.format(val=1))
+            if rewrite_:
                 tfrecords_to_save.append((i, filepath))
 
         # Function for saving a single TFRecord

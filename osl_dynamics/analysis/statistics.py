@@ -2,288 +2,143 @@
 
 """
 
-import logging
-
 import numpy as np
-from scipy import stats
 
-import glmtools as glm
-
-_logger = logging.getLogger("osl-dynamics")
-
-
-def _check_glm_data(data, covariates, assignments=None):
-    """Check shapes and remove subjects from GLM data which contain nans."""
-
-    # Make sure the number of subjects in data and covariates match
-    n_subjects = data.shape[0]
-    for k, v in covariates.items():
-        if v.shape[0] != n_subjects:
-            raise ValueError(
-                f"Got covariates['{k}'].shape[0]={v.shape[0]}, "
-                + f"but was expecting {n_subjects}."
-            )
-
-    # Convert covariates to a numpy array
-    if len(covariates) > 0:
-        covariates_data = np.array(list(covariates.values())).T
-
-    # Remove subjects with a nan in either array
-    remove = []
-    for i in range(n_subjects):
-        if np.isnan(data[i]).any():
-            remove.append(i)
-        if len(covariates) > 0:
-            if np.isnan(covariates_data[i]).any():
-                remove.append(i)
-        if assignments is not None:
-            if np.isnan(assignments[i]):
-                remove.append(i)
-    remove = np.unique(remove)
-    if len(remove) > 0:
-        _logger.warn(f"The following subjects were removed from the GLM: {remove}")
-
-    # Keep subjects without nans
-    keep = [i for i in range(n_subjects) if i not in remove]
-    data = np.copy(data)[keep]
-    covariates_ = {}
-    for key in covariates:
-        covariates_[key] = covariates[key][keep]
-    if assignments is not None:
-        assignments = np.copy(assignments)[keep]
-
-    # Check we have some subjects left
-    if len(data) == 0:
-        raise ValueError("No valid data to calculate the GLM.")
-
-    if assignments is not None:
-        return data, covariates_, assignments
-    else:
-        return data, covariates_
+from osl_dynamics.glm import DesignConfig, MaxStatPermutation
 
 
 def evoked_response_max_stat_perm(
     data, n_perm, covariates=None, metric="copes", n_jobs=1
 ):
-    """Statistical significant testing for evoked responses.
-
-    This function fits a General Linear Model (GLM) with ordinary least squares
-    and performs a sign flip permutations test with the maximum statistic to
-    determine a p-value for evoked responses.
+    """
+    Statistical significance testing for evoked responses.
 
     Parameters
     ----------
     data : np.ndarray
-        Baseline corrected evoked responses. This will be the target data for
-        the GLM. Must be shape (n_subjects, n_samples, ...).
+        Data array for baseline corrected evoked responses.
+        Shape is (n_samples, *target_dims).
     n_perm : int
         Number of permutations.
     covariates : dict, optional
-        Covariates (extra regressors) to add to the GLM fit. These will be
-        z-transformed. Must a dict with values of shape (n_subjects,).
+        Dictionary of continuous covariates.
+            - key: name of the covariate
+            - value: np.ndarray of covariate values. Shape is (n_samples,).
+        Default is None.
     metric : str, optional
-        Metric to use to build the null distribution. Can be :code:`'tstats'` or
-        :code:`'copes'`.
+        Metric to compute p-values. Options are 'copes' and 'tstats'.
+        Default is 'copes'.
     n_jobs : int, optional
-        Number of processes to run in parallel.
+        Number of jobs to run in parallel. Default is 1.
 
     Returns
     -------
     pvalues : np.ndarray
-        P-values for the evoked response. Shape is (n_subjects, n_samples, ...).
+        P-values. Shape is (*target_dims,).
     """
+    features = [
+        {"name": "Mean", "values": np.ones(data.shape[0]), "feature_type": "constant"}
+    ]
     if covariates is None:
         covariates = {}
 
-    if not isinstance(data, np.ndarray):
-        raise ValueError("data must be a numpy array.")
+    for key, value in covariates.items():
+        features.append({"name": key, "values": value, "feature_type": "continuous"})
+    contrasts = [{"name": "Mean", "values": [1] + [0] * len(covariates)}]
 
-    ndim = data.ndim
-    if ndim < 3:
-        raise ValueError("data must be 3D or greater.")
+    DC = DesignConfig(features=features, contrasts=contrasts)
+    design = DC.create_design()
 
-    if metric not in ["tstats", "copes"]:
-        raise ValueError("metric must be 'tstats' or 'copes'.")
-
-    data, covariates = _check_glm_data(data, covariates)
-
-    # Create GLM Dataset
-    data = glm.data.TrialGLMData(
-        data=data,
-        **covariates,
-        dim_labels=["subjects", "time"] + [f"features {i}" for i in range(1, ndim - 1)],
-    )
-
-    # Create design matrix
-    DC = glm.design.DesignConfig()
-    for name in covariates:
-        DC.add_regressor(
-            name=name,
-            rtype="Parametric",
-            datainfo=name,
-            preproc="z",
-        )
-    DC.add_regressor(name="Mean", rtype="Constant")
-    DC.add_contrast(name="Mean", values=[1] + [0] * len(covariates))
-    design = DC.design_from_datainfo(data.info)
-
-    # Fit model and get t-statistics
-    model = glm.fit.OLSModel(design, data)
-
-    # Pool over all dimensions over than subjects
-    pooled_dims = tuple(range(1, ndim))
-
-    # Run permutations and get null distribution
-    perm = glm.permutations.MaxStatPermutation(
+    perm = MaxStatPermutation(
         design,
-        data,
-        contrast_idx=0,  # selects the Mean contrast
-        nperms=n_perm,
-        metric=metric,
-        tail=0,  # two-sided test
-        pooled_dims=pooled_dims,
-        nprocesses=n_jobs,
+        contrast_indx=0,
+        n_perm=n_perm,
+        n_jobs=n_jobs,
     )
-    null_dist = perm.nulls
-
-    # Get p-values
-    if metric == "tstats":
-        print("Using tstats as metric")
-        tstats = abs(model.tstats[0])
-        percentiles = stats.percentileofscore(null_dist, tstats)
-    elif metric == "copes":
-        print("Using copes as metric")
-        copes = abs(model.copes[0])
-        percentiles = stats.percentileofscore(null_dist, copes)
-    pvalues = 1 - percentiles / 100
-
-    if np.all(pvalues < 0.05):
-        _logger.warn(
-            "All time points for all modes are significant with p-value<0.05. "
-            + "Did you remember to baseline correct the evoked responses?"
-        )
-
+    perm.fit(data)
+    pvalues = perm.get_pvalues(metric=metric)
     return pvalues
 
 
 def group_diff_max_stat_perm(
     data, assignments, n_perm, covariates=None, metric="tstats", n_jobs=1
 ):
-    """Statistical significant testing for the difference between two groups.
+    """
+    Statistical significance testing for difference between two groups.
 
     This function fits a General Linear Model (GLM) with ordinary least squares
-    and performs a row shuffle permutations test with the maximum statistic to
-    determine a p-value for differences between two groups.
+    and performs a row shuffle permutation test with maximum statistic to
+    determine a p-value for the difference between two groups.
 
     Parameters
     ----------
     data : np.ndarray
-        Subject-specific quantities to compare. This will be the target data
-        for the GLM. Must be shape (n_subjects, features1, features2, ...).
+        Data array for baseline corrected evoked responses.
+        Shape is (n_samples, *target_dims).
     assignments : np.ndarray
-        1D numpy array containing group assignments. A value of 1 indicates
-        Group1 and a value of 2 indicates Group2. Note, we test the contrast
-        :code:`abs(Group1 - Group2) > 0`.
+        Group assignments. Shape is (n_samples,). Must have exactly two unique values.
     n_perm : int
         Number of permutations.
     covariates : dict, optional
-        Covariates (extra regressors) to add to the GLM fit. These will be
-        z-transformed. Must be a dict with values of shape (n_subjects,).
+        Dictionary of continuous covariates.
+            - key: name of the covariate
+            - value: np.ndarray of covariate values. Shape is (n_samples,).
+        Default is None.
     metric : str, optional
-        Metric to use to build the null distribution. Can be :code:`'tstats'` or
-        :code:`'copes'`.
+        Metric to compute p-values. Options are 'copes' and 'tstats'.
+        Default is 'copes'.
     n_jobs : int, optional
-        Number of processes to run in parallel.
+        Number of jobs to run in parallel. Default is 1.
 
     Returns
     -------
     group_diff : np.ndarray
-        Group difference: Group1 - Group2. Shape is (features1, features2, ...).
+        Difference between two groups. Shape is (*target_dims,).
     pvalues : np.ndarray
-        P-values for the features. Shape is (features1, features2, ...).
+        P-values. Shape is (*target_dims,).
     """
     if covariates is None:
         covariates = {}
 
-    if not isinstance(data, np.ndarray):
-        raise ValueError("data must be a numpy array.")
+    unique_groups = np.unique(assignments)
+    if len(unique_groups) != 2:
+        raise ValueError("assignments must have exactly two unique values.")
 
-    ndim = data.ndim
-    if ndim == 1:
-        raise ValueError("data must be 2D or greater.")
+    features = [
+        {
+            "name": "Group1",
+            "values": (assignments == unique_groups[0]).astype(int),
+            "feature_type": "categorical",
+        },
+        {
+            "name": "Group2",
+            "values": (assignments == unique_groups[1]).astype(int),
+            "feature_type": "categorical",
+        },
+    ]
+    for key, value in covariates.items():
+        features.append({"name": key, "values": value, "feature_type": "continuous"})
 
-    if metric not in ["tstats", "copes"]:
-        raise ValueError("metric must be 'tstats' or 'copes'.")
+    contrasts = [{"name": "GroupDiff", "values": [1, -1] + [0] * len(covariates)}]
 
-    data, covariates, assignments = _check_glm_data(
-        data,
-        covariates,
-        assignments,
-    )
+    DC = DesignConfig(features=features, contrasts=contrasts)
+    design = DC.create_design()
 
-    # Create GLM Dataset
-    data = glm.data.TrialGLMData(
-        data=data,
-        **covariates,
-        category_list=assignments,
-        dim_labels=["subjects"] + [f"features {i}" for i in range(1, ndim)],
-    )
-
-    # Create design matrix
-    DC = glm.design.DesignConfig()
-    DC.add_regressor(name="Group1", rtype="Categorical", codes=1)
-    DC.add_regressor(name="Group2", rtype="Categorical", codes=2)
-    for name in covariates:
-        DC.add_regressor(
-            name=name,
-            rtype="Parametric",
-            datainfo=name,
-            preproc="z",
-        )
-    DC.add_contrast(name="GroupDiff", values=[1, -1] + [0] * len(covariates))
-    design = DC.design_from_datainfo(data.info)
-
-    # Fit model and get t-statistics
-    model = glm.fit.OLSModel(design, data)
-
-    # Which dimensions are we pooling over?
-    if ndim == 2:
-        pooled_dims = 1
-    else:
-        pooled_dims = tuple(range(1, ndim))
-
-    # Run permutations and get null distribution
-    perm = glm.permutations.MaxStatPermutation(
+    perm = MaxStatPermutation(
         design,
-        data,
-        contrast_idx=0,  # selects GroupDiff
-        nperms=n_perm,
-        metric=metric,
-        tail=0,  # two-sided test
-        pooled_dims=pooled_dims,
-        nprocesses=n_jobs,
+        contrast_indx=0,
+        n_perm=n_perm,
+        n_jobs=n_jobs,
     )
-    null_dist = perm.nulls
-
-    # Get p-values
-    if metric == "tstats":
-        print("Using tstats as metric")
-        tstats = abs(model.tstats[0])
-        percentiles = stats.percentileofscore(null_dist, tstats)
-    elif metric == "copes":
-        print("Using copes as metric")
-        copes = abs(model.copes[0])
-        percentiles = stats.percentileofscore(null_dist, copes)
-    pvalues = 1 - percentiles / 100
-
-    # Get group differences
-    group_diff = model.copes[0]
-
+    perm.fit(data)
+    pvalues = perm.get_pvalues(metric=metric)
+    group_diff = perm.copes
     return group_diff, pvalues
 
 
-def paired_diff_max_stat_perm(data, n_perm, metric="tstats", n_jobs=1):
-    """Statistical significant testing for paired differences.
+def paired_diff_max_stat_perm(data, n_perm, metric="copes", n_jobs=1):
+    """
+    Statistical significance testing for paired difference.
 
     This function fits a General Linear Model (GLM) with ordinary least squares
     and performs a sign flip permutations test with the maximum statistic to
@@ -292,79 +147,38 @@ def paired_diff_max_stat_perm(data, n_perm, metric="tstats", n_jobs=1):
     Parameters
     ----------
     data : np.ndarray
-        Paired differences to compare. This will be the target data for the GLM.
-        Must be shape (n_subjects, features1, features2, ...).
+        Data array for baseline corrected evoked responses.
+        Shape is (n_samples, *target_dims).
     n_perm : int
         Number of permutations.
     metric : str, optional
-        Metric to use to build the null distribution. Can be :code:`'tstats'` or
-        :code:`'copes'`.
+        Metric to compute p-values. Options are 'copes' and 'tstats'.
+        Default is 'copes'.
     n_jobs : int, optional
-        Number of processes to run in parallel.
+        Number of jobs to run in parallel. Default is 1.
 
     Returns
     -------
     paired_diff : np.ndarray
-        Paired differences. Shape is (features1, features2, ...).
+        Paired differences. Shape is (*target_dims,).
     pvalues : np.ndarray
-        P-values for the features. Shape is (features1, features2, ...).
+        P-values. Shape is (*target_dims,).
     """
-    if not isinstance(data, np.ndarray):
-        raise ValueError("data must be a numpy array.")
+    features = [
+        {"name": "Mean", "values": np.ones(data.shape[0]), "feature_type": "constant"}
+    ]
+    contrasts = [{"name": "Mean", "values": [1]}]
 
-    ndim = data.ndim
-    if ndim == 1:
-        raise ValueError("data must be 2D or greater.")
+    DC = DesignConfig(features=features, contrasts=contrasts)
+    design = DC.create_design()
 
-    if metric not in ["tstats", "copes"]:
-        raise ValueError("metric must be 'tstats' or 'copes'.")
-
-    # Create GLM Dataset
-    data = glm.data.TrialGLMData(
-        data=data,
-        dim_labels=["subjects"] + [f"features {i}" for i in range(1, ndim)],
-    )
-
-    # Create design matrix
-    DC = glm.design.DesignConfig()
-    DC.add_regressor(name="Mean", rtype="Constant")
-    DC.add_contrast(name="Mean", values=[1])
-    design = DC.design_from_datainfo(data.info)
-
-    # Fit model and get t-statistics
-    model = glm.fit.OLSModel(design, data)
-
-    # Which dimensions are we pooling over?
-    if ndim == 2:
-        pooled_dims = 1
-    else:
-        pooled_dims = tuple(range(1, ndim))
-
-    # Run permutations and get null distribution
-    perm = glm.permutations.MaxStatPermutation(
+    perm = MaxStatPermutation(
         design,
-        data,
-        contrast_idx=0,
-        nperms=n_perm,
-        metric=metric,
-        tail=0,  # two-sided test
-        pooled_dims=pooled_dims,
-        nprocesses=n_jobs,
+        contrast_indx=0,
+        n_perm=n_perm,
+        n_jobs=n_jobs,
     )
-    null_dist = perm.nulls
-
-    # Get p-values
-    if metric == "tstats":
-        print("Using tstats as metric")
-        tstats = abs(model.tstats[0])
-        percentiles = stats.percentileofscore(null_dist, tstats)
-    elif metric == "copes":
-        print("Using copes as metric")
-        copes = abs(model.copes[0])
-        percentiles = stats.percentileofscore(null_dist, copes)
-    pvalues = 1 - percentiles / 100
-
-    # Get paired differences
-    paired_diff = model.copes[0]
-
+    perm.fit(data)
+    pvalues = perm.get_pvalues(metric=metric)
+    paired_diff = perm.copes
     return paired_diff, pvalues
