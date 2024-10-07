@@ -1,4 +1,4 @@
-"""State-Dynamic Network Modelling (State-DyNeMo).
+"""Simplified State-Dynamic Network Modelling (State-DyNeMo).
 
 """
 
@@ -11,29 +11,24 @@ from tensorflow.keras import layers
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
-    CategoricalKLDivergenceLayer,
-    CategoricalLogLikelihoodLossLayer,
-    CovarianceMatricesLayer,
-    DiagonalMatricesLayer,
-    InferenceRNNLayer,
-    KLLossLayer,
-    ModelRNNLayer,
-    SampleOneHotCategoricalDistributionLayer,
-    SoftmaxLayer,
-    VectorsLayer,
     StaticLossScalingFactorLayer,
+    ModelRNNLayer,
+    CategoricalLogLikelihoodLossLayer,
+    SoftmaxLayer,
+    ShiftForForecastingLayer,
+    VectorsLayer,
+    ZeroLayer,
 )
-from osl_dynamics.models.dynemo import Model as DyNeMo
+from osl_dynamics.models.simplified_dynemo import Model as SimplifiedDyNeMo
 from osl_dynamics.models.inf_mod_base import VariationalInferenceModelConfig
 from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.simulation import HMM
 
 _logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
 class Config(BaseModelConfig, VariationalInferenceModelConfig):
-    """Settings for State-DyNeMo.
+    """Settings for Simplified State-DyNeMo.
 
     Parameters
     ----------
@@ -45,23 +40,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Number of channels.
     sequence_length : int
         Length of sequence passed to the inference network and generative model.
-
-    inference_rnn : str
-        RNN to use, either :code:`'gru'` or :code:`'lstm'`.
-    inference_n_layers : int
-        Number of layers.
-    inference_n_units : int
-        Number of units.
-    inference_normalization : str
-        Type of normalization to use. Either :code:`None`, :code:`'batch'`
-        or :code:`'layer'`.
-    inference_activation : str
-        Type of activation to use after normalization and before dropout.
-        E.g. :code:`'relu'`, :code:`'elu'`, etc.
-    inference_dropout : float
-        Dropout rate.
-    inference_regularizer : str
-        Regularizer.
 
     model_rnn : str
         RNN to use, either :code:`'gru'` or :code:`'lstm'`.
@@ -97,16 +75,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     covariances_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for covariance matrices.
 
-    do_kl_annealing : bool
-        Should we use KL annealing during training?
-    kl_annealing_curve : str
-        Type of KL annealing curve. Either :code:`'linear'` or :code:`'tanh'`.
-    kl_annealing_sharpness : float
-        Parameter to control the shape of the annealing curve if
-        :code:`kl_annealing_curve='tanh'`.
-    n_kl_annealing_epochs : int
-        Number of epochs to perform KL annealing.
-
     batch_size : int
         Mini-batch size.
     learning_rate : float
@@ -121,22 +89,16 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
         Optimizer to use. :code:`'adam'` is recommended.
+    loss_calc : str
+        How should we collapse the time dimension in the loss?
+        Either :code:`'mean'` or :code:`'sum'`.
     multi_gpu : bool
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
     """
 
-    model_name: str = "State-DyNeMo"
-
-    # Inference network parameters
-    inference_rnn: str = "lstm"
-    inference_n_layers: int = 1
-    inference_n_units: int = None
-    inference_normalization: str = None
-    inference_activation: str = None
-    inference_dropout: float = 0.0
-    inference_regularizer: str = None
+    model_name: str = "Simplified-State-DyNeMo"
 
     # Model network parameters
     model_rnn: str = "lstm"
@@ -165,9 +127,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         self.validate_training_parameters()
 
     def validate_rnn_parameters(self):
-        if self.inference_n_units is None:
-            raise ValueError("Please pass inference_n_units.")
-
         if self.model_n_units is None:
             raise ValueError("Please pass model_n_units.")
 
@@ -176,19 +135,18 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             raise ValueError("learn_means and learn_covariances must be passed.")
 
 
-class Model(DyNeMo):
-    """State-DyNeMo model class.
+class Model(SimplifiedDyNeMo):
+    """Simplified State-DyNeMo model class.
 
     Parameters
     ----------
-    config : osl_dynamics.models.state_dynemo.Config
+    config : osl_dynamics.models.simplified_state_dynemo.Config
     """
 
     config_type = Config
 
     def sample_alpha(self, n_samples):
-        """Uses the model RNN to sample a state time course, alpha."""
-        raise NotImplementedError("This method hasn't been coded yet.")
+        raise NotImplementedError
 
     def _model_structure(self):
         """Build the model structure."""
@@ -200,7 +158,6 @@ class Model(DyNeMo):
             shape=(config.sequence_length, config.n_channels), name="data"
         )
 
-        # Static loss scaling factor
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
             config.sequence_length,
             config.loss_calc,
@@ -208,80 +165,9 @@ class Model(DyNeMo):
         )
         static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
 
-        # Inference RNN:
-        # - q(state_t) = softmax(theta_t), where theta_t is a set of logits
-        inf_rnn_layer = InferenceRNNLayer(
-            config.inference_rnn,
-            config.inference_normalization,
-            config.inference_activation,
-            config.inference_n_layers,
-            config.inference_n_units,
-            config.inference_dropout,
-            config.inference_regularizer,
-            name="inf_rnn",
-        )
-        inf_theta_layer = layers.Dense(config.n_states, name="inf_theta")
-        alpha_layer = SoftmaxLayer(
-            initial_temperature=1.0,
-            learn_temperature=False,
-            name="alpha",
-        )
-        states_layer = SampleOneHotCategoricalDistributionLayer(name="states")
-
-        inf_rnn = inf_rnn_layer(inputs)
-        inf_theta = inf_theta_layer(inf_rnn)
-        alpha = alpha_layer(inf_theta)
-        states = states_layer(inf_theta)
-
-        # Observation model:
-        # - p(x_t) = N(m_t, C_t), where m_t and C_t are state dependent
-        #   means/covariances
-        means_layer = VectorsLayer(
-            config.n_states,
-            config.n_channels,
-            config.learn_means,
-            config.initial_means,
-            config.means_regularizer,
-            name="means",
-        )
-        if config.diagonal_covariances:
-            covs_layer = DiagonalMatricesLayer(
-                config.n_states,
-                config.n_channels,
-                config.learn_covariances,
-                config.initial_covariances,
-                config.covariances_epsilon,
-                config.covariances_regularizer,
-                name="covs",
-            )
-        else:
-            covs_layer = CovarianceMatricesLayer(
-                config.n_states,
-                config.n_channels,
-                config.learn_covariances,
-                config.initial_covariances,
-                config.covariances_epsilon,
-                config.covariances_regularizer,
-                name="covs",
-            )
-        ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-            config.n_states,
-            config.covariances_epsilon,
-            config.loss_calc,
-            name="ll_loss",
-        )
-
-        mu = means_layer(
-            inputs, static_loss_scaling_factor=static_loss_scaling_factor
-        )  # data not used
-        D = covs_layer(
-            inputs, static_loss_scaling_factor=static_loss_scaling_factor
-        )  # data not used
-        ll_loss = ll_loss_layer([inputs, mu, D, alpha, None])
-
-        # Model RNN:
-        # - p(theta_t | state_<t), predicts logits for the next state based
-        #   on a history of states.
+        # Model RNN: predicts the next mixing coefficients based on historic
+        # observed data
+        data_drop_layer = layers.Dropout(config.model_dropout, name="data_drop")
         mod_rnn_layer = ModelRNNLayer(
             config.model_rnn,
             config.model_normalization,
@@ -292,17 +178,57 @@ class Model(DyNeMo):
             config.model_regularizer,
             name="mod_rnn",
         )
-        mod_theta_layer = layers.Dense(config.n_states, name="mod_theta")
-        kl_div_layer = CategoricalKLDivergenceLayer(config.loss_calc, name="kl_div")
-        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
+        theta_layer = layers.Dense(config.n_states, name="theta")
+        alpha_layer = SoftmaxLayer(
+            initial_temperature=1.0,
+            learn_temperature=False,
+            name="alpha",
+        )
 
-        mod_rnn = mod_rnn_layer(states)
-        mod_theta = mod_theta_layer(mod_rnn)
-        kl_div = kl_div_layer([inf_theta, mod_theta])
-        kl_loss = kl_loss_layer(kl_div)
+        data_drop = data_drop_layer(inputs)
+        mod_rnn = mod_rnn_layer(data_drop)
+        theta = theta_layer(mod_rnn)
+        alpha = alpha_layer(theta)
+
+        # Shift data and inferred mixing coefficients to ensure the model is
+        # forecasting future values
+        shift_for_forecasting_layer = ShiftForForecastingLayer(clip=1, name="shift")
+
+        shifted_alpha, shifted_inputs = shift_for_forecasting_layer([alpha, inputs])
+
+        # Observation model: calculate the probability of the observed
+        # data given the mixing coefficients
+        means_layer = VectorsLayer(
+            config.n_states,
+            config.n_channels,
+            config.learn_means,
+            config.initial_means,
+            config.means_regularizer,
+            name="means",
+        )
+        covs_layer = self._select_covariance_layer()
+
+        mu = means_layer(
+            inputs, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # inputs not used
+        D = covs_layer(
+            inputs, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # inputs not used
+
+        # Calculate losses
+        ll_loss_layer = CategoricalLogLikelihoodLossLayer(
+            config.n_states,
+            config.covariances_epsilon,
+            config.loss_calc,
+            name="ll_loss",
+        )
+        zero_layer = ZeroLayer(shape=(1,))
+
+        ll_loss = ll_loss_layer([shifted_inputs, mu, D, shifted_alpha, None])
+        zero_loss = zero_layer(inputs)  # inputs not used
 
         return tf.keras.Model(
             inputs=inputs,
-            outputs=[ll_loss, kl_loss, inf_theta],
+            outputs=[ll_loss, zero_loss, theta],
             name=config.model_name,
         )

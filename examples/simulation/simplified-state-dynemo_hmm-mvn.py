@@ -1,11 +1,11 @@
-"""Example script for training State-DyNeMo on HMM-MVN simulated data.
+"""Example script for training simplified State-DyNeMo on HMM-MVN simulated data.
 
 """
 
 print("Setting up")
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
-from osl_dynamics.models.state_dynemo import Config, Model
+from osl_dynamics.models.simplified_state_dynemo import Config, Model
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -14,20 +14,15 @@ tf_ops.gpu_growth()
 config = Config(
     n_states=5,
     n_channels=11,
-    sequence_length=200,
-    inference_n_units=64,
-    inference_normalization="layer",
+    sequence_length=100,
     model_n_units=64,
     model_normalization="layer",
     learn_means=False,
     learn_covariances=True,
-    do_kl_annealing=True,
-    kl_annealing_curve="tanh",
-    kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
     batch_size=16,
-    learning_rate=0.005,
-    n_epochs=200,
+    learning_rate=0.01,
+    lr_decay=0,
+    n_epochs=50,
 )
 
 # Simulate data
@@ -73,4 +68,4 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (State-DyNeMo):", modes.fractional_occupancies(inf_stc))
+print("Fractional occupancies (Simplified State-DyNeMo):", modes.fractional_occupancies(inf_stc))
