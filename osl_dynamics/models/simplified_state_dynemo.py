@@ -1,4 +1,4 @@
-"""State-Dynamic Network Modelling (State-DyNeMo).
+"""Simplified State-Dynamic Network Modelling (State-DyNeMo).
 
 """
 
@@ -28,7 +28,7 @@ _logger = logging.getLogger("osl-dynamics")
 
 @dataclass
 class Config(BaseModelConfig, VariationalInferenceModelConfig):
-    """Settings for State-DyNeMo.
+    """Settings for Simplified State-DyNeMo.
 
     Parameters
     ----------
@@ -98,7 +98,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Strategy for distributed learning.
     """
 
-    model_name: str = "State-DyNeMo"
+    model_name: str = "Simplified-State-DyNeMo"
 
     # Model network parameters
     model_rnn: str = "lstm"
@@ -136,11 +136,11 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
 
 class Model(SimplifiedDyNeMo):
-    """State-DyNeMo model class.
+    """Simplified State-DyNeMo model class.
 
     Parameters
     ----------
-    config : osl_dynamics.models.state_dynemo.Config
+    config : osl_dynamics.models.simplified_state_dynemo.Config
     """
 
     config_type = Config
