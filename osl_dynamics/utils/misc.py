@@ -417,7 +417,7 @@ def load(filename, **kwargs):
     return array
 
 
-def set_random_seed(seed):
+def set_random_seed(seed, op_determinism=False):
     """Set all random seeds.
 
     This includes Python's random module, NumPy and TensorFlow.
@@ -426,14 +426,18 @@ def set_random_seed(seed):
     ----------
     seed : int
         Random seed.
+    op_determinism : bool, optional
+        Whether to enable operation determinism in TensorFlow.
+        If True, TensorFlow operations will be deterministic, generally at the cost of
+        lower performance. Note that the model may run slower if enabled.
     """
     import tensorflow as tf  # avoids slow imports
 
     _logger.info(f"Setting random seed to {seed}")
 
-    random.seed(seed)
-    np.random.seed(seed)
-    tf.random.set_seed(seed)
+    tf.keras.utils.set_random_seed(seed)
+    if op_determinism:
+        tf.config.experimental.enable_op_determinism()
 
 
 @contextmanager
