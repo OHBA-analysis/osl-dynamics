@@ -361,6 +361,7 @@ class ModelBase:
                     concatenate=concatenate,
                     step_size=step_size,
                     drop_last_batch=drop_last_batch,
+                    overwrite=True,
                 )
             else:
                 outputs = inputs.dataset(

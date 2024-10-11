@@ -1523,12 +1523,24 @@ class Data:
             # Check if we need to rewrite the TFRecord datasets
             tfrecord_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
 
+            if tfrecord_config["identifier"] != self._identifier:
+                _logger.warning("Identifier has changed. Rewriting TFRecords.")
+                return True
+
             if tfrecord_config["sequence_length"] != self.sequence_length:
                 _logger.warning("Sequence length has changed. Rewriting TFRecords.")
                 return True
 
+            if tfrecord_config["n_channels"] != self.n_channels:
+                _logger.warning("Number of channels has changed. Rewriting TFRecords.")
+                return True
+
             if tfrecord_config["step_size"] != self.step_size:
                 _logger.warning("Step size has changed. Rewriting TFRecords.")
+                return True
+
+            if tfrecord_config["validation_split"] != self.validation_split:
+                _logger.warning("Validation split has changed. Rewriting TFRecords.")
                 return True
 
             for label in self.session_labels.keys():
