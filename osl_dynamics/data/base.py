@@ -1543,8 +1543,8 @@ class Data:
                 _logger.warning("Validation split has changed. Rewriting TFRecords.")
                 return True
 
-            for label in self.session_labels.keys():
-                if label not in tfrecord_config["session_labels"]:
+            for label in self.session_labels:
+                if label.name not in tfrecord_config["session_labels"]:
                     _logger.warning(
                         f"Session label {label} not found. Rewriting TFRecords."
                     )
