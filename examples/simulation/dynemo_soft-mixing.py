@@ -78,7 +78,8 @@ print(f"Free energy: {free_energy}")
 
 # Inferred alpha and mode time course
 inf_alp = model.get_alpha(training_data)
-sim_alp, inf_alp = modes.match_modes(sim_alp, inf_alp)
+orders = modes.match_modes(sim_alp, inf_alp, return_order=True)
+inf_alp = inf_alp[:, orders[1]]
 
 # Compare the inferred mode time course to the ground truth
 plotting.plot_alpha(
@@ -102,7 +103,7 @@ print("Correlation (DyNeMo vs Simulation):", corr)
 
 # Reconstruction of the time-varying covariance
 sim_cov = sim.covariances
-inf_cov = model.get_covariances()
+inf_cov = model.get_covariances()[orders[1]]
 
 sim_tvcov = np.sum(
     sim_alp[:, :, np.newaxis, np.newaxis] * sim_cov[np.newaxis, :, :, :], axis=1
