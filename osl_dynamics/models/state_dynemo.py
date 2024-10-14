@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
@@ -186,9 +187,60 @@ class Model(DyNeMo):
 
     config_type = Config
 
-    def sample_alpha(self, n_samples):
-        """Uses the model RNN to sample a state time course, alpha."""
-        raise NotImplementedError("This method hasn't been coded yet.")
+    def sample_alpha(self, n_samples, states=None):
+        """Uses the model RNN to sample a state probability time course, :code:`alpha`.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples to take.
+        states : np.ndarray, optional
+            One-hot state vectors to initialise the sampling with.
+            Shape must be (sequence_length, n_states).
+
+        Returns
+        -------
+        alpha : np.ndarray
+            Sampled alpha.
+        """
+        # Get layers
+        mod_rnn_layer = self.model.get_layer("mod_rnn")
+        mod_theta_layer = self.model.get_layer("mod_theta")
+        alpha_layer = self.model.get_layer("alpha")
+        states_layer = self.model.get_layer("states")
+
+        if states is None:
+            # Sequence of the underlying state time course
+            states = np.zeros(
+                [self.config.sequence_length, self.config.n_states],
+                dtype=np.float32,
+            )
+
+            # Randomly sample the first time step
+            states[-1] = states_layer(np.random.normal(size=self.config.n_states))
+
+        # Sample the state probability time course
+        alpha = np.empty([n_samples, self.config.n_states], dtype=np.float32)
+        for i in trange(n_samples, desc="Sampling state time course"):
+            # If there are leading zeros we trim the state time course so that
+            # we don't pass the zeros
+            trimmed_states = states[~np.all(states == 0, axis=1)][np.newaxis, :, :]
+
+            # Predict the probability distribution function for theta one time
+            # step in the future, p(theta|state_<t)
+            mod_rnn = mod_rnn_layer(trimmed_states)
+            mod_theta = mod_theta_layer(mod_rnn)[0, -1]
+
+            # Shift the state time course one time step to the left
+            states = np.roll(states, -1, axis=0)
+
+            # Sample from the probability distribution function
+            states[-1] = states_layer(mod_theta[np.newaxis, np.newaxis, :][0])
+
+            # Calculate the state time courses
+            alpha[i] = alpha_layer(mod_theta[np.newaxis, np.newaxis, :])[0, 0]
+
+        return alpha
 
     def _model_structure(self):
         """Build the model structure."""
