@@ -26,7 +26,7 @@ def get_data(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 720 GB)
+# Download the dataset (approximately 720 MB)
 get_data("notts_mrc_meguk_glasser", rename="source_data")
 
 #%%
