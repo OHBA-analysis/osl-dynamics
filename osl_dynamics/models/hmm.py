@@ -33,7 +33,7 @@ from tqdm.auto import trange
 from pqdm.threads import pqdm
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.inference import initializers
+from osl_dynamics.inference import initializers, modes
 from osl_dynamics.inference.layers import (
     CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
@@ -200,6 +200,7 @@ class Model(ModelBase):
         use_tqdm=False,
         checkpoint_freq=None,
         save_filepath=None,
+        dfo_tol=None,
         verbose=1,
         **kwargs,
     ):
@@ -223,6 +224,10 @@ class Model(ModelBase):
             Frequency (in epochs) of saving model checkpoints.
         save_filepath : str, optional
             Path to save the model.
+        dfo_tol : float, optional
+            When the maximum fractional occupancy change (from epoch to epoch)
+            is less than this value, we stop the training. If :code:`None`
+            there is no early stopping.
         verbose : int, optional
             Verbosity level. :code:`0=silent`.
         kwargs : keyword arguments, optional
@@ -232,8 +237,8 @@ class Model(ModelBase):
         Returns
         -------
         history : dict
-            Dictionary with history of the loss and learning rates (:code:`lr`
-            and :code:`rho`).
+            Dictionary with history of the loss, learning rates (:code:`lr`
+            and :code:`rho`) and fractional occupancies during training.
         """
         if epochs is None:
             epochs = self.config.n_epochs
@@ -248,6 +253,9 @@ class Model(ModelBase):
             checkpoint_dir = f"{save_filepath}/checkpoints"
             checkpoint_prefix = f"{checkpoint_dir}/ckpt"
 
+        if dfo_tol is None:
+            dfo_tol = 0
+
         # Make a TensorFlow Dataset
         dataset = self.make_dataset(dataset, shuffle=True, concatenate=True)
 
@@ -255,7 +263,7 @@ class Model(ModelBase):
         self.set_static_loss_scaling_factor(dataset)
 
         # Training curves
-        history = {"loss": [], "rho": [], "lr": []}
+        history = {"loss": [], "rho": [], "lr": [], "fo": [], "max_dfo": []}
 
         # Loop through epochs
         if use_tqdm:
@@ -279,6 +287,7 @@ class Model(ModelBase):
 
             # Loop over batches
             loss = []
+            occupancies = []
             for data in dataset:
                 x = data["data"]
 
@@ -288,6 +297,10 @@ class Model(ModelBase):
                 # Update transition probability matrix
                 if self.config.learn_trans_prob:
                     self.update_trans_prob(gamma, xi)
+
+                # Calculate fractional occupancy
+                stc = modes.argmax_time_courses(gamma)
+                occupancies.append(np.sum(stc, axis=0))
 
                 # Reshape gamma: (batch_size*sequence_length, n_states)
                 # -> (batch_size, sequence_length, n_states)
@@ -318,9 +331,26 @@ class Model(ModelBase):
             history["rho"].append(self.rho)
             history["lr"].append(lr)
 
+            occupancy = np.sum(occupancies, axis=0)
+            fo = occupancy / np.sum(occupancy)
+            history["fo"].append(fo)
+
             # Save model checkpoint
             if checkpoint_freq is not None and (n + 1) % checkpoint_freq == 0:
                 checkpoint.save(file_prefix=checkpoint_prefix)
+
+            # How much has the fractional occupancy changed?
+            if len(history["fo"]) == 1:
+                max_dfo = np.max(
+                    np.abs(history["fo"][-1] - np.zeros_like(history["fo"][-1]))
+                )
+            else:
+                max_dfo = np.max(np.abs(history["fo"][-1] - history["fo"][-2]))
+            history["max_dfo"].append(max_dfo)
+            if dfo_tol > 0:
+                print(f"Max change in FO: {max_dfo}")
+            if max_dfo < dfo_tol:
+                break
 
         if checkpoint_freq is not None:
             np.save(f"{save_filepath}/trans_prob.npy", self.trans_prob)
@@ -1431,7 +1461,12 @@ class Model(ModelBase):
         return bic
 
     def fine_tuning(
-        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
+        self,
+        training_data,
+        n_epochs=None,
+        learning_rate=None,
+        dfo_tol=None,
+        store_dir="tmp",
     ):
         """Fine tuning the model for each session.
 
@@ -1449,6 +1484,10 @@ class Model(ModelBase):
         learning_rate : float, optional
             Learning rate. Defaults to the value in the :code:`config` used
             to create the model.
+        dfo_tol : float, optional
+            When the maximum fractional occupancy change (from epoch to epoch)
+            is less than this value, we stop the training. If :code:`None`
+            there is no early stopping.
         store_dir : str, optional
             Directory to temporarily store the model in.
 
@@ -1486,7 +1525,7 @@ class Model(ModelBase):
             for i in trange(training_data.n_sessions, desc="Fine tuning"):
                 # Train on this session
                 with training_data.set_keep(i):
-                    self.fit(training_data, verbose=0)
+                    self.fit(training_data, dfo_tol=dfo_tol, verbose=0)
                     a = self.get_alpha(training_data, concatenate=True)
 
                 # Get the inferred parameters
