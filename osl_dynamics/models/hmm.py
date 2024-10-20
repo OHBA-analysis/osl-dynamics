@@ -347,7 +347,7 @@ class Model(ModelBase):
             else:
                 max_dfo = np.max(np.abs(history["fo"][-1] - history["fo"][-2]))
             history["max_dfo"].append(max_dfo)
-            if verbose > 0:
+            if dfo_tol > 0:
                 print(f"Max change in FO: {max_dfo}")
             if max_dfo < dfo_tol:
                 break
