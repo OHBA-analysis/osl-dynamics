@@ -221,7 +221,7 @@ class Model(DyNeMo):
 
         # Sample the state probability time course
         alpha = np.empty([n_samples, self.config.n_states], dtype=np.float32)
-        for i in trange(n_samples, desc="Sampling state time course"):
+        for i in trange(n_samples, desc="Sampling state probability time course"):
             # If there are leading zeros we trim the state time course so that
             # we don't pass the zeros
             trimmed_states = states[~np.all(states == 0, axis=1)][np.newaxis, :, :]
@@ -237,7 +237,7 @@ class Model(DyNeMo):
             # Sample from the probability distribution function
             states[-1] = states_layer(mod_theta[np.newaxis, np.newaxis, :][0])
 
-            # Calculate the state time courses
+            # Calculate the state probability time courses
             alpha[i] = alpha_layer(mod_theta[np.newaxis, np.newaxis, :])[0, 0]
 
         return alpha

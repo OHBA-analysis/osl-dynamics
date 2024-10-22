@@ -7,7 +7,9 @@ from dataclasses import dataclass
 
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
 from tensorflow.keras import layers
+from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
@@ -145,8 +147,81 @@ class Model(SimplifiedDyNeMo):
 
     config_type = Config
 
-    def sample_alpha(self, n_samples):
-        raise NotImplementedError
+    def sample_alpha(self, n_samples, input_mean=0, input_std=1):
+        """Uses the model RNN to sample a state probability time course, :code:`alpha`.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples to take.
+        input_mean : float
+            Mean of the normal distribution to sample the initial input data from.
+            Defaults to 0.
+        input_std : float
+            Standard deviation of the normal distribution to sample the initial input
+            data from. Defaults to 1.
+
+        Returns
+        -------
+        alpha : np.ndarray
+            Sampled alpha.
+        """
+        # Get layers
+        mod_rnn_layer = self.get_layer("mod_rnn")
+        theta_layer = self.get_layer("theta")
+        alpha_layer = self.get_layer("alpha")
+
+        # Sequence of the input data
+        input_data = np.zeros(
+            [self.config.sequence_length, self.config.n_channels],
+            dtype=np.float32,
+        )
+
+        # Randomly sample the first time step
+        input_data[-1] = np.random.normal(
+            loc=input_mean,
+            scale=input_std,
+            size=self.config.n_channels,
+        )
+
+        # Get observation model
+        mu = self.get_means()  # shape: (n_states, n_channels)
+        D = self.get_covariances()  # shape: (n_states, n_channels, n_channels)
+        mvns = [
+            tfp.distributions.MultivariateNormalTriL(
+                loc=tf.gather(mu, n, axis=-2),
+                scale_tril=tf.linalg.cholesky(tf.gather(D, n, axis=-3)),
+                allow_nan_stats=False,
+            )
+            for n in range(self.config.n_states)
+        ]
+
+        # Sample the state probability time course
+        alpha = np.empty([n_samples, self.config.n_states], dtype=np.float32)
+        for i in trange(n_samples, desc="Sampling state probability time course"):
+            # If there are leading zeros we trim the state probabilities so that
+            # we don't pass the zeros
+            trimmed_input = input_data[~np.all(input_data == 0, axis=1)][
+                np.newaxis, :, :
+            ]
+
+            # Predict the probability distribution function for theta one time
+            # step in the future
+            mod_rnn = mod_rnn_layer(trimmed_input)
+            theta = theta_layer(mod_rnn)[0, -1]
+
+            # Calculate the state probability time course
+            alpha[i] = alpha_layer(theta[np.newaxis, np.newaxis, :])[0, 0]
+
+            # Shift the input data one time step to the left
+            input_data = np.roll(input_data, -1, axis=0)
+
+            # Generate the next input data by sampling from the corresponding
+            # state-specific observation model
+            state = np.argmax(alpha[i])
+            input_data[-1] = mvns[state].sample()  # shape: (n_channels,)
+
+        return alpha
 
     def _model_structure(self):
         """Build the model structure."""
