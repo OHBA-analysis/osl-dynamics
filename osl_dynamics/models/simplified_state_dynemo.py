@@ -196,13 +196,6 @@ class Model(SimplifiedDyNeMo):
             for n in range(self.config.n_states)
         ]
 
-        # Sample from the observation model
-        obs_samples = []
-        for n in range(self.config.n_states):
-            samples = mvns[n].sample(sample_shape=n_samples)
-            obs_samples.append(samples)
-        obs_samples = np.array(obs_samples)  # shape: (n_states, n_samples, n_channels)
-
         # Sample the state probability time course
         alpha = np.empty([n_samples, self.config.n_states], dtype=np.float32)
         for i in trange(n_samples, desc="Sampling state probability time course"):
@@ -223,12 +216,10 @@ class Model(SimplifiedDyNeMo):
             # Shift the input data one time step to the left
             input_data = np.roll(input_data, -1, axis=0)
 
-            # Generate the next input data by summing the weighted observations
-            # over the states
-            input_data[-1] = np.sum(
-                obs_samples[:, i, :] * np.expand_dims(alpha[i, :], axis=1),
-                axis=0,
-            )  # shape: (n_channels,)
+            # Generate the next input data by sampling from the corresponding
+            # state-specific observation model
+            state = np.argmax(alpha[i])
+            input_data[-1] = mvns[state].sample()  # shape: (n_channels,)
 
         return alpha
 
