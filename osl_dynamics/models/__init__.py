@@ -6,10 +6,7 @@ import yaml
 
 from osl_dynamics.models import (
     dynemo,
-    simplified_dynemo,
     mdynemo,
-    state_dynemo,
-    simplified_state_dynemo,
     hmm,
     hmm_poi,
     hive,
@@ -19,10 +16,7 @@ from osl_dynamics.utils import misc
 
 models = {
     "DyNeMo": dynemo.Model,
-    "Simplified-DyNeMo": simplified_dynemo.Model,
     "M-DyNeMo": mdynemo.Model,
-    "State-DyNeMo": state_dynemo.Model,
-    "Simplified-State-DyNeMo": simplified_state_dynemo.Model,
     "HMM": hmm.Model,
     "HMM-Poisson": hmm_poi.Model,
     "HIVE": hive.Model,
