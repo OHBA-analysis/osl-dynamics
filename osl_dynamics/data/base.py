@@ -193,7 +193,7 @@ class Data:
 
     @property
     def n_samples(self):
-        """Number of samples for each array."""
+        """Number of samples across all arrays."""
         return sum([array.shape[-2] for array in self.arrays])
 
     @property
@@ -327,6 +327,61 @@ class Data:
         n_channels = [array.shape[-1] for array in self.raw_data_arrays]
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
+
+    def _validate_batching(
+        self,
+        sequence_length,
+        batch_size,
+        step_size=None,
+        drop_last_batch=False,
+        concatenate=True,
+    ):
+        """Validate the batching process.
+
+        Parameters
+        ----------
+        sequence_length : int
+            Length of the segement of data to feed into the model.
+        batch_size : int
+            Number sequences in each mini-batch which is used to train the
+            model.
+        step_size : int, optional
+            Number of samples to slide the sequence across the dataset.
+            Default is no overlap.
+        drop_last_batch : bool, optional
+            Should we drop the last batch if it is smaller than the batch size?
+            Defaults to False.
+        concatenate : bool, optional
+            Should we concatenate the datasets for each array?
+            Defaults to True.
+        """
+
+        # Calculate number of sequences per session
+        n_sequences_per_session = [
+            (array.shape[0] - sequence_length) // step_size + 1 for array in self.arrays
+        ]
+
+        # Calculate number of batches
+        if concatenate:
+            # Calculate total batches across concatenated sequences
+            total_n_sequences = sum(n_sequences_per_session)
+            n_batches = total_n_sequences // batch_size
+            # Add one more batch if the last incomplete batch is not dropped
+            if not drop_last_batch and total_n_sequences & batch_size != 0:
+                n_batches += 1
+        else:
+            # Calculate batches per session individually, then sum
+            n_batches_per_session = [
+                n // batch_size + (0 if drop_last_batch or n % batch_size == 0 else 1)
+                for n in n_sequences_per_session
+            ]
+            n_batches = sum(n_batches_per_session)
+
+        if n_batches < 1:
+            raise ValueError(
+                "Number of batches must be greater than or equal to 1. "
+                + "Please adjust your sequence length and batch size."
+            )
 
     def select(self, channels=None, sessions=None, use_raw=False):
         """Select channels.
@@ -1368,6 +1423,15 @@ class Data:
         self.step_size = step_size or sequence_length
         self.validation_split = validation_split
 
+        # Validate batching
+        self._validate_batching(
+            sequence_length,
+            batch_size,
+            step_size=self.step_size,
+            drop_last_batch=drop_last_batch,
+            concatenate=concatenate,
+        )
+
         n_sequences = self.count_sequences(self.sequence_length)
 
         def _create_dataset(X):
@@ -1699,6 +1763,15 @@ class Data:
             validation set if :code:`validation_split` was passed.
         """
         tfrecord_dir = tfrecord_dir or self.store_dir
+
+        # Validate batching
+        self._validate_batching(
+            sequence_length,
+            batch_size,
+            step_size=(step_size or sequence_length),
+            drop_last_batch=drop_last_batch,
+            concatenate=concatenate,
+        )
 
         # Save and load the TFRecord files
         self.save_tfrecord_dataset(
