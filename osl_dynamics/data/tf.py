@@ -28,9 +28,16 @@ def get_n_sequences(arr, sequence_length, step_size=None):
     n : int
         Number of sequences.
     """
-    step_size = step_size or sequence_length
-    n_samples = (arr.shape[0] // sequence_length) * sequence_length
-    return n_samples // step_size
+    n_samples = arr.shape[0]
+
+    # Number of non-overlapping sequences
+    n_sequences = n_samples // sequence_length
+
+    if step_size is not None:
+        # Number of overlapping sequences
+        n_sequences += (n_samples - step_size) // sequence_length
+
+    return n_sequences
 
 
 def concatenate_datasets(datasets):
