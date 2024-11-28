@@ -1390,6 +1390,7 @@ class Data:
         concatenate=True,
         step_size=None,
         drop_last_batch=False,
+        repeat_count=1,
     ):
         """Create a Tensorflow Dataset for training or evaluation.
 
@@ -1411,6 +1412,8 @@ class Data:
             Default is no overlap.
         drop_last_batch : bool, optional
             Should we drop the last batch if it is smaller than the batch size?
+        repeat_count : int, optional
+            Number of times to repeat the dataset. Default is once.
 
         Returns
         -------
@@ -1434,7 +1437,7 @@ class Data:
 
         n_sequences = self.count_sequences(self.sequence_length)
 
-        def _create_dataset(X):
+        def _create_dataset(X, shuffle=shuffle, repeat_count=repeat_count):
             # X is a list of np.ndarray
 
             # Create datasets for each array
@@ -1475,6 +1478,9 @@ class Data:
                         self.batch_size, drop_remainder=drop_last_batch
                     )
 
+                # Repeat the dataset
+                full_dataset = full_dataset.repeat(repeat_count)
+
                 import tensorflow as tf  # moved here to avoid slow imports
 
                 return full_dataset.prefetch(tf.data.AUTOTUNE)
@@ -1493,6 +1499,9 @@ class Data:
                     if shuffle:
                         # Shuffle batches
                         ds = ds.shuffle(self.buffer_size)
+
+                    # Repeat the dataset
+                    ds = ds.repeat(repeat_count)
 
                     import tensorflow as tf  # moved here to avoid slow imports
 
@@ -1539,7 +1548,9 @@ class Data:
                 X_train.append(x_train)
                 X_val.append(x_val)
 
-            return _create_dataset(X_train), _create_dataset(X_val)
+            return _create_dataset(X_train), _create_dataset(
+                X_val, shuffle=False, repeat_count=1
+            )
 
         else:
             return _create_dataset(X)
@@ -1728,6 +1739,7 @@ class Data:
         concatenate=True,
         step_size=None,
         drop_last_batch=False,
+        repeat_count=1,
         tfrecord_dir=None,
         overwrite=False,
     ):
@@ -1750,6 +1762,8 @@ class Data:
             Default is no overlap.
         drop_last_batch : bool, optional
             Should we drop the last batch if it is smaller than the batch size?
+        repeat_count : int, optional
+            Number of times to repeat the dataset. Default is once.
         tfrecord_dir : str, optional
             Directory to save the TFRecord datasets. If :code:`None`, then
             :code:`Data.store_dir` is used.
@@ -1787,6 +1801,7 @@ class Data:
             shuffle=shuffle,
             concatenate=concatenate,
             drop_last_batch=drop_last_batch,
+            repeat_count=repeat_count,
             buffer_size=self.buffer_size,
             keep=self.keep,
         )
