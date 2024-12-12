@@ -96,6 +96,48 @@ class DiceCoefficientCallback(callbacks.Callback):
                 logs[key] = dices[i]
 
 
+class GumbelSoftmaxAnnealingCallback(tf.keras.callbacks.Callback):
+    """Callback to anneal the temperature of a Gumbel-Softmax distribution.
+    Currently only supports linear annealing.
+
+    Parameters
+    ----------
+    layer_name : str
+        Name of the Gumbel-Softmax layer.
+    n_epochs : int
+        Total number of epochs.
+    start_temperature : float, optional
+        Starting temperature for the annealing.
+    end_temperature : float, optional
+        Ending temperature for the annealing.
+    """
+
+    def __init__(
+        self,
+        layer_name,
+        n_epochs,
+        start_temperature=1.0,
+        end_temperature=0.1,
+    ):
+        self.n_epochs = n_epochs
+        self.layer_name = layer_name
+        self.start_temperature = start_temperature
+        self.end_temperature = end_temperature
+        self.temperatures = np.linspace(
+            start_temperature, end_temperature, n_epochs
+        )  # linear decay
+
+    def on_epoch_begin(self, epoch, logs=None):
+        temperature = self.temperatures[epoch]
+        gumbel_softmax_layer = self.model.get_layer(self.layer_name)
+        gumbel_softmax_layer.temperature.assign(temperature)
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        gumbel_softmax_layer = self.model.get_layer(self.layer_name)
+        logs["temperature"] = float(gumbel_softmax_layer.temperature.numpy())
+
+
 class KLAnnealingCallback(callbacks.Callback):
     """Callback to update the KL annealing factor during training.
 
