@@ -374,7 +374,7 @@ class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
 
     def __init__(self, temperature, **kwargs):
         super().__init__(**kwargs)
-        self.temperature = temperature
+        self.temperature = tf.Variable(temperature, trainable=False, dtype=tf.float32)
 
     def call(self, inputs, **kwargs):
         """This method accepts logits and outputs samples."""
