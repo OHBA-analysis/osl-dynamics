@@ -208,8 +208,8 @@ class MaxStatPermutation(Permutation):
         """
         super().fit(y)
         pool_axis = tuple(range(1, len(self.glm.target_dims) + 1))
-        self.null_max_copes = np.max(np.abs(self.null_copes), axis=pool_axis)
-        self.null_max_tstats = np.max(np.abs(self.null_tstats), axis=pool_axis)
+        self.null_max_copes = np.nanmax(np.abs(self.null_copes), axis=pool_axis)
+        self.null_max_tstats = np.nanmax(np.abs(self.null_tstats), axis=pool_axis)
 
     def get_pvalues(self, metric="copes"):
         """
