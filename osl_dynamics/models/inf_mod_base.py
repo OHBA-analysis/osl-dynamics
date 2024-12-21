@@ -975,7 +975,7 @@ class VariationalInferenceModelBase(ModelBase):
         """
         loss = self.free_energy(dataset)
         n_params = self.get_n_params_generative_model()
-        n_sequences = dtf.n_batches(
+        n_sequences = dtf.get_n_batches(
             dataset.time_series(concatenate=True), self.config.sequence_length
         )
 
