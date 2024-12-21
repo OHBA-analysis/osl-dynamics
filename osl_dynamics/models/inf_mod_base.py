@@ -974,8 +974,12 @@ class VariationalInferenceModelBase(ModelBase):
             Bayesian Information Criterion for the model (for each sequence).
         """
         loss = self.free_energy(dataset)
+
+        if self.config.loss_calc == "sum":
+            loss /= self.config.sequence_length
+
         n_params = self.get_n_params_generative_model()
-        n_sequences = dtf.get_n_batches(
+        n_sequences = dtf.get_n_sequences(
             dataset.time_series(concatenate=True), self.config.sequence_length
         )
 
@@ -984,6 +988,7 @@ class VariationalInferenceModelBase(ModelBase):
             + (np.log(self.config.sequence_length) + np.log(n_sequences))
             * n_params
             / n_sequences
+            / self.config.sequence_length
         )
         return bic
 

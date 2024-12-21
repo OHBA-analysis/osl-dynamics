@@ -1145,7 +1145,10 @@ class Model(ModelBase):
             free_energy.append(seq_fe)
 
         # Return average over batches
-        return np.mean(free_energy)
+        free_energy = np.mean(free_energy)
+        if self.config.loss_calc == "mean":
+            free_energy /= self.config.sequence_length
+        return free_energy
 
     def evidence(self, dataset):
         """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
@@ -1261,7 +1264,12 @@ class Model(ModelBase):
                 pb_i.add(1)
             evidence += np.mean(batch_evidence)
 
-        return evidence / n_batches
+        evidence = evidence / n_batches
+
+        if self.config.loss_calc == "mean":
+            evidence /= self.config.sequence_length
+
+        return evidence
 
     def get_alpha(self, dataset, concatenate=False, remove_edge_effects=False):
         """Get state probabilities.
@@ -1447,8 +1455,11 @@ class Model(ModelBase):
         else:
             raise ValueError("loss_type must be 'free_energy' or 'evidence'")
 
+        if self.config.loss_calc == "sum":
+            loss /= self.config.sequence_length
+
         n_params = self.get_n_params_generative_model()
-        n_sequences = dtf.get_n_batches(
+        n_sequences = dtf.get_n_sequences(
             dataset.time_series(concatenate=True), self.config.sequence_length
         )
 
@@ -1457,6 +1468,7 @@ class Model(ModelBase):
             + (np.log(self.config.sequence_length) + np.log(n_sequences))
             * n_params
             / n_sequences
+            / self.config.sequence_length
         )
         return bic
 
