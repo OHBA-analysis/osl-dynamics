@@ -863,15 +863,18 @@ def hmm_dual_estimation(data, alpha, zero_mean=False, eps=1e-5, n_jobs=1):
 
         return m, c
 
-    # Calculate in parallel
-    results = pqdm(
-        array=zip(alpha, data),
-        function=_calc,
-        n_jobs=n_jobs,
-        desc="Dual estimation",
-        argument_type="args",
-        total=len(data),
-    )
+    if n_jobs is None:
+        results = [_calc(a, x) for a, x in zip(alpha, data)]
+    else:
+        # Calculate in parallel
+        results = pqdm(
+            array=zip(alpha, data),
+            function=_calc,
+            n_jobs=n_jobs,
+            desc="Dual estimation",
+            argument_type="args",
+            total=len(data),
+        )
 
     # Unpack results
     means = []
@@ -882,3 +885,85 @@ def hmm_dual_estimation(data, alpha, zero_mean=False, eps=1e-5, n_jobs=1):
         covariances.append(c)
 
     return np.squeeze(means), np.squeeze(covariances)
+
+
+def hmm_features(
+    data,
+    alpha,
+    sampling_frequency=None,
+    zero_mean=False,
+    eps=1e-5,
+    pca_components=None,
+    n_jobs=1,
+):
+    """Dual estimation of HMM features.
+
+    Parameters
+    ----------
+    data : np.ndarray or list of np.ndarray
+        Prepared data. Shape must be (n_samples, n_channels)
+        or (n_subjects, n_samples, n_channels).
+    alpha : np.ndarray or list of np.ndarray
+        State probabilities. Shape must be (n_samples, n_states)
+        or (n_subjects, n_samples, n_states).
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. If not passed, summary statistics
+        are unitless.
+    zero_mean : bool, optional
+        Should we force the state means to be zero?
+    eps : float, optional
+        Small value to add to the diagonal of each state covariance.
+    pca_components : np.ndarray, optional
+        PCA components to reduce dimensionality of features.
+        Shape must be (n_pca_components, n_channels).
+    n_jobs : int, optional
+        Number of jobs to run in parallel.
+
+    Returns
+    -------
+    means : np.ndarray or list of np.ndarray
+        State means. Shape is (n_states, n_channels) or
+        (n_subjects, n_states, n_channels).
+    covariances : np.ndarray or list of np.ndarray
+        State covariances. Shape is (n_states, n_channels, n_channels)
+        or (n_subjects, n_states, n_channels, n_channels).
+    """
+    from osl_dynamics.inference.modes import argmax_time_courses
+
+    def _calc(a, x):
+        # Summary statistics features
+        stc = argmax_time_courses(a)
+        fo = fractional_occupancies(stc)
+        lt = mean_lifetimes(stc, sampling_frequency=sampling_frequency)
+        intv = mean_intervals(stc, sampling_frequency=sampling_frequency)
+        sr = switching_rates(stc, sampling_frequency=sampling_frequency)
+        sum_stats = np.concatenate([fo, lt, intv, sr], axis=-1)
+
+        # Observation model features
+        m, c = hmm_dual_estimation(x, a, zero_mean=zero_mean, eps=eps, n_jobs=None)
+        i, j = np.triu_indices(c.shape[-1])
+        c = c[..., i, j]
+        if zero_mean:
+            obs_mod = c
+        else:
+            obs_mod = np.concatenate([m, c], axis=-1)
+        obs_mod = obs_mod.reshape(-1)
+
+        # Combine features and optionally apply PCA
+        features = np.concatenate([sum_stats, obs_mod])
+        if pca_components is not None:
+            features = pca_components.dot(features)
+
+        return features
+
+    # Calculate in parallel
+    features = pqdm(
+        array=zip(alpha, data),
+        function=_calc,
+        n_jobs=n_jobs,
+        desc="Calculating HMM features",
+        argument_type="args",
+        total=len(data),
+    )
+
+    return np.array(features)
