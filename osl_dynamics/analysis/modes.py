@@ -863,15 +863,18 @@ def hmm_dual_estimation(data, alpha, zero_mean=False, eps=1e-5, n_jobs=1):
 
         return m, c
 
-    # Calculate in parallel
-    results = pqdm(
-        array=zip(alpha, data),
-        function=_calc,
-        n_jobs=n_jobs,
-        desc="Dual estimation",
-        argument_type="args",
-        total=len(data),
-    )
+    if n_jobs is None:
+        results = [_calc(a, x) for a, x in zip(alpha, data)]
+    else:
+        # Calculate in parallel
+        results = pqdm(
+            array=zip(alpha, data),
+            function=_calc,
+            n_jobs=n_jobs,
+            desc="Dual estimation",
+            argument_type="args",
+            total=len(data),
+        )
 
     # Unpack results
     means = []
@@ -912,6 +915,7 @@ def hmm_features(
         Small value to add to the diagonal of each state covariance.
     pca_components : np.ndarray, optional
         PCA components to reduce dimensionality of features.
+        Shape must be (n_pca_components, n_channels).
     n_jobs : int, optional
         Number of jobs to run in parallel.
 
@@ -936,20 +940,19 @@ def hmm_features(
         sum_stats = np.concatenate([fo, lt, intv, sr], axis=-1)
 
         # Observation model features
-        m, c = hmm_dual_estimation(x, a, zero_mean=zero_mean, eps=eps, n_jobs=1)
+        m, c = hmm_dual_estimation(x, a, zero_mean=zero_mean, eps=eps, n_jobs=None)
         i, j = np.triu_indices(c.shape[-1])
         c = c[..., i, j]
         if zero_mean:
             obs_mod = c
         else:
             obs_mod = np.concatenate([m, c], axis=-1)
+        obs_mod = obs_mod.reshape(-1)
 
-        # Combine features
-        features = np.concatenate([sum_stats, obs_mod], axis=-1)
-
-        # Apply dimensionality reduction
+        # Combine features and optionally apply PCA
+        features = np.concatenate([sum_stats, obs_mod])
         if pca_components is not None:
-            features @= pca_components
+            features = pca_components.dot(features)
 
         return features
 
