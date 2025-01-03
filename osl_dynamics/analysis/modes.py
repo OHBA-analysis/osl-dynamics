@@ -885,7 +885,13 @@ def hmm_dual_estimation(data, alpha, zero_mean=False, eps=1e-5, n_jobs=1):
 
 
 def hmm_features(
-    data, alpha, sampling_frequency=None, zero_mean=False, eps=1e-5, n_jobs=1
+    data,
+    alpha,
+    sampling_frequency=None,
+    zero_mean=False,
+    eps=1e-5,
+    pca_components=None,
+    n_jobs=1,
 ):
     """Dual estimation of HMM features.
 
@@ -904,6 +910,8 @@ def hmm_features(
         Should we force the state means to be zero?
     eps : float, optional
         Small value to add to the diagonal of each state covariance.
+    pca_components : np.ndarray, optional
+        PCA components to reduce dimensionality of features.
     n_jobs : int, optional
         Number of jobs to run in parallel.
 
@@ -936,8 +944,14 @@ def hmm_features(
         else:
             obs_mod = np.concatenate([m, c], axis=-1)
 
-        # Return combined features
-        return np.concatenate([sum_stats, obs_mod], axis=-1)
+        # Combine features
+        features = np.concatenate([sum_stats, obs_mod], axis=-1)
+
+        # Apply dimensionality reduction
+        if pca_components is not None:
+            features @= pca_components
+
+        return features
 
     # Calculate in parallel
     features = pqdm(
