@@ -893,7 +893,7 @@ def hmm_features(
     sampling_frequency=None,
     zero_mean=False,
     eps=1e-5,
-    pca_components=None,
+    use_partial=False,
     n_jobs=1,
 ):
     """Dual estimation of HMM features.
@@ -913,25 +913,45 @@ def hmm_features(
         Should we force the state means to be zero?
     eps : float, optional
         Small value to add to the diagonal of each state covariance.
-    pca_components : np.ndarray, optional
-        PCA components to reduce dimensionality of features.
-        Shape must be (n_pca_components, n_channels).
+    use_partial : bool, optional
+        Should we use the partial state correlation matrix rather than
+        the full state covariance matrix?
     n_jobs : int, optional
         Number of jobs to run in parallel.
 
     Returns
     -------
-    means : np.ndarray or list of np.ndarray
-        State means. Shape is (n_states, n_channels) or
-        (n_subjects, n_states, n_channels).
-    covariances : np.ndarray or list of np.ndarray
-        State covariances. Shape is (n_states, n_channels, n_channels)
-        or (n_subjects, n_states, n_channels, n_channels).
+    features : np.ndarray
+        HMM features. Shape is (n_subjects, n_features).
     """
     from osl_dynamics.inference.modes import argmax_time_courses
 
+    # Validation
+    if (isinstance(data, list) != isinstance(alpha, list)) or (
+        isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
+    ):
+        raise ValueError(
+            f"data is type {type(data)} and alpha is type "
+            f"{type(alpha)}. They must both be lists or numpy arrays."
+        )
+
+    if isinstance(data, np.ndarray):
+        if alpha.shape[0] != data.shape[0]:
+            raise ValueError("data and alpha must have the same number of samples.")
+
+        if data.ndim == 2:
+            data = [data]
+            alpha = [alpha]
+
+    if len(data) != len(alpha):
+        raise ValueError(
+            "A different number of arrays has been passed for "
+            f"data and alpha: len(data)={len(data)}, "
+            f"len(alpha)={len(alpha)}."
+        )
+
     def _calc(a, x):
-        # Summary statistics features
+        # Summary statistics for dynamics
         stc = argmax_time_courses(a)
         fo = fractional_occupancies(stc)
         lt = mean_lifetimes(stc, sampling_frequency=sampling_frequency)
@@ -939,9 +959,15 @@ def hmm_features(
         sr = switching_rates(stc, sampling_frequency=sampling_frequency)
         sum_stats = np.concatenate([fo, lt, intv, sr], axis=-1)
 
-        # Observation model features
+        # Transition probabilities
+        trans_prob = calc_trans_prob_matrix(stc, n_states=stc.shape[-1])
+        trans_prob = trans_prob.flatten()
+
+        # Observation model parameters
         m, c = hmm_dual_estimation(x, a, zero_mean=zero_mean, eps=eps, n_jobs=None)
         i, j = np.triu_indices(c.shape[-1])
+        if use_partial:
+            c = array_ops.cov2partialcorr(c)
         c = c[..., i, j]
         if zero_mean:
             obs_mod = c
@@ -949,12 +975,8 @@ def hmm_features(
             obs_mod = np.concatenate([m, c], axis=-1)
         obs_mod = obs_mod.reshape(-1)
 
-        # Combine features and optionally apply PCA
-        features = np.concatenate([sum_stats, obs_mod])
-        if pca_components is not None:
-            features = pca_components.dot(features)
-
-        return features
+        # Combine features
+        return np.concatenate([sum_stats, trans_prob, obs_mod])
 
     # Calculate in parallel
     features = pqdm(
@@ -966,4 +988,4 @@ def hmm_features(
         total=len(data),
     )
 
-    return np.array(features)
+    return np.squeeze(features)

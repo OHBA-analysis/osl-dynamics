@@ -105,6 +105,32 @@ def cov2std(cov):
     return np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
 
 
+def cov2partialcorr(cov):
+    """Converts batches of covariance matrices into batches of partial
+    correlation matrices.
+
+    Parameters
+    ----------
+    cov : np.ndarray
+        Covariance matrices. Shape must be (..., N, N).
+
+    Returns
+    -------
+    partial_corr : np.ndarray
+        Partial correlation matrices. Shape is (..., N, N).
+    """
+    cov = np.array(cov)
+    if cov.ndim < 2:
+        raise ValueError("input covariances must have more than 1 dimension.")
+    N = cov.shape[-1]
+    precision = np.linalg.inv(cov)
+    diag = np.diagonal(precision, axis1=-2, axis2=-1)
+    outer_diag = diag[..., :, np.newaxis] * diag[..., np.newaxis, :]
+    partial_corr = -precision / np.sqrt(outer_diag)
+    partial_corr[..., range(N), range(N)] = 1.0 / diag
+    return partial_corr
+
+
 def sliding_window_view(
     x,
     window_shape,
