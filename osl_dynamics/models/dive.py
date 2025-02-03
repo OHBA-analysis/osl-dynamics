@@ -300,6 +300,32 @@ class Model(VariationalInferenceModelBase):
         """Builds a keras model."""
         self.model = _model_structure(self.config)
 
+    def reset_weights(self, keep=None):
+        """Reset the model weights.
+
+        Parameters
+        ----------
+        keep : list of str, optional
+            Layer names to NOT reset.
+        """
+        super().reset_weights(keep=keep)
+        self.reset_kl_annealing_factor()
+
+    def reset_kl_annealing_factor(self):
+        """Reset the KL annealing factor."""
+        if self.config.do_kl_annealing:
+            kl_loss_layer = self.model.get_layer("kl_loss")
+            kl_loss_layer.annealing_factor.assign(0.0)
+
+            layer_names = [layer.name for layer in self.model.layers]
+            if "means_dev_mag" in layer_names:
+                means_dev_mag_layer = self.model.get_layer("means_dev_mag")
+                means_dev_mag_layer.annealing_factor.assign(0.0)
+
+            if "covs_dev_mag" in layer_names:
+                covs_dev_mag_layer = self.model.get_layer("covs_dev_mag")
+                covs_dev_mag_layer.annealing_factor.assign(0.0)
+
     def get_group_means(self):
         """Get the group level mode means.
 

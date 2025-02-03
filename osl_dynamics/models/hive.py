@@ -339,11 +339,12 @@ class Model(MarkovStateInferenceModelBase):
             kl_loss_layer = self.model.get_layer("kl_loss")
             kl_loss_layer.annealing_factor.assign(0.0)
 
-            if "means_dev_mag" in self.model.layers:
+            layer_names = [layer.name for layer in self.model.layers]
+            if "means_dev_mag" in layer_names:
                 means_dev_mag_layer = self.model.get_layer("means_dev_mag")
                 means_dev_mag_layer.annealing_factor.assign(0.0)
 
-            if "covs_dev_mag" in self.model.layers:
+            if "covs_dev_mag" in layer_names:
                 covs_dev_mag_layer = self.model.get_layer("covs_dev_mag")
                 covs_dev_mag_layer.annealing_factor.assign(0.0)
 
