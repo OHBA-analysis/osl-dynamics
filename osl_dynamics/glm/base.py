@@ -401,7 +401,7 @@ class GLM:
         self.n_targets = y_copy.shape[1]
         return y_copy
 
-    def get_tstats(self, copes, varcopes):
+    def get_tstats(self, copes=None, varcopes=None):
         """
         Get t-statistics.
 
@@ -417,7 +417,8 @@ class GLM:
         tstats : np.ndarray
             t-statistics. Shape is (n_contrasts, *target_dims).
         """
-        # TODO: Deal with division by zero and NaNs
+        copes = copes or self.copes
+        varcopes = varcopes or self.varcopes
         return copes / np.sqrt(varcopes)
 
     @property
