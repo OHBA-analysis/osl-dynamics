@@ -1,6 +1,9 @@
 import numpy as np
 
 from osl_dynamics.analysis import prediction
+from osl_dynamics.utils.misc import set_random_seed
+
+set_random_seed(42)
 
 # Create a pipeline builder
 pipeline_builder = prediction.PipelineBuilder()
@@ -26,18 +29,22 @@ params_grid = pipeline_builder.get_params_grid(
 )
 
 
-# Now simulate some random data
+# Now simulate some data with y = Xw + noise
 n_samples = 5000
 n_features = 10
+noise_level = 0.1
 X = np.random.randn(n_samples, n_features)
-y = np.random.randn(n_samples)
+w = np.random.randn(n_features, 1)
+y = X @ w + noise_level * np.random.randn(n_samples)
 
 # The model is a pipeline, so we can fit it as usual
 model.fit(X, y)
 print("Score of fitting model with default parameters: ", model.score(X, y))
 
 # We can also use the model selection class to perform a grid search and nested cross-validation
-model_selection = prediction.ModelSelection(model=model, params_grid=params_grid)
+model_selection = prediction.ModelSelection(
+    model=model, params_grid=params_grid, n_jobs=12, verbose=1
+)
 
 # Grid search
 model_selection.model_selection(X, y)
