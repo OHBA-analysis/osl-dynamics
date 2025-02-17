@@ -199,10 +199,10 @@ class ModelSelection:
     def __init__(
         self,
         model,
-        param_grid=None,
+        params_grid=None,
         search_type="grid",
         cv=5,
-        scoring="accuracy",
+        scoring=None,
         n_iter=10,
         random_state=None,
         n_jobs=1,
@@ -215,14 +215,14 @@ class ModelSelection:
         ----------
         model : sklearn.base.BaseEstimator
             The machine learning model to be used.
-        param_grid : dict, optional
+        params_grid : dict, optional
             The hyperparameter grid for tuning.
         search_type : str, default='grid'
             The type of search: 'grid' for GridSearchCV or 'random' for RandomizedSearchCV.
         cv : int, optional
             Number of cross-validation folds. Defaults to 5.
         scoring : str, optional
-            Scoring metric to optimize. Defaults to 'accuracy'.
+            Scoring metric to optimize. Defaults to None.
         n_iter : int, optional
             Number of iterations for RandomizedSearchCV. Defaults to 10.
         random_state : int, optional
@@ -233,7 +233,7 @@ class ModelSelection:
             Verbosity level for model selection methods. Defaults to 0.
         """
         self.model = model
-        self.param_grid = param_grid
+        self.params_grid = params_grid
         self.search_type = search_type
         self.cv = cv
         self.scoring = scoring
@@ -242,19 +242,20 @@ class ModelSelection:
         self.n_jobs = n_jobs
         self.verbose = verbose
         self.best_model = None
+        self.best_params = None
 
-    def set_param_grid(self, param_grid):
+    def set_params_grid(self, params_grid):
         """
         Sets the hyperparameter grid for tuning.
 
         Parameters
         ----------
-        param_grid : dict
+        params_grid : dict
             The hyperparameter grid for tuning.
         """
-        if not isinstance(param_grid, dict):
-            raise ValueError("param_grid must be a dictionary.")
-        self.param_grid = param_grid
+        if not isinstance(params_grid, dict):
+            raise ValueError("params_grid must be a dictionary.")
+        self.params_grid = params_grid
 
     def set_cv(self, cv):
         """Sets the number of cross-validation folds.
@@ -277,7 +278,7 @@ class ModelSelection:
         scoring : str
             The scoring metric to use.
         """
-        if not isinstance(scoring, str):
+        if scoring is not None and not isinstance(scoring, str):
             raise ValueError("scoring must be a string representing a valid metric.")
         self.scoring = scoring
 
@@ -307,7 +308,7 @@ class ModelSelection:
         if X.shape[0] != y.shape[0]:
             raise ValueError("X and y must have the same number of samples.")
 
-    def model_selection(self, X, y):
+    def model_selection(self, X, y, override_best_model=True):
         """
         Performs hyperparameter tuning using cross-validation.
 
@@ -327,28 +328,38 @@ class ModelSelection:
         """
         self.validate_data(X, y)
 
-        if self.param_grid is None:
-            raise ValueError("param_grid must be provided for model selection.")
+        if self.params_grid is None:
+            raise ValueError("params_grid must be provided for model selection.")
 
         if self.search_type == "grid":
             search = GridSearchCV(
-                self.model, self.param_grid, cv=self.cv, scoring=self.scoring
+                self.model,
+                self.params_grid,
+                cv=self.cv,
+                scoring=self.scoring,
+                n_jobs=self.n_jobs,
+                verbose=self.verbose,
             )
         elif self.search_type == "random":
             search = RandomizedSearchCV(
                 self.model,
-                self.param_grid,
+                self.params_grid,
                 cv=self.cv,
                 scoring=self.scoring,
                 n_iter=self.n_iter,
                 random_state=self.random_state,
+                n_jobs=self.n_jobs,
+                verbose=self.verbose,
             )
         else:
             raise ValueError("Invalid search type. Must be 'grid' or 'random'.")
 
         search.fit(X, y)
-        self.best_model = search.best_estimator_
-        return search.best_params_, search.best_score_
+        if override_best_model:
+            self.best_model = search.best_estimator_
+            self.best_params = search.best_params_
+
+        return search.best_estimator_
 
     def nested_cross_validation(
         self, X, y, split_type="kfold", outer_cv=5, shuffle=True
@@ -396,9 +407,9 @@ class ModelSelection:
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]
 
-            self.model_selection(X_train, y_train)
-            best_model = self.best_model
-
+            best_model = self.model_selection(
+                X_train, y_train, override_best_model=False
+            )
             test_score = best_model.score(X_test, y_test)
             outer_scores.append(test_score)
 
