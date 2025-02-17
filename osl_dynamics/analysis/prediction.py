@@ -60,7 +60,7 @@ class PipelineBuilder:
             "ols": LinearRegression(),
             "ridge": Ridge(),
             "lasso": Lasso(),
-            "elasticnet": ElasticNet(),
+            "elastic_net": ElasticNet(),
             "svm": SVC(),
             "knn": KNeighborsClassifier(),
             "random_forest": RandomForestClassifier(),
