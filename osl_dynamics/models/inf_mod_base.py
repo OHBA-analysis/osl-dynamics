@@ -1650,3 +1650,6 @@ class MarkovStateInferenceModelBase(ModelBase):
             evidence += np.mean(batch_evidence)
 
         return evidence / n_batches
+
+    def reset_kl_annealing_factor(self):
+        pass
