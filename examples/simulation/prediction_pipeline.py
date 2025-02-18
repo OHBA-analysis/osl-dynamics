@@ -1,3 +1,8 @@
+"""
+Example of how to use the prediction pipeline to 
+perform a grid search and nested cross-validation.
+"""
+
 import numpy as np
 
 from osl_dynamics.analysis import prediction
@@ -30,7 +35,7 @@ params_grid = pipeline_builder.get_params_grid(
 
 
 # Now simulate some data with y = Xw + noise
-n_samples = 5000
+n_samples = 100
 n_features = 10
 noise_level = 0.1
 X = np.random.randn(n_samples, n_features)

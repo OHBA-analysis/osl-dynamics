@@ -1,3 +1,8 @@
+"""
+This module provides classes for building machine learning pipelines, 
+performing hyperparameter tuning, and evaluating model performance.
+"""
+
 import numpy as np
 from tqdm.auto import tqdm
 
