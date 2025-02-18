@@ -13,4 +13,5 @@ from osl_dynamics.analysis import (
     static,
     statistics,
     workbench,
+    prediction,
 )
