@@ -113,7 +113,7 @@ def train_hmm(
     if data is None:
         raise ValueError("data must be passed.")
 
-    from osl_dynamics.models import new_hmm as hmm
+    from osl_dynamics.models import hmm
 
     init_kwargs = {} if init_kwargs is None else init_kwargs
     fit_kwargs = {} if fit_kwargs is None else fit_kwargs

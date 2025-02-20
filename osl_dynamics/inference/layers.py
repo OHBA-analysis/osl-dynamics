@@ -2092,12 +2092,17 @@ class SeparateLogLikelihoodLayer(layers.Layer):
 
         n_states = tf.shape(mu)[1]
 
-        # add the sequence dimension
+        # Add the sequence dimension
         mu = tf.expand_dims(mu, axis=1)
         sigma = tf.expand_dims(sigma, axis=1)
 
+        # Cast to desired data type
+        x = tf.cast(x, self.dtype)
+        mu = tf.cast(mu, self.dtype)
+        sigma = tf.cast(sigma, self.dtype)
+
         # Calculate log-likelihood for each state
-        log_likelihood = tf.TensorArray(tf.float32, size=n_states)
+        log_likelihood = tf.TensorArray(self.dtype, size=n_states)
         for state in range(n_states):
             mvn = tfp.distributions.MultivariateNormalTriL(
                 loc=tf.gather(mu, state, axis=-2),
