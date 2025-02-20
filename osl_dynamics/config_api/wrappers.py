@@ -96,8 +96,8 @@ def train_hmm(
         .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html\
         #osl_dynamics.models.hmm.Config>`_. Defaults to::
 
-            {'sequence_length': 2000,
-             'batch_size': 32,
+            {'sequence_length': 200,
+             'batch_size': 128,
              'learning_rate': 0.01,
              'n_epochs': 20}.
     init_kwargs : dict, optional
@@ -113,7 +113,7 @@ def train_hmm(
     if data is None:
         raise ValueError("data must be passed.")
 
-    from osl_dynamics.models import hmm
+    from osl_dynamics.models import new_hmm as hmm
 
     init_kwargs = {} if init_kwargs is None else init_kwargs
     fit_kwargs = {} if fit_kwargs is None else fit_kwargs
@@ -125,8 +125,8 @@ def train_hmm(
     _logger.info("Building model")
     default_config_kwargs = {
         "n_channels": data.n_channels,
-        "sequence_length": 2000,
-        "batch_size": 32,
+        "sequence_length": 200,
+        "batch_size": 128,
         "learning_rate": 0.01,
         "n_epochs": 20,
     }

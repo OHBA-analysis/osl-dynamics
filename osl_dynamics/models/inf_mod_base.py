@@ -1545,10 +1545,18 @@ class MarkovStateInferenceModelBase(ModelBase):
             )
 
         dataset = self.make_dataset(dataset, concatenate=False)
-        _logger.info("Getting free energy")
+
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting free energy")
+            kwargs["verbose"] = 0
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting free energy")
+
         free_energy = []
-        for ds in dataset:
-            predictions = self.predict(ds, **kwargs)
+        for i in iterator:
+            predictions = self.predict(dataset[i], **kwargs)
             ll_loss = np.mean(predictions["ll_loss"])
             entropy = _get_posterior_entropy(predictions["gamma"], predictions["xi"])
             prior = _get_posterior_expected_prior(
