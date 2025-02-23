@@ -12,30 +12,15 @@ class CrossValidationSplit:
     Parameters
     ----------
     split_row : dict, optional
-        Configuration for row splitting. Should contain:
-        - `n_samples` (int): Number of samples.
-        - `method` (str): Cross-validation method (`"ShuffleSplit"` or `"KFold"`).
-        - `method_kwargs` (dict): Additional arguments for the chosen method.
+        Configuration for row splitting.
     split_column : dict, optional
-        Configuration for column splitting. Same structure as `split_row`.
+        Configuration for column splitting.
     strategy : str, optional
         Strategy for combining row and column splits:
         - `"combination"`: Generates all row-column split combinations.
         - `"pairing"`: Matches row splits to column splits in sequential order.
     kwargs : dict, optional
-        Additional configurations for cross-validation (e.g., `random_state`).
-
-    Raises
-    ------
-    ValueError
-        If an invalid strategy is provided.
-        If neither `split_row` nor `split_column` is provided.
-
-    Notes
-    -----
-    This class supports two cross-validation strategies:
-    1. **Combination**: Produces all possible (row, column) splits.
-    2. **Pairing**: Matches row splits to column splits in sequential order.
+        Additional parameters (e.g., random_state) to be passed into splitters.
     """
 
     def __init__(self, split_row: Optional[Dict[str, Any]] = None,
@@ -44,7 +29,7 @@ class CrossValidationSplit:
         self.split_row = split_row
         self.split_column = split_column
         self.strategy = strategy
-        self.kwargs = kwargs
+        self.kwargs = kwargs  # Preserve kwargs for flexibility
 
         self._validate_strategy()
         self.row_splitter = self._init_splitter(split_row) if split_row else None
@@ -71,12 +56,6 @@ class CrossValidationSplit:
         -------
         tuple
             Initialized splitter and the number of samples.
-
-        Raises
-        ------
-        ValueError
-            If `split_config` does not contain `n_samples`.
-            If the provided method is not `"ShuffleSplit"` or `"KFold"`.
         """
         if "n_samples" not in split_config:
             raise ValueError("split_config must include 'n_samples'.")
@@ -85,6 +64,7 @@ class CrossValidationSplit:
         method = split_config.get("method", "ShuffleSplit")
         method_kwargs = split_config.get("method_kwargs", {})
 
+        # Include **self.kwargs to handle extra parameters
         if method == "ShuffleSplit":
             splitter = ShuffleSplit(n_splits=method_kwargs.get("n_splits", 5),
                                     train_size=method_kwargs.get("train_size", 0.8),
