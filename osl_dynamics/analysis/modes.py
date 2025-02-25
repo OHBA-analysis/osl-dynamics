@@ -782,7 +782,7 @@ def partial_covariances(data, alpha):
 
 
 def hmm_dual_estimation(data, alpha, zero_mean=False, eps=1e-5, n_jobs=1):
-    """HMM dual estiation of observation model parameters.
+    """HMM dual estimation of observation model parameters.
 
     Parameters
     ----------
@@ -847,6 +847,10 @@ def hmm_dual_estimation(data, alpha, zero_mean=False, eps=1e-5, n_jobs=1):
     def _calc(a, x):
         sum_a = np.sum(a, axis=0)
 
+        n_samples = x.shape[0]
+        memory_threshold = 1e8  # threshold for memory usage
+        seq_length = max(int(memory_threshold // (n_channels**2)), 1)
+
         m = np.zeros([n_states, n_channels])
         if not zero_mean:
             for i in range(n_states):
@@ -854,11 +858,22 @@ def hmm_dual_estimation(data, alpha, zero_mean=False, eps=1e-5, n_jobs=1):
 
         c = np.zeros([n_states, n_channels, n_channels])
         for i in range(n_states):
-            d = x - m[i]
-            c[i] = (
-                np.sum(d[:, :, None] * d[:, None, :] * a[:, i, None, None], axis=0)
-                / sum_a[i]
-            )
+            if x.size <= memory_threshold:
+                d = x - m[i]
+                c[i] = (
+                    np.sum(d[:, :, None] * d[:, None, :] * a[:, i, None, None], axis=0)
+                    / sum_a[i]
+                )
+            else:
+                # If the data is too large, calculate in chunks to avoid memory overflow.
+                for start in range(0, n_samples, seq_length):
+                    end = min(start + seq_length, n_samples)
+                    d = x[start:end] - m[i]
+                    c[i] += np.sum(
+                        d[:, :, None] * d[:, None, :] * a[start:end, i, None, None],
+                        axis=0,
+                    )
+                c[i] /= sum_a[i]
             c[i] += eps * np.eye(n_channels)
 
         return m, c

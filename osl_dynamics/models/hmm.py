@@ -1616,6 +1616,11 @@ class Model(ModelBase):
         # Helper function for dual estimation for a single session
         def _single_dual_estimation(a, x):
             sum_a = np.sum(a, axis=0)
+
+            n_samples = x.shape[0]
+            memory_threshold = 1e8  # threshold for memory usage
+            seq_length = max(int(memory_threshold // (n_channels**2)), 1)
+
             if self.config.learn_means:
                 session_means = np.empty((n_states, n_channels))
                 for state in range(n_states):
@@ -1628,21 +1633,36 @@ class Model(ModelBase):
             if self.config.learn_covariances:
                 session_covariances = np.empty((n_states, n_channels, n_channels))
                 for state in range(n_states):
-                    diff = x - session_means[state]
-                    session_covariances[state] = (
-                        np.sum(
-                            diff[:, :, None]
-                            * diff[:, None, :]
-                            * a[:, state, None, None],
-                            axis=0,
+                    if x.size <= memory_threshold:
+                        diff = x - session_means[state]
+                        session_covariances[state] = (
+                            np.sum(
+                                diff[:, :, None]
+                                * diff[:, None, :]
+                                * a[:, state, None, None],
+                                axis=0,
+                            )
+                            / sum_a[state]
                         )
-                        / sum_a[state]
-                    )
+                    else:
+                        # If the data is too large, calculate in chunks to avoid memory overflow.
+                        for start in range(0, n_samples, seq_length):
+                            end = min(start + seq_length, n_samples)
+                            diff = x[start:end] - session_means[state]
+                            session_covariances[state] += np.sum(
+                                diff[:, :, None]
+                                * diff[:, None, :]
+                                * a[start:end, state, None, None],
+                                axis=0,
+                            )
+                        session_covariances[state] /= sum_a[state]
+
                     session_covariances[
                         state
                     ] += self.config.covariances_epsilon * np.eye(
                         self.config.n_channels
                     )
+
             else:
                 session_covariances = self.get_covariances()
 
