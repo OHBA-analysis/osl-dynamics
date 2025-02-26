@@ -12,7 +12,7 @@ import numpy as np
 
 from osl_dynamics.simulation import HMM_MVN
 from osl_dynamics.data import Data
-from osl_dynamics.models.hmm import Config, Model
+from osl_dynamics.models.new_hmm import Config, Model
 from osl_dynamics.inference import modes, metrics
 
 # Create directory for results
