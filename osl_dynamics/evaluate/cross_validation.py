@@ -19,17 +19,14 @@ class CrossValidationSplit:
         Strategy for combining row and column splits:
         - `"combination"`: Generates all row-column split combinations.
         - `"pairing"`: Matches row splits to column splits in sequential order.
-    kwargs : dict, optional
-        Additional parameters (e.g., random_state) to be passed into splitters.
     """
 
     def __init__(self, split_row: Optional[Dict[str, Any]] = None,
                  split_column: Optional[Dict[str, Any]] = None,
-                 strategy: str = "combination", **kwargs):
+                 strategy: str = "combination"):
         self.split_row = split_row
         self.split_column = split_column
         self.strategy = strategy
-        self.kwargs = kwargs  # Preserve kwargs for flexibility
 
         self._validate_strategy()
         self.row_splitter = self._init_splitter(split_row) if split_row else None
@@ -66,11 +63,9 @@ class CrossValidationSplit:
 
         # Include **self.kwargs to handle extra parameters
         if method == "ShuffleSplit":
-            splitter = ShuffleSplit(n_splits=method_kwargs.get("n_splits", 5),
-                                    train_size=method_kwargs.get("train_size", 0.8),
-                                    **self.kwargs)
+            splitter = ShuffleSplit(**method_kwargs)
         elif method == "KFold":
-            splitter = KFold(n_splits=method_kwargs.get("n_splits", 5), **self.kwargs)
+            splitter = KFold(**method_kwargs)
         else:
             raise ValueError("Unsupported cross-validation method: use 'ShuffleSplit' or 'KFold'.")
 
@@ -142,12 +137,24 @@ class CrossValidationSplit:
         """
         os.makedirs(save_dir, exist_ok=True)
 
+        def to_sorted_list(array):
+            """Convert array to sorted list, handling empty arrays."""
+            return sorted(array.tolist()) if len(array) > 0 else []
+
         for i, (row_train, row_test, col_train, col_test) in enumerate(self.split()):
             split_dict = {
-                "row_train": sorted(row_train.tolist()) if row_train else [],
-                "row_test": sorted(row_test.tolist()) if row_test else [],
-                "column_train": sorted(col_train.tolist()) if col_train else [],
-                "column_test": sorted(col_test.tolist()) if col_test else [],
+                "row_train": to_sorted_list(row_train),
+                "row_test": to_sorted_list(row_test),
+                "column_train": to_sorted_list(col_train),
+                "column_test": to_sorted_list(col_test),
             }
             with open(os.path.join(save_dir, f"fold_indices_{i + 1}.json"), "w") as f:
                 json.dump(split_dict, f, indent=4)
+
+class BiCrossValidation:
+    def __init__(self):
+        pass
+
+class NaiveCrossValidation:
+    def __init__(self):
+        pass
