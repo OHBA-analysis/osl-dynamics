@@ -1991,7 +1991,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                     + log_B[:, i]
                 )
             log_alpha = tf.tensor_scatter_nd_update(log_alpha, indices, values)
-            log_alpha, log_scale = _rescale(log_alpha, log_scale, indices, i)
+            #log_alpha, log_scale = _rescale(log_alpha, log_scale, indices, i)
 
         # Backward pass
         for i in range(sequence_length, 0, -1):
@@ -2004,9 +2004,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                     axis=-1,
                 )
             log_beta = tf.tensor_scatter_nd_update(log_beta, indices, values)
-            log_beta, _ = _rescale(
-                log_beta, log_scale, indices, i - 1, update_scale=False
-            )
+            #log_beta, _ = _rescale(log_beta, log_scale, indices, i - 1, update_scale=False)
 
         # Marginal probabilities
         log_gamma = log_alpha + log_beta
