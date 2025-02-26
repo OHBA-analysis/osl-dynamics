@@ -797,7 +797,8 @@ def hmm_dual_estimation(data, alpha, zero_mean=False, eps=1e-5, n_jobs=1):
     eps : float, optional
         Small value to add to the diagonal of each state covariance.
     n_jobs : int, optional
-        Number of jobs to run in parallel.
+        Number of jobs to run in parallel. If set as None, the function
+        will run sequentially.
 
     Returns
     -------

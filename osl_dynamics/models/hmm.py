@@ -33,6 +33,7 @@ from tqdm.auto import trange
 from pqdm.threads import pqdm
 
 import osl_dynamics.data.tf as dtf
+from osl_dynamics.analysis.modes import hmm_dual_estimation
 from osl_dynamics.inference import initializers, modes
 from osl_dynamics.inference.layers import (
     CategoricalLogLikelihoodLossLayer,
@@ -1557,8 +1558,9 @@ class Model(ModelBase):
 
         return alpha, np.array(means), np.array(covariances)
 
-    def dual_estimation(self, training_data, alpha=None, n_jobs=1):
+    def dual_estimation(self, training_data, alpha=None, concatenate=False, n_jobs=1):
         """Dual estimation to get session-specific observation model parameters.
+        This function is the wrapper for the :code:`hmm_dual_estimation` function.
 
         Here, we estimate the state means and covariances for sessions
         with the posterior distribution of the states held fixed.
@@ -1570,6 +1572,8 @@ class Model(ModelBase):
         alpha : list of np.ndarray, optional
             Posterior distribution of the states. Shape is
             (n_sessions, n_samples, n_states).
+        concatenate : bool, optional
+            Should we concatenate the data across sessions?
         n_jobs : int, optional
             Number of jobs to run in parallel.
 
@@ -1583,7 +1587,7 @@ class Model(ModelBase):
         """
         if alpha is None:
             # Get the posterior
-            alpha = self.get_alpha(training_data, concatenate=False)
+            alpha = self.get_alpha(training_data, concatenate=cocatenate)
 
         if isinstance(alpha, np.ndarray):
             alpha = [alpha]
@@ -1597,109 +1601,31 @@ class Model(ModelBase):
                     subject_data.append(np.concatenate(batch["data"]))
                 data.append(np.concatenate(subject_data))
         else:
-            data = training_data.time_series(prepared=True, concatenate=False)
+            data = training_data.time_series(prepared=True, concatenate=concatenate)
 
         if isinstance(data, np.ndarray):
             data = [data]
 
-        if len(alpha) != len(data):
-            raise ValueError(
-                "len(alpha) and training_data.n_sessions must be the same."
-            )
-
         # Make sure the data and alpha have the same number of samples
         data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
 
-        n_states = self.config.n_states
-        n_channels = self.config.n_channels
-
-        # Helper function for dual estimation for a single session
-        def _single_dual_estimation(a, x):
-            sum_a = np.sum(a, axis=0)
-
-            n_samples = x.shape[0]
-            memory_threshold = 1e8  # threshold for memory usage
-            seq_length = max(int(memory_threshold // (n_channels**2)), 1)
-
-            if self.config.learn_means:
-                session_means = np.empty((n_states, n_channels))
-                for state in range(n_states):
-                    session_means[state] = (
-                        np.sum(x * a[:, state, None], axis=0) / sum_a[state]
-                    )
-            else:
-                session_means = self.get_means()
-
-            if self.config.learn_covariances:
-                session_covariances = np.empty((n_states, n_channels, n_channels))
-                for state in range(n_states):
-                    if x.size <= memory_threshold:
-                        diff = x - session_means[state]
-                        session_covariances[state] = (
-                            np.sum(
-                                diff[:, :, None]
-                                * diff[:, None, :]
-                                * a[:, state, None, None],
-                                axis=0,
-                            )
-                            / sum_a[state]
-                        )
-                    else:
-                        # If the data is too large, calculate in chunks to avoid memory overflow.
-                        for start in range(0, n_samples, seq_length):
-                            end = min(start + seq_length, n_samples)
-                            diff = x[start:end] - session_means[state]
-                            session_covariances[state] += np.sum(
-                                diff[:, :, None]
-                                * diff[:, None, :]
-                                * a[start:end, state, None, None],
-                                axis=0,
-                            )
-                        session_covariances[state] /= sum_a[state]
-
-                    session_covariances[
-                        state
-                    ] += self.config.covariances_epsilon * np.eye(
-                        self.config.n_channels
-                    )
-
-            else:
-                session_covariances = self.get_covariances()
-
-            return session_means, session_covariances
-
-        # Setup keyword arguments to pass to the helper function
-        kwargs = []
-        for a, x in zip(alpha, data):
-            kwargs.append({"a": a, "x": x})
-
-        if len(data) == 1:
-            _logger.info("Dual estimation")
-            results = [_single_dual_estimation(**kwargs[0])]
-
-        elif n_jobs == 1:
-            results = []
-            for i in trange(len(data), desc="Dual estimation"):
-                results.append(_single_dual_estimation(**kwargs[i]))
-
-        else:
-            _logger.info("Dual estimation")
-            results = pqdm(
-                kwargs,
-                _single_dual_estimation,
-                argument_type="kwargs",
+        # Dual estimation
+        if self.config.learn_covariances:
+            means, covariances = hmm_dual_estimation(
+                data,
+                alpha,
+                zero_mean=(not self.config.learn_means),
+                eps=self.config.covariances_epsilon,
                 n_jobs=n_jobs,
             )
+            if not self.config.learn_means:
+                means = self.get_means()
+                # get initial means (this is not necessarily the same as
+                # the zero means)
+        else:
+            covariances = self.get_covariances()
 
-        # Unpack the results
-        means = []
-        covariances = []
-        for result in results:
-            m, c = result
-            means.append(m)
-            covariances.append(c)
-
-        return np.squeeze(means), np.squeeze(covariances)
+        return means, covariances
 
     def save_weights(self, filepath):
         """Save all model weights.
