@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 import numpy.testing as npt
 from osl_dynamics.data import Data
@@ -7,7 +8,7 @@ def test_data_nparray():
     # Note: the input should be (n_timepoints,n_channels)
     input = np.array([[1., 0.5], [2., 0.4], [1.5, 0.3]])
 
-    data = Data(input,buffer_size=1000,sampling_frequency=2.0)
+    data = Data(input, buffer_size=1000, sampling_frequency=2.0)
 
     # Test self.__iter__
     for obj in data:
@@ -29,8 +30,9 @@ def test_data_nparray():
     data.set_buffer_size(100)
     npt.assert_equal(data.buffer_size, 100)
     # Test self.select
-    data.select(channels=[1], timepoints=[1, 4],sessions=[0])
+    data.select(channels=[1], timepoints=[1, 4], sessions=[0])
     npt.assert_almost_equal(data.arrays[0], input[1:3, 1:])
+    data.delete_dir()
 
 
 def test_data_list_nparray():
@@ -44,6 +46,9 @@ def test_data_list_nparray():
     npt.assert_equal(data.n_sessions, 2)
     # Test @property self.n_samples
     npt.assert_equal(data.n_samples, 6)
+    # Test @self.time_series()
+    npt.assert_almost_equal(data.time_series(concatenate=True),np.concatenate([input_1,input_2]))
+    npt.assert_almost_equal(data.time_series(concatenate=False), np.array([input_1, input_2]))
 
     # Test data.set_keep
     with data.set_keep([0]):
@@ -58,31 +63,56 @@ def test_data_list_nparray():
 
     with data.set_keep([1, 0]):
         npt.assert_equal(data.keep, [1, 0])
-        for element in data.dataset(sequence_length=3, batch_size=2):
-            print(element['data'].numpy().shape)
-            print(element['data'].numpy())
-
-            npt.assert_almost_equal(element['data'].numpy(), np.array([input_2, input_1]))
+        for element in data.dataset(sequence_length=3, batch_size=2, shuffle=False):
+            npt.assert_almost_equal(element['data'].numpy(), np.array([input_1, input_2]))
 
     # Test self.select
-    data.select(channels=[1],sessions=[1],timepoints=[1,3])
+    data.select(channels=[1], sessions=[1], timepoints=[1, 3])
     npt.assert_almost_equal(data.arrays[0], input_2[1:3, 1:])
     # Test @property self.n_samples after selection
     npt.assert_equal(data.n_samples, 2)
+    data.delete_dir()
 
+    input_3 = np.array([[1.], [2.], [1.5]])
+
+    with pytest.raises(ValueError, match="All inputs should have the same number of channels."):
+        data_wrong = Data([input_1, input_3])  # Should raise ValueError
+        data_wrong.delete_dir()
 
 def test_data_files():
     import os
     import numpy as np
+    import shutil
     save_dir = './test_temp/'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+    os.makedirs(save_dir)
     input_1 = np.array([[1., 0.5], [2., 0.4], [1.5, 0.3]])
     input_2 = input_1 / 2
-    np.save(f'{save_dir}10001.npy', input_1)
-    np.savetxt(f'{save_dir}10002.txt', input_2)
-    data = Data(save_dir)
-    npt.assert_almost_equal(data.arrays, [input_1, input_2])
+    np.save(f'{save_dir}/10001.npy', input_1)
+    np.savetxt(f'{save_dir}/10002.txt', input_2)
+
+    # Case 1: A directory
+    data_1 = Data(save_dir)
+    npt.assert_almost_equal(data_1.arrays, [input_1, input_2])
+    data_1.delete_dir()
+
+    # Case 2: A list of file names
+    file_path = [f'{save_dir}/10001.npy', f'{save_dir}/10002.txt']
+    data_2 = Data(file_path)
+    npt.assert_almost_equal(data_2.arrays, [input_1, input_2])
+    data_2.delete_dir()
+
+    # Case 3: Save the list of file names to a txt file
+    output_txt = "./file_list.txt"  # Define output file
+
+    with open(output_txt, "w") as f:
+        for path in file_path:
+            f.write(path + "\n")  # Write each item followed by a newline
+    data_3 = Data(output_txt)
+    npt.assert_almost_equal(data_3.arrays, [input_1, input_2])
+    data_3.delete_dir()
+    os.remove(output_txt)
 
     # Remove the directory after testing
     from shutil import rmtree
@@ -108,6 +138,7 @@ def test_standardize():
     npt.assert_almost_equal(data.time_series(prepared=True)[0], np.array([vector, vector]).T)
     npt.assert_almost_equal(data.time_series(prepared=True)[1], np.array([vector, vector]).T)
     npt.assert_almost_equal(data.time_series(prepared=False), np.array([input_1, input_2]), decimal=6)
+    data.delete_dir()
 
     ### Case 2: input represents multiple sessions
     input = np.concatenate((input_1, input_2), axis=0)
@@ -130,7 +161,7 @@ def test_standardize():
     npt.assert_almost_equal(data.time_series(prepared=True)[1][:3], np.array([vector, vector]).T)
     npt.assert_almost_equal(data.time_series(prepared=True)[1][3:], np.array([vector, vector]).T)
     npt.assert_almost_equal(data.time_series(prepared=False)[1], np.concatenate((input_1, input_2), axis=0), decimal=6)
-
+    data.delete_dir()
 
 def test_prepare():
     """
@@ -286,13 +317,13 @@ def test_filter_session():
     prepare_no_session = {'select': {'timepoints': [0, 2400]},
                           'filter': {'low_freq': cutoff_frequency}}
     data.prepare(prepare_no_session)
-    filtered_ts_no_session = np.squeeze(data.time_series()[0][:,0])
+    filtered_ts_no_session = np.squeeze(data.time_series()[0][:, 0])
 
     # Prepare with session input
     prepare_with_session = {'select': {'timepoints': [0, 2400]},
                             'filter': {'low_freq': cutoff_frequency, 'session_length': 1200}}
     data.prepare(prepare_with_session)
-    filtered_ts_with_session = np.squeeze(data.time_series()[0][:,0])
+    filtered_ts_with_session = np.squeeze(data.time_series()[0][:, 0])
 
     # Plot frequency spectrum
     def plot_frequency(signal, sampling_frequency, title):
@@ -314,7 +345,7 @@ def test_filter_session():
     plt.show()
 
     # Plot original, filtered without session, and filtered with session
-    #plot_frequency(time_series_combined, sampling_frequency, "Original Signal")
+    # plot_frequency(time_series_combined, sampling_frequency, "Original Signal")
     plot_frequency(filtered_ts_no_session, sampling_frequency, "Filtered Signal Without Session")
     plot_frequency(filtered_ts_with_session, sampling_frequency, "Filtered Signal With Session")
 
@@ -322,6 +353,7 @@ def test_filter_session():
     for file in os.listdir(save_dir):
         os.remove(os.path.join(save_dir, file))
     os.rmdir(save_dir)
+
 
 def test_filter_gaussian_weighted_least_squares_straight_line_fitting():
     """
@@ -337,7 +369,7 @@ def test_filter_gaussian_weighted_least_squares_straight_line_fitting():
 
     sampling_frequency = 0.1
 
-    time_series = np.array([1.0,2.0,3.0,4.0,5.0,1.0,2.0,3.0,4.0,5.0])
+    time_series = np.array([1.0, 2.0, 3.0, 4.0, 5.0, 1.0, 2.0, 3.0, 4.0, 5.0])
     time_series_save = np.column_stack((time_series, time_series))
 
     # Save the combined time series for testing
@@ -347,15 +379,14 @@ def test_filter_gaussian_weighted_least_squares_straight_line_fitting():
     data = Data(save_dir, sampling_frequency=sampling_frequency)
 
     # Prepare with session input
-    prepare_with_session = {'filter': {'sigma': 40, 'session_length':5}}
+    prepare_with_session = {'filter': {'sigma': 40, 'session_length': 5}}
     data.prepare(prepare_with_session)
     filtered_ts_with_session = np.squeeze(data.time_series()[0][:, 0])
 
-    answer = time_series - np.array([2.91948343,  2.95023502,  3.        ,  3.04976498,  3.08051657,
-                                     2.91948343,  2.95023502,  3.        ,  3.04976498,  3.08051657])
+    answer = time_series - np.array([2.91948343, 2.95023502, 3., 3.04976498, 3.08051657,
+                                     2.91948343, 2.95023502, 3., 3.04976498, 3.08051657])
 
-    npt.assert_almost_equal(filtered_ts_with_session,answer)
-
+    npt.assert_almost_equal(filtered_ts_with_session, answer)
 
     # Clean up temporary files
     for file in os.listdir(save_dir):
@@ -392,7 +423,7 @@ def test_filter_gaussian_weighted_least_squares_straight_line_fitting():
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
-    sampling_frequency = 1/0.72
+    sampling_frequency = 1 / 0.72
 
     # Generate the fMRI-like signal
     time, signal = generate_fmri_like_signal(sampling_frequency=sampling_frequency)
@@ -411,12 +442,10 @@ def test_filter_gaussian_weighted_least_squares_straight_line_fitting():
 
     filtered_ts_with_session = np.squeeze(data.time_series()[0][:, 0])
 
-
-
     # Plot the signal
     plt.figure(figsize=(10, 4))
     plt.plot(time, signal, label='Simulated fMRI Signal', linewidth=1)
-    plt.plot(time,filtered_ts_with_session,label='After filtering',linewidth=1)
+    plt.plot(time, filtered_ts_with_session, label='After filtering', linewidth=1)
     plt.xlabel('Time (s)')
     plt.ylabel('Amplitude')
     plt.title('Synthetic fMRI-like Time Series')
