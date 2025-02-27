@@ -98,10 +98,12 @@ class DiceCoefficientCallback(callbacks.Callback):
 
 class GumbelSoftmaxAnnealingCallback(tf.keras.callbacks.Callback):
     """Callback to anneal the temperature of a Gumbel-Softmax distribution.
-    Currently only supports linear annealing.
 
     Parameters
     ----------
+    curve : str
+        Shape of the annealing curve.
+        Can be either :code:`'linear'` or :code:`'exp'`.
     layer_name : str
         Name of the Gumbel-Softmax layer.
     n_epochs : int
@@ -110,32 +112,51 @@ class GumbelSoftmaxAnnealingCallback(tf.keras.callbacks.Callback):
         Starting temperature for the annealing.
     end_temperature : float, optional
         Ending temperature for the annealing.
+    slope : float
+        Slope of the curve. Only used when :code:`curve='exp'`.
     """
 
     def __init__(
         self,
+        curve,
         layer_name,
         n_epochs,
         start_temperature=1.0,
-        end_temperature=0.1,
+        end_temperature=0.0,
+        slope=0.014,
     ):
-        self.n_epochs = n_epochs
+        self.curve = curve
         self.layer_name = layer_name
+        self.n_epochs = n_epochs
         self.start_temperature = start_temperature
         self.end_temperature = end_temperature
-        self.temperatures = np.linspace(
-            start_temperature, end_temperature, n_epochs
-        )  # linear decay
+        self.slope = slope
+
+        # Precompute temperatures for linear decay
+        if self.curve == "linear":
+            self.temperatures = np.linspace(
+                start_temperature, end_temperature, n_epochs
+            )
+
+    def set_model(self, model):
+        # Cache the Gumbel-Softmax layer when the model is set
+        super().set_model(model)
+        self.gumbel_softmax_layer = model.get_layer(self.layer_name)
 
     def on_epoch_begin(self, epoch, logs=None):
-        temperature = self.temperatures[epoch]
-        gumbel_softmax_layer = self.model.get_layer(self.layer_name)
-        gumbel_softmax_layer.temperature.assign(temperature)
+        if self.curve == "linear":
+            temperature = self.temperatures[epoch]
+        if self.curve == "exp":
+            temperature = max(
+                self.end_temperature,
+                self.start_temperature * np.exp(-self.slope * epoch),
+            )
+
+        self.gumbel_softmax_layer.temperature.assign(temperature)
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
-        gumbel_softmax_layer = self.model.get_layer(self.layer_name)
-        logs["temperature"] = float(gumbel_softmax_layer.temperature.numpy())
+        logs["temperature"] = float(self.gumbel_softmax_layer.temperature.numpy())
 
 
 class KLAnnealingCallback(callbacks.Callback):
