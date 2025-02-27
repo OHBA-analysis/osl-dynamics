@@ -29,11 +29,12 @@ def validate_inputs(inputs):
     """
     if isinstance(inputs, str):
         if path.isdir(inputs):
-            validated_inputs = sorted(list_dir(inputs, keep_ext=_allowed_ext))
+            validated_inputs = list_dir(inputs, keep_ext=_allowed_ext)
+            validated_inputs.sort()
         elif path.isfile(inputs) and inputs.endswith('.txt'):
             with open(inputs, 'r') as file:
-                file_paths = file.read().splitlines()
-            validated_inputs = sorted(file_paths)
+                validated_inputs = file.read().splitlines()
+            validated_inputs.sort()
         else:
             validated_inputs = [inputs]
 
@@ -57,6 +58,7 @@ def validate_inputs(inputs):
                     validated_inputs.append(inp)
                 else:
                     _logger.warn(f"{inp} not found")
+            validated_inputs.sort()
         else:
             validated_inputs = inputs
 
