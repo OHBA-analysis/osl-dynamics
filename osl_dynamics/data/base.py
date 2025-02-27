@@ -32,9 +32,9 @@ class Data:
 
     Parameters
     ----------
-    inputs : list of str or str or np.ndarray
-        - A path to a directory containing :code:`.npy` files. Each
-          :code:`.npy` file should be a subject or session.
+    inputs : list of str or str or np.ndarray or list of np.ndarray
+        - A path to a directory containing :code:`.npy` or :code:`.txt` files. Each
+          :code:`.npy` :code:`txt` file should be a subject or session.
         - A list of paths to :code:`.npy`, :code:`.mat` or :code:`.fif` files.
           Each file should be a subject or session. If a :code:`.fif` file is
           passed is must end with :code:`'raw.fif'` or :code:`'epo.fif'`.
@@ -42,6 +42,7 @@ class Data:
           same subject.
         - A list of numpy arrays. Each numpy array should be the data for a
           subject or session.
+        - A path to a txt file containing the :code:`.npy` or :code:`.txt` files
 
         The data files or numpy arrays should be in the format (n_samples,
         n_channels). If your data is in (n_channels, n_samples) format, use
@@ -383,8 +384,8 @@ class Data:
                 + "Please adjust your sequence length and batch size."
             )
 
-    def select(self, channels=None, sessions=None, use_raw=False):
-        """Select channels.
+    def select(self, channels=None, sessions=None, timepoints=None, use_raw=False):
+        """Select channels, sessions, and timepoints.
 
         This is an in-place operation.
 
@@ -394,6 +395,10 @@ class Data:
             Channel indices to keep. If None, all channels are retained.
         sessions : int or list of int, optional
             Session indices to keep. If None, all sessions are retained.
+        timepoints : list of two integers, optional
+            Specifies the time range to keep as [start, end].
+            Only timepoints from `start` to `end-1` are retained.
+            If None, all timepoints are kept.
         use_raw : bool, optional
             Should we select channel from the original 'raw' data that
             we loaded?
@@ -440,10 +445,30 @@ class Data:
         # What data should we use?
         arrays = self.raw_data_arrays if use_raw else self.arrays
 
+        min_session_length = min(array.shape[0] for array in arrays)
+
+        # Validate timepoints before looping through sessions
+        if timepoints is not None:
+            if not (isinstance(timepoints, list) and len(timepoints) == 2 and all(
+                    isinstance(tp, int) for tp in timepoints)):
+                raise ValueError("timepoints must be a list of two integers: [start, end].")
+
+            time_start, time_end = timepoints
+            if time_start < 0:
+                raise ValueError("time_start must be non-negative.")
+            if time_start >= time_end:
+                raise ValueError("time_start must be less than time_end.")
+            if time_end > min_session_length:
+                _logger.warning(
+                    f"time_end ({time_end}) exceeds the shortest session length ({min_session_length}).")
+
+
         # Select channels
         new_arrays = []
-        for i in tqdm(sessions, desc="Selecting channels/sessions"):
+        for i in tqdm(sessions, desc="Selecting channels/sessions/timepoints"):
             array = arrays[i][:, channels]
+            if timepoints is not None:
+                array = array[timepoints[0]:timepoints[1],:]
             if self.load_memmaps:
                 array = misc.array_to_memmap(self.prepared_data_filenames[i], array)
             new_arrays.append(array)
