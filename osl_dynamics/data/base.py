@@ -924,22 +924,45 @@ class Data:
 
         return self
 
-    def standardize(self, use_raw=False):
+    def standardize(self, use_raw=False, session_length=None):
         """Standardize (z-transform) the data.
 
         This is an in-place operation.
+
+        Parameters
+        ----------
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
+        session_length : int, optional
+            The length of each session. If provided, the data will be z-scored
+            separately for each session within an array.
 
         Returns
         -------
         data : osl_dynamics.data.Data
             The modified Data object.
-        use_raw : bool, optional
-            Should we prepare the original 'raw' data that we loaded?
         """
 
         # Function to apply standardisation to a single array
         def _apply(array):
-            return processing.standardize(array, create_copy=False)
+            n_timepoints, _ = array.shape
+            if session_length is None:
+                return processing.standardize(array, create_copy=False)
+            else:
+                # Check if n_timepoints is divisible by session_length
+                if n_timepoints % session_length != 0:
+                    _logger.warning(
+                        f"n_timepoints={n_timepoints} is not evenly divisible by "
+                        f"session_length={session_length}. Some data at the end of the array may be ignored."
+                    )
+                # Standardize each session separately
+                standardized_array = np.zeros_like(array)
+                for start in range(0, n_timepoints, session_length):
+                    end = min(start + session_length, n_timepoints)
+                    standardized_array[start:end] = processing.standardize(
+                        array[start:end], create_copy=False
+                    )
+                return standardized_array
 
         # Apply standardisation to each array in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
