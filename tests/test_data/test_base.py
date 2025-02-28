@@ -163,64 +163,6 @@ def test_standardize():
     npt.assert_almost_equal(data.time_series(prepared=False)[1], np.concatenate((input_1, input_2), axis=0), decimal=6)
     data.delete_dir()
 
-def test_prepare():
-    """
-    This function mimics the real case of HCP data, where
-    we builds up two subjects with 4800 time points and 2 channels.
-    These subjects are then saved in temporary text files.
-    In the prepare step, we keep the first 1200 time points and 2 channels.
-    standardize the data and check the output.
-    Finally, we test the corresponding set_keep function.
-    """
-    import numpy as np
-    import os
-
-    save_dir = './test_prepare_temp/'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-    # Construct the input arrays
-    vector_1 = np.array([-1.5 ** 0.5, 0, 1.5 ** 0.5])
-    vector_2 = np.array([1.5 ** 0.5, 0, -1.5 ** 0.5])
-    input_1_short = np.array([vector_1 + 1.0, vector_1 * 5.0]).T
-    input_2_short = np.array([vector_2 * 0.1 + 1.0, vector_2 * 2.0 - 3.0]).T
-    # Copy input_i_short into a (1200,2) ndarray input_i_long
-    input_1_long = np.tile(input_1_short, (400, 1))
-    input_2_long = np.tile(input_2_short, (400, 1))
-    # Concatenate input_i_long with gaussian noise to get (4800,2) ndarray input_i
-    gaussian_array = np.random.normal(100., 5.0, size=(3600, 2))
-    input_1 = np.concatenate([input_1_long, gaussian_array], axis=0)
-    input_2 = np.concatenate([input_2_long, gaussian_array], axis=0)
-
-    # save the input_1 and input_2
-    np.savetxt(f'{save_dir}10001.txt', input_1)
-    np.savetxt(f'{save_dir}10002.txt', input_2)
-
-    data = Data(save_dir)
-    prepare_dict = {'select': {'timepoints': [0, 1200]},
-                    'standardize': {}
-                    }
-    data.prepare(prepare_dict)
-
-    answer_1 = np.tile(np.array([vector_1, vector_1]).T, (400, 1))
-    answer_2 = np.tile(np.array([vector_2, vector_2]).T, (400, 1))
-    npt.assert_almost_equal(data.arrays[0], answer_1, decimal=6)
-    npt.assert_almost_equal(data.arrays[1], answer_2, decimal=6)
-
-    with data.set_keep([0]):
-        npt.assert_equal(data.keep, [0])
-        for element in data.dataset(sequence_length=1200, batch_size=1):
-            npt.assert_almost_equal(element['data'].numpy(), np.array([answer_1]), decimal=6)
-
-    with data.set_keep([1]):
-        npt.assert_equal(data.keep, [1])
-        for element in data.dataset(sequence_length=1200, batch_size=1):
-            npt.assert_almost_equal(element['data'].numpy(), np.array([answer_2]), decimal=6)
-
-    # Remove the directory after testing
-    from shutil import rmtree
-    rmtree(save_dir)
-
-
 def test_filter():
     """
     This function aims to test the band-pass filter of the Data Class.
@@ -236,13 +178,13 @@ def test_filter():
     # Parameters
     length = 2400
     sampling_frequency = 1 / 0.7
-    cutoff_frequency = 0.25
+    cutoff_frequency = 0.15
 
     def generate_time_series(length, sampling_frequency):
         t = np.arange(0, length * sampling_frequency, sampling_frequency)
         # Create a signal with low and high frequency components
-        low_freq_signal = np.sin(2 * np.pi * 0.1 * t)  # Low frequency component (0.1 Hz)
-        high_freq_signal = np.sin(2 * np.pi * 0.3 * t)  # High frequency component (1.0 Hz)
+        low_freq_signal = np.sin(2 * np.pi * 0.05 * t)  # Low frequency component (0.1 Hz)
+        high_freq_signal = np.sin(2 * np.pi * 0.3 * t)  # High frequency component (0.3 Hz)
         return low_freq_signal + high_freq_signal
 
     time_series = generate_time_series(length, sampling_frequency)
@@ -260,21 +202,39 @@ def test_filter():
 
     filtered_ts = np.squeeze(data.time_series()[0][:, 0])
 
-    def plot_frequency(signal, sampling_frequency):
+    def get_fft_magnitudes(signal, sampling_frequency):
         fft_values = np.fft.rfft(signal)
         fft_frequencies = np.fft.rfftfreq(len(signal), d=sampling_frequency)
+        return fft_frequencies, np.abs(fft_values)
 
+    def plot_frequency(fft_frequencies,fft_absolute_values):
         plt.figure(figsize=(5, 4))
-        plt.plot(fft_frequencies, np.abs(fft_values))
+        plt.plot(fft_frequencies, fft_absolute_values)
         plt.xlabel('Frequency (Hz)')
         plt.ylabel('Magnitude')
         plt.show()
 
-    plot_frequency(time_series, sampling_frequency)
-    plot_frequency(filtered_ts, sampling_frequency)
 
-    # npt.assert_array_less(np.abs(np.fft.rfft(filtered_ts)), 0.2)
+    # Compute FFT for original and filtered signals
+    fft_freqs, fft_orig = get_fft_magnitudes(time_series, sampling_frequency)
+    _, fft_filtered = get_fft_magnitudes(filtered_ts, sampling_frequency)
 
+    plot_frequency(fft_freqs, fft_orig)
+    plot_frequency(fft_freqs, fft_filtered)
+
+    # Find indices corresponding to 0.05Hz and 0.3Hz
+    idx_005Hz = np.argmin(np.abs(fft_freqs - 0.05))
+    idx_03Hz = np.argmin(np.abs(fft_freqs - 0.3))
+
+    # **Test: Ensure the 0.05Hz component is removed**
+    npt.assert_array_less(fft_filtered[idx_005Hz], fft_orig[idx_005Hz] * 0.1,
+                          err_msg="Low-frequency component (0.05Hz) was not sufficiently filtered.")
+
+    # **Test: Ensure the 0.3Hz component is preserved within 1% relative error**
+    relative_error = np.abs(fft_filtered[idx_03Hz] - fft_orig[idx_03Hz]) / fft_orig[idx_03Hz]
+    npt.assert_array_less(relative_error, 0.01,
+                      err_msg="High-frequency component (0.3Hz) relative error exceeds 1%.")
+    data.delete_dir()
 
 def test_filter_session():
     """
@@ -451,3 +411,65 @@ def test_filter_gaussian_weighted_least_squares_straight_line_fitting():
     plt.title('Synthetic fMRI-like Time Series')
     plt.legend()
     plt.show()
+
+
+
+def test_prepare():
+    """
+    This function mimics the real case of HCP data, where
+    we builds up two subjects with 4800 time points and 2 channels.
+    These subjects are then saved in temporary text files.
+    In the prepare step, we keep the first 1200 time points and 2 channels.
+    standardize the data and check the output.
+    Finally, we test the corresponding set_keep function.
+    """
+    import numpy as np
+    import os
+
+    save_dir = './test_prepare_temp/'
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    # Construct the input arrays
+    vector_1 = np.array([-1.5 ** 0.5, 0, 1.5 ** 0.5])
+    vector_2 = np.array([1.5 ** 0.5, 0, -1.5 ** 0.5])
+    input_1_short = np.array([vector_1 + 1.0, vector_1 * 5.0]).T
+    input_2_short = np.array([vector_2 * 0.1 + 1.0, vector_2 * 2.0 - 3.0]).T
+    # Copy input_i_short into a (1200,2) ndarray input_i_long
+    input_1_long = np.tile(input_1_short, (400, 1))
+    input_2_long = np.tile(input_2_short, (400, 1))
+    # Concatenate input_i_long with gaussian noise to get (4800,2) ndarray input_i
+    gaussian_array = np.random.normal(100., 5.0, size=(3600, 2))
+    input_1 = np.concatenate([input_1_long, gaussian_array], axis=0)
+    input_2 = np.concatenate([input_2_long, gaussian_array], axis=0)
+
+    # save the input_1 and input_2
+    np.savetxt(f'{save_dir}10001.txt', input_1)
+    np.savetxt(f'{save_dir}10002.txt', input_2)
+
+    data = Data(save_dir)
+    prepare_dict = {'select': {'timepoints': [0, 1200]},
+                    'standardize': {}
+                    }
+    data.prepare(prepare_dict)
+
+    answer_1 = np.tile(np.array([vector_1, vector_1]).T, (400, 1))
+    answer_2 = np.tile(np.array([vector_2, vector_2]).T, (400, 1))
+    npt.assert_almost_equal(data.arrays[0], answer_1, decimal=6)
+    npt.assert_almost_equal(data.arrays[1], answer_2, decimal=6)
+
+    with data.set_keep([0]):
+        npt.assert_equal(data.keep, [0])
+        for element in data.dataset(sequence_length=1200, batch_size=1):
+            npt.assert_almost_equal(element['data'].numpy(), np.array([answer_1]), decimal=6)
+
+    with data.set_keep([1]):
+        npt.assert_equal(data.keep, [1])
+        for element in data.dataset(sequence_length=1200, batch_size=1):
+            npt.assert_almost_equal(element['data'].numpy(), np.array([answer_2]), decimal=6)
+
+    # Remove the directory after testing
+    from shutil import rmtree
+    rmtree(save_dir)
+
+
+
