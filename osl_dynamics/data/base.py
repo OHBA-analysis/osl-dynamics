@@ -1263,15 +1263,23 @@ class Data:
         """Prepare data.
 
         Wrapper for calling a series of data preparation methods. Any method
-        in Data can be called. Note that if the same method is called multiple
-        times, the method name should be appended with an underscore and a
-        number, e.g. :code:`standardize_1` and :code:`standardize_2`.
+        in Data can be called. If the "method_order" key is present, the
+        methods will be executed in the specified order. Otherwise, the methods
+        are applied in their natural dictionary order (Python 3.7+ guarantees
+        insertion order).
+
+        Note that if the same method is called multiple times, the method name
+        should be appended with an underscore and a number,
+        e.g. :code:`standardize_1` and :code:`standardize_2`.
 
         Parameters
         ----------
         methods : dict
-            Each key is the name of a method to call. Each value is a
-            :code:`dict` containing keyword arguments to pass to the method.
+            A dictionary specifying the data preparation methods. If the
+            "method_order" key is present, it should contain a list specifying
+            the execution order of the methods. Each other key is the name of a
+            method to call, and each value is a dict containing keyword arguments
+            to pass to the method.
 
         Returns
         -------
@@ -1280,6 +1288,16 @@ class Data:
 
         Examples
         --------
+        Using an explicit execution order::
+
+            methods = {
+                "method_order": ["filter", "standardize", "moving_average"],
+                "filter": {"low_freq": 1, "high_freq": 45},
+                "standardize": {},
+                "moving_average": {"n_window": 5},
+            }
+            data.prepare(methods)
+
         TDE-PCA data preparation::
 
             methods = {
@@ -1298,16 +1316,20 @@ class Data:
             }
             data.prepare(methods)
         """
+        # Extract method execution order if specified
+        method_order = methods.pop("method_order", list(methods.keys()))
+
         # Pattern for identifying the method name from "method-name_num"
         pattern = re.compile(r"^(\w+?)(_\d+)?$")
 
-        for method_name, kwargs in methods.items():
-            # Remove the "_num" part from the dict key
-            method_name = pattern.search(method_name).groups()[0]
+        for method_name in method_order:
+            if method_name in methods:
+                # Remove the "_num" part from the dict key
+                base_method_name = pattern.search(method_name).groups()[0]
 
-            # Apply method
-            method = getattr(self, method_name)
-            method(**kwargs)
+                # Apply method
+                method = getattr(self, base_method_name)
+                method(**methods[method_name])
 
         return self
 

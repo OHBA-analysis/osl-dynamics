@@ -1,3 +1,4 @@
+import os
 import pytest
 import numpy as np
 import numpy.testing as npt
@@ -29,6 +30,12 @@ def test_data_nparray():
     npt.assert_equal(data.buffer_size, 1000)
     data.set_buffer_size(100)
     npt.assert_equal(data.buffer_size, 100)
+
+    data.save()
+    array_save = np.load('./array0.npy')
+    npt.assert_almost_equal(array_save,input)
+    os.remove('./array0.npy')
+    os.remove('preparation.pkl')
     # Test self.select
     data.select(channels=[1], timepoints=[1, 4], sessions=[0])
     npt.assert_almost_equal(data.arrays[0], input[1:3, 1:])
@@ -236,6 +243,9 @@ def test_filter():
                       err_msg="High-frequency component (0.3Hz) relative error exceeds 1%.")
     data.delete_dir()
 
+    # Remove the directory after testing
+    from shutil import rmtree
+    rmtree(save_dir)
 def test_filter_gaussian_weighted_least_squares_straight_line_fitting_session():
     """
     This function aims to test the gaussian_weighted_least_squares_straight_line_fitting.
@@ -334,7 +344,109 @@ def test_filter_gaussian_weighted_least_squares_straight_line_fitting_session():
     plt.legend()
     plt.show()
     data.delete_dir()
+    # Remove the directory after testing
+    from shutil import rmtree
+    rmtree(save_dir)
 
+def test_prepare_method_order():
+    """
+    This function tests how method order would impact the 'prepare' method
+    """
+    import numpy as np
+    import os
+    vector_1 = np.array([1.0,2.0,3.0,4.0,5.0,-10.0])
+    vector_2 = np.array([0.1,1000.,-10000.,30.,-25.3,0.0])
+    input = np.array([vector_1,vector_2]).T
+
+    ### Case 1
+    data_1 = Data([input,input],sampling_frequency=0.1)
+    prepare_kwargs_1 = {'method_order':['select','filter','standardize'],
+                        'select':{'channels':[0],'sessions':[1],'timepoints':[0,5]},
+                        'filter':{'sigma': 40},
+                        'standardize':{}}
+    data_1.prepare(prepare_kwargs_1)
+    npt.assert_equal(data_1.n_sessions,1)
+    answer_1 = np.array([[-1.41700965],
+                         [-0.70148675],
+                         [0.],
+                         [0.70148675],
+                         [1.41700965]])
+    npt.assert_almost_equal(data_1.arrays[0],answer_1)
+    data_1.delete_dir()
+
+    ### Case 2
+    data_2 = Data([input, input], sampling_frequency=0.1)
+    prepare_kwargs_2 = {'method_order': ['select','standardize','filter'],
+                        'select': {'channels': [0], 'sessions': [1], 'timepoints': [0, 5]},
+                        'filter': {'sigma': 40},
+                        'standardize': {}}
+    data_2.prepare(prepare_kwargs_2)
+    answer_2 = np.array([[-1.35727975],
+                         [-0.67191763],
+                         [0.],
+                         [0.67191763],
+                         [1.35727975]])
+    npt.assert_almost_equal(data_2.arrays[0], answer_2)
+    data_2.delete_dir()
+
+    ### Case 3
+    data_3 = Data([input, input], sampling_frequency=0.1)
+    prepare_kwargs_3 = {'method_order': ['standardize', 'filter','select'],
+                        'select': {'channels': [0], 'sessions': [1], 'timepoints': [0, 5]},
+                        'filter': {'sigma': 40},
+                        'standardize': {}}
+    data_3.prepare(prepare_kwargs_3)
+    answer_3 = np.array([[-0.02573626],
+                         [0.18943394],
+                         [0.41620497],
+                         [0.64729963],
+                         [0.87427632]])
+    npt.assert_almost_equal(data_3.arrays[0], answer_3)
+    data_3.delete_dir()
+
+    ### Case 4
+    data_4 = Data([input, input], sampling_frequency=0.1)
+    prepare_kwargs_4 = {'select_1': {'channels': [0], 'sessions': [1], 'timepoints': [0, 5]},
+                        'filter_123': {'sigma': 40},
+                        'standardize_432': {}}
+    data_4.prepare(prepare_kwargs_4)
+    npt.assert_equal(data_4.n_sessions, 1)
+    answer_4 = np.array([[-1.41700965],
+                         [-0.70148675],
+                         [0.],
+                         [0.70148675],
+                         [1.41700965]])
+    npt.assert_almost_equal(data_4.arrays[0], answer_4)
+    data_4.delete_dir()
+
+    ### Case 5
+    data_5 = Data([input, input], sampling_frequency=0.1)
+    prepare_kwargs_5 = {'select': {'channels': [0], 'sessions': [1], 'timepoints': [0, 5]},
+                        'standardize': {},
+                        'filter': {'sigma': 40}}
+    data_5.prepare(prepare_kwargs_5)
+    answer_5 = np.array([[-1.35727975],
+                         [-0.67191763],
+                         [0.],
+                         [0.67191763],
+                         [1.35727975]])
+    npt.assert_almost_equal(data_5.arrays[0], answer_5)
+    data_5.delete_dir()
+
+    ### Case 6
+    data_6 = Data([input, input], sampling_frequency=0.1)
+    prepare_kwargs_6 = {'standardize': {},
+                        'filter': {'sigma': 40},
+                        'select': {'channels': [0], 'sessions': [1], 'timepoints': [0, 5]},
+                        }
+    data_6.prepare(prepare_kwargs_6)
+    answer_6 = np.array([[-0.02573626],
+                         [0.18943394],
+                         [0.41620497],
+                         [0.64729963],
+                         [0.87427632]])
+    npt.assert_almost_equal(data_6.arrays[0], answer_6)
+    data_6.delete_dir()
 
 
 def test_prepare():
