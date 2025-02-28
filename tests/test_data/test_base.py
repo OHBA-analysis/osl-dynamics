@@ -236,88 +236,10 @@ def test_filter():
                       err_msg="High-frequency component (0.3Hz) relative error exceeds 1%.")
     data.delete_dir()
 
-def test_filter_session():
+def test_filter_gaussian_weighted_least_squares_straight_line_fitting_session():
     """
-    This function aims to test the band-pass filter of the Data Class when session input is fed in
-    """
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import os
-
-    save_dir = './test_filter_temp/'
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
-    # Parameters
-    length = 1200
-    sampling_frequency = 1 / 0.7
-    cutoff_frequency = 0.2
-
-    def generate_time_series(length, sampling_frequency):
-        t = np.arange(0, length * sampling_frequency, sampling_frequency)
-        # Create distinct signals for two sessions
-        session_1_signal = np.sin(2 * np.pi * 0.1 * t)  # Low frequency component (0.1 Hz)
-        session_2_signal = np.sin(2 * np.pi * 0.4 * t)  # High frequency component (0.4 Hz)
-
-        # Combine into one time series with two sessions
-        combined_signal = np.hstack((session_1_signal, session_2_signal))
-        return combined_signal
-
-    time_series = generate_time_series(length, sampling_frequency)
-    time_series_save = np.column_stack((time_series, time_series))
-
-    # Save the combined time series for testing
-    np.savetxt(f'{save_dir}10001.txt', time_series_save)
-    np.savetxt(f'{save_dir}10002.txt', time_series_save)
-
-    # Initialize the Data object
-    data = Data(save_dir, sampling_frequency=sampling_frequency)
-
-    # Prepare without session input
-    prepare_no_session = {'select': {'timepoints': [0, 2400]},
-                          'filter': {'low_freq': cutoff_frequency}}
-    data.prepare(prepare_no_session)
-    filtered_ts_no_session = np.squeeze(data.time_series()[0][:, 0])
-
-    # Prepare with session input
-    prepare_with_session = {'select': {'timepoints': [0, 2400]},
-                            'filter': {'low_freq': cutoff_frequency, 'session_length': 1200}}
-    data.prepare(prepare_with_session)
-    filtered_ts_with_session = np.squeeze(data.time_series()[0][:, 0])
-
-    # Plot frequency spectrum
-    def plot_frequency(signal, sampling_frequency, title):
-        fft_values = np.fft.rfft(signal)
-        fft_frequencies = np.fft.rfftfreq(len(signal), d=sampling_frequency)
-
-        plt.figure(figsize=(5, 4))
-        plt.plot(fft_frequencies, np.abs(fft_values))
-        plt.xlabel('Frequency (Hz)')
-        plt.ylabel('Magnitude')
-        plt.title(title)
-        plt.show()
-
-    plt.plot(filtered_ts_no_session)
-    plt.title('Time domain, filtered signal without Session')
-    plt.show()
-    plt.plot(filtered_ts_with_session)
-    plt.title('Time domain, filtered signal with session')
-    plt.show()
-
-    # Plot original, filtered without session, and filtered with session
-    # plot_frequency(time_series_combined, sampling_frequency, "Original Signal")
-    plot_frequency(filtered_ts_no_session, sampling_frequency, "Filtered Signal Without Session")
-    plot_frequency(filtered_ts_with_session, sampling_frequency, "Filtered Signal With Session")
-
-    # Clean up temporary files
-    for file in os.listdir(save_dir):
-        os.remove(os.path.join(save_dir, file))
-    os.rmdir(save_dir)
-
-
-def test_filter_gaussian_weighted_least_squares_straight_line_fitting():
-    """
-    This function aims to test the gaussian_weighted_least_squares_straight_line_fitting
+    This function aims to test the gaussian_weighted_least_squares_straight_line_fitting.
+    It also tests the effect of "session length" variable.
     """
     import numpy as np
     import matplotlib.pyplot as plt
@@ -411,6 +333,7 @@ def test_filter_gaussian_weighted_least_squares_straight_line_fitting():
     plt.title('Synthetic fMRI-like Time Series')
     plt.legend()
     plt.show()
+    data.delete_dir()
 
 
 
