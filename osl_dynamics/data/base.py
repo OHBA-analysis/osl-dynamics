@@ -1386,7 +1386,7 @@ class Data:
         Parameters
         ----------
         sequence_length : int
-            Length of the segement of data to feed into the model.
+            Length of the segment of data to feed into the model.
         step_size : int, optional
             The number of samples by which to move the sliding window between
             sequences. Defaults to :code:`sequence_length`.
