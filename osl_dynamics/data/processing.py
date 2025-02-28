@@ -5,6 +5,7 @@
 import mne
 import numpy as np
 from scipy import signal, stats
+from scipy import ndimage
 
 from osl_dynamics import array_ops
 
@@ -70,7 +71,7 @@ def time_embed(x, n_embeddings):
     return X
 
 
-def temporal_filter(x, low_freq, high_freq, sampling_frequency, order=5):
+def temporal_filter(x, low_freq, high_freq, sigma, sampling_frequency, order=5):
     """Apply temporal filtering.
 
     Parameters
@@ -81,6 +82,9 @@ def temporal_filter(x, low_freq, high_freq, sampling_frequency, order=5):
         Frequency in Hz for a high pass filter.
     high_freq : float
         Frequency in Hz for a low pass filter.
+    sigma: float
+        If sigma is not None, apply a Gaussian-weighted least-squares straight-line fitting
+        with sigma as the hyperparameter. The unit is "second".
     sampling_frequency : float
         Sampling frequency in Hz.
     order : int, optional
@@ -91,8 +95,20 @@ def temporal_filter(x, low_freq, high_freq, sampling_frequency, order=5):
     X : np.ndarray
         Filtered time series. Shape is (n_samples, n_channels).
     """
-    if low_freq is None and high_freq is None:
+    if low_freq is None and high_freq is None and sigma is None:
         # No filtering
+        return x
+
+    # Apply Gaussian-weighted least-squares filtering if sigma is specified
+    if sigma is not None:
+        # Compute the low-frequency trend (Gaussian smoothing)
+        sigma_points = sigma * sampling_frequency  # Convert from seconds to time points
+        trend = ndimage.gaussian_filter1d(x, sigma=sigma_points, axis=0)
+        # Remove the trend (high-pass effect)
+        x = x - trend
+
+    # If no Butterworth filtering is required, return the detrended data
+    if low_freq is None and high_freq is None:
         return x
 
     if low_freq is None and high_freq is not None:
