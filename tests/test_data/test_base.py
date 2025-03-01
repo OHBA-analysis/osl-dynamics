@@ -372,6 +372,12 @@ def test_prepare_method_order():
                          [0.70148675],
                          [1.41700965]])
     npt.assert_almost_equal(data_1.arrays[0],answer_1)
+
+    #Test self.time_series()
+    npt.assert_almost_equal(data_1.time_series(prepared=True), answer_1)
+    npt.assert_almost_equal(data_1.time_series(prepared=False,concatenate=True),
+                            np.concatenate((input,input),axis=0),decimal=6)
+
     data_1.delete_dir()
 
     ### Case 2
@@ -448,6 +454,21 @@ def test_prepare_method_order():
     npt.assert_almost_equal(data_6.arrays[0], answer_6)
     data_6.delete_dir()
 
+    ### Case 7
+    data_7 = Data([input, input], sampling_frequency=0.1)
+    prepare_kwargs_7 = {'standardize': {},
+                        'filter': {'sigma': 40},
+                        'select': {'channels': [0], 'sessions': [1], 'timepoints': [0, 5],'use_raw':True},
+                        }
+    data_7.prepare(prepare_kwargs_7)
+    answer_7 = np.array([[1.0],
+                         [2.0],
+                         [3.0],
+                         [4.0],
+                         [5.0]])
+    npt.assert_almost_equal(data_7.arrays[0], answer_7)
+    data_7.delete_dir()
+
 
 def test_prepare():
     """
@@ -505,6 +526,48 @@ def test_prepare():
     # Remove the directory after testing
     from shutil import rmtree
     rmtree(save_dir)
+
+def test_dataset():
+    input_1 = np.array([[1., 0.5], [2., 0.4], [1.5, 0.3],[3.0,0.2],[-1.0,1.0],[4.0,0.0]])
+    input_2 = input_1 / 2
+    data = Data([input_1, input_2])
+
+    dataset_1 = data.dataset(sequence_length=3, batch_size=2, shuffle=False,concatenate=True)
+    answer_1 = [
+        np.array([[[1.,0.5],[2.,0.4],[1.5,0.3]],
+                  [[3.0,0.2],[-1.0,1.0],[4.0,0.0]]
+                  ]),
+        np.array([[[0.5, 0.25], [1., 0.2], [0.75, 0.15]],
+                  [[1.5, 0.1], [-0.5, 0.5], [2.0, 0.0]]
+                  ])
+    ]
+    for i, batch in enumerate(dataset_1):
+        npt.assert_almost_equal(batch['data'].numpy(),answer_1[i])
+
+    dataset_1_list = data.dataset(sequence_length=3, batch_size=2, shuffle=False,concatenate=False)
+    for j in range(len(dataset_1_list)):
+        for batch in dataset_1_list[j]:
+            npt.assert_almost_equal(batch['data'].numpy(), answer_1[j])
+
+    answer_2 = [
+        np.array([[[1., 0.5], [2., 0.4]],
+                  [[1.5, 0.3],[3.0, 0.2]],
+                  [[-1.0, 1.0], [4.0, 0.0]]
+                  ]),
+        np.array([[[0.5, 0.25], [1., 0.2]],
+                  [[0.75, 0.15],[1.5, 0.1]],
+                  [[-0.5, 0.5], [2.0, 0.0]]
+                  ])
+    ]
+    dataset_2 = data.dataset(sequence_length=2, batch_size=3, shuffle=False, concatenate=True)
+    for i, batch in enumerate(dataset_2):
+        npt.assert_almost_equal(batch['data'].numpy(),answer_2[i])
+
+    dataset_2_list = data.dataset(sequence_length=2, batch_size=3, shuffle=False, concatenate=False)
+    for j in range(len(dataset_2_list)):
+        for batch in dataset_2_list[j]:
+            npt.assert_almost_equal(batch['data'].numpy(), answer_2[j])
+
 
 
 
