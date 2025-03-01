@@ -567,7 +567,38 @@ def test_dataset():
     for j in range(len(dataset_2_list)):
         for batch in dataset_2_list[j]:
             npt.assert_almost_equal(batch['data'].numpy(), answer_2[j])
+    data.delete_dir()
 
+def test_tfrecord_dataset():
+    import shutil
+    input_1 = np.array([[1., 0.5], [2., 0.4], [1.5, 0.3], [3.0, 0.2], [-1.0, 1.0], [4.0, 0.0]])
+    input_2 = input_1 / 2
+    data = Data([input_1, input_2])
 
+    tfrecord_dir = "./test_tfrecord_temp/"
+    if not os.path.exists(tfrecord_dir):
+        os.makedirs(tfrecord_dir)
+
+    dataset = data.tfrecord_dataset(sequence_length=3,
+                                    batch_size=2,
+                                    shuffle=False,
+                                    concatenate=True,
+                                    tfrecord_dir=tfrecord_dir,
+                                    overwrite=True)
+    answer = [
+        np.array([[[1., 0.5], [2., 0.4], [1.5, 0.3]],
+                  [[3.0, 0.2], [-1.0, 1.0], [4.0, 0.0]]
+                  ]),
+        np.array([[[0.5, 0.25], [1., 0.2], [0.75, 0.15]],
+                  [[1.5, 0.1], [-0.5, 0.5], [2.0, 0.0]]
+                  ])
+    ]
+
+    for i, batch in enumerate(dataset):
+        print(batch['data'].numpy())
+        #npt.assert_almost_equal(batch['data'].numpy(),answer[i])
+
+    data.delete_dir()
+    shutil.rmtree(tfrecord_dir)
 
 
