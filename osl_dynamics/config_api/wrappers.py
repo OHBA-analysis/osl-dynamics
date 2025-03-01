@@ -58,7 +58,155 @@ def load_data(inputs, kwargs=None, prepare=None):
     data.prepare(prepare)
     return data
 
+def train_model(
+    model_type,
+    data,
+    output_dir,
+    config_kwargs,
+    init_kwargs=None,
+    fit_kwargs=None,
+    save_inf_params=True,
+):
+    """
+    Train a dynamic functional connectivity model,
+    such as Hidden Markov Model (HMM), Dynamic Network Modes (DyNeMo), Sliding Window Correlation.
+    `Hidden Markov Model <https://osl-dynamics.readthedocs.io/en\
+    /latest/autoapi/osl_dynamics/models/hmm/index.html>`_.
+    `DyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
+    /osl_dynamics/models/dynemo/index.html>`_.
 
+    This function will:
+
+    1. Build a :code:`Model` object for the specified model type.
+    2. Initialize model parameters using an appropriate method.
+    3. Perform full training.
+    4. Save the trained model and inferred parameters.
+
+    The function creates the following directories:
+
+    - :code:`<output_dir>/model`, which contains the trained model.
+    - :code:`<output_dir>/inf_params`, which contains inferred parameters
+      (if :code:`save_inf_params=True`).
+
+    Parameters
+    ----------
+    model_type : str
+        Type of model to train. Recognized values are "hmm", "dynemo", and "swc","mDyNeMo".
+    data : osl_dynamics.data.Data
+        Data object for training the model.
+    output_dir : str
+        Path to output directory.
+    config_kwargs : dict
+        Configuration parameters for the model, which override default settings.
+    init_kwargs : dict, optional
+        Initialization parameters for the model. Overrides default settings.
+    fit_kwargs : dict, optional
+        Training parameters for the model. Overrides default settings.
+    save_inf_params : bool, optional
+        Whether to save inferred parameters (default=True).
+
+    Returns
+    -------
+    model : object
+        The trained model object.
+
+    Examples
+    --------
+    Train an HMM model::
+
+        train_model(
+            model_type="hmm",
+            data=my_data,
+            output_dir="results/hmm",
+            config_kwargs={"n_states": 8, "n_epochs": 30},
+        )
+
+    Train a DyNeMo model::
+
+        train_model(
+            model_type="dynemo",
+            data=my_data,
+            output_dir="results/dynemo",
+            config_kwargs={"n_epochs": 50},
+            fit_kwargs={"learning_rate": 0.001},
+        )
+
+    Train an SWC model::
+
+        train_model(
+            model_type="swc",
+            data=my_data,
+            output_dir="results/swc",
+            config_kwargs={"n_states": 5},
+        )
+    """
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    # Retrieve the correct model module and defaults
+    if model_type in DEFAULT_CONFIGS:
+        model_lib = globals()[model_type]
+        default_config_kwargs, default_init_kwargs = DEFAULT_CONFIGS[model_type]
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}. Must be one of {list(DEFAULT_CONFIGS.keys())}.")
+
+    # Override default config/init parameters
+    config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
+    init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs or {})
+    fit_kwargs = fit_kwargs or {}
+
+    _logger.info(f"Using config_kwargs: {config_kwargs}")
+    _logger.info(f"Using init_kwargs: {init_kwargs}")
+    _logger.info(f"Using fit_kwargs: {fit_kwargs}")
+
+    # Directories
+    model_dir = os.path.join(output_dir, "model")
+    inf_params_dir = os.path.join(output_dir, "inf_params")
+
+    # Create the model object
+    _logger.info(f"Building {model_type} model")
+    config = model_lib.Config(**config_kwargs)
+    model = model_lib.Model(config)
+    model.summary()
+
+    # Special case for DyNeMo: set regularizers
+    if model_type == "dynemo":
+        model.set_regularizers(data)
+
+    # Model initialization
+    if model_type == "hmm":
+        init_history = model.random_state_time_course_initialization(data, **init_kwargs)
+    elif model_type == "dynemo":
+        init_history = model.random_subset_initialization(data, **init_kwargs)
+    else:
+        init_history = None  # SWC doesn't have an explicit init step
+
+    # Training
+    history = model.fit(data, **fit_kwargs)
+
+    # Add free energy to history (if applicable)
+    if model_type in ["hmm", "dynemo"]:
+        history["free_energy"] = model.free_energy(data) if model_type == "hmm" else history["loss"][-1]
+
+    # Save trained model
+    _logger.info(f"Saving model to: {model_dir}")
+    model.save(model_dir)
+    save(f"{model_dir}/init_history.pkl", init_history)
+    save(f"{model_dir}/history.pkl", history)
+
+    if save_inf_params:
+        os.makedirs(inf_params_dir, exist_ok=True)
+        if model_type in ["hmm", "dynemo"]:
+            alpha = model.get_alpha(data)
+            means, covs = model.get_means_covariances()
+        elif model_type == "swc":
+            covs, alpha = model.fit(data, **fit_kwargs)
+            means = np.zeros((config_kwargs["n_states"], config_kwargs["n_channels"]))
+        save(f"{inf_params_dir}/alp.pkl", alpha)
+        save(f"{inf_params_dir}/means.npy", means)
+        save(f"{inf_params_dir}/covs.npy", covs)
+
+    return model
 def train_hmm(
     data,
     output_dir,
