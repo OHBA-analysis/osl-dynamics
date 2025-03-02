@@ -16,12 +16,14 @@ where:
 
 import os
 import logging
+import importlib
 from pathlib import Path
 
 import numpy as np
 
 from osl_dynamics import array_ops
 from osl_dynamics.utils.misc import load, override_dict_defaults, save
+from osl_dynamics.config_api.default_config import DEFAULT_CONFIGS
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -101,7 +103,7 @@ def train_model(
     init_kwargs : dict, optional
         Initialization parameters for the model. Overrides default settings.
     fit_kwargs : dict, optional
-        Training parameters for the model. Overrides default settings.
+        Training parameters for the model. No defaults.
     save_inf_params : bool, optional
         Whether to save inferred parameters (default=True).
 
@@ -147,6 +149,11 @@ def train_model(
     if model_type in DEFAULT_CONFIGS:
         model_lib = globals()[model_type]
         default_config_kwargs, default_init_kwargs = DEFAULT_CONFIGS[model_type]
+        # Retrieve the correct model module dynamically
+        try:
+            model_lib = importlib.import_module(f"osl_dynamics.models.{model_type}")
+        except ModuleNotFoundError:
+            raise ValueError(f"Unknown model_type: {model_type}. Must be one of {list(DEFAULT_CONFIGS.keys())}.")
     else:
         raise ValueError(f"Unknown model_type: {model_type}. Must be one of {list(DEFAULT_CONFIGS.keys())}.")
 
