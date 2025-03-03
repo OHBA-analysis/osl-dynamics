@@ -463,7 +463,7 @@ class Data:
                     f"time_end ({time_end}) exceeds the shortest session length ({min_session_length}).")
 
 
-        # Select channels
+        # Select channels and sessions
         new_arrays = []
         for i in tqdm(sessions, desc="Selecting channels/sessions/timepoints"):
             array = arrays[i][:, channels]
