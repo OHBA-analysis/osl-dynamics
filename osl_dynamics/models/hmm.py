@@ -20,6 +20,7 @@ import os.path as op
 import sys
 import warnings
 from dataclasses import dataclass
+from typing import Union
 from pathlib import Path
 
 import numba
@@ -75,19 +76,21 @@ class Config(BaseModelConfig):
         Should we make the mean vectors for each state trainable?
     learn_covariances : bool
         Should we make the covariance matrix for each staet trainable?
-    initial_means : np.ndarray
-        Initialisation for state means.
-    initial_covariances : np.ndarray
+    initial_means : np.ndarray or str
+        Initialisation for state means. String indicated the *.npy directory.
+    initial_covariances : np.ndarray or str
         Initialisation for state covariances. If
         :code:`diagonal_covariances=True` and full matrices are passed,
         the diagonal is extracted.
+        String is the *.npy directory.
     diagonal_covariances : bool
         Should we learn diagonal covariances?
     covariances_epsilon : float
         Error added to state covariances for numerical stability.
 
-    initial_trans_prob : np.ndarray
+    initial_trans_prob : np.ndarray or str
         Initialisation for the transition probability matrix.
+        string works for the :code: 'random' or specify a file to read
     learn_trans_prob : bool
         Should we make the transition probability matrix trainable?
     state_probs_t0: np.ndarray
@@ -132,14 +135,14 @@ class Config(BaseModelConfig):
     # Observation model parameters
     learn_means: bool = None
     learn_covariances: bool = None
-    initial_means: np.ndarray = None
-    initial_covariances: np.ndarray = None
+    initial_means: Union[np.ndarray,str] = None
+    initial_covariances: Union[np.ndarray,str] = None
     diagonal_covariances: bool = False
     covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
-    initial_trans_prob: np.ndarray = None
+    initial_trans_prob: Union[np.ndarray,str] = None
     learn_trans_prob: bool = True
     state_probs_t0: np.ndarray = None
 
@@ -149,6 +152,15 @@ class Config(BaseModelConfig):
     observation_update_decay: float = 0.1
 
     def __post_init__(self):
+        if isinstance(self.initial_means,str):
+            if self.initial_means.endswith('.npy'):
+                self.initial_means = np.load(self.initial_means)
+        if isinstance(self.initial_covariances,str):
+            if self.initial_covariances.endswith('.npy'):
+                self.initial_covariances = np.load(self.initial_covariances)
+        if isinstance(self.initial_trans_prob,str):
+            if self.initial_trans_prob.endswith('.npy'):
+                self.initial_trans_prob = np.load(self.initial_trans_prob)
         self.validate_observation_model_parameters()
         self.validate_trans_prob_parameters()
         self.validate_dimension_parameters()
