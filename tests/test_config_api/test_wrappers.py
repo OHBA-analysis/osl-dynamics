@@ -95,7 +95,7 @@ def test_train_model_hmm():
                     learn_means: False
                     learn_covariances: True
                     learning_rate: 0.01
-                    n_epochs: 3
+                    n_epochs: 10
                     sequence_length: 600
                 init_kwargs:
                     n_init: 1
@@ -118,3 +118,5 @@ def test_train_model_hmm():
     # Assert off-diagonal elements are equal to cors
     off_diagonal = np.array([float(result_covs[i, 0, 1]) for i in range(n_states)])
     npt.assert_allclose(np.sort(off_diagonal), cors_Y, atol=0.05, rtol=0.05)
+
+    shutil.rmtree(save_dir)
