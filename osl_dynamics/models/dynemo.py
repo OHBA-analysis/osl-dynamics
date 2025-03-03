@@ -5,6 +5,7 @@ See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
 """
 
 import os
+from typing import Union
 import logging
 from dataclasses import dataclass
 
@@ -101,10 +102,13 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Should we make the mean vectors for each mode trainable?
     learn_covariances : bool
         Should we make the covariance matrix for each mode trainable?
-    initial_means : np.ndarray
-        Initialisation for mean vectors.
-    initial_covariances : np.ndarray
-        Initialisation for state covariances.
+    initial_means : np.ndarray or str
+        Initialisation for state means. String indicated the *.npy directory.
+    initial_covariances : np.ndarray or str
+        Initialisation for state covariances. If
+        :code:`diagonal_covariances=True` and full matrices are passed,
+        the diagonal is extracted.
+        String is the *.npy directory.
         If :code:`diagonal_covariances=True` and full matrices are passed,
         the diagonal is extracted.
     covariances_epsilon : float
@@ -172,14 +176,22 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     # Observation model parameters
     learn_means: bool = None
     learn_covariances: bool = None
-    initial_means: np.ndarray = None
-    initial_covariances: np.ndarray = None
+    initial_means: Union[np.ndarray, str] = None
+    initial_covariances: Union[np.ndarray, str] = None
     diagonal_covariances: bool = False
     covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
     def __post_init__(self):
+        # Check whether initial_means and initial_covarainces are file directories,
+        # Read the file if so.
+        if isinstance(self.initial_means,str):
+            if self.initial_means.endswith('.npy'):
+                self.initial_means = np.load(self.initial_means)
+        if isinstance(self.initial_covariances,str):
+            if self.initial_covariances.endswith('.npy'):
+                self.initial_covariances = np.load(self.initial_covariances)
         self.validate_rnn_parameters()
         self.validate_observation_model_parameters()
         self.validate_alpha_parameters()
