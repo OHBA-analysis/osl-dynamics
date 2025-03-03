@@ -147,7 +147,6 @@ def train_model(
 
     # Retrieve the correct model module and defaults
     if model_type in DEFAULT_CONFIGS:
-        model_lib = globals()[model_type]
         default_config_kwargs, default_init_kwargs = DEFAULT_CONFIGS[model_type]
         # Retrieve the correct model module dynamically
         try:
@@ -161,6 +160,10 @@ def train_model(
     config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs or {})
     fit_kwargs = fit_kwargs or {}
+
+    # Ensure n_channels is set if missing
+    if "n_channels" not in config_kwargs:
+        config_kwargs["n_channels"] = data.n_channels
 
     _logger.info(f"Using config_kwargs: {config_kwargs}")
     _logger.info(f"Using init_kwargs: {init_kwargs}")
