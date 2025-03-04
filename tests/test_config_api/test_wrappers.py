@@ -3,6 +3,7 @@ import numpy.testing as npt
 from osl_dynamics.config_api.wrappers import load_data
 from osl_dynamics.config_api.pipeline import run_pipeline_from_file
 
+
 def test_load_data():
     import os
     import json
@@ -12,14 +13,14 @@ def test_load_data():
     vector = np.array([-1.5 ** 0.5, 0, 1.5 ** 0.5])
     input_1 = np.array([vector, vector + 10.0]).T
     input_2 = np.array([vector * 0.5 + 1., vector * 100]).T
-    input_3 = np.zeros((3,2))
+    input_3 = np.zeros((3, 2))
     np.savetxt(f'{save_dir}10001.txt', input_1)
     np.savetxt(f'{save_dir}10002.txt', input_2)
-    np.savetxt(f'{save_dir}10003.txt',input_3)
-    prepare = {'select':{'sessions':[0,1]},'standardize': {}}
+    np.savetxt(f'{save_dir}10003.txt', input_3)
+    prepare = {'select': {'sessions': [0, 1]}, 'standardize': {}}
 
     data = load_data(inputs=save_dir, prepare=prepare)
-    npt.assert_equal(data.n_sessions,2)
+    npt.assert_equal(data.n_sessions, 2)
     npt.assert_almost_equal(data.arrays[0], np.array([vector, vector]).T)
     npt.assert_almost_equal(data.arrays[1], np.array([vector, vector]).T)
     data.delete_dir()
@@ -27,10 +28,10 @@ def test_load_data():
     from shutil import rmtree
     rmtree(save_dir)
 
+
 def test_train_model_hmm():
     import os
     import shutil
-
 
     save_dir = './test_train_model_hmm/'
     if os.path.exists(save_dir):
@@ -51,6 +52,7 @@ def test_train_model_hmm():
         return np.random.multivariate_normal(mean, cov, n_timepoints)
 
     # Define the covariance matrices of state 1,2 in both splits
+    means_Y = [np.array([-10.0, -10.0]), np.array([0.0, 0.0]), np.array([10.0, 10.0])]
     cors_Y = [-0.5, 0.0, 0.5]
     covs_Y = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_Y]
 
@@ -65,7 +67,7 @@ def test_train_model_hmm():
     for i in range(0, 2):
         obs = []
         for j in range(1500):
-            observations_Y = [generate_obs(covs_Y[i]), generate_obs(covs_Y[i + 1])]
+            observations_Y = [generate_obs(covs_Y[i], means_Y[i]), generate_obs(covs_Y[i + 1], means_Y[i + 1])]
             observations_X = [generate_obs([[vars_X[i]]], [means_X[i]]),
                               generate_obs([[vars_X[i + 1]]], [means_X[i + 1]])]
             observations = np.concatenate(
@@ -92,21 +94,20 @@ def test_train_model_hmm():
                 model_type: hmm
                 config_kwargs: 
                     n_states: {n_states}
-                    learn_means: False
+                    learn_means: True
                     learn_covariances: True
                     learning_rate: 0.01
-                    n_epochs: 10
+                    n_epochs: 30
                     sequence_length: 600
                 init_kwargs:
-                    n_init: 1
-                    n_epochs: 1
+                    n_init: 10
+                    n_epochs: 2
 
             """
 
     with open(f'{save_dir}/config.yaml', "w") as file:
         file.write(config)
-    run_pipeline_from_file(f'{save_dir}config.yaml',save_dir)
-
+    run_pipeline_from_file(f'{save_dir}config.yaml', save_dir)
 
     result_means = np.load(f'{save_dir}/inf_params/means.npy')
     result_covs = np.load(f'{save_dir}/inf_params/covs.npy')
@@ -127,7 +128,6 @@ def test_train_model_dynemo():
     import pickle
     import shutil
     import yaml
-
 
     save_dir = './test_train_model_dynemo/'
     if os.path.exists(save_dir):
@@ -246,7 +246,7 @@ def test_train_model_dynemo():
 
     with open(f'{save_dir}/config.yaml', "w") as file:
         file.write(config)
-    run_pipeline_from_file(f'{save_dir}config.yaml',save_dir)
+    run_pipeline_from_file(f'{save_dir}config.yaml', save_dir)
 
     result_means = np.load(f'{save_dir}/inf_params/means.npy')
     result_covs = np.load(f'{save_dir}/inf_params/covs.npy')
@@ -254,9 +254,9 @@ def test_train_model_dynemo():
         alpha = pickle.load(file)
 
     # We check the reconstruction of means and covariances.
-    def reconstruct(alpha,mode_stat,stat_type):
+    def reconstruct(alpha, mode_stat, stat_type):
         if stat_type == 'mean':
-            return np.dot(alpha,mode_stat)
+            return np.dot(alpha, mode_stat)
         elif stat_type == 'cov':
             return np.einsum('tm,mij->tij', alpha, mode_stat)
         else:
@@ -265,13 +265,13 @@ def test_train_model_dynemo():
     alpha_np = np.concatenate(alpha)
     alpha_truth_np = np.concatenate(alpha_truth)
 
-
     npt.assert_allclose(result_means, np.array(means_Y), rtol=1e-6, atol=1e-6)
     npt.assert_allclose(result_covs, np.stack(covs_Y), rtol=1e-2, atol=1e-2)
 
     # Test whether the inferred alphas are close to the ground truth
     mean_difference = np.mean(np.abs(alpha_np - alpha_truth_np))
     npt.assert_array_less(mean_difference, 1e-2, err_msg=f"Mean difference exceeds 1e-2")
+
 
 def test_infer_temporal_hmm():
     import os
@@ -371,7 +371,7 @@ def test_infer_temporal_hmm():
     with open(f'{save_dir}/config.yaml', "w") as file:
         file.write(config)
 
-    run_pipeline_from_file(f'{save_dir}/config.yaml',save_dir)
+    run_pipeline_from_file(f'{save_dir}/config.yaml', save_dir)
     # Read the alpha
     with open(f'{save_dir}/inf_params/alp.pkl', 'rb') as file:
         alpha = pickle.load(file)
@@ -379,3 +379,136 @@ def test_infer_temporal_hmm():
     for i in range(2):
         npt.assert_allclose(alpha[i], hidden_states[i], atol=1e-6)
 
+def test_infer_temporal_dynemo():
+    import os
+    import pickle
+    import shutil
+    import yaml
+
+    save_dir = './test_infer_temporal_dynemo/'
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+    os.makedirs(save_dir)
+
+    # Define a very simple test case
+    n_samples = 3
+    n_channels = 3
+    n_states = 2
+    select_sessions = [1, 2]
+    select_channels = [0, 2]
+
+    # Construct the data
+    def generate_obs(cov, mean=None, n_timepoints=100):
+        if mean is None:
+            mean = np.zeros(len(cov))
+        return np.random.multivariate_normal(mean, cov, n_timepoints)
+
+    # Define the covariance matrices of state 1,2 in both splits
+    cors_X = [-0.5, 0.5]
+    covs_X = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_X]
+    means_X = [[1.0, -1.0], [-1.0, 1.0]]
+
+    means_Y = [1.0, 2.0]
+    vars_Y = [0.5, 2.0]
+
+    # save these files
+    data_dir = f'{save_dir}data/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    timepoints = 100  # Number of timepoints per segment
+    alpha_truth = []
+
+    for i in range(0, 2):
+        obs = []
+        alphas = []
+        for j in range(3000):
+            t = np.linspace(0, timepoints - 1, timepoints) / timepoints
+
+            # Alpha coefficients
+            alpha_t1 = np.sin(2 * np.pi * t) ** 2
+            alpha_t2 = np.cos(2 * np.pi * t) ** 2
+
+            alphas.append(np.stack((alpha_t1, alpha_t2), axis=1))
+
+            X_mean_t = np.outer(alpha_t1, means_X[0]) + np.outer(alpha_t2, means_X[1])
+            X_cov_t = np.einsum('t,ij->tij', alpha_t1, covs_X[0]) + np.einsum('t,ij->tij', alpha_t2, covs_X[1])
+
+            X_obs = np.array(
+                [np.random.multivariate_normal(X_mean_t[t_idx], X_cov_t[t_idx]) for t_idx in range(timepoints)])
+
+            # Generate X observations
+            Y_mean_t = alpha_t1 * means_Y[0] + alpha_t2 * means_Y[1]
+            Y_var_t = alpha_t1 * vars_Y[0] + alpha_t2 * vars_Y[1]
+
+            Y_obs = np.reshape(np.random.normal(Y_mean_t, np.sqrt(Y_var_t)), (-1, 1))
+
+            # Combine X and Y observations
+            observations = np.hstack((X_obs[:, :1], Y_obs, X_obs[:, 1:]))
+            obs.append(observations)
+
+        obs = np.concatenate(obs, axis=0)
+        np.save(f"{data_dir}{10002 + i}.npy", obs)
+        alpha_truth.append(np.concatenate(alphas, axis=0))
+
+    # Generate irrelevant dataset
+    np.save(f"{data_dir}10001.npy", generate_obs(np.eye(3) * 100, n_timepoints=300000))
+
+    np.save(f'{save_dir}/fixed_means.npy', np.array(means_X))
+    np.save(f'{save_dir}/fixed_covs.npy', np.stack(covs_X))
+    with open(f"{save_dir}alpha_truth.pkl", "wb") as f:
+        pickle.dump(alpha_truth, f)
+    spatial_means = f'{save_dir}/fixed_means.npy'
+    spatial_covariances = f'{save_dir}/fixed_covs.npy'
+
+    config = f"""
+            load_data:
+                inputs: {data_dir}
+                prepare:
+                    select:
+                        sessions: {select_channels}
+                        channels: {select_channels}
+                        timepoints:
+                            - 0
+                            - 300000
+            infer_temporal:
+                model_type: dynemo
+                config_kwargs:
+                    batch_size: 64
+                    do_kl_annealing: true
+                    inference_n_units: 64
+                    inference_normalization: layer
+                    initial_alpha_temperature: 1.0
+                    kl_annealing_curve: tanh
+                    kl_annealing_sharpness: 5
+                    learn_alpha_temperature: true
+                    learn_covariances: true
+                    learn_means: true
+                    learning_rate: 0.01
+                    model_n_units: 64
+                    model_normalization: layer
+                    n_channels: 2
+                    n_epochs: 30
+                    n_kl_annealing_epochs: 10
+                    n_modes: 2
+                    sequence_length: 100
+                init_kwargs:
+                    n_init: 10
+                    n_epochs: 2
+                spatial_params:
+                    means: {spatial_means}
+                    covariances: {spatial_covariances}
+            """
+    with open(f'{save_dir}/config.yaml', "w") as file:
+        file.write(config)
+
+    run_pipeline_from_file(f'{save_dir}/config.yaml', save_dir)
+
+    # Read the alpha
+    with open(f'{save_dir}/inf_params/alp.pkl', 'rb') as file:
+        alpha = pickle.load(file)
+
+    # Test whether the inferred alphas are close to the ground truth
+    for truth, inferred in zip(alpha_truth, alpha):
+        mean_difference = np.mean(np.abs(truth - inferred))
+        npt.assert_array_less(mean_difference, 5e-2, err_msg=f"Mean difference {mean_difference} exceeds 5e-2")
