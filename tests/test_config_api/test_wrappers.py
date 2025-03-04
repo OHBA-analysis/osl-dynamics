@@ -119,8 +119,6 @@ def test_train_model_hmm():
     off_diagonal = np.array([float(result_covs[i, 0, 1]) for i in range(n_states)])
     npt.assert_allclose(np.sort(off_diagonal), cors_Y, atol=0.05, rtol=0.05)
 
-    shutil.rmtree(save_dir)
-
 
 def test_train_model_dynemo():
     import os
