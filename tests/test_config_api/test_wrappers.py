@@ -232,7 +232,7 @@ def test_train_model_dynemo():
                     model_n_units: 64
                     model_normalization: layer
                     n_channels: 2
-                    n_epochs: 5
+                    n_epochs: 30
                     n_kl_annealing_epochs: 10
                     n_modes: 2
                     sequence_length: 100
@@ -267,7 +267,7 @@ def test_train_model_dynemo():
 
     # Test whether the inferred alphas are close to the ground truth
     mean_difference = np.mean(np.abs(alpha_np - alpha_truth_np))
-    npt.assert_array_less(mean_difference, 1e-2, err_msg=f"Mean difference exceeds 1e-2")
+    npt.assert_array_less(mean_difference, 1e-3, err_msg=f"Mean difference exceeds 1e-3")
 
 
 def test_infer_temporal_hmm():
@@ -353,8 +353,8 @@ def test_infer_temporal_hmm():
                     model_type: hmm
                     config_kwargs:
                         n_states: {n_states}
-                        learn_means: False
-                        learn_covariances: False
+                        learn_means: True
+                        learn_covariances: True
                         learning_rate: 0.01
                         n_epochs: 30
                         sequence_length: 600
@@ -463,7 +463,7 @@ def test_infer_temporal_dynemo():
                 inputs: {data_dir}
                 prepare:
                     select:
-                        sessions: {select_channels}
+                        sessions: {select_sessions}
                         channels: {select_channels}
                         timepoints:
                             - 0
