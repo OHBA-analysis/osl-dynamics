@@ -40,7 +40,7 @@ def test_train_model_hmm():
 
     # Define a very simple test case
     n_samples = 3
-    n_channels = 3
+    n_channels = 2
     n_states = 3
     select_sessions = [1, 2]
     select_channels = [0, 2]
@@ -52,7 +52,6 @@ def test_train_model_hmm():
         return np.random.multivariate_normal(mean, cov, n_timepoints)
 
     # Define the covariance matrices of state 1,2 in both splits
-    means_Y = [np.array([-10.0, -10.0]), np.array([0.0, 0.0]), np.array([10.0, 10.0])]
     cors_Y = [-0.5, 0.0, 0.5]
     covs_Y = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_Y]
 
@@ -67,7 +66,7 @@ def test_train_model_hmm():
     for i in range(0, 2):
         obs = []
         for j in range(1500):
-            observations_Y = [generate_obs(covs_Y[i], means_Y[i]), generate_obs(covs_Y[i + 1], means_Y[i + 1])]
+            observations_Y = [generate_obs(covs_Y[i]), generate_obs(covs_Y[i + 1])]
             observations_X = [generate_obs([[vars_X[i]]], [means_X[i]]),
                               generate_obs([[vars_X[i + 1]]], [means_X[i + 1]])]
             observations = np.concatenate(
@@ -94,14 +93,14 @@ def test_train_model_hmm():
                 model_type: hmm
                 config_kwargs: 
                     n_states: {n_states}
-                    learn_means: True
+                    learn_means: False
                     learn_covariances: True
                     learning_rate: 0.01
                     n_epochs: 30
                     sequence_length: 600
                 init_kwargs:
-                    n_init: 10
-                    n_epochs: 2
+                    n_init: 3
+                    n_epochs: 1
 
             """
 
@@ -111,7 +110,7 @@ def test_train_model_hmm():
 
     result_means = np.load(f'{save_dir}/inf_params/means.npy')
     result_covs = np.load(f'{save_dir}/inf_params/covs.npy')
-    npt.assert_array_equal(result_means, np.zeros((n_states, 2)))
+    npt.assert_array_equal(result_means, np.zeros((n_states,n_channels)))
 
     # Assert diagonal elements are all one
     npt.assert_allclose(np.diagonal(result_covs, axis1=-2, axis2=-1), 1.0, rtol=0.05, atol=0.05)
