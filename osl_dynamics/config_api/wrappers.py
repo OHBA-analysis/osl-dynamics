@@ -217,6 +217,74 @@ def train_model(
         save(f"{inf_params_dir}/covs.npy", covs)
 
     return model
+
+
+def infer_temporal(
+    model_type,
+    data,
+    output_dir,
+    config_kwargs,
+    spatial_params,  # Renamed from "spatial" for clarity
+    init_kwargs=None,
+    fit_kwargs=None,
+    save_inf_params=True,
+):
+    """
+    Infer temporal dynamics while fixing the spatial parameters.
+
+    This function modifies `config_kwargs` to ensure that the spatial means and covariances
+    are fixed while inferring only the temporal dynamics.
+
+    Parameters
+    ----------
+    model_type : str
+        Type of model to train. Recognized values: "hmm", "dynemo", "swc", "mDyNeMo".
+    data : osl_dynamics.data.Data
+        Data object for inference.
+    output_dir : str
+        Path to output directory.
+    config_kwargs : dict
+        Configuration parameters for the model, which override default settings.
+    spatial_params : dict
+        Dictionary specifying the paths to spatial means and covariances.
+        Expected keys:
+        - "means": Path or array for spatial means.
+        - "covariances": Path or array for spatial covariances.
+    init_kwargs : dict, optional
+        Initialization parameters for the model. Overrides default settings.
+    fit_kwargs : dict, optional
+        Training parameters for the model.
+    save_inf_params : bool, optional
+        Whether to save inferred parameters (default=True).
+
+    Returns
+    -------
+    model : object
+        The trained model object with fixed spatial parameters and inferred temporal dynamics.
+    """
+
+    if not isinstance(spatial_params, dict) or "means" not in spatial_params or "covariances" not in spatial_params:
+        raise ValueError("spatial_params must be a dictionary containing 'means' and 'covariances'.")
+
+    # Ensure learn_means and learn_covariances are always set to True
+    config_kwargs = config_kwargs.copy()  # Avoid modifying the original dictionary
+    config_kwargs["learn_means"] = False
+    config_kwargs["learn_covariances"] = False
+
+    # Set initial spatial parameters
+    config_kwargs["initial_means"] = spatial_params["means"]
+    config_kwargs["initial_covariances"] = spatial_params["covariances"]
+
+    # Call train_model with the modified configuration
+    return train_model(
+        model_type=model_type,
+        data=data,
+        output_dir=output_dir,
+        config_kwargs=config_kwargs,
+        init_kwargs=init_kwargs,
+        fit_kwargs=fit_kwargs,
+        save_inf_params=save_inf_params,
+    )
 def train_hmm(
     data,
     output_dir,
