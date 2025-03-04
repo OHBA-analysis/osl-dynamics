@@ -215,7 +215,7 @@ def test_train_model_dynemo():
                             - 0
                             - 300000
             train_model:
-                model_type: hmm
+                model_type: dynemo
                 config_kwargs:
                     batch_size: 64
                     do_kl_annealing: true
