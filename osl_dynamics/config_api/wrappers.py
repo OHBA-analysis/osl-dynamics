@@ -218,6 +218,87 @@ def train_model(
 
     return model
 
+def infer_spatial(
+    model_type,
+    data,
+    output_dir,
+    config_kwargs,
+    temporal_params,
+    init_kwargs=None,
+    fit_kwargs=None,
+    save_inf_params=True,
+      # This replaces spatial_params to fix temporal dynamics
+):
+    """
+    Infer spatial parameters while fixing the temporal dynamics.
+
+    Parameters
+    ----------
+    model_type : str
+        Type of model to train. Recognized values: "hmm", "dynemo", "swc", "mDyNeMo".
+    data : osl_dynamics.data.Data
+        Data object for inference.
+    output_dir : str
+        Path to output directory.
+    config_kwargs : dict
+        Configuration parameters for the model, which override default settings.
+    temporal_params : dict
+        Dictionary specifying the paths to temporal parameters.
+        Expected keys:
+        - "alpha": Path or array for inferred state/mode probabilities (alpha).
+    init_kwargs : dict, optional
+        Initialization parameters for the model. Overrides default settings.
+    fit_kwargs : dict, optional
+        Training parameters for the model.
+    save_inf_params : bool, optional
+        Whether to save inferred parameters (default=True).
+
+    Returns
+    -------
+    model : object
+        The trained model object with fixed temporal parameters and inferred spatial properties.
+    """
+
+    # Validate temporal_params
+    if not isinstance(temporal_params, dict) or "alpha" not in temporal_params:
+        raise ValueError("temporal_params must be a dictionary containing 'alpha'.")
+
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    # Retrieve the correct model module and defaults
+    if model_type in DEFAULT_CONFIGS:
+        default_config_kwargs, default_init_kwargs = DEFAULT_CONFIGS[model_type]
+        # Retrieve the correct model module dynamically
+        try:
+            model_lib = importlib.import_module(f"osl_dynamics.models.{model_type}")
+        except ModuleNotFoundError:
+            raise ValueError(f"Unknown model_type: {model_type}. Must be one of {list(DEFAULT_CONFIGS.keys())}.")
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}. Must be one of {list(DEFAULT_CONFIGS.keys())}.")
+
+    # Override default config/init parameters
+    config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
+
+    # Ensure n_channels is set if missing
+    if "n_channels" not in config_kwargs:
+        config_kwargs["n_channels"] = data.n_channels
+
+    _logger.info(f"Using config_kwargs: {config_kwargs}")
+
+    # Directories
+    model_dir = os.path.join(output_dir, "model")
+    inf_params_dir = os.path.join(output_dir, "inf_params")
+
+    # Create the model object
+    _logger.info(f"Building {model_type} model")
+    config = model_lib.Config(**config_kwargs)
+    model = model_lib.Model(config)
+    model.summary()
+
+    results = model.dual_estimation(data,temporal_params['alpha'],concatenate=True)
+    np.save(f'{inf_params_dir}/means.npy',results[0])
+    np.save(f'{inf_params_dir}/covs.npy',results[1])
 
 def infer_temporal(
     model_type,
