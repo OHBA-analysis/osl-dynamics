@@ -25,6 +25,18 @@ conda env create -f envs/linux.yml
 conda activate osld
 pip install -e .
 ```
+Then, for CPU users, install Tensorflow with
+```
+pip install tensorflow==2.18
+```
+For GPU users, intall Tensorflow, CUDA and cuDNN with
+```
+pip install tensorflow[and-cuda]==2.18
+```
+Next we need to install tensorflow-probability. As of when this document is updated, tensorflow-probability still runs with Keras-2, which is not intalled by default in tensorflow `2.16+`. Therefore we need to run
+```
+pip install tensorflow-probability[tf]==0.25
+```
 
 ### Mac
 
@@ -77,11 +89,9 @@ osl-dynamics has been tested with the following versions:
 You can use the following to check if TensorFlow is using any GPUs you have available:
 ```
 conda activate osld
-python
->> import tensorflow as tf
->> print(tf.test.is_gpu_available())
+python3 -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
-This should print `True` if you have GPUs available (and `False` otherwise).
+If a list of GPU devices is returned, you've installed Tensorflow successfully.
 
 ### Removing osl-dynamics
 

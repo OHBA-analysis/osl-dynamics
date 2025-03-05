@@ -176,6 +176,19 @@ class Config(BaseModelConfig):
                 raise ValueError("rows of initial_trans_prob must sum to one.")
 
 
+class SplitInputLayer(layers.Layer):
+    """Split input layer for the HMM."""
+
+    def __init__(self, n_states, n_channels, **kwargs):
+        super().__init__(**kwargs)
+        self.n_states = n_states
+        self.n_channels = n_channels
+
+    def call(self, inputs):
+        data, gamma = tf.split(inputs, [self.n_channels, self.n_states], axis=2)
+        return data, gamma
+
+
 class Model(ModelBase):
     """HMM class.
 
@@ -284,7 +297,7 @@ class Model(ModelBase):
             lr = self.config.learning_rate * np.exp(
                 -self.config.observation_update_decay * n
             )
-            backend.set_value(self.model.optimizer.lr, lr)
+            self.model.optimizer.learning_rate.assign(lr)
 
             # Loop over batches
             loss = []
@@ -325,7 +338,11 @@ class Model(ModelBase):
                     else:
                         pb_i.add(
                             1,
-                            values=[("rho", self.rho), ("lr", lr), ("loss", l)],
+                            values=[
+                                ("rho", self.rho),
+                                ("lr", self.model.optimizer.learning_rate),
+                                ("loss", l),
+                            ],
                         )
 
             history["loss"].append(np.mean(loss))
@@ -1694,6 +1711,9 @@ class Model(ModelBase):
             shape=(config.sequence_length, config.n_channels + config.n_states),
             name="inputs",
         )
+        input_layer = SplitInputLayer(
+            config.n_states, config.n_channels, name="split_input"
+        )
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
             config.sequence_length,
             config.loss_calc,
@@ -1735,7 +1755,7 @@ class Model(ModelBase):
         )
 
         # Data flow
-        data, gamma = tf.split(inputs, [config.n_channels, config.n_states], axis=2)
+        data, gamma = input_layer(inputs)
         static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
         mu = means_layer(
             data, static_loss_scaling_factor=static_loss_scaling_factor
@@ -1743,6 +1763,6 @@ class Model(ModelBase):
         D = covs_layer(
             data, static_loss_scaling_factor=static_loss_scaling_factor
         )  # data not used
-        ll_loss = ll_loss_layer([data, mu, D, gamma, None])
+        ll_loss = ll_loss_layer([data, mu, D, gamma])
 
         return tf.keras.Model(inputs=inputs, outputs=[ll_loss], name="HMM")

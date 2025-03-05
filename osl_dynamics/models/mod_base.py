@@ -22,12 +22,8 @@ from tqdm.keras import TqdmCallback
 
 if version.parse(tf.__version__) < version.parse("2.13"):
     from tensorflow.python.distribute.distribution_strategy_context import get_strategy
-elif version.parse(tf.__version__) < version.parse("2.16"):
-    from tensorflow.python.distribute.distribute_lib import get_strategy
 else:
-    raise ImportError(
-        f"Unsupported TensorFlow version: {tf.__version__}. Please use <= 2.15."
-    )
+    from tensorflow.python.distribute.distribute_lib import get_strategy
 
 import osl_dynamics
 from osl_dynamics import data
@@ -535,7 +531,7 @@ class ModelBase:
         """
         self.save_config(dirname)
         self.save_weights(
-            f"{dirname}/weights"
+            f"{dirname}/model_weights.weights.h5"
         )  # will use the keras method: self.model.save_weights()
 
     def set_static_loss_scaling_factor(self, dataset):
@@ -693,7 +689,7 @@ class ModelBase:
             if config_dict["model_name"] == "HMM":
                 model.trans_prob = np.load(f"{dirname}/trans_prob.npy")
         else:
-            model.load_weights(f"{dirname}/weights").expect_partial()
+            model.load_weights(f"{dirname}/model_weights.weights.h5").expect_partial()
 
         return model
 
