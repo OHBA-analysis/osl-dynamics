@@ -172,6 +172,8 @@ class Data:
         # Extra channels
         if extra_channels is None:
             self.extra_channels = {}
+        else:
+            self.extra_channels = extra_channels
 
     def __iter__(self):
         return iter(self.arrays)
