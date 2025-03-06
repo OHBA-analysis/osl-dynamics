@@ -31,6 +31,7 @@ from osl_dynamics.inference.layers import (
     VectorsLayer,
     StaticLossScalingFactorLayer,
 )
+from osl_dynamics.data import Data
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelBase,
@@ -269,6 +270,64 @@ class Model(VariationalInferenceModelBase):
     def get_observation_model_parameters(self):
         """Wrapper for :code:`get_means_covariances`."""
         return self.get_means_covariances()
+
+    def get_posterior_expected_log_likelihood(self, x, alpha,average=False):
+        """
+        Calculates the expected log-likelihood with respect to the MEAN posterior alpha
+
+        .. math::
+            LL &= \log \prod_{t=1}^T p(x_t | m_t,C_t)
+            m_t = \sum_{j=1}^J alpha_{jt}\mu_j
+            C_t = \sum_{j=1}^J \alpha_{jt}D_j
+
+        Parameters
+        ----------
+        x : np.ndarray or osl_dynamics.data.Data
+            Data. Shape is (batch_size, sequence_length, n_channels).
+            If x is an osl_dynamics.data.Data, then convert it to np.ndarray.
+        alpha : np.ndarray or list or str
+            MEAN posterior distribution of time series given the data,
+            :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
+            If alpha is a string, then read from the file path.
+            If alpha is a list, then turn it into an array.
+        average: bool, optional
+            whether tu return the average value
+
+        Returns
+        -------
+        log_likelihood : float
+            Posterior expected log-likelihood.
+        """
+        from scipy.stats import multivariate_normal
+
+        if isinstance(x,Data):
+            x = np.array(x.time_series(prepared=True,concatenate=False))
+        if isinstance(alpha,str):
+            try:
+                with open(alpha, "rb") as f:
+                    alpha = pickle.load(f)
+            except Exception as e:
+                raise ValueError(f"Failed to load alpha from {alpha}: {e}")
+        if isinstance(alpha,list):
+            alpha = np.array(alpha)
+        alpha = np.reshape(alpha,(alpha.shape[0] * alpha.shape[1],-1))
+        x = np.reshape(x, (x.shape[0] * x.shape[1], -1))
+
+        means,covs = self.get_means_covariances()
+
+        # Calculate m_t using einsum
+        m_t = np.einsum('ns,sc->nc', alpha, means)
+
+        # Calculate C_t using einsum
+        C_t = np.einsum('ns,sij->nij', alpha, covs)
+
+        # Calculate the log likelihood for each observation
+        log_likelihood = np.array([multivariate_normal.logpdf(x[i], mean=m_t[i], cov=C_t[i]) for i in range(len(x))])
+
+        if average:
+            return np.average(log_likelihood)
+        else:
+            return np.sum(log_likelihood)
 
     def set_means(self, means, update_initializer=True):
         """Set the mode means.
