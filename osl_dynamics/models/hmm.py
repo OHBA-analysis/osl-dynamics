@@ -35,6 +35,7 @@ from tqdm.auto import trange
 from pqdm.threads import pqdm
 
 import osl_dynamics.data.tf as dtf
+from osl_dynamics.data import Data
 from osl_dynamics.analysis.modes import hmm_dual_estimation
 from osl_dynamics.inference import initializers, modes
 from osl_dynamics.inference.layers import (
@@ -760,11 +761,14 @@ class Model(ModelBase):
 
         Parameters
         ----------
-        x : np.ndarray
+        x : np.ndarray or osl_dynamics.data.Data
             Data. Shape is (batch_size, sequence_length, n_channels).
-        gamma : np.ndarray
+            If x is an osl_dynamics.data.Data, then convert it to np.ndarray.
+        gamma : np.ndarray or list or str
             Marginal posterior distribution of hidden states given the data,
             :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
+            If gamma is a string, then read from the file path.
+            If gamma is a list, then turn it into an array.
         average: bool, optional
             whether to average the value.
 
@@ -773,6 +777,16 @@ class Model(ModelBase):
         log_likelihood : float
             Posterior expected log-likelihood.
         """
+        if isinstance(x,Data):
+            x = np.array(x.time_series(prepared=True,concatenate=False))
+        if isinstance(gamma,str):
+            try:
+                with open(gamma, "rb") as f:
+                    gamma = pickle.load(f)
+            except Exception as e:
+                raise ValueError(f"Failed to load alpha from {gamma}: {e}")
+        if isinstance(gamma,list):
+            gamma = np.array(gamma)
         gamma = np.reshape(gamma, (x.shape[0], x.shape[1], -1))
         log_likelihood = self.get_log_likelihood(x)
         if average:
