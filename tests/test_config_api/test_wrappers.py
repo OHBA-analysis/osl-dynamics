@@ -4,6 +4,10 @@ from osl_dynamics.config_api.wrappers import load_data
 from osl_dynamics.config_api.pipeline import run_pipeline_from_file
 
 
+def generate_obs(cov, mean=None, n_timepoints=100):
+    if mean is None:
+        mean = np.zeros(len(cov))
+    return np.random.multivariate_normal(mean, cov, n_timepoints)
 def test_load_data():
     import os
     import json
@@ -43,12 +47,6 @@ def test_train_model_hmm():
     n_states = 3
     select_sessions = [1, 2]
     select_channels = [0, 2]
-
-    # Construct the data
-    def generate_obs(cov, mean=None, n_timepoints=100):
-        if mean is None:
-            mean = np.zeros(len(cov))
-        return np.random.multivariate_normal(mean, cov, n_timepoints)
 
     # Define the covariance matrices of state 1,2 in both splits
     cors_Y = [-0.5, 0.0, 0.5]
@@ -135,12 +133,6 @@ def test_train_model_dynemo():
     n_channels = 3
     select_sessions = [1, 2]
     select_channels = [0, 2]
-
-    # Construct the data
-    def generate_obs(cov, mean=None, n_timepoints=100):
-        if mean is None:
-            mean = np.zeros(len(cov))
-        return np.random.multivariate_normal(mean, cov, n_timepoints)
 
     # Define the covariance matrices of state 1,2 in both splits
     cors_Y = [-0.5, 0.5]
@@ -286,12 +278,6 @@ def test_infer_spatial_hmm():
     select_sessions = [1, 2]
     select_channels = [1]
 
-    # Construct the data
-    def generate_obs(cov, mean=None, n_timepoints=100):
-        if mean is None:
-            mean = np.zeros(len(cov))
-        return np.random.multivariate_normal(mean, cov, n_timepoints)
-
     # Define the covariance matrices of state 1,2 in both splits
     cors_Y = [-0.5, 0.0, 0.5]
     covs_Y = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_Y]
@@ -368,6 +354,131 @@ def test_infer_spatial_hmm():
     result_covs = np.load(f'{save_dir}/inf_params/covs.npy')
     npt.assert_allclose(means_X_estimate, result_means, rtol=1e-2, atol=1e-2)
     npt.assert_allclose(vars_X_estimate, result_covs, rtol=1e-2, atol=1e-2)
+
+def test_infer_spatial_dynemo():
+    import os
+    import pickle
+    import shutil
+    import yaml
+
+    save_dir = './test_infer_spatial_dynemo/'
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+    os.makedirs(save_dir)
+
+    # Define a very simple test case
+    n_samples = 2
+    n_channels = 2
+    n_modes = 2
+    select_sessions = [1, 2]
+    select_channels = [0, 2]
+
+
+    # Define the covariance matrices of state 1,2 in both splits
+    cors_X = [-0.5, 0.5]
+    covs_X = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_X]
+    means_X = [[1.0, -1.0], [-1.0, 1.0]]
+
+    means_Y = [1.0, 2.0]
+    vars_Y = [0.5, 2.0]
+
+    # save these files
+    data_dir = f'{save_dir}data/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    timepoints = 100  # Number of timepoints per segment
+    alpha_truth = []
+
+    for i in range(0, 2):
+        obs = []
+        alphas = []
+        for j in range(3000):
+            t = np.linspace(0, timepoints - 1, timepoints) / timepoints
+
+            # Alpha coefficients
+            alpha_t1 = np.sin(2 * np.pi * t) ** 2
+            alpha_t2 = np.cos(2 * np.pi * t) ** 2
+
+            alphas.append(np.stack((alpha_t1, alpha_t2), axis=1))
+
+            X_mean_t = np.outer(alpha_t1, means_X[0]) + np.outer(alpha_t2, means_X[1])
+            X_cov_t = np.einsum('t,ij->tij', alpha_t1, covs_X[0]) + np.einsum('t,ij->tij', alpha_t2, covs_X[1])
+
+            X_obs = np.array(
+                [np.random.multivariate_normal(X_mean_t[t_idx], X_cov_t[t_idx]) for t_idx in range(timepoints)])
+
+            # Generate X observations
+            Y_mean_t = alpha_t1 * means_Y[0] + alpha_t2 * means_Y[1]
+            Y_var_t = alpha_t1 * vars_Y[0] + alpha_t2 * vars_Y[1]
+
+            Y_obs = np.reshape(np.random.normal(Y_mean_t, np.sqrt(Y_var_t)), (-1, 1))
+
+            # Combine X and Y observations
+            observations = np.hstack((X_obs[:, :1], Y_obs, X_obs[:, 1:]))
+            obs.append(observations)
+
+        obs = np.concatenate(obs, axis=0)
+        np.save(f"{data_dir}{10002 + i}.npy", obs)
+        alpha_truth.append(np.concatenate(alphas, axis=0))
+
+    # Generate irrelevant dataset
+    np.save(f"{data_dir}10001.npy", generate_obs(np.eye(3) * 100, n_timepoints=300000))
+
+    np.save(f'{save_dir}/fixed_means.npy', np.array(means_X))
+    np.save(f'{save_dir}/fixed_covs.npy', np.stack(covs_X))
+
+    alpha_file_path = f"{save_dir}/alp.pkl"
+    with open(alpha_file_path, "wb") as f:
+        pickle.dump(alpha_truth, f)
+
+    config = f"""
+            load_data:
+                inputs: {data_dir}
+                prepare:
+                    select:
+                        channels: {select_channels}
+                        sessions: {select_sessions}
+                        timepoints:
+                            - 0
+                            - 300000
+
+            infer_spatial:
+                model_type: dynemo
+                config_kwargs:
+                    batch_size: 64
+                    do_kl_annealing: true
+                    inference_n_units: 64
+                    inference_normalization: layer
+                    initial_alpha_temperature: 1.0
+                    kl_annealing_curve: tanh
+                    kl_annealing_sharpness: 5
+                    learn_alpha_temperature: true
+                    learn_covariances: true
+                    learn_means: true
+                    learning_rate: 0.01
+                    model_n_units: 64
+                    model_normalization: layer
+                    n_channels: {n_channels}
+                    n_epochs: 30
+                    n_kl_annealing_epochs: 10
+                    n_modes: {n_modes}
+                    sequence_length: 150
+                init_kwargs:
+                    n_init: 10
+                    n_epochs: 2
+                temporal_params:
+                    alpha: {alpha_file_path}
+            """
+    with open(f'{save_dir}/config.yaml', "w") as file:
+        file.write(config)
+    run_pipeline_from_file(f'{save_dir}config.yaml', save_dir)
+
+    result_means = np.load(f'{save_dir}/inf_params/means.npy')
+    result_covs = np.load(f'{save_dir}/inf_params/covs.npy')
+
+    npt.assert_allclose(result_means, np.array(means_X), rtol=1e-2, atol=1e-2)
+    npt.assert_allclose(result_covs, np.stack(covs_X), rtol=3e-2, atol=3e-2)
 def test_infer_temporal_hmm():
     import os
     import shutil
@@ -385,12 +496,6 @@ def test_infer_temporal_hmm():
     n_states = 3
     select_sessions = [1, 2]
     select_channels = [0, 2]
-
-    # Construct the data
-    def generate_obs(cov, mean=None, n_timepoints=100):
-        if mean is None:
-            mean = np.zeros(len(cov))
-        return np.random.multivariate_normal(mean, cov, n_timepoints)
 
     # Define the covariance matrices of state 1,2 in both splits
     means_X = [np.array([-10.0, -10.0]), np.array([0.0, 0.0]), np.array([10.0, 10.0])]
@@ -491,12 +596,6 @@ def test_infer_temporal_dynemo():
     n_states = 2
     select_sessions = [1, 2]
     select_channels = [0, 2]
-
-    # Construct the data
-    def generate_obs(cov, mean=None, n_timepoints=100):
-        if mean is None:
-            mean = np.zeros(len(cov))
-        return np.random.multivariate_normal(mean, cov, n_timepoints)
 
     # Define the covariance matrices of state 1,2 in both splits
     cors_X = [-0.5, 0.5]

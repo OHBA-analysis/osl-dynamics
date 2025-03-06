@@ -5,6 +5,7 @@ See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
 """
 
 import os
+import pickle
 from typing import Union
 import logging
 from dataclasses import dataclass
@@ -536,6 +537,8 @@ class Model(VariationalInferenceModelBase):
     def dual_estimation(
         self,
         training_data,
+        alpha=None,
+        concatenate=False,
         n_epochs=None,
         learning_rate=None,
         store_dir="tmp",
@@ -551,6 +554,14 @@ class Model(VariationalInferenceModelBase):
         ----------
         training_data : osl_dynamics.data.Data or list of tf.data.Dataset
             Training dataset.
+        alpha: list of np.ndarray, or string, optional,
+            Posterior distribution of the states. Shape is
+            (n_sessions, n_samples, n_states).
+            If passed in, the dual estimation finds the maximum log-likelihood solution
+            of observation model
+            If a string is provided, it should be a file path to the stored alpha values.
+        concatenate: bool,optional
+            Whether to concatenate the data before calculating estimating state stats
         n_epochs : int, optional
             Number of epochs to train for. Defaults to the value in the
             :code:`config` used to create the model.
@@ -568,57 +579,132 @@ class Model(VariationalInferenceModelBase):
             Session-specific covariances.
             Shape is (n_sessions, n_modes, n_channels, n_channels).
         """
-        # Save the group level model
-        os.makedirs(store_dir, exist_ok=True)
-        self.save_weights(f"{store_dir}/weights.h5")
+        if alpha is not None:
+            # Validation
+            # Load alpha if it's a file path
+            if isinstance(alpha, str):
+                try:
+                    with open(alpha, "rb") as f:
+                        alpha = pickle.load(f)
+                except Exception as e:
+                    raise ValueError(f"Failed to load alpha from {alpha}: {e}")
 
-        # Save original training hyperparameters
-        original_n_epochs = self.config.n_epochs
-        original_learning_rate = self.config.learning_rate
-        self.config.n_epochs = n_epochs or self.config.n_epochs
-        self.config.learning_rate = learning_rate or self.config.learning_rate
+            if isinstance(alpha, np.ndarray):
+                alpha = [alpha]
 
-        # Layers to fix (i.e. make non-trainable)
-        fixed_layers = [
-            "mod_rnn",
-            "mod_mu",
-            "mod_sigma",
-            "inf_rnn",
-            "inf_mu",
-            "inf_sigma",
-            "theta_norm",
-            "alpha",
-        ]
+            data = training_data.arrays
 
-        # Dual estimation on sessions
-        means = []
-        covariances = []
-        with self.set_trainable(fixed_layers, False):
-            if isinstance(training_data, list):
-                n_sessions = len(training_data)
-            else:
-                n_sessions = training_data.n_sessions
+            if len(alpha) != len(data):
+                raise ValueError(
+                    "len(alpha) and training_data.n_sessions must be the same."
+                )
 
-            for i in trange(n_sessions, desc="Dual estimation"):
-                # Train on this session
+            # Make sure the data and alpha have the same number of samples
+            data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
+
+            # Define a function to create sequences from data and alpha
+            def create_sequences(data, alpha, seq_length):
+                data_sequences = []
+                alpha_sequences = []
+
+                for d, a in zip(data, alpha):
+                    for start in range(0, len(d),seq_length):
+                        data_seq = d[start:start + seq_length]
+                        alpha_seq = a[start:start + seq_length]
+                        data_sequences.append(data_seq)
+                        alpha_sequences.append(alpha_seq)
+
+                return np.array(data_sequences), np.array(alpha_sequences)
+
+            # Prepare sequences
+            data_sequences, alpha_sequences = create_sequences(data, alpha, self.config.sequence_length)
+
+            # Create model with only the necessary layers
+            inputs = layers.Input(shape=(self.config.sequence_length, self.config.n_channels), name="data")
+            alpha_input = layers.Input(shape=(self.config.sequence_length, self.config.n_modes), name="alpha")
+
+            mu = self.model.get_layer("means")(inputs)
+            D = self.model.get_layer("covs")(inputs)
+            m = self.model.get_layer("mix_means")([alpha_input, mu])
+            C = self.model.get_layer("mix_covs")([alpha_input, D])
+            ll_loss = self.model.get_layer("ll_loss")([inputs, m, C])
+
+            observation_model = tf.keras.Model(inputs=[inputs, alpha_input], outputs=ll_loss,
+                                                name="ObservationModel")
+            observation_model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=self.config.learning_rate))
+
+            # Train the observation model using stochastic gradient descent
+            for epoch in range(n_epochs or self.config.n_epochs):
+                logging.info(f"Starting epoch {epoch + 1}/{self.config.n_epochs}")
+                permutation = np.random.permutation(len(data_sequences))
+                data_sequences_shuffled = data_sequences[permutation]
+                alpha_sequences_shuffled = alpha_sequences[permutation]
+
+                for i in range(0, len(data_sequences_shuffled), self.config.batch_size):
+                    x_batch = data_sequences_shuffled[i:i + self.config.batch_size]
+                    alpha_batch = alpha_sequences_shuffled[i:i + self.config.batch_size]
+
+                    try:
+                        observation_model.fit([x_batch, alpha_batch], epochs=1, batch_size=self.config.batch_size,
+                                              verbose=0)
+                    except Exception as e:
+                        logging.error(
+                            f"Error during training at epoch {epoch + 1}, batch {i // self.config.batch_size + 1}: {e}")
+
+            # Get the means and covariances
+            means, covariances = self.get_means_covariances()
+        else:
+            # Save the group level model
+            os.makedirs(store_dir, exist_ok=True)
+            self.save_weights(f"{store_dir}/weights.h5")
+
+            # Save original training hyperparameters
+            original_n_epochs = self.config.n_epochs
+            original_learning_rate = self.config.learning_rate
+            self.config.n_epochs = n_epochs or self.config.n_epochs
+            self.config.learning_rate = learning_rate or self.config.learning_rate
+
+            # Layers to fix (i.e. make non-trainable)
+            fixed_layers = [
+                "mod_rnn",
+                "mod_mu",
+                "mod_sigma",
+                "inf_rnn",
+                "inf_mu",
+                "inf_sigma",
+                "theta_norm",
+                "alpha",
+            ]
+
+            # Dual estimation on sessions
+            means = []
+            covariances = []
+            with self.set_trainable(fixed_layers, False):
                 if isinstance(training_data, list):
-                    self.fit(training_data[i], verbose=0)
+                    n_sessions = len(training_data)
                 else:
-                    with training_data.set_keep(i):
-                        self.fit(training_data, verbose=0)
+                    n_sessions = training_data.n_sessions
 
-                # Get inferred parameters
-                m, c = self.get_means_covariances()
-                means.append(m)
-                covariances.append(c)
+                for i in trange(n_sessions, desc="Dual estimation"):
+                    # Train on this session
+                    if isinstance(training_data, list):
+                        self.fit(training_data[i], verbose=0)
+                    else:
+                        with training_data.set_keep(i):
+                            self.fit(training_data, verbose=0)
 
-                # Reset back to group-level model parameters
-                self.load_weights(f"{store_dir}/weights.h5")
-                self.compile()
+                    # Get inferred parameters
+                    m, c = self.get_means_covariances()
+                    means.append(m)
+                    covariances.append(c)
 
-        # Reset hyperparameters
-        self.config.n_epochs = original_n_epochs
-        self.config.learning_rate = original_learning_rate
+                    # Reset back to group-level model parameters
+                    self.load_weights(f"{store_dir}/weights.h5")
+                    self.compile()
+
+            # Reset hyperparameters
+            self.config.n_epochs = original_n_epochs
+            self.config.learning_rate = original_learning_rate
 
         return np.array(means), np.array(covariances)
 
