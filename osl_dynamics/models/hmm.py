@@ -747,7 +747,7 @@ class Model(ModelBase):
 
         return first_term - second_term
 
-    def get_posterior_expected_log_likelihood(self, x, gamma):
+    def get_posterior_expected_log_likelihood(self, x, gamma,average=False):
         """Expected log-likelihood.
 
         Calculates the expected log-likelihood with respect to the posterior
@@ -765,6 +765,8 @@ class Model(ModelBase):
         gamma : np.ndarray
             Marginal posterior distribution of hidden states given the data,
             :math:`q(s_t)`. Shape is (batch_size*sequence_length, n_states).
+        average: bool, optional
+            whether to average the value.
 
         Returns
         -------
@@ -773,7 +775,10 @@ class Model(ModelBase):
         """
         gamma = np.reshape(gamma, (x.shape[0], x.shape[1], -1))
         log_likelihood = self.get_log_likelihood(x)
-        return tf.stop_gradient(tf.reduce_sum(log_likelihood * gamma))
+        if average:
+            return tf.stop_gradient(tf.reduce_mean(log_likelihood * gamma)) * gamma.shape[2]
+        else:
+            return tf.stop_gradient(tf.reduce_sum(log_likelihood * gamma))
 
     def get_posterior_expected_prior(self, gamma, xi):
         """Posterior expected prior.
