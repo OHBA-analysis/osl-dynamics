@@ -1953,7 +1953,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             return probs, scale
 
         # Hyperparameters
-        batch_size, sequence_length, n_states = tf.shape(B)
+        batch_size = tf.shape(B)[0]
+        sequence_length = tf.shape(B)[1]
 
         # Transition probability matrix
         P = tf.stop_gradient(self.get_trans_prob())
@@ -1967,10 +1968,10 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
         # Temporary variables used in the calculation
         alpha = tf.zeros(
-            [batch_size, sequence_length, n_states], dtype=self.compute_dtype
+            [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
         )
         beta = tf.zeros(
-            [batch_size, sequence_length, n_states], dtype=self.compute_dtype
+            [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
         )
         scale = tf.zeros([batch_size, sequence_length], dtype=self.compute_dtype)
 
