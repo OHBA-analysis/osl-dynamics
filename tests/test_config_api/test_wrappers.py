@@ -648,15 +648,13 @@ def test_infer_temporal_dynemo():
     # Generate irrelevant dataset
     np.save(f"{data_dir}10001.npy", generate_obs(np.eye(3) * 100, n_timepoints=300000))
 
-    # Save all the files
+    np.save(f'{save_dir}/fixed_means.npy', np.array(means_X))
+    np.save(f'{save_dir}/fixed_covs.npy', np.stack(covs_X))
+    with open(f"{save_dir}alpha_truth.pkl", "wb") as f:
+        pickle.dump(alpha_truth, f)
+
     spatial_means = f'{save_dir}/fixed_means.npy'
     spatial_covariances = f'{save_dir}/fixed_covs.npy'
-    alpha_file_path = f"{save_dir}alpha_truth.pkl"
-
-    np.save(spatial_means, np.array(means_X))
-    np.save(spatial_covariances, np.stack(covs_X))
-    with open(alpha_file_path, "wb") as f:
-        pickle.dump(alpha_truth, f)
 
     config = f"""
             load_data:
@@ -695,8 +693,6 @@ def test_infer_temporal_dynemo():
                 spatial_params:
                     means: {spatial_means}
                     covariances: {spatial_covariances}
-                temporal_params:
-                    alpha: {alpha_file_path}
             """
     with open(f'{save_dir}/config.yaml', "w") as file:
         file.write(config)
@@ -771,6 +767,22 @@ def test_calculate_log_likelihood_hmm():
 
         return log_likelihood
 
+    means = np.zeros((3, 2))
+    covs = np.array([[[1.0, 0.0], [0.0, 1.0]],
+                     [[1.5, 0.8], [0.8, 1.5]],
+                     [[0.5, -0.25], [-0.25, 0.5]]])
+    spatial_means = f'{save_dir}/means.npy'
+    spatial_covariances = f'{save_dir}/covs.npy'
+    np.save(spatial_means, means)
+    np.save(spatial_covariances, covs)
+
+    # Set up the alpha.pkl
+    alpha = [np.array([[1., 0., 0.], [0.0, 0.5, 0.5]]),
+             np.array([[0.5, 0.5, 0.0], [0.0, 0.0, 1.0]])]
+    alpha_file_path = f'{save_dir}/alp.pkl'
+    with open(alpha_file_path, "wb") as file:
+        pickle.dump(alpha, file)
+
     config = f"""
                 load_data:
                     inputs: {data_dir}
@@ -793,45 +805,18 @@ def test_calculate_log_likelihood_hmm():
                     init_kwargs:
                         n_init: 1
                         n_epochs: 1
-                    spatial_params: 
+                    spatial_params:
+                        means: {spatial_means}
+                        covariances: {spatial_covariances}
+                    temporal_params:
+                        alpha: {alpha_file_path}
                 """
     with open(f'{save_dir}/config.yaml', "w") as file:
         file.write(config)
 
     run_pipeline_from_file(f'{save_dir}/config.yaml', save_dir)
 
-    means = np.zeros((3, 2))
-    covs = np.array([[[1.0, 0.0], [0.0, 1.0]],
-                     [[1.5, 0.8], [0.8, 1.5]],
-                     [[0.5, -0.25], [-0.25, 0.5]]])
-    np.save(f'{save_dir}/means.npy', means)
-    np.save(f'{save_dir}/covs.npy', covs)
-    spatial = {
-        'means': f'{save_dir}/means.npy',
-        'covs': f'{save_dir}/covs.npy'
-    }
 
-    # Set up the alpha.pkl
-    alpha = [np.array([[1., 0., 0.], [0.0, 0.5, 0.5]]),
-             np.array([[0.5, 0.5, 0.0], [0.0, 0.0, 1.0]])]
-    with open(f'{data_dir}alp.pkl', "wb") as file:
-        pickle.dump(alpha, file)
-    # Set up the cross validation
-    train_keys = ['n_channels',
-                  'n_states',
-                  'learn_means',
-                  'learn_covariances',
-                  'learn_trans_prob',
-                  'initial_means',
-                  'initial_covariances',
-                  'initial_trans_prob',
-                  'sequence_length',
-                  'batch_size',
-                  'learning_rate',
-                  'n_epochs',
-                  ]
-    cv = CVHMM(n_samples, n_channels, train_keys=train_keys)
-    result = cv.calculate_error(config, row_test, column_Y, f'{data_dir}alp.pkl', spatial)
 
     ll_1 = multivariate_gaussian_log_likelihood(data_2[:1, [0, 2]], np.array([0, 0]), covs[0])
     ll_2 = 0.5 * multivariate_gaussian_log_likelihood(data_2[1:2, [0, 2]], np.array([0, 0]), covs[1]) + \
@@ -840,8 +825,8 @@ def test_calculate_log_likelihood_hmm():
            0.5 * multivariate_gaussian_log_likelihood(data_3[:1, [0, 2]], np.array([0, 0]), covs[1])
     ll_4 = multivariate_gaussian_log_likelihood(data_3[1:2, [0, 2]], np.array([0, 0]), covs[2])
 
-    ll = (ll_1 + ll_2 + ll_3 + ll_4) / 2
-    with open(result, 'r') as file:
+    ll = (ll_1 + ll_2 + ll_3 + ll_4) / 4 # average of each time point.
+    with open(f'{save_dir}/metrics.json', 'r') as file:
         # Load the JSON data
         metrics = json.load(file)
 
