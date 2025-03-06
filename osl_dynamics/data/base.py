@@ -89,6 +89,9 @@ class Data:
         training on large datasets. Default is :code:`False`.
     session_labels : list of SessionLabels, optional
         Extra session labels.
+    extra_channels : dict, optional
+        Extra channels to add to the data. The keys are the channel names and
+        the values are the channel data. 
     n_jobs : int, optional
         Number of processes to load the data in parallel.
         Default is 1, which loads data in serial.
@@ -109,6 +112,7 @@ class Data:
         buffer_size=4000,
         use_tfrecord=False,
         session_labels=None,
+        extra_channels=None,
         n_jobs=1,
     ):
         self._identifier = id(self)
@@ -164,6 +168,10 @@ class Data:
         # Extra session labels
         if session_labels is None:
             self.session_labels = []
+
+        # Extra channels
+        if extra_channels is None:
+            self.extra_channels = {}
 
     def __iter__(self):
         return iter(self.arrays)
@@ -327,6 +335,28 @@ class Data:
         n_channels = [array.shape[-1] for array in self.raw_data_arrays]
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
+
+    def validate_extra_channels(self, data, extra_channels):
+        """Validate extra channels."""
+        n_sessions = len(data)
+        # Validate each channel
+        for channel_name, channel in extra_channels.items():
+            if not isinstance(channel_name, str):
+                raise ValueError("Channel name must be a string.")
+
+            if not isinstance(channel, list):
+                raise ValueError(f"Extra channel {channel_name} must be a list.")
+
+            if len(channel) != n_sessions:
+                raise ValueError(
+                    "Extra channel must have the same number of sessions as the data."
+                )
+
+            for i in range(n_sessions):
+                if data[i].shape[0] != channel[i].shape[0]:
+                    raise ValueError(
+                        f"Extra channel {channel_name} have different number of samples than the data in session {i}."
+                    )
 
     def _validate_batching(
         self,
@@ -1355,7 +1385,7 @@ class Data:
             ]
         )
 
-    def _create_data_dict(self, i, array):
+    def _create_data_dict(self, i, array, extra_channels):
         """Create a dictionary of data for a single session.
 
         Parameters
@@ -1364,6 +1394,8 @@ class Data:
             Index of the session.
         array : np.ndarray
             Time series data for a single session.
+        extra_channels : dict
+            Dictionary of extra channels to add to the data.
 
         Returns
         -------
@@ -1379,7 +1411,65 @@ class Data:
             label_values = session_label.values
             data[label_name] = placeholder + label_values[i]
 
+        # Add extra channels
+        for k, v in extra_channels.items():
+            if k in data:
+                raise ValueError(f"Channel name '{k}' already exists.")
+            data[k] = v[i]
+
         return data
+
+    def _trim_data(self, data, sequence_length, n_sequences):
+        """Trim data to be an integer multiple of the sequence length."""
+        X = []
+        for i in range(self.n_sessions):
+            X.append(data[i][: n_sequences[i] * sequence_length])
+        return X
+
+    def _validation_split(self, X, extra_channels, validation_split):
+        """Split the data into training and validation sets."""
+
+        def _split_data(d, val_indx, train_indx):
+            n_channels = d.shape[-1]
+            d = d.reshape(-1, self.sequence_length, n_channels)
+            d_train = d[train_indx].reshape(-1, n_channels)
+            d_val = d[val_indx].reshape(-1, n_channels)
+            return d_train, d_val
+
+        n_sequences = self.count_sequences(self.sequence_length)
+
+        # Number of sequences that should be in the validation set
+        n_val_sequences = (validation_split * n_sequences).astype(int)
+
+        if np.all(n_val_sequences == 0):
+            raise ValueError(
+                "No full sequences could be assigned to the validation set. "
+                "Consider reducing the sequence_length."
+            )
+
+        X_train = []
+        X_val = []
+        extra_channels_train = {k: [] for k in extra_channels.keys()}
+        extra_channels_val = {k: [] for k in extra_channels.keys()}
+
+        for i in range(self.n_sessions):
+            # Randomly pick sequences
+            val_indx = np.random.choice(
+                n_sequences[i], size=n_val_sequences[i], replace=False
+            )
+            train_indx = np.setdiff1d(np.arange(n_sequences[i]), val_indx)
+
+            # Split data
+            x_train, x_val = _split_data(X[i], val_indx, train_indx)
+            X_train.append(x_train)
+            X_val.append(x_val)
+
+            for k in extra_channels.keys():
+                x_train, x_val = _split_data(extra_channels[k][i], val_indx, train_indx)
+                extra_channels_train[k].append(x_train)
+                extra_channels_val[k].append(x_val)
+
+        return X_train, X_val, extra_channels_train, extra_channels_val
 
     def dataset(
         self,
@@ -1435,15 +1525,22 @@ class Data:
             concatenate=concatenate,
         )
 
+        # Validate extra channels
+        self.validate_extra_channels(self.arrays, self.extra_channels)
+
         n_sequences = self.count_sequences(self.sequence_length)
 
-        def _create_dataset(X, shuffle=shuffle, repeat_count=repeat_count):
+        def _create_dataset(
+            X, extra_channels, shuffle=shuffle, repeat_count=repeat_count
+        ):
             # X is a list of np.ndarray
 
             # Create datasets for each array
             datasets = []
-            for i in range(len(X)):
-                data = self._create_data_dict(i, X[i])
+            for i in range(self.n_sessions):
+                if i not in self.keep:
+                    continue
+                data = self._create_data_dict(i, X[i], extra_channels)
                 dataset = dtf.create_dataset(
                     data,
                     self.sequence_length,
@@ -1510,50 +1607,22 @@ class Data:
                 return full_datasets
 
         # Trim data to be an integer multiple of the sequence length
-        X = []
-        for i in range(self.n_sessions):
-            if i not in self.keep:
-                # We don't want to include this session
-                continue
-            x = self.arrays[i]
-            n = n_sequences[i]
-            X.append(x[: n * sequence_length])
+        X = self._trim_data(self.arrays, sequence_length, n_sequences)
+        extra_channels = {}
+        for k, v in self.extra_channels.items():
+            extra_channels[k] = self._trim_data(v, sequence_length, n_sequences)
 
         if validation_split is not None:
-            # Number of sequences that should be in the validation set
-            n_val_sequences = (validation_split * n_sequences).astype(int)
+            X_train, X_val, extra_channels_train, extra_channels_val = (
+                self._validation_split(X, extra_channels, validation_split)
+            )
 
-            if np.all(n_val_sequences == 0):
-                raise ValueError(
-                    "No full sequences could be assigned to the validation set. "
-                    "Consider reducing the sequence_length."
-                )
-
-            X_train = []
-            X_val = []
-            for i in range(self.n_sessions):
-                if i not in self.keep:
-                    continue
-
-                # Randomly pick sequences
-                val_indx = np.random.choice(
-                    n_sequences[i], size=n_val_sequences[i], replace=False
-                )
-                train_indx = np.setdiff1d(np.arange(n_sequences[i]), val_indx)
-
-                # Split data
-                x = X[i].reshape(-1, sequence_length, self.n_channels)
-                x_train = x[train_indx].reshape(-1, self.n_channels)
-                x_val = x[val_indx].reshape(-1, self.n_channels)
-                X_train.append(x_train)
-                X_val.append(x_val)
-
-            return _create_dataset(X_train), _create_dataset(
-                X_val, shuffle=False, repeat_count=1
+            return _create_dataset(X_train, extra_channels_train), _create_dataset(
+                X_val, extra_channels_val, shuffle=False, repeat_count=1
             )
 
         else:
-            return _create_dataset(X)
+            return _create_dataset(X, extra_channels)
 
     def save_tfrecord_dataset(
         self,
@@ -1625,17 +1694,17 @@ class Data:
                     )
                     return True
 
+            for channel_name in self.extra_channels.keys():
+                if channel_name not in tfrecord_config["extra_channels"]:
+                    _logger.warning(
+                        f"Extra channel {channel_name} not found. Rewriting TFRecords."
+                    )
+                    return True
+
             return False
 
         # Number of sequences
         n_sequences = self.count_sequences(self.sequence_length)
-        if validation_split is not None:
-            n_val_sequences = (validation_split * n_sequences).astype(int)
-            if np.all(n_val_sequences == 0):
-                raise ValueError(
-                    "No full sequences could be assigned to the validation set. "
-                    "Consider reducing the sequence_length."
-                )
 
         # Path to TFRecord file
         tfrecord_path = (
@@ -1663,48 +1732,43 @@ class Data:
             if rewrite_:
                 tfrecords_to_save.append((i, filepath))
 
+        # Trim data to be an integer multiple of the sequence length
+        X = self._trim_data(self.arrays, sequence_length, n_sequences)
+        extra_channels = {}
+        for k, v in self.extra_channels.items():
+            extra_channels[k] = self._trim_data(v, sequence_length, n_sequences)
+
+        if validation_split is not None:
+            X_train, X_val, extra_channels_train, extra_channels_val = (
+                self._validation_split(X, extra_channels, validation_split)
+            )
+
         # Function for saving a single TFRecord
         def _save_tfrecord(i, filepath):
-            # Trim data to be an integer multiple of the sequence length
-            x = self.arrays[i][: n_sequences[i] * sequence_length]
-
             if validation_split is not None:
-                # Randomly pick sequences
-                val_indx = np.random.choice(
-                    n_sequences[i], size=n_val_sequences[i], replace=False
-                )
-                train_indx = np.setdiff1d(np.arange(n_sequences[i]), val_indx)
-
-                # Split data
-                x = x.reshape(-1, sequence_length, self.n_channels)
-                x_train = x[train_indx].reshape(-1, self.n_channels)
-                x_val = x[val_indx].reshape(-1, self.n_channels)
-
-                # Save datasets
-                X_train = self._create_data_dict(i, x_train)
                 dtf.save_tfrecord(
-                    X_train,
+                    self._create_data_dict(i, X_train[i], extra_channels_train),
                     self.sequence_length,
                     self.step_size,
                     filepath.format(val=0),
                 )
-                X_val = self._create_data_dict(i, x_val)
                 dtf.save_tfrecord(
-                    X_val,
+                    self._create_data_dict(i, X_val[i], extra_channels_val),
                     self.sequence_length,
                     self.step_size,
                     filepath.format(val=1),
                 )
 
             else:
-                # Save the dataset
-                X = self._create_data_dict(i, x)
                 dtf.save_tfrecord(
-                    X,
+                    self._create_data_dict(i, X[i], extra_channels),
                     self.sequence_length,
                     self.step_size,
                     filepath.format(val=0),
                 )
+
+        # Validate extra channels
+        self.validate_extra_channels(self.arrays, self.extra_channels)
 
         # Save TFRecords
         if len(tfrecords_to_save) > 0:
@@ -1727,6 +1791,7 @@ class Data:
                 "validation_split": self.validation_split,
                 "session_labels": [label.name for label in self.session_labels],
                 "n_sessions": self.n_sessions,
+                "extra_channels": list(self.extra_channels.keys()),
             }
             misc.save(f"{tfrecord_dir}/tfrecord_config.pkl", tfrecord_config)
 
