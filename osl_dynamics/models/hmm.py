@@ -17,6 +17,7 @@ See Also
 import logging
 import os
 import os.path as op
+import pickle
 import sys
 import warnings
 from dataclasses import dataclass
@@ -1581,9 +1582,10 @@ class Model(ModelBase):
         ----------
         training_data : osl_dynamics.data.Data or list of tf.data.Dataset
             Prepared training data object.
-        alpha : list of np.ndarray, optional
+        alpha : list of np.ndarray, or string, optional
             Posterior distribution of the states. Shape is
             (n_sessions, n_samples, n_states).
+            If a string is provided, it should be a file path to the stored alpha values.
         concatenate : bool, optional
             Should we concatenate the data across sessions?
         n_jobs : int, optional
@@ -1599,7 +1601,17 @@ class Model(ModelBase):
         """
         if alpha is None:
             # Get the posterior
-            alpha = self.get_alpha(training_data, concatenate=cocatenate)
+            alpha = self.get_alpha(training_data, concatenate=concatenate)
+
+        # Load alpha if it's a file path
+        if isinstance(alpha, str):
+            try:
+                with open(alpha, "rb") as f:
+                    alpha = pickle.load(f)
+            except Exception as e:
+                raise ValueError(f"Failed to load alpha from {alpha}: {e}")
+            if concatenate and isinstance(alpha,list):
+                alpha = np.concatenate(alpha)
 
         if isinstance(alpha, np.ndarray):
             alpha = [alpha]
