@@ -28,7 +28,6 @@ def test_load_data():
     from shutil import rmtree
     rmtree(save_dir)
 
-
 def test_train_model_hmm():
     import os
     import shutil
@@ -269,7 +268,106 @@ def test_train_model_dynemo():
     mean_difference = np.mean(np.abs(alpha_np - alpha_truth_np))
     npt.assert_array_less(mean_difference, 1e-3, err_msg=f"Mean difference exceeds 1e-3")
 
+def test_infer_spatial_hmm():
+    import os
+    import pickle
+    import shutil
+    import yaml
 
+    save_dir = './test_infer_spatial_hmm/'
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+    os.makedirs(save_dir)
+
+    # Define a very simple test case
+    n_samples = 3
+    n_channels = 3
+    n_states = 3
+    select_sessions = [1, 2]
+    select_channels = [1]
+
+    # Construct the data
+    def generate_obs(cov, mean=None, n_timepoints=100):
+        if mean is None:
+            mean = np.zeros(len(cov))
+        return np.random.multivariate_normal(mean, cov, n_timepoints)
+
+    # Define the covariance matrices of state 1,2 in both splits
+    cors_Y = [-0.5, 0.0, 0.5]
+    covs_Y = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_Y]
+
+    means_X = [1.0, 2.0, 3.0]
+    vars_X = [0.5, 1.0, 2.0]
+
+    means_X_estimate = [1.4, 2, 2.6]
+    vars_X_estimate = [0.94, 1.5, 1.84]
+
+    n_timepoints = 100
+
+    # save these files
+    data_dir = f'{save_dir}data/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    hidden_states = []
+
+    for i in range(0, 2):
+        # Build up the hidden variable
+        hv_temp = np.zeros((n_timepoints * 2, n_states))
+        hv_temp[:, i] = np.array([0.6] * n_timepoints + [0.4] * n_timepoints)
+        hv_temp[:, i + 1] = np.array([0.4] * n_timepoints + [0.6] * n_timepoints)
+        hidden_states.append(np.tile(hv_temp, (1500, 1)))
+
+        obs = []
+        for j in range(1500):
+            observations_Y = [generate_obs(covs_Y[i], n_timepoints=n_timepoints),
+                              generate_obs(covs_Y[i + 1], n_timepoints=n_timepoints)]
+            observations_X = [generate_obs([[vars_X[i]]], [means_X[i]], n_timepoints=n_timepoints),
+                              generate_obs([[vars_X[i + 1]]], [means_X[i + 1]], n_timepoints=n_timepoints)]
+            observations = np.concatenate(
+                [np.hstack((Y[:, :1], X, Y[:, 1:])) for X, Y in zip(observations_X, observations_Y)], axis=0)
+            obs.append(observations)
+
+        obs = np.concatenate(obs, axis=0)
+        np.save(f"{data_dir}{10002 + i}.npy", obs)
+
+    alpha_file_path = f'{save_dir}/alp.pkl'
+    with open(alpha_file_path, "wb") as file:
+        pickle.dump(hidden_states, file)
+    # Genetate irrelevant dataset
+    np.save(f"{data_dir}10001.npy", generate_obs(np.eye(3) * 100, n_timepoints=300000))
+
+    config = f"""
+            load_data:
+                inputs: {data_dir}
+                prepare:
+                    select:
+                        channels: {select_channels}
+                        sessions: {select_sessions}
+                        timepoints:
+                            - 0
+                            - 300000
+            infer_spatial:
+                model_type: hmm
+                config_kwargs:
+                    n_states: {n_states}
+                    learn_means: True
+                    learn_covariances: True
+                    learning_rate: 0.01
+                    n_epochs: 3
+                    sequence_length: 600
+                temporal_params:
+                    alpha: {alpha_file_path}
+            """
+
+    with open(f'{save_dir}/config.yaml', "w") as file:
+        file.write(config)
+    run_pipeline_from_file(f'{save_dir}config.yaml', save_dir)
+
+    result_means = np.load(f'{save_dir}/inf_params/means.npy')
+    result_covs = np.load(f'{save_dir}/inf_params/covs.npy')
+    npt.assert_allclose(means_X_estimate, result_means, rtol=1e-2, atol=1e-2)
+    npt.assert_allclose(vars_X_estimate, result_covs, rtol=1e-2, atol=1e-2)
 def test_infer_temporal_hmm():
     import os
     import shutil

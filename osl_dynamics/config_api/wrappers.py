@@ -290,6 +290,9 @@ def infer_spatial(
     model_dir = os.path.join(output_dir, "model")
     inf_params_dir = os.path.join(output_dir, "inf_params")
 
+    if not os.path.exists(inf_params_dir):
+        os.makedirs(inf_params_dir)
+
     # Create the model object
     _logger.info(f"Building {model_type} model")
     config = model_lib.Config(**config_kwargs)
