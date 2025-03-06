@@ -15,6 +15,7 @@ where:
 """
 
 import os
+import json
 import logging
 import importlib
 from pathlib import Path
@@ -216,8 +217,6 @@ def train_model(
         save(f"{inf_params_dir}/means.npy", means)
         save(f"{inf_params_dir}/covs.npy", covs)
 
-    return model
-
 def infer_spatial(
     model_type,
     data,
@@ -360,7 +359,7 @@ def infer_temporal(
     config_kwargs["initial_covariances"] = spatial_params["covariances"]
 
     # Call train_model with the modified configuration
-    return train_model(
+    train_model(
         model_type=model_type,
         data=data,
         output_dir=output_dir,
@@ -369,6 +368,107 @@ def infer_temporal(
         fit_kwargs=fit_kwargs,
         save_inf_params=save_inf_params,
     )
+
+
+def calculate_log_likelihood(
+    model_type,
+    data,
+    output_dir,
+    config_kwargs,
+    spatial_params,
+    temporal_params,
+    init_kwargs=None,
+    fit_kwargs=None,
+):
+    """
+    Compute the posterior expected log-likelihood using fixed spatial and temporal parameters.
+
+    Parameters
+    ----------
+    model_type : str
+        Type of model to evaluate. Recognized values: "hmm", "dynemo", "swc", "mDyNeMo".
+    data : osl_dynamics.data.Data
+        Data object for inference.
+    output_dir : str
+        Path to output directory.
+    config_kwargs : dict
+        Configuration parameters for the model, which override default settings.
+    spatial_params : dict
+        Dictionary specifying the paths or values for spatial means and covariances.
+        Expected keys:
+        - "means": Path or array for spatial means.
+        - "covariances": Path or array for spatial covariances.
+    temporal_params : dict
+        Dictionary specifying the paths or values for temporal parameters.
+        Expected keys:
+        - "alpha": Path or array for inferred state/mode probabilities (alpha).
+    init_kwargs : dict, optional
+        Initialization parameters for the model. Overrides default settings.
+    fit_kwargs : dict, optional
+        Training parameters for the model.
+
+    Returns
+    -------
+    log_likelihood : float
+        The posterior expected log-likelihood of the model given the data.
+    """
+
+    # Validate spatial parameters
+    if not isinstance(spatial_params, dict) or "means" not in spatial_params or "covariances" not in spatial_params:
+        raise ValueError("spatial_params must be a dictionary containing 'means' and 'covariances'.")
+
+    # Validate temporal parameters
+    if not isinstance(temporal_params, dict) or "alpha" not in temporal_params:
+        raise ValueError("temporal_params must be a dictionary containing 'alpha'.")
+
+    if data is None:
+        raise ValueError("data must be passed.")
+
+    # Retrieve the correct model module and defaults
+    if model_type in DEFAULT_CONFIGS:
+        default_config_kwargs, default_init_kwargs = DEFAULT_CONFIGS[model_type]
+        try:
+            model_lib = importlib.import_module(f"osl_dynamics.models.{model_type}")
+        except ModuleNotFoundError:
+            raise ValueError(f"Unknown model_type: {model_type}. Must be one of {list(DEFAULT_CONFIGS.keys())}.")
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}. Must be one of {list(DEFAULT_CONFIGS.keys())}.")
+
+    # Override default config/init parameters
+    config_kwargs = override_dict_defaults(default_config_kwargs, config_kwargs)
+
+    # Ensure learn_means and learn_covariances are set to False (parameters are fixed)
+    config_kwargs["learn_means"] = False
+    config_kwargs["learn_covariances"] = False
+
+    # Set initial spatial parameters
+    config_kwargs["initial_means"] = spatial_params["means"]
+    config_kwargs["initial_covariances"] = spatial_params["covariances"]
+
+    # Ensure n_channels is set if missing
+    if "n_channels" not in config_kwargs:
+        config_kwargs["n_channels"] = data.n_channels
+
+    _logger.info(f"Using config_kwargs: {config_kwargs}")
+
+    # Create the model object
+    _logger.info(f"Building {model_type} model")
+    config = model_lib.Config(**config_kwargs)
+    model = model_lib.Model(config)
+    model.summary()
+
+    # Compute the posterior expected log-likelihood
+    log_likelihood = float(model.get_posterior_expected_log_likelihood(
+        data, temporal_params["alpha"], average=True
+    ))
+
+    # Save
+    with open(f"{output_dir}metrics.json", "w") as file:
+        json.dump({'log_likelihood': log_likelihood}, file)
+
+    _logger.info(f"Computed log-likelihood: {log_likelihood}")
+
+
 def train_hmm(
     data,
     output_dir,
