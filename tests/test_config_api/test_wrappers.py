@@ -648,12 +648,15 @@ def test_infer_temporal_dynemo():
     # Generate irrelevant dataset
     np.save(f"{data_dir}10001.npy", generate_obs(np.eye(3) * 100, n_timepoints=300000))
 
-    np.save(f'{save_dir}/fixed_means.npy', np.array(means_X))
-    np.save(f'{save_dir}/fixed_covs.npy', np.stack(covs_X))
-    with open(f"{save_dir}alpha_truth.pkl", "wb") as f:
-        pickle.dump(alpha_truth, f)
+    # Save all the files
     spatial_means = f'{save_dir}/fixed_means.npy'
     spatial_covariances = f'{save_dir}/fixed_covs.npy'
+    alpha_file_path = f"{save_dir}alpha_truth.pkl"
+
+    np.save(spatial_means, np.array(means_X))
+    np.save(spatial_covariances, np.stack(covs_X))
+    with open(alpha_file_path, "wb") as f:
+        pickle.dump(alpha_truth, f)
 
     config = f"""
             load_data:
@@ -692,6 +695,8 @@ def test_infer_temporal_dynemo():
                 spatial_params:
                     means: {spatial_means}
                     covariances: {spatial_covariances}
+                temporal_params:
+                    alpha: {alpha_file_path}
             """
     with open(f'{save_dir}/config.yaml', "w") as file:
         file.write(config)
@@ -706,3 +711,138 @@ def test_infer_temporal_dynemo():
     for truth, inferred in zip(alpha_truth, alpha):
         mean_difference = np.mean(np.abs(truth - inferred))
         npt.assert_array_less(mean_difference, 5e-2, err_msg=f"Mean difference {mean_difference} exceeds 5e-2")
+
+def test_calculate_log_likelihood_hmm():
+    import os
+    import json
+    import shutil
+    import yaml
+    import pickle
+
+    save_dir = './test_calculate_log_likelihood_hmm/'
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+
+    os.makedirs(save_dir)
+
+    # Define a very simple test case
+    n_samples = 2
+    n_channels = 2
+    n_states = 3
+    select_sessions = [1, 2]
+    select_channels = [0, 2]
+
+    # Generate the data
+    data_dir = f'{save_dir}data/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    # Build up subject data
+    data_1 = np.zeros((2, 3))
+    np.save(f'{data_dir}10001.npy', data_1)
+    data_2 = np.array([[1., 0., 1., ], [-1., 0., 0.]])
+    np.save(f'{data_dir}10002.npy', data_2)
+    data_3 = np.array([[-1., 0., -1.], [1., 0., 0.]])
+    np.save(f'{data_dir}10003.npy', data_3)
+
+    def multivariate_gaussian_log_likelihood(x, mu, cov):
+        """
+        Calculate the log-likelihood for a multivariate Gaussian distribution.
+
+        Parameters:
+            x (ndarray): Observations (N, d), where N is the number of samples and d is the dimensionality.
+            mu (ndarray): Mean vector of the distribution (d,).
+            cov (ndarray): Covariance matrix of the distribution (d, d).
+
+        Returns:
+            float: Log-likelihood value.
+        """
+        # Dimensionality of the data
+        d = len(mu)
+
+        # Calculate the log determinant of the covariance matrix
+        log_det_cov = np.log(np.linalg.det(cov))
+
+        # Calculate the quadratic term in the exponent
+        quad_term = np.sum((x - mu) @ np.linalg.inv(cov) * (x - mu), axis=1)
+
+        # Calculate the log-likelihood
+        log_likelihood = -0.5 * (d * np.log(2 * np.pi) + log_det_cov + quad_term)
+
+        return log_likelihood
+
+    config = f"""
+                load_data:
+                    inputs: {data_dir}
+                    prepare:
+                        select:
+                            sessions: {select_sessions}
+                            channels: {select_channels}
+                            timepoints:
+                                - 0
+                                - 2
+                calculate_log_likelihood:
+                    model_type: hmm
+                    config_kwargs:
+                        n_states: {n_states}
+                        learn_means: False
+                        learn_covariances: True
+                        learning_rate: 0.01
+                        n_epochs: 10
+                        sequence_length: 600
+                    init_kwargs:
+                        n_init: 1
+                        n_epochs: 1
+                    spatial_params: 
+                """
+    with open(f'{save_dir}/config.yaml', "w") as file:
+        file.write(config)
+
+    run_pipeline_from_file(f'{save_dir}/config.yaml', save_dir)
+
+    means = np.zeros((3, 2))
+    covs = np.array([[[1.0, 0.0], [0.0, 1.0]],
+                     [[1.5, 0.8], [0.8, 1.5]],
+                     [[0.5, -0.25], [-0.25, 0.5]]])
+    np.save(f'{save_dir}/means.npy', means)
+    np.save(f'{save_dir}/covs.npy', covs)
+    spatial = {
+        'means': f'{save_dir}/means.npy',
+        'covs': f'{save_dir}/covs.npy'
+    }
+
+    # Set up the alpha.pkl
+    alpha = [np.array([[1., 0., 0.], [0.0, 0.5, 0.5]]),
+             np.array([[0.5, 0.5, 0.0], [0.0, 0.0, 1.0]])]
+    with open(f'{data_dir}alp.pkl', "wb") as file:
+        pickle.dump(alpha, file)
+    # Set up the cross validation
+    train_keys = ['n_channels',
+                  'n_states',
+                  'learn_means',
+                  'learn_covariances',
+                  'learn_trans_prob',
+                  'initial_means',
+                  'initial_covariances',
+                  'initial_trans_prob',
+                  'sequence_length',
+                  'batch_size',
+                  'learning_rate',
+                  'n_epochs',
+                  ]
+    cv = CVHMM(n_samples, n_channels, train_keys=train_keys)
+    result = cv.calculate_error(config, row_test, column_Y, f'{data_dir}alp.pkl', spatial)
+
+    ll_1 = multivariate_gaussian_log_likelihood(data_2[:1, [0, 2]], np.array([0, 0]), covs[0])
+    ll_2 = 0.5 * multivariate_gaussian_log_likelihood(data_2[1:2, [0, 2]], np.array([0, 0]), covs[1]) + \
+           0.5 * multivariate_gaussian_log_likelihood(data_2[1:2, [0, 2]], np.array([0, 0]), covs[2])
+    ll_3 = 0.5 * multivariate_gaussian_log_likelihood(data_3[:1, [0, 2]], np.array([0, 0]), covs[0]) + \
+           0.5 * multivariate_gaussian_log_likelihood(data_3[:1, [0, 2]], np.array([0, 0]), covs[1])
+    ll_4 = multivariate_gaussian_log_likelihood(data_3[1:2, [0, 2]], np.array([0, 0]), covs[2])
+
+    ll = (ll_1 + ll_2 + ll_3 + ll_4) / 2
+    with open(result, 'r') as file:
+        # Load the JSON data
+        metrics = json.load(file)
+
+    npt.assert_almost_equal(ll, metrics['log_likelihood'], decimal=3)
