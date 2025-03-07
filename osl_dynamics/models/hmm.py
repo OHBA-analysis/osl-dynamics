@@ -274,7 +274,6 @@ def _model_structure(config):
     # Log-likelihood
     ll_layer = SeparateLogLikelihoodLayer(
         config.n_states,
-        config.covariances_epsilon,
         dtype="float64",
         name="ll",
     )

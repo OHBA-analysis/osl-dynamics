@@ -1172,17 +1172,14 @@ class LogLikelihoodLossLayer(layers.Layer):
 
     Parameters
     ----------
-    epsilon : float
-        Error added to the covariance matrices for numerical stability.
     calculation : str
         Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, calculation, **kwargs):
+    def __init__(self, calculation, **kwargs):
         super().__init__(**kwargs)
-        self.epsilon = epsilon
         self.calculation = calculation
 
     def call(self, inputs):
@@ -1190,9 +1187,6 @@ class LogLikelihoodLossLayer(layers.Layer):
         The method takes the data, mean vector and covariance matrix.
         """
         x, mu, sigma = inputs
-
-        # Add a small error for numerical stability
-        sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
         # Multivariate normal distribution
         mvn = tfp.distributions.MultivariateNormalTriL(
@@ -1490,25 +1484,19 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
     ----------
     n_states : int
         Number of states.
-    epsilon : float
-        Error added to the covariances for numerical stability.
     calculation : str
         Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, n_states, epsilon, calculation, **kwargs):
+    def __init__(self, n_states, calculation, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
-        self.epsilon = epsilon
         self.calculation = calculation
 
     def call(self, inputs, **kwargs):
         x, mu, sigma, probs, session_id = inputs
-
-        # Add a small error for numerical stability
-        sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
         if session_id is not None:
             # Get the mean and covariance for the requested array
@@ -2060,25 +2048,19 @@ class SeparateLogLikelihoodLayer(layers.Layer):
     ----------
     n_states : int
         Number of states.
-    epsilon : float
-        Error added to the covariance matrices for numerical stability.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the keras.layers.Layer.
     """
 
-    def __init__(self, n_states, epsilon, **kwargs):
+    def __init__(self, n_states, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
-        self.epsilon = epsilon
 
     def call(self, inputs, **kwargs):
         x, mu, sigma = inputs
         # x.shape = (None, sequence_length, n_channels)
         # mu.shape = (None, n_states, n_channels)
         # sigma.shape = (None, n_states, n_channels, n_channels)
-
-        # Add value to the diagonal of each state covariance
-        sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
         # Add the sequence dimension
         mu = tf.expand_dims(mu, axis=1)
