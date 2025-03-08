@@ -272,11 +272,7 @@ def _model_structure(config):
     )  # data not used
 
     # Log-likelihood
-    ll_layer = SeparateLogLikelihoodLayer(
-        config.n_states,
-        dtype="float64",
-        name="ll",
-    )
+    ll_layer = SeparateLogLikelihoodLayer(config.n_states, name="ll")
     ll = ll_layer([data, [mu], [D]])
 
     # Hidden state inference

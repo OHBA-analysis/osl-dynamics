@@ -629,12 +629,10 @@ class Model(ModelBase):
         # observed data
         log_likelihood = np.empty([n_states, batch_size, sequence_length])
         for state in range(n_states):
-            mvn = tf.stop_gradient(
-                tfp.distributions.MultivariateNormalTriL(
-                    loc=tf.gather(means, state, axis=-2),
-                    scale_tril=tf.linalg.cholesky(tf.gather(covs, state, axis=-3)),
-                    allow_nan_stats=False,
-                )
+            mvn = tfp.distributions.MultivariateNormalTriL(
+                loc=tf.gather(means, state, axis=-2),
+                scale_tril=tf.linalg.cholesky(tf.gather(covs, state, axis=-3)),
+                allow_nan_stats=False,
             )
             log_likelihood[state] = mvn.log_prob(x)
         log_likelihood = log_likelihood.reshape(n_states, batch_size * sequence_length)
@@ -1783,7 +1781,6 @@ class Model(ModelBase):
             )
         ll_loss_layer = CategoricalLogLikelihoodLossLayer(
             config.n_states,
-            config.covariances_epsilon,
             config.loss_calc,
             name="ll_loss",
         )
