@@ -219,6 +219,7 @@ class Model(MarkovStateInferenceModelBase):
                 self.config.diagonal_covariances,
             )
 
+
 def _model_structure(config):
     # Inputs
     data = layers.Input(
