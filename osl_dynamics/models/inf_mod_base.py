@@ -1672,4 +1672,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         return evidence / n_batches
 
     def reset_kl_annealing_factor(self):
+        """Method to reset KL annealing factor.
+
+        Should be overwritten in subclass.
+        """
         pass
