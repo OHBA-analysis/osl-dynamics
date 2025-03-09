@@ -6,7 +6,7 @@ import numpy as np
 
 
 def epoch(data, time_index, pre, post, pad=False):
-    """Transform (time, channel) data to (time, channel, epoch) data.
+    """Transform (time, channels) data to (epochs, time, channels) data.
 
     Given a series of triggers given by :code:`time_index`, spit a continuous
     dataset into epochs. :code:`time_index` should be a sequence of integers
@@ -29,7 +29,7 @@ def epoch(data, time_index, pre, post, pad=False):
     Returns
     -------
     epoched : np.ndarray
-        A (time, channels, epochs) dataset.
+        An (epochs, time, channels) dataset.
     """
     if pad:
         # Pad before and after the data with zeros
