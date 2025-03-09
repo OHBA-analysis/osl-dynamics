@@ -42,9 +42,6 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
 
-    initial_trans_prob: np.ndarray = None
-    learn_trans_prob: bool = True
-
     def __post_init__(self):
         self.validate_observation_model_parameters()
         self.validate_trans_prob_parameters()
@@ -60,17 +57,6 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
                 self.covariances_epsilon = 1e-6
             else:
                 self.covariances_epsilon = 0.0
-
-    def validate_trans_prob_parameters(self):
-        if self.initial_trans_prob is not None:
-            if (
-                not isinstance(self.initial_trans_prob, np.ndarray)
-                or self.initial_trans_prob.ndim != 2
-            ):
-                raise ValueError("initial_trans_prob must be a 2D numpy array.")
-
-            if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
-                raise ValueError("rows of initial_trans_prob must sum to one.")
 
 
 class Model(MarkovStateInferenceModelBase):
@@ -280,7 +266,9 @@ def _model_structure(config):
     hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
         config.n_states,
         config.initial_trans_prob,
+        config.initial_state_probs,
         config.learn_trans_prob,
+        config.learn_initial_state_probs,
         dtype="float64",
         name="hid_state_inf",
     )

@@ -1844,9 +1844,14 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         Number of states.
     initial_trans_prob : np.ndarray
         Initial transition probability matrix.
-        Shape must be (n_states, n_states.)
-    learn : bool
+        Shape must be (n_states, n_states).
+    initial_state_probs : np.ndarray
+        Initial transition probability matrix.
+        Shape must be (n_states,)
+    learn_trans_prob : bool
         Should we learn the transition probability matrix?
+    learn_initial_state_probs : bool
+        Should we learn the initial state probabilities?
     use_stationary_distribution : bool, optional
         Should we use the stationary distribution (estimated from the
         transition probability matrix) for the initial state probabilities?
@@ -1858,46 +1863,56 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         self,
         n_states,
         initial_trans_prob,
-        learn,
+        initial_state_probs,
+        learn_trans_prob,
+        learn_initial_state_probs,
         use_stationary_distribution=False,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_states = n_states
+        self.use_stationary_distribution = use_stationary_distribution
 
-        # Default initial transition probability matrix
+        # Initial state probabilities
+        if initial_state_probs is None:
+            initial_state_probs = np.ones(self.n_states) / self.n_states
+
+        if initial_state_probs.shape != (n_states,):
+            raise ValueError(f"initial_trans_prob shape must be ({n_states},).")
+        initial_state_probs = initial_state_probs.astype("float32")
+
+        initial_state_probs_layer = LearnableTensorLayer(
+            shape=(n_states,),
+            learn=learn_initial_state_probs,
+            initializer=osld_initializers.WeightInitializer(initial_state_probs),
+            initial_value=initial_state_probs,
+            regularizer=None,
+            name=self.name + "_initial_state_probs_kernel",
+        )
+
+        # Transition probability matrix
         if initial_trans_prob is None:
             initial_trans_prob = np.ones((n_states, n_states)) * 0.1 / (n_states - 1)
             np.fill_diagonal(initial_trans_prob, 0.9)
 
-        # Validation
         if initial_trans_prob.shape != (n_states, n_states):
             raise ValueError(
                 f"initial_trans_prob shape must be ({n_states}, {n_states})."
             )
         initial_trans_prob = initial_trans_prob.astype("float32")
 
-        # Initializer
-        initial_value = initial_trans_prob
-        initializer = osld_initializers.WeightInitializer(initial_value)
+        trans_prob_layer = LearnableTensorLayer(
+            shape=(n_states, n_states),
+            learn=learn_trans_prob,
+            initializer=osld_initializers.WeightInitializer(initial_trans_prob),
+            initial_value=initial_trans_prob,
+            regularizer=None,
+            name=self.name + "_trans_prob_kernel",
+        )
 
         # We use self.layers for compatibility with
         # initializers.reinitialize_model_weights
-        self.layers = [
-            LearnableTensorLayer(
-                shape=(n_states, n_states),
-                learn=learn,
-                initializer=initializer,
-                initial_value=initial_value,
-                regularizer=None,
-                name=self.name + "_kernel",
-            )
-        ]
-
-        # Initial state probabilities
-        self.use_stationary_distribution = use_stationary_distribution
-        if not use_stationary_distribution:
-            self.initial_state_probs = tf.ones(self.n_states) / self.n_states
+        self.layers = [initial_state_probs_layer, trans_prob_layer]
 
     def get_stationary_distribution(self):
         trans_prob = self.get_trans_prob()
@@ -1909,8 +1924,15 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         stationary_distribution /= tf.reduce_sum(stationary_distribution)
         return stationary_distribution
 
+    def get_initial_state_probs(self):
+        if self.use_stationary_distribution:
+            return self.get_stationary_distribution()
+        else:
+            learnable_tensors_layer = self.layers[0]
+            return learnable_tensors_layer(1)
+
     def get_trans_prob(self):
-        learnable_tensors_layer = self.layers[0]
+        learnable_tensors_layer = self.layers[1]
         return learnable_tensors_layer(1)
 
     def _baum_welch(self, B):
@@ -1946,10 +1968,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
         # Transition probability matrix
         P = tf.stop_gradient(self.get_trans_prob())
-        if self.use_stationary_distribution:
-            Pi_0 = tf.stop_gradient(self.get_stationary_distribution())
-        else:
-            Pi_0 = self.initial_state_probs
+        Pi_0 = tf.stop_gradient(self.get_initial_state_probs())
 
         P = tf.cast(P, self.compute_dtype)
         Pi_0 = tf.cast(Pi_0, self.compute_dtype)
@@ -2034,7 +2053,9 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 # in inference.optimizers.ExponentialMovingAverageOptimizer
                 phi_interim = self._trans_prob_update(gamma, xi)
                 phi_interim = tf.cast(phi_interim, tf.float32)
-                return None, [phi_interim]
+                pi0_interim = tf.reduce_mean(gamma[:, 0], axis=0)
+                pi0_interim = tf.cast(pi0_interim, tf.float32)
+                return None, [pi0_interim, phi_interim]
 
             return (gamma, xi), grad
 

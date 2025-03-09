@@ -997,11 +997,13 @@ class VariationalInferenceModelBase(ModelBase):
 class MarkovStateInferenceModelConfig:
     """Settings needed for inferring a Markov chain for hidden states."""
 
-    # Transition probability matrix
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
     trans_prob_update_delay: float = 5  # alpha
     trans_prob_update_forget: float = 0.7  # beta
+
+    initial_state_probs: np.ndarray = None
+    learn_initial_state_probs: bool = True
 
     def validate_trans_prob_parameters(self):
         if self.initial_trans_prob is not None:
@@ -1013,6 +1015,16 @@ class MarkovStateInferenceModelConfig:
 
             if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
                 raise ValueError("rows of initial_trans_prob must sum to one.")
+
+        if self.initial_state_probs is not None:
+            if (
+                not isinstance(self.initial_state_probs, np.ndarray)
+                or self.initial_trans_prob.ndim != 1
+            ):
+                raise ValueError("initial_state_probs must be a 1D numpy array.")
+
+            if not all(np.isclose(np.sum(self.initial_state_probs), 1)):
+                raise ValueError("rows of initial_state_probs must sum to one.")
 
 
 class MarkovStateInferenceModelBase(ModelBase):
@@ -1190,8 +1202,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
         return hidden_state_inference_layer.get_trans_prob().numpy()
 
-    def get_initial_distribution(self):
-        """Get the initial distribution.
+    def get_initial_state_probs(self):
+        """Get the initial state probability distribution.
 
         Returns
         -------
@@ -1199,7 +1211,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             Initial distribution. Shape is (n_states,).
         """
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.initial_state_probs
+        return hidden_state_inference_layer.get_initial_state_probs().numpy()
 
     def set_trans_prob(self, trans_prob, update_initializer=True):
         """Set the transition probability matrix.
@@ -1521,7 +1533,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             #   = int q(s_1) log p(s_1) ds_1
             #     + sum_{t=1}^{T-1} int q(s_t,s_{t+1}) log p(s_{t+1}|s_t) ds_t ds_{t+1}
 
-            initial_distribution = self.get_initial_distribution()
+            initial_distribution = self.get_initial_state_probs()
             trans_prob = self.get_trans_prob()
 
             # first_term = int q(s_1) log p(s_1) ds_1
@@ -1590,7 +1602,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             # p(s_t=j|x_{1:t-1}) = sum_i p(s_t=j|s_{t-1}=i) p(s_{t-1}=i|x_{1:t-1})
             # log_smoothing_distribution.shape = (batch_size, n_states)
             if log_smoothing_distribution is None:
-                initial_distribution = self.get_initial_distribution()
+                initial_distribution = self.get_initial_state_probs()
                 log_prediction_distribution = np.broadcast_to(
                     np.expand_dims(initial_distribution, axis=0),
                     (batch_size, self.config.n_states),
