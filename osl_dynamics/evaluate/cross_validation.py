@@ -279,6 +279,33 @@ class BiCrossValidation:
             yaml.safe_dump(config, file, default_flow_style=False)
         return infer_temporal(**config)
 
+    def calculate_log_likelihood(self, row, column, temporal_params, spatial_params, save_dir=None):
+        from osl_dynamics.config_api.wrappers import calculate_log_likelihood
+        # Specify the save directory
+        if save_dir is None:
+            save_dir = os.path.join(self.save_dir, 'calculate_log_likelihood/')
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        # Prepare the config
+        config = {}
+        config['model_type'] = self.model
+        config['data'] = self._prepare_load_data_config(row, column, save_dir)
+        config['output_dir'] = save_dir
+        # Add spatial and temporal parameters
+        config['spatial_params'] = spatial_params
+        config['temporal_params'] = temporal_params
+
+        # Add keys only if they exist in self.model_kwargs
+        for key in ["config_kwargs", "init_kwargs", "fit_kwargs"]:
+            if key in self.model_kwargs:
+                config[key] = self.model_kwargs[key]
+
+        with open(f'{save_dir}/config.yaml', 'w') as file:
+            yaml.safe_dump(config, file, default_flow_style=False)
+        return calculate_log_likelihood(**config)
+
+
 
     def validate(self):
         if self.bcv_variant == 'fu_perry':
@@ -288,7 +315,7 @@ class BiCrossValidation:
                                                  save_dir=os.path.join(self.save_dir, 'X_train/'))
             temporal_X_test = self.infer_temporal(self.row_test, self.column_X, spatial_X_train,
                                                   save_dir=os.path.join(self.save_dir, 'X_test/'))
-            metric = self.calculate_error(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
+            metric = self.calculate_log_likelihood(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
                                           save_dir=os.path.join(self.save_dir, 'Y_test/'))
         elif self.bcv_variant == 'owen_perry':
             spatial_X_train, temporal_X_train = self.full_train(self.row_train, self.column_X,
@@ -297,7 +324,7 @@ class BiCrossValidation:
                                                  save_dir=os.path.join(self.save_dir, 'Y_train/'))
             temporal_X_test = self.infer_temporal(self.row_test, self.column_X, spatial_X_train,
                                                   save_dir=os.path.join(self.save_dir, 'X_test/'))
-            metric = self.calculate_error(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
+            metric = self.calculate_log_likelihood(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
                                           save_dir=os.path.join(self.save_dir, 'Y_test/'))
         elif self.bcv_variant == 'smith':
             spatial_XY_train, _ = self.full_train(self.row_train, sorted(self.column_X + self.column_Y),
@@ -308,7 +335,7 @@ class BiCrossValidation:
                                                                  )
             temporal_X_test = self.infer_temporal(self.row_test, self.column_X, spatial_X_train,
                                                   save_dir=os.path.join(self.save_dir, 'X_test/'))
-            metric = self.calculate_error(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
+            metric = self.calculate_log_likelihood(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
                                           save_dir=os.path.join(self.save_dir, 'Y_test/'))
         elif self.bcv_variant == 'woolrich':
             _, temporal_X_traintest = self.full_train(sorted(self.row_train + self.row_test), self.column_X,
@@ -318,7 +345,7 @@ class BiCrossValidation:
                                                                          os.path.join(self.save_dir, 'X_test/')])
             spatial_Y_train = self.infer_spatial(self.row_train, self.column_Y, temporal_X_train,
                                                  save_dir=os.path.join(self.save_dir, 'Y_train/'))
-            metric = self.calculate_error(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
+            metric = self.calculate_log_likelihood(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
                                           save_dir=os.path.join(self.save_dir, 'Y_test/'))
         return metric
 
