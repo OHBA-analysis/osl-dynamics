@@ -1,6 +1,4 @@
-"""DIVE (DyNeMo with Integrated Variability Estimation).
-
-"""
+"""DIVE (DyNeMo with Integrated Variability Estimation)."""
 
 from typing import List
 from dataclasses import dataclass

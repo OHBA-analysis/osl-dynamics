@@ -1,6 +1,4 @@
-"""Function related to TensorFlow datasets.
-
-"""
+"""Function related to TensorFlow datasets."""
 
 import logging
 import numpy as np
@@ -197,27 +195,16 @@ def load_tfrecord_dataset(
 
     tfrecord_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
     identifier = tfrecord_config["identifier"]
-    sequence_length = tfrecord_config["sequence_length"]
     validation_split = tfrecord_config["validation_split"]
-    n_channels = tfrecord_config["n_channels"]
-    session_labels = tfrecord_config["session_labels"]
     n_sessions = tfrecord_config["n_sessions"]
+    input_shapes = tfrecord_config["input_shapes"]
 
     keep = keep or list(range(n_sessions))
 
     # Helper functions
     def _parse_example(example):
-        feature_names = ["data"]
-        tensor_shapes = {
-            "data": [sequence_length, n_channels],
-        }
-        # Add session labels if there are any
-        for feature_name in session_labels:
-            feature_names.append(feature_name)
-            tensor_shapes[feature_name] = [sequence_length]
-
         feature_description = {
-            name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
+            name: tf.io.FixedLenFeature([], tf.string) for name in input_shapes.keys()
         }
         parsed_example = tf.io.parse_single_example(
             example,
@@ -225,7 +212,8 @@ def load_tfrecord_dataset(
         )
         return {
             name: tf.ensure_shape(
-                tf.io.parse_tensor(tensor, tf.float32), tensor_shapes[name]
+                tf.io.parse_tensor(tensor, tf.float32),
+                input_shapes[name],
             )
             for name, tensor in parsed_example.items()
         }

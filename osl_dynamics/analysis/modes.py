@@ -1,6 +1,4 @@
-"""Functions to manipulate and analyse inferred mode/state data.
-
-"""
+"""Functions to manipulate and analyse inferred mode/state data."""
 
 import itertools
 import logging

@@ -1,6 +1,4 @@
-"""Classes for simulating a Poisson time series.
-
-"""
+"""Classes for simulating a Poisson time series."""
 
 import numpy as np
 

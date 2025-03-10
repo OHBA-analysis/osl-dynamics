@@ -1,6 +1,4 @@
-"""Functions to perform statistical significance testing.
-
-"""
+"""Functions to perform statistical significance testing."""
 
 import numpy as np
 

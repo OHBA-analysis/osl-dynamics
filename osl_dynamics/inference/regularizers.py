@@ -1,6 +1,4 @@
-"""Custom TensorFlow regularizers.
-
-"""
+"""Custom TensorFlow regularizers."""
 
 import numpy as np
 import tensorflow as tf

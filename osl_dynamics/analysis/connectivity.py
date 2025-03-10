@@ -1,6 +1,4 @@
-"""Functions to calculate and plot network connectivity.
-
-"""
+"""Functions to calculate and plot network connectivity."""
 
 import os
 import logging

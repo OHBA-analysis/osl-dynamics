@@ -1,6 +1,4 @@
-"""Base classes inference models.
-
-"""
+"""Base classes inference models."""
 
 import logging
 from dataclasses import dataclass

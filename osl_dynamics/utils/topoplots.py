@@ -1,6 +1,4 @@
-"""Classes and functions to make topoplots.
-
-"""
+"""Classes and functions to make topoplots."""
 
 import numpy as np
 import pandas as pd

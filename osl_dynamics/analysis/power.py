@@ -1,6 +1,4 @@
-"""Functions to calculate and save network power maps.
-
-"""
+"""Functions to calculate and save network power maps."""
 
 import os
 import logging

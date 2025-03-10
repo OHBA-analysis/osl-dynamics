@@ -1,6 +1,4 @@
-"""Metrics for evaluating model performance.
-
-"""
+"""Metrics for evaluating model performance."""
 
 import numpy as np
 from scipy.linalg import eigvalsh

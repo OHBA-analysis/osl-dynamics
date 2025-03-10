@@ -1,6 +1,4 @@
-"""Custom Tensorflow callbacks.
-
-"""
+"""Custom Tensorflow callbacks."""
 
 import numpy as np
 import tensorflow as tf
