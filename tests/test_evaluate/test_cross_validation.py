@@ -553,6 +553,104 @@ def test_BiCrossValidation_full_train_dynemo():
         mean_difference = np.mean(np.abs(truth - inferred))
         npt.assert_array_less(mean_difference, 5e-2, err_msg=f"Mean difference {mean_difference} exceeds 5e-2")
 
+def test_BiCrossValidation_infer_spatial_hmm():
+
+    save_dir = './test_BiCrossValidation_infer_spatial_hmm/'
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+    os.makedirs(save_dir)
+
+    # Define a very simple test case
+    n_states = 3
+    row_train = [1, 2]
+    row_test =[0]
+    column_X = [1]
+    column_Y = [0, 2]
+
+    # Save the indices
+    indices = {
+        "row_train": row_train,
+        "row_test": row_test,
+        "column_X": column_X,
+        "column_Y": column_Y
+    }
+
+    # Save to a JSON file
+    indices_dir = f"{save_dir}/indices.json"
+    with open(indices_dir, "w") as file:
+        json.dump(indices, file, indent=4)
+
+    # Define the covariance matrices of state 1,2 in both splits
+    cors_Y = [-0.5, 0.0, 0.5]
+    covs_Y = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_Y]
+
+    means_X = [1.0, 2.0, 3.0]
+    vars_X = [0.5, 1.0, 2.0]
+
+    means_X_estimate = [1.4, 2, 2.6]
+    vars_X_estimate = [0.94, 1.5, 1.84]
+
+    n_timepoints = 100
+
+    # save these files
+    data_dir = f'{save_dir}data/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    hidden_states = []
+
+    for i in range(0, 2):
+        # Build up the hidden variable
+        hv_temp = np.zeros((n_timepoints * 2, n_states))
+        hv_temp[:, i] = np.array([0.6] * n_timepoints + [0.4] * n_timepoints)
+        hv_temp[:, i + 1] = np.array([0.4] * n_timepoints + [0.6] * n_timepoints)
+        hidden_states.append(np.tile(hv_temp, (1500, 1)))
+
+        obs = []
+        for j in range(1500):
+            observations_Y = [generate_obs(covs_Y[i], n_timepoints=n_timepoints),
+                              generate_obs(covs_Y[i + 1], n_timepoints=n_timepoints)]
+            observations_X = [generate_obs([[vars_X[i]]], [means_X[i]], n_timepoints=n_timepoints),
+                              generate_obs([[vars_X[i + 1]]], [means_X[i + 1]], n_timepoints=n_timepoints)]
+            observations = np.concatenate(
+                [np.hstack((Y[:, :1], X, Y[:, 1:])) for X, Y in zip(observations_X, observations_Y)], axis=0)
+            obs.append(observations)
+
+        obs = np.concatenate(obs, axis=0)
+        np.save(f"{data_dir}{10002 + i}.npy", obs)
+
+    temporal_params = {'alpha':f'{data_dir}alp.pkl'}
+    with open(temporal_params['alpha'], "wb") as file:
+        pickle.dump(hidden_states, file)
+    # Genetate irrelevant dataset
+    np.save(f"{data_dir}10001.npy", generate_obs(np.eye(3) * 100, n_timepoints=300000))
+
+    config = f"""
+            load_data:
+                inputs: {data_dir}
+            model:
+                hmm:
+                    config_kwargs:
+                        n_states: {n_states}
+                        learn_means: True
+                        learn_covariances: True
+                        learning_rate: 0.01
+                        n_epochs: 10
+                        sequence_length: 600
+            save_dir: {save_dir}
+            indices: {indices_dir}
+            mode: bcv_1
+            """
+
+    config = yaml.safe_load(config)
+    bcv = BiCrossValidation(config)
+    spatial_X_train = bcv.infer_spatial(row_train, column_X,temporal_params)
+
+    result_means = np.load(spatial_X_train['means'])
+    result_covs = np.load(spatial_X_train['covariances'])
+    npt.assert_allclose(means_X_estimate, result_means, rtol=1e-2, atol=1e-2)
+    npt.assert_allclose(vars_X_estimate, result_covs, rtol=1e-2, atol=1e-2)
+
 def test_BiCrossValidation_infer_temporal_hmm():
 
     save_dir = './test_BiCrossValidation_infer_temporal_hmm/'
@@ -783,3 +881,4 @@ def test_BiCrossValidation_infer_temporal_dynemo():
     for truth, inferred in zip(alpha_truth, inferred_alpha):
         mean_difference = np.mean(np.abs(truth - inferred))
         npt.assert_array_less(mean_difference, 5e-2, err_msg=f"Mean difference {mean_difference} exceeds 5e-2")
+
