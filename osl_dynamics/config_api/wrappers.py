@@ -278,6 +278,9 @@ def infer_spatial(
     if data is None:
         raise ValueError("data must be passed.")
 
+    if isinstance(data,dict):
+        data = load_data(**data)
+
     # Retrieve the correct model module and defaults
     if model_type in DEFAULT_CONFIGS:
         default_config_kwargs, default_init_kwargs = DEFAULT_CONFIGS[model_type]
@@ -441,6 +444,9 @@ def calculate_log_likelihood(
 
     if data is None:
         raise ValueError("data must be passed.")
+
+    if isinstance(data,dict):
+        data = load_data(**data)
 
     # Retrieve the correct model module and defaults
     if model_type in DEFAULT_CONFIGS:
