@@ -229,6 +229,9 @@ class BiCrossValidation:
             yaml.safe_dump(config, file, default_flow_style=False)
         return train_model(**config)
 
+    def infer_temporal(self,row,column,spatial,save_dir=None):
+        pass
+
     def validate(self):
         if self.bcv_variant == 'fu_perry':
             spatial_Y_train, temporal_Y_train = self.full_train(self.row_train, self.column_Y,
