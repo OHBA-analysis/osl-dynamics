@@ -492,6 +492,7 @@ def calculate_log_likelihood(
 
     _logger.info(f"Computed log-likelihood: {log_likelihood}")
 
+    return log_likelihood
 
 def train_hmm(
     data,
