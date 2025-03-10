@@ -1,6 +1,4 @@
-"""Helpful functions related to observation models.
-
-"""
+"""Helpful functions related to observation models."""
 
 import numpy as np
 import tensorflow as tf

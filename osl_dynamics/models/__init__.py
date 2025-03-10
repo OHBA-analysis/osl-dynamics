@@ -1,6 +1,4 @@
-"""Implemented models.
-
-"""
+"""Implemented models."""
 
 import yaml
 

@@ -1,6 +1,4 @@
-"""Functions used to manage files kept within osl-dynamics.
-
-"""
+"""Functions used to manage files kept within osl-dynamics."""
 
 from os import path
 

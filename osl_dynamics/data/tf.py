@@ -229,7 +229,7 @@ def load_tfrecord_dataset(
         )
         return {
             name: tf.ensure_shape(
-                tf.io.parse_tensor(tensor, tf.float32 if name == "data" else tf.int32),
+                tf.io.parse_tensor(tensor, tf.float32),
                 tensor_shapes[name],
             )
             for name, tensor in parsed_example.items()

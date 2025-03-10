@@ -1,6 +1,4 @@
-"""Custom TensorFlow optimizers.
-
-"""
+"""Custom TensorFlow optimizers."""
 
 from packaging import version
 

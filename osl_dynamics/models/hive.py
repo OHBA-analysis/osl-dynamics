@@ -1,6 +1,4 @@
-"""HIVE (HMM with Integrated Variability Estimation).
-
-"""
+"""HIVE (HMM with Integrated Variability Estimation)."""
 
 from typing import List
 from dataclasses import dataclass

@@ -355,7 +355,7 @@ class Data:
             for i in range(n_sessions):
                 extra_channels[channel_name][i] = extra_channels[channel_name][
                     i
-                ].astype(np.int32)
+                ].astype(np.float32)
                 if not channel[i].ndim == 1:
                     raise ValueError(
                         f"Extra channel {channel_name} must be a 1D array."

@@ -1,6 +1,4 @@
-"""Classes for simulating Hidden Semi-Markov Models (HSMMs).
-
-"""
+"""Classes for simulating Hidden Semi-Markov Models (HSMMs)."""
 
 import numpy as np
 

@@ -1,6 +1,4 @@
-"""A collection of modules to perform post-hoc analysis of data.
-
-"""
+"""A collection of modules to perform post-hoc analysis of data."""
 
 from osl_dynamics.analysis import (
     connectivity,

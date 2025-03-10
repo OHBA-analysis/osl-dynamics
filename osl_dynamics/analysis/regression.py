@@ -1,6 +1,4 @@
-"""Functions to perform regression analysis.
-
-"""
+"""Functions to perform regression analysis."""
 
 import logging
 

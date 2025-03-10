@@ -1,6 +1,4 @@
-"""Functions for inference.
-
-"""
+"""Functions for inference."""
 
 from osl_dynamics.inference import metrics
 from osl_dynamics.inference import modes
