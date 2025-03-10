@@ -1967,8 +1967,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         sequence_length = tf.shape(B)[1]
 
         # Transition probability matrix
-        P = tf.stop_gradient(self.get_trans_prob())
-        Pi_0 = tf.stop_gradient(self.get_initial_state_probs())
+        P = self.get_trans_prob()
+        Pi_0 = self.get_initial_state_probs()
 
         P = tf.cast(P, self.compute_dtype)
         Pi_0 = tf.cast(Pi_0, self.compute_dtype)
@@ -2029,8 +2029,6 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         return sum_xi / sum_gamma
 
     def call(self, log_B, **kwargs):
-        log_B = tf.stop_gradient(log_B)
-
         # Renormalise the log-likelihood for numerical stability
         max_values = tf.reduce_max(log_B, axis=-1, keepdims=True)
         max_values = tf.minimum(max_values, 0.0)

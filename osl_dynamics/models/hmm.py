@@ -10,7 +10,6 @@ from tensorflow.keras import layers
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
-    CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
     VectorsLayer,
