@@ -223,14 +223,35 @@ class BiCrossValidation:
             if key in self.model_kwargs:
                 config[key] = self.model_kwargs[key]
 
-        # Now config will only contain the keys that exist in self.model_kwargs
-
         with open(f'{save_dir}/config.yaml', 'w') as file:
             yaml.safe_dump(config, file, default_flow_style=False)
         return train_model(**config)
 
-    def infer_temporal(self,row,column,spatial,save_dir=None):
-        pass
+    def infer_temporal(self,row,column,spatial_params,save_dir=None):
+        from osl_dynamics.config_api.wrappers import infer_temporal
+        # Specify the save directory
+        if save_dir is None:
+            save_dir = os.path.join(self.save_dir, 'infer_temporal/')
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        # Prepare the config
+        config = {}
+        config['model_type'] = self.model
+        config['data'] = self._prepare_load_data_config(row, column, save_dir)
+        config['output_dir'] = save_dir
+
+        # Add the spatial parameters
+        config['spatial_params'] = spatial_params
+
+        # Add keys only if they exist in self.model_kwargs
+        for key in ["config_kwargs", "init_kwargs", "fit_kwargs"]:
+            if key in self.model_kwargs:
+                config[key] = self.model_kwargs[key]
+
+        with open(f'{save_dir}/config.yaml', 'w') as file:
+            yaml.safe_dump(config, file, default_flow_style=False)
+        return infer_temporal(**config)
 
     def validate(self):
         if self.bcv_variant == 'fu_perry':
