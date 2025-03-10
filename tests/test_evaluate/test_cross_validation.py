@@ -519,7 +519,7 @@ def test_BiCrossValidation_full_train_dynemo():
                         kl_annealing_sharpness: 5
                         learn_alpha_temperature: true
                         learn_covariances: true
-                        learn_means: true
+                        learn_means: False
                         initial_means: {means_truth_dir}
                         initial_covariances: {covs_truth_dir}
                         learning_rate: 0.001
@@ -542,7 +542,7 @@ def test_BiCrossValidation_full_train_dynemo():
     spatial_Y_train, temporal_Y_train = cv.full_train(row_train, column_Y,save_dir)
 
     result_means = np.load(spatial_Y_train['means'])
-    result_covs = np.load(spatial_Y_train['covs'])
+    result_covs = np.load(spatial_Y_train['covariances'])
     with open(temporal_Y_train, 'rb') as file:
         alpha = pickle.load(file)
 
