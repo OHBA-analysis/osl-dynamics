@@ -239,15 +239,6 @@ def test_train_model_dynemo():
     with open(f'{save_dir}/inf_params/alp.pkl', 'rb') as file:
         alpha = pickle.load(file)
 
-    # We check the reconstruction of means and covariances.
-    def reconstruct(alpha, mode_stat, stat_type):
-        if stat_type == 'mean':
-            return np.dot(alpha, mode_stat)
-        elif stat_type == 'cov':
-            return np.einsum('tm,mij->tij', alpha, mode_stat)
-        else:
-            raise ValueError('Incorrect statistics!')
-
     alpha_np = np.concatenate(alpha)
     alpha_truth_np = np.concatenate(alpha_truth)
 
