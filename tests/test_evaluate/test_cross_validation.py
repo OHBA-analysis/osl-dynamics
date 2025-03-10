@@ -766,7 +766,6 @@ def test_BiCrossValidation_infer_temporal_dynemo():
                         n_init: 1
                         n_epochs: 1
             save_dir: {save_dir}
-            model: dynemo
             indices: {indices_dir}
             mode: bcv_1
 
