@@ -129,8 +129,6 @@ def test_train_model_dynemo():
     os.makedirs(save_dir)
 
     # Define a very simple test case
-    n_samples = 3
-    n_channels = 3
     select_sessions = [1, 2]
     select_channels = [0, 2]
 
