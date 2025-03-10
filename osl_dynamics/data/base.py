@@ -209,6 +209,33 @@ class Data:
         """Number of arrays."""
         return len(self.arrays)
 
+    @property
+    def input_shapes(self):
+        """Get the input shapes for the model.
+
+        Returns
+        -------
+        shapes : dict
+            Dictionary of input shapes.
+        """
+        if getattr(self, "sequence_length", None) is None:
+            raise ValueError("Data.sequence_length must be set.")
+
+        input_shapes = {"data": [self.sequence_length, self.n_channels]}
+        for session_label in self.session_labels:
+            input_shapes[session_label.name] = [self.sequence_length]
+
+        for channel_name, channel_values in self.extra_channels.items():
+            if channel_values[0].ndim == 1:
+                input_shapes[channel_name] = [self.sequence_length]
+            else:
+                input_shapes[channel_name] = [
+                    self.sequence_length,
+                    channel_values[0].shape[-1],
+                ]
+
+        return input_shapes
+
     @contextmanager
     def set_keep(self, keep):
         """Context manager to temporarily set the kept arrays.
@@ -358,11 +385,10 @@ class Data:
                 )
 
             for i, channel_data in enumerate(channel):
-                if channel[i].ndim != 2:
+                if channel_data.ndim not in [1, 2]:
                     raise ValueError(
-                        f"Extra channel {channel_name} must be a 2D array."
+                        f"Extra channel {channel_name} in session {i} must be 1D or 2D."
                     )
-
                 if data[i].shape[0] != channel_data.shape[0]:
                     raise ValueError(
                         f"Extra channel {channel_name} have different number of samples than the data in session {i}."
@@ -1705,17 +1731,20 @@ class Data:
                 _logger.warning("Validation split has changed. Rewriting TFRecords.")
                 return True
 
-            for label in self.session_labels:
-                if label.name not in tfrecord_config["session_labels"]:
+            if tfrecord_config["n_sessions"] != self.n_sessions:
+                _logger.warning("Number of sessions has changed. Rewriting TFRecords.")
+                return True
+
+            input_shapes = tfrecord_config["input_shapes"]
+            for input_name, input_shape in self.input_shapes.items():
+                if input_name not in input_shapes:
                     _logger.warning(
-                        f"Session label {label} not found. Rewriting TFRecords."
+                        f"Input shape {input_name} not found. Rewriting TFRecords."
                     )
                     return True
-
-            for channel_name in self.extra_channels.keys():
-                if channel_name not in tfrecord_config["extra_channels"]:
+                if input_shapes[input_name] != input_shape:
                     _logger.warning(
-                        f"Extra channel {channel_name} not found. Rewriting TFRecords."
+                        f"Input shape {input_name} has changed. Rewriting TFRecords."
                     )
                     return True
 
@@ -1809,9 +1838,8 @@ class Data:
                 "n_channels": self.n_channels,
                 "step_size": self.step_size,
                 "validation_split": self.validation_split,
-                "session_labels": [label.name for label in self.session_labels],
                 "n_sessions": self.n_sessions,
-                "extra_channels": list(self.extra_channels.keys()),
+                "input_shapes": self.input_shapes,
             }
             misc.save(f"{tfrecord_dir}/tfrecord_config.pkl", tfrecord_config)
 
