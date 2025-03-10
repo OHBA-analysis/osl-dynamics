@@ -2023,10 +2023,10 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         return gamma, xi
 
     def _trans_prob_update(self, gamma, xi):
-        sum_xi = tf.reduce_sum(xi, axis=1)
-        sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=1)
+        sum_xi = tf.reduce_sum(xi, axis=(0, 1))
+        sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=(0, 1))
         sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
-        return tf.reduce_sum(sum_xi, axis=0) / tf.reduce_sum(sum_gamma, axis=0)
+        return sum_xi / sum_gamma
 
     def call(self, log_B, **kwargs):
         log_B = tf.stop_gradient(log_B)
