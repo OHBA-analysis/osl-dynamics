@@ -1008,3 +1008,129 @@ def test_BiCrossValidation_infer_temporal_dynemo():
         mean_difference = np.mean(np.abs(truth - inferred))
         npt.assert_array_less(mean_difference, 5e-2, err_msg=f"Mean difference {mean_difference} exceeds 5e-2")
 
+def test_BiCrossValidation_calculate_log_likelihood_hmm():
+
+    save_dir = './test_BiCrossValidation_calculate_log_likelihood_hmm/'
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+
+    os.makedirs(save_dir)
+
+    # Define a very simple test case
+    n_states = 3
+    row_train = [0]
+    row_test = [1, 2]
+    column_X = [1]
+    column_Y = [0, 2]
+
+    # Save the indices
+    indices = {
+        "row_train": row_train,
+        "row_test": row_test,
+        "column_X": column_X,
+        "column_Y": column_Y
+    }
+
+    # Save to a JSON file
+    indices_dir = f"{save_dir}/indices.json"
+    with open(indices_dir, "w") as file:
+        json.dump(indices, file, indent=4)
+
+    # Generate the data
+    data_dir = f'{save_dir}data/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    # Build up subject data
+    data_1 = np.zeros((2, 3))
+    np.save(f'{data_dir}10001.npy', data_1)
+    data_2 = np.array([[1., 0., 1., ], [-1., 0., 0.]])
+    np.save(f'{data_dir}10002.npy', data_2)
+    data_3 = np.array([[-1., 0., -1.], [1., 0., 0.]])
+    np.save(f'{data_dir}10003.npy', data_3)
+
+    def multivariate_gaussian_log_likelihood(x, mu, cov):
+        """
+        Calculate the log-likelihood for a multivariate Gaussian distribution.
+
+        Parameters:
+            x (ndarray): Observations (N, d), where N is the number of samples and d is the dimensionality.
+            mu (ndarray): Mean vector of the distribution (d,).
+            cov (ndarray): Covariance matrix of the distribution (d, d).
+
+        Returns:
+            float: Log-likelihood value.
+        """
+        # Dimensionality of the data
+        d = len(mu)
+
+        # Calculate the log determinant of the covariance matrix
+        log_det_cov = np.log(np.linalg.det(cov))
+
+        # Calculate the quadratic term in the exponent
+        quad_term = np.sum((x - mu) @ np.linalg.inv(cov) * (x - mu), axis=1)
+
+        # Calculate the log-likelihood
+        log_likelihood = -0.5 * (d * np.log(2 * np.pi) + log_det_cov + quad_term)
+
+        return log_likelihood
+
+    # Define spatial and temporal params
+    means = np.zeros((3, 2))
+    covs = np.array([[[1.0, 0.0], [0.0, 1.0]],
+                     [[1.5, 0.8], [0.8, 1.5]],
+                     [[0.5, -0.25], [-0.25, 0.5]]])
+    np.save(f'{save_dir}/means.npy', means)
+    np.save(f'{save_dir}/covs.npy', covs)
+    spatial_params = {
+        'means': f'{save_dir}/means.npy',
+        'covariances': f'{save_dir}/covs.npy'
+    }
+
+    # Set up the alpha.pkl
+    alpha = [np.array([[1., 0., 0.], [0.0, 0.5, 0.5]]),
+             np.array([[0.5, 0.5, 0.0], [0.0, 0.0, 1.0]])]
+    with open(f'{data_dir}alp.pkl', "wb") as file:
+        pickle.dump(alpha, file)
+    temporal_params = {'alpha':f'{data_dir}alp.pkl'}
+    config = f"""
+                load_data:
+                    inputs: {data_dir}
+                model:
+                    hmm:
+                        config_kwargs:
+                            n_states: {n_states}
+                            learn_means: True
+                            learn_covariances: True
+                            learning_rate: 0.01
+                            n_epochs: 10
+                            sequence_length: 600
+                        init_kwargs:
+                            n_init: 1
+                            n_epochs: 1
+                save_dir: {save_dir}
+                indices: {indices_dir}
+                spatial_params: {spatial_params}
+                temporal_params: {temporal_params}
+                mode: bcv_1
+                """
+    config = yaml.safe_load(config)
+
+    bcv = BiCrossValidation(config)
+    result = bcv.calculate_log_likelihood(row_test, column_Y, temporal_params,spatial_params)
+
+    ll_1 = multivariate_gaussian_log_likelihood(data_2[:1, [0, 2]], np.array([0, 0]), covs[0])
+    ll_2 = 0.5 * multivariate_gaussian_log_likelihood(data_2[1:2, [0, 2]], np.array([0, 0]), covs[1]) + \
+           0.5 * multivariate_gaussian_log_likelihood(data_2[1:2, [0, 2]], np.array([0, 0]), covs[2])
+    ll_3 = 0.5 * multivariate_gaussian_log_likelihood(data_3[:1, [0, 2]], np.array([0, 0]), covs[0]) + \
+           0.5 * multivariate_gaussian_log_likelihood(data_3[:1, [0, 2]], np.array([0, 0]), covs[1])
+    ll_4 = multivariate_gaussian_log_likelihood(data_3[1:2, [0, 2]], np.array([0, 0]), covs[2])
+
+    ll = (ll_1 + ll_2 + ll_3 + ll_4) / 2/2
+    with open(f'{save_dir}/calculate_log_likelihood/metrics.json', 'r') as file:
+        # Load the JSON data
+        metrics = json.load(file)
+
+    npt.assert_almost_equal(ll, metrics['log_likelihood'], decimal=3)
+    npt.assert_almost_equal(ll, result, decimal=3)
+
