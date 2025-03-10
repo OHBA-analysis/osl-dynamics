@@ -1906,6 +1906,17 @@ class Data:
 
         self.session_labels.append(SessionLabels(label_name, label_values, label_type))
 
+    def add_extra_channel(self, channel_name, channel_values):
+        """Add an extra channel to the data."""
+        if len(channel_values) != self.n_sessions:
+            raise ValueError(
+                "channel_values must have the same length as the number of sessions."
+            )
+        if channel_name in self.extra_channels:
+            raise ValueError(f"Channel name '{channel_name}' already exists.")
+
+        self.extra_channels[channel_name] = channel_values
+
     def get_session_labels(self):
         """Get the session labels.
 
