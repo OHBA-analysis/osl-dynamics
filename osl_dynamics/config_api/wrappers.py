@@ -372,7 +372,7 @@ def infer_temporal(
     config_kwargs["initial_covariances"] = spatial_params["covariances"]
 
     # Call train_model with the modified configuration
-    train_model(
+    spatial_params, temporal_params = train_model(
         model_type=model_type,
         data=data,
         output_dir=output_dir,
@@ -381,6 +381,7 @@ def infer_temporal(
         fit_kwargs=fit_kwargs,
         save_inf_params=save_inf_params,
     )
+    return temporal_params
 
 
 def calculate_log_likelihood(
