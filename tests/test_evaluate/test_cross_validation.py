@@ -654,3 +654,133 @@ def test_BiCrossValidation_infer_temporal_hmm():
 
     for i in range(2):
         npt.assert_allclose(alpha[i], hidden_states[i], atol=1e-6)
+
+def test_BiCrossValidation_infer_temporal_dynemo():
+
+    save_dir = './test_BiCrossValidation_infer_temporal_dynemo/'
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+    os.makedirs(save_dir)
+
+    # Define a very simple test case
+    n_modes = 2
+    row_train = [0]
+    row_test = [1, 2]
+    column_X = [0, 2]
+    column_Y = [1]
+
+    # Save the indices
+    indices = {
+        "row_train": row_train,
+        "row_test": row_test,
+        "column_X": column_X,
+        "column_Y": column_Y
+    }
+
+    # Save to a JSON file
+    indices_dir = f"{save_dir}/indices.json"
+    with open(indices_dir, "w") as file:
+        json.dump(indices, file, indent=4)
+
+    # Define the covariance matrices of state 1,2 in both splits
+    cors_X = [-0.5, 0.5]
+    covs_X = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_X]
+    means_X = [[1.0, -1.0], [-1.0, 1.0]]
+
+    means_Y = [1.0, 2.0]
+    vars_Y = [0.5, 2.0]
+
+    # save these files
+    data_dir = f'{save_dir}data/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    timepoints = 100  # Number of timepoints per segment
+    alpha_truth = []
+
+    for i in range(0, 2):
+        obs = []
+        alphas = []
+        for j in range(3000):
+            t = np.linspace(0, timepoints - 1, timepoints) / timepoints
+
+            # Alpha coefficients
+            alpha_t1 = np.sin(2 * np.pi * t) ** 2
+            alpha_t2 = np.cos(2 * np.pi * t) ** 2
+
+            alphas.append(np.stack((alpha_t1, alpha_t2), axis=1))
+
+            X_mean_t = np.outer(alpha_t1, means_X[0]) + np.outer(alpha_t2, means_X[1])
+            X_cov_t = np.einsum('t,ij->tij', alpha_t1, covs_X[0]) + np.einsum('t,ij->tij', alpha_t2, covs_X[1])
+
+            X_obs = np.array(
+                [np.random.multivariate_normal(X_mean_t[t_idx], X_cov_t[t_idx]) for t_idx in range(timepoints)])
+
+            # Generate X observations
+            Y_mean_t = alpha_t1 * means_Y[0] + alpha_t2 * means_Y[1]
+            Y_var_t = alpha_t1 * vars_Y[0] + alpha_t2 * vars_Y[1]
+
+            Y_obs = np.reshape(np.random.normal(Y_mean_t, np.sqrt(Y_var_t)), (-1, 1))
+
+            # Combine X and Y observations
+            observations = np.hstack((X_obs[:, :1], Y_obs, X_obs[:, 1:]))
+            obs.append(observations)
+
+        obs = np.concatenate(obs, axis=0)
+        np.save(f"{data_dir}{10002 + i}.npy", obs)
+        alpha_truth.append(np.concatenate(alphas, axis=0))
+
+    # Generate irrelevant dataset
+    np.save(f"{data_dir}10001.npy", generate_obs(np.eye(3) * 100, n_timepoints=300000))
+
+    np.save(f'{save_dir}/fixed_means.npy', np.array(means_X))
+    np.save(f'{save_dir}/fixed_covs.npy', np.stack(covs_X))
+    with open(f"{save_dir}alpha_truth.pkl", "wb") as f:
+        pickle.dump(alpha_truth, f)
+    spatial_X_train = {'means': f'{save_dir}/fixed_means.npy', 'covariances': f'{save_dir}/fixed_covs.npy'}
+
+    config = f"""
+            load_data:
+                inputs: {data_dir}
+            model:
+                dynemo:
+                    config_kwargs:
+                        batch_size: 64
+                        do_kl_annealing: true
+                        inference_n_units: 64
+                        inference_normalization: layer
+                        initial_alpha_temperature: 1.0
+                        kl_annealing_curve: tanh
+                        kl_annealing_sharpness: 5
+                        learn_alpha_temperature: true
+                        learn_covariances: true
+                        learn_means: true
+                        learning_rate: 0.01
+                        model_n_units: 64
+                        model_normalization: layer
+                        n_epochs: 30
+                        n_kl_annealing_epochs: 10
+                        n_modes: {n_modes}
+                        sequence_length: 100
+                    init_kwargs:
+                        n_init: 1
+                        n_epochs: 1
+            save_dir: {save_dir}
+            model: dynemo
+            indices: {indices_dir}
+            mode: bcv_1
+
+            """
+    config = yaml.safe_load(config)
+
+    bcv = BiCrossValidation(config)
+    temporal_X_test = bcv.infer_temporal(row_test, column_X,spatial_X_train)
+
+    # Load inferred alpha values
+    with open(temporal_X_test['alpha'], 'rb') as f:
+        inferred_alpha = pickle.load(f)
+
+    # Test whether the inferred alphas are close to the ground truth
+    for truth, inferred in zip(alpha_truth, inferred_alpha):
+        mean_difference = np.mean(np.abs(truth - inferred))
+        npt.assert_array_less(mean_difference, 5e-2, err_msg=f"Mean difference {mean_difference} exceeds 5e-2")
