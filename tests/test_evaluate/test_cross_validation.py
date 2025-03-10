@@ -2,6 +2,7 @@ import os
 import json
 import shutil
 import yaml
+import pickle
 
 import pytest
 import numpy as np
@@ -536,8 +537,8 @@ def test_BiCrossValidation_full_train_dynemo():
             """
     config = yaml.safe_load(config)
 
-    cv = BiCrossValidation(config)
-    spatial_Y_train, temporal_Y_train = cv.full_train(row_train, column_Y,save_dir)
+    bcv = BiCrossValidation(config)
+    spatial_Y_train, temporal_Y_train = bcv.full_train(row_train, column_Y,save_dir)
 
     result_means = np.load(spatial_Y_train['means'])
     result_covs = np.load(spatial_Y_train['covariances'])
@@ -551,3 +552,105 @@ def test_BiCrossValidation_full_train_dynemo():
     for truth, inferred in zip(alpha_truth, alpha):
         mean_difference = np.mean(np.abs(truth - inferred))
         npt.assert_array_less(mean_difference, 5e-2, err_msg=f"Mean difference {mean_difference} exceeds 5e-2")
+
+def test_BiCrossValidation_infer_temporal_hmm():
+
+    save_dir = './test_BiCrossValidation_infer_temporal_hmm/'
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+    os.makedirs(save_dir)
+
+    # Define a very simple test case
+    n_states = 3
+    row_train = [0]
+    row_test = [1, 2]
+    column_X = [0, 2]
+    column_Y = [1]
+
+    # Save the indices
+    indices = {
+        "row_train": row_train,
+        "row_test": row_test,
+        "column_X": column_X,
+        "column_Y": column_Y
+    }
+
+    # Save to a JSON file
+    indices_dir = f"{save_dir}/indices.json"
+    with open(indices_dir, "w") as file:
+        json.dump(indices, file, indent=4)
+
+    # Define the covariance matrices of state 1,2 in both splits
+    means_X = [np.array([-10.0, -10.0]), np.array([0.0, 0.0]), np.array([10.0, 10.0])]
+    cors_X = [-0.5, 0.0, 0.5]
+    covs_X = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_X]
+
+    means_Y = [1.0, 2.0, 3.0]
+    vars_Y = [0.5, 1.0, 2.0]
+
+    np.save(f'{save_dir}/fixed_means.npy', np.array(means_X))
+    np.save(f'{save_dir}/fixed_covs.npy', np.stack(covs_X))
+    spatial_X_train = {'means': f'{save_dir}/fixed_means.npy', 'covariances': f'{save_dir}/fixed_covs.npy'}
+
+    # save these files
+    data_dir = f'{save_dir}data/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    hidden_states = []
+    n_timepoints = 100
+
+    for i in range(0, 2):
+
+        # Build up the hidden variable
+        hv_temp = np.zeros((n_timepoints * 2, n_states))
+        hv_temp[:, i] = np.array([1.0] * n_timepoints + [0.0] * n_timepoints)
+        hv_temp[:, i + 1] = np.array([0.0] * n_timepoints + [1.0] * n_timepoints)
+        hidden_states.append(np.tile(hv_temp, (1500, 1)))
+
+        obs = []
+        for j in range(1500):
+            observations_X = [generate_obs(covs_X[i], means_X[i], n_timepoints),
+                              generate_obs(covs_X[i + 1], means_X[i + 1], n_timepoints)]
+            observations_Y = [generate_obs([[vars_Y[i]]], [means_Y[i]], n_timepoints),
+                              generate_obs([[vars_Y[i + 1]]], [means_Y[i + 1]]), n_timepoints]
+            observations = np.concatenate(
+                [np.hstack((X[:, :1], Y, X[:, 1:])) for X, Y in zip(observations_X, observations_Y)], axis=0)
+            obs.append(observations)
+
+        obs = np.concatenate(obs, axis=0)
+        np.save(f"{data_dir}{10002 + i}.npy", obs)
+
+    # Genetate irrelevant dataset
+    np.save(f"{data_dir}10001.npy", generate_obs(np.eye(3) * 100, n_timepoints=300000))
+
+    config = f"""
+            load_data:
+                inputs: {data_dir}
+            model:
+                hmm:
+                    config_kwargs:
+                        n_states: {n_states}
+                        learn_means: True
+                        learn_covariances: True
+                        learning_rate: 0.01
+                        n_epochs: 10
+                        sequence_length: 600
+                    init_kwargs:
+                        n_init: 1
+                        n_epochs: 1
+            save_dir: {save_dir}
+            indices: {indices_dir}
+            mode: bcv_1
+            """
+    config = yaml.safe_load(config)
+
+    bcv = BiCrossValidation(config)
+    temporal_X_test = bcv.infer_temporal(row_test, column_X, spatial_X_train)
+
+    # Read the alpha
+    with open(temporal_X_test['alpha'], 'rb') as file:
+        alpha = pickle.load(file)
+
+    for i in range(2):
+        npt.assert_allclose(alpha[0], hidden_states[0], atol=1e-6)
