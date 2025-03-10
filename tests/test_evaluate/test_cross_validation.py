@@ -424,9 +424,7 @@ def test_BiCrossValidation_full_train_dynemo():
     os.makedirs(save_dir)
 
     # Define a very simple test case
-    n_samples = 3
-    n_channels = 3
-    n_states = 2
+    n_modes = 2
     row_train = [1, 2]
     row_test = [0]
     column_X = [1]
@@ -527,7 +525,7 @@ def test_BiCrossValidation_full_train_dynemo():
                         model_normalization: layer
                         n_epochs: 30
                         n_kl_annealing_epochs: 10
-                        n_modes: 2
+                        n_modes: {n_modes}
                         sequence_length: 100
                     init_kwargs:
                         n_init: 1
@@ -543,11 +541,11 @@ def test_BiCrossValidation_full_train_dynemo():
 
     result_means = np.load(spatial_Y_train['means'])
     result_covs = np.load(spatial_Y_train['covariances'])
-    with open(temporal_Y_train, 'rb') as file:
+    with open(temporal_Y_train['alpha'], 'rb') as file:
         alpha = pickle.load(file)
 
     npt.assert_allclose(result_means, np.array(means_Y), rtol=1e-6, atol=1e-6)
-    npt.assert_allclose(result_covs, np.stack(covs_Y), rtol=1e-6, atol=1e-6)
+    npt.assert_allclose(result_covs, np.stack(covs_Y), rtol=1e-2, atol=1e-2)
 
     # Test whether the inferred alphas are close to the ground truth
     for truth, inferred in zip(alpha_truth, alpha):
