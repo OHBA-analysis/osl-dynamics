@@ -95,8 +95,8 @@ def train_model(
     ----------
     model_type : str
         Type of model to train. Recognized values are "hmm", "dynemo", and "swc","mDyNeMo".
-    data : osl_dynamics.data.Data
-        Data object for training the model.
+    data : osl_dynamics.data.Data or dict
+        Data object for training the model. When data is a dictionary, load the data first.
     output_dir : str
         Path to output directory.
     config_kwargs : dict
@@ -146,6 +146,9 @@ def train_model(
     if data is None:
         raise ValueError("data must be passed.")
 
+    if isinstance(data,dict):
+        data = load_data(**data)
+
     # Retrieve the correct model module and defaults
     if model_type in DEFAULT_CONFIGS:
         default_config_kwargs, default_init_kwargs = DEFAULT_CONFIGS[model_type]
@@ -153,7 +156,7 @@ def train_model(
         try:
             model_lib = importlib.import_module(f"osl_dynamics.models.{model_type}")
         except ModuleNotFoundError:
-            raise ValueError(f"Unknown model_type: {model_type}. Must be one of {list(DEFAULT_CONFIGS.keys())}.")
+            raise ValueError(f"Unknown model type: {model_type}. Must be one of {list(DEFAULT_CONFIGS.keys())}.")
     else:
         raise ValueError(f"Unknown model_type: {model_type}. Must be one of {list(DEFAULT_CONFIGS.keys())}.")
 
@@ -216,6 +219,16 @@ def train_model(
         save(f"{inf_params_dir}/alp.pkl", alpha)
         save(f"{inf_params_dir}/means.npy", means)
         save(f"{inf_params_dir}/covs.npy", covs)
+
+    # Delete the temporary directory created by the Data class
+    if data is not None:
+        data.delete_dir()
+
+    spatial_params = {'means':f"{inf_params_dir}/means.npy",
+                      'covariances':f"{inf_params_dir}/covs.npy"}
+    temporal_params = {'alpha':f"{inf_params_dir}/alp.pkl"}
+
+    return spatial_params, temporal_params
 
 def infer_spatial(
     model_type,
