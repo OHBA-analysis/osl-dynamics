@@ -339,10 +339,15 @@ class Data:
     def validate_extra_channels(self, data, extra_channels):
         """Validate extra channels."""
         n_sessions = len(data)
+
         # Validate each channel
         for channel_name, channel in extra_channels.items():
             if not isinstance(channel_name, str):
                 raise ValueError("Channel name must be a string.")
+
+            if isinstance(channel, np.ndarray):
+                channel = [channel]
+                extra_channels[channel_name] = channel
 
             if not isinstance(channel, list):
                 raise ValueError(f"Extra channel {channel_name} must be a list.")
@@ -352,19 +357,18 @@ class Data:
                     "Extra channel must have the same number of sessions as the data."
                 )
 
-            for i in range(n_sessions):
-                extra_channels[channel_name][i] = extra_channels[channel_name][
-                    i
-                ].astype(np.float32)
-                if not channel[i].ndim == 1:
+            for i, channel_data in enumerate(channel):
+                if channel[i].ndim != 2:
                     raise ValueError(
-                        f"Extra channel {channel_name} must be a 1D array."
+                        f"Extra channel {channel_name} must be a 2D array."
                     )
 
-                if data[i].shape[0] != channel[i].shape[0]:
+                if data[i].shape[0] != channel_data.shape[0]:
                     raise ValueError(
                         f"Extra channel {channel_name} have different number of samples than the data in session {i}."
                     )
+
+                extra_channels[channel_name][i] = channel_data.astype(np.float32)
 
         return extra_channels
 
