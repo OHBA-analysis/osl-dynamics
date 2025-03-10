@@ -1,6 +1,4 @@
-"""Function related to TensorFlow datasets.
-
-"""
+"""Function related to TensorFlow datasets."""
 
 import logging
 import numpy as np
@@ -202,6 +200,7 @@ def load_tfrecord_dataset(
     n_channels = tfrecord_config["n_channels"]
     session_labels = tfrecord_config["session_labels"]
     n_sessions = tfrecord_config["n_sessions"]
+    extra_channels = tfrecord_config["extra_channels"]
 
     keep = keep or list(range(n_sessions))
 
@@ -216,6 +215,11 @@ def load_tfrecord_dataset(
             feature_names.append(feature_name)
             tensor_shapes[feature_name] = [sequence_length]
 
+        # Add extra channels if there are any
+        for feature_name in extra_channels:
+            feature_names.append(feature_name)
+            tensor_shapes[feature_name] = [sequence_length]
+
         feature_description = {
             name: tf.io.FixedLenFeature([], tf.string) for name in feature_names
         }
@@ -225,7 +229,8 @@ def load_tfrecord_dataset(
         )
         return {
             name: tf.ensure_shape(
-                tf.io.parse_tensor(tensor, tf.float32), tensor_shapes[name]
+                tf.io.parse_tensor(tensor, tf.float32 if name == "data" else tf.int32),
+                tensor_shapes[name],
             )
             for name, tensor in parsed_example.items()
         }

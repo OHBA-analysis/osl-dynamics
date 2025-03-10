@@ -1,6 +1,4 @@
-"""Base class for handling data.
-
-"""
+"""Base class for handling data."""
 
 import re
 import logging
@@ -355,10 +353,20 @@ class Data:
                 )
 
             for i in range(n_sessions):
+                extra_channels[channel_name][i] = extra_channels[channel_name][
+                    i
+                ].astype(np.int32)
+                if not channel[i].ndim == 1:
+                    raise ValueError(
+                        f"Extra channel {channel_name} must be a 1D array."
+                    )
+
                 if data[i].shape[0] != channel[i].shape[0]:
                     raise ValueError(
                         f"Extra channel {channel_name} have different number of samples than the data in session {i}."
                     )
+
+        return extra_channels
 
     def _validate_batching(
         self,
@@ -399,7 +407,7 @@ class Data:
             total_n_sequences = sum(n_sequences_per_session)
             n_batches = total_n_sequences // batch_size
             # Add one more batch if the last incomplete batch is not dropped
-            if not drop_last_batch and total_n_sequences & batch_size != 0:
+            if not drop_last_batch and total_n_sequences % batch_size != 0:
                 n_batches += 1
         else:
             # Calculate batches per session individually, then sum
@@ -1432,11 +1440,13 @@ class Data:
         """Split the data into training and validation sets."""
 
         def _split_data(d, val_indx, train_indx):
+            if d.ndim == 1:
+                d = d[:, None]
             n_channels = d.shape[-1]
             d = d.reshape(-1, self.sequence_length, n_channels)
             d_train = d[train_indx].reshape(-1, n_channels)
             d_val = d[val_indx].reshape(-1, n_channels)
-            return d_train, d_val
+            return np.squeeze(d_train), np.squeeze(d_val)
 
         n_sequences = self.count_sequences(self.sequence_length)
 
@@ -1528,7 +1538,9 @@ class Data:
         )
 
         # Validate extra channels
-        self.validate_extra_channels(self.arrays, self.extra_channels)
+        self.extra_channels = self.validate_extra_channels(
+            self.arrays, self.extra_channels
+        )
 
         n_sequences = self.count_sequences(self.sequence_length)
 
@@ -1734,6 +1746,11 @@ class Data:
             if rewrite_:
                 tfrecords_to_save.append((i, filepath))
 
+        # Validate extra channels
+        self.extra_channels = self.validate_extra_channels(
+            self.arrays, self.extra_channels
+        )
+
         # Trim data to be an integer multiple of the sequence length
         X = self._trim_data(self.arrays, sequence_length, n_sequences)
         extra_channels = {}
@@ -1768,9 +1785,6 @@ class Data:
                     self.step_size,
                     filepath.format(val=0),
                 )
-
-        # Validate extra channels
-        self.validate_extra_channels(self.arrays, self.extra_channels)
 
         # Save TFRecords
         if len(tfrecords_to_save) > 0:
