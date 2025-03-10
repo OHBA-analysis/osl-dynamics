@@ -653,4 +653,4 @@ def test_BiCrossValidation_infer_temporal_hmm():
         alpha = pickle.load(file)
 
     for i in range(2):
-        npt.assert_allclose(alpha[0], hidden_states[0], atol=1e-6)
+        npt.assert_allclose(alpha[i], hidden_states[i], atol=1e-6)
