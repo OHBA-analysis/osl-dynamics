@@ -315,6 +315,10 @@ def infer_spatial(
     np.save(f'{inf_params_dir}/means.npy',results[0])
     np.save(f'{inf_params_dir}/covs.npy',results[1])
 
+    spatial_params = {'means':f'{inf_params_dir}/means.npy','covariances':f'{inf_params_dir}/covs.npy'}
+
+    return spatial_params
+
 def infer_temporal(
     model_type,
     data,
