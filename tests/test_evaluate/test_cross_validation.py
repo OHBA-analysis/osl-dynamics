@@ -1,14 +1,20 @@
+import os
+import json
+import shutil
+import yaml
+
 import pytest
 import numpy as np
 import numpy.testing as npt
 
+from osl_dynamics.evaluate.cross_validation import CrossValidationSplit, BiCrossValidation
 
+
+def generate_obs(cov, mean=None, n_timepoints=100):
+    if mean is None:
+        mean = np.zeros(len(cov))
+    return np.random.multivariate_normal(mean, cov, n_timepoints)
 def test_CrossValidationSplit():
-    from osl_dynamics.evaluate.cross_validation import CrossValidationSplit
-
-    import os
-    import json
-    import shutil
 
     save_dir = './tests/tmp_cross_validation_split/'
     if os.path.exists(save_dir):
@@ -313,3 +319,237 @@ def test_CrossValidationSplit():
     }
     with pytest.raises(ValueError, match="At least one of split_row or split_column must be provided."):
         CrossValidationSplit(**config_8)
+
+def test_BiCrossValidation_full_train_hmm():
+
+    save_dir = './test_BiCrossValidation_full_train_hmm/'
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+    os.makedirs(save_dir)
+
+    # Define a very simple test case
+    n_states = 3
+    row_train = [1, 2]
+    row_test = [0]
+    column_X = [1]
+    column_Y = [0, 2]
+
+    # Save the indices
+    indices = {
+        "row_train": row_train,
+        "row_test": row_test,
+        "column_X": column_X,
+        "column_Y": column_Y
+    }
+
+    # Save to a JSON file
+    indices_dir = f"{save_dir}/indices.json"
+    with open(indices_dir, "w") as file:
+        json.dump(indices, file, indent=4)
+
+    # Define the covariance matrices of state 1,2 in both splits
+    cors_Y = [-0.5, 0.0, 0.5]
+    covs_Y = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_Y]
+
+    means_X = [1.0, 2.0, 3.0]
+    vars_X = [0.5, 1.0, 2.0]
+
+    # save these files
+    data_dir = f'{save_dir}data/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    for i in range(0, 2):
+        obs = []
+        for j in range(1500):
+            observations_Y = [generate_obs(covs_Y[i]), generate_obs(covs_Y[i + 1])]
+            observations_X = [generate_obs([[vars_X[i]]], [means_X[i]]),
+                              generate_obs([[vars_X[i + 1]]], [means_X[i + 1]])]
+            observations = np.concatenate(
+                [np.hstack((Y[:, :1], X, Y[:, 1:])) for X, Y in zip(observations_X, observations_Y)], axis=0)
+            obs.append(observations)
+
+        obs = np.concatenate(obs, axis=0)
+        np.save(f"{data_dir}{10002 + i}.npy", obs)
+
+    # Genetate irrelevant dataset
+    np.save(f"{data_dir}10001.npy", generate_obs(np.eye(3) * 100, n_timepoints=300000))
+
+    config = f"""
+               load_data:
+                   inputs: {data_dir}
+               model:
+                   hmm:
+                       config_kwargs:   
+                           n_states: {n_states}
+                           learn_means: False
+                           learn_covariances: True
+                           learning_rate: 0.01
+                           n_epochs: 10
+                           sequence_length: 600
+                       init_kwargs:
+                           n_init: 1
+                           n_epochs: 1
+               save_dir: {save_dir}
+               indices: {indices_dir}
+               mode: bcv_1
+               """
+    config = yaml.safe_load(config)
+
+    bcv = BiCrossValidation(config)
+    spatial_Y_train, temporal_Y_train = bcv.full_train(row_train, column_Y,save_dir)
+
+    result_means = np.load(spatial_Y_train['means'])
+    result_covs = np.load(spatial_Y_train['covariances'])
+    npt.assert_array_equal(result_means, np.zeros((n_states, len(column_Y))))
+
+    # Assert diagonal elements are all one
+    npt.assert_allclose(np.diagonal(result_covs, axis1=-2, axis2=-1), 1.0, rtol=0.05, atol=0.05)
+
+    # Assert off-diagonal elements are equal to cors
+    off_diagonal = np.array([float(result_covs[i, 0, 1]) for i in range(n_states)])
+    npt.assert_allclose(np.sort(off_diagonal), cors_Y, atol=0.05, rtol=0.05)
+
+
+def test_BiCrossValidation_full_train_dynemo():
+    import os
+    import pickle
+    import shutil
+    import yaml
+    from osl_dynamics.evaluate.cross_validation import BiCrossValidation
+
+    save_dir = './test_BiCrossValidation_full_train_dynemo/'
+    if os.path.exists(save_dir):
+        shutil.rmtree(save_dir)
+    os.makedirs(save_dir)
+
+    # Define a very simple test case
+    n_samples = 3
+    n_channels = 3
+    n_states = 2
+    row_train = [1, 2]
+    row_test = [0]
+    column_X = [1]
+    column_Y = [0, 2]
+
+    # Save the indices
+    indices = {
+        "row_train": row_train,
+        "row_test": row_test,
+        "column_X": column_X,
+        "column_Y": column_Y
+    }
+
+    # Save to a JSON file
+    indices_dir = f"{save_dir}/indices.json"
+    with open(indices_dir, "w") as file:
+        json.dump(indices, file, indent=4)
+
+    # Define the covariance matrices of state 1,2 in both splits
+    cors_Y = [-0.5, 0.5]
+    covs_Y = [np.array([[1.0, cor], [cor, 1.0]]) for cor in cors_Y]
+
+    means_Y = [[10.0, 0.0], [0.0, 10.0]]
+
+    means_X = [1.0, 2.0]
+    vars_X = [0.5, 2.0]
+
+    # save these files
+    data_dir = f'{save_dir}data/'
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    timepoints = 100  # Number of timepoints per segment
+    alpha_truth = []
+
+    for i in range(0, 2):
+        obs = []
+        alphas = []
+        for j in range(3000):
+            t = np.linspace(0, timepoints - 1, timepoints) / timepoints
+
+            # Alpha coefficients as a staircase function
+            alpha_t1 = np.ones_like(t)
+            alpha_t1[len(t) // 2:] = 0  # Set second half to 0
+            alpha_t2 = 1 - alpha_t1
+            alphas.append(np.stack((alpha_t1, alpha_t2), axis=1))
+
+            Y_mean_t = np.outer(alpha_t1, means_Y[0]) + np.outer(alpha_t2, means_Y[1])
+            Y_cov_t = np.einsum('t,ij->tij', alpha_t1, covs_Y[0]) + np.einsum('t,ij->tij', alpha_t2, covs_Y[1])
+
+            Y_obs = np.array(
+                [np.random.multivariate_normal(Y_mean_t[t_idx], Y_cov_t[t_idx]) for t_idx in range(timepoints)])
+
+            # Generate X observations
+            X_mean_t = alpha_t1 * means_X[0] + alpha_t2 * means_X[1]
+            X_var_t = alpha_t1 * vars_X[0] + alpha_t2 * vars_X[1]
+
+            X_obs = np.reshape(np.random.normal(X_mean_t, np.sqrt(X_var_t)), (-1, 1))
+
+            # Combine X and Y observations
+            observations = np.hstack((Y_obs[:, :1], X_obs, Y_obs[:, 1:]))
+            obs.append(observations)
+
+        obs = np.concatenate(obs, axis=0)
+        np.save(f"{data_dir}{10002 + i}.npy", obs)
+        alpha_truth.append(np.concatenate(alphas, axis=0))
+
+    # Generate irrelevant dataset
+    np.save(f"{data_dir}10001.npy", generate_obs(np.eye(3) * 100, n_timepoints=300000))
+    with open(f"{save_dir}alpha_truth.pkl", "wb") as f:
+        pickle.dump(alpha_truth, f)
+    np.save(f'{save_dir}/means_truth.npy', np.array(means_Y))
+    np.save(f'{save_dir}/covs_truth.npy', np.stack(covs_Y))
+
+    means_truth_dir = f'{save_dir}/means_truth.npy'
+    covs_truth_dir = f'{save_dir}/covs_truth.npy'
+
+    config = f"""
+            load_data:
+                inputs: {data_dir}
+            model:
+                dynemo:
+                    config_kwargs:
+                        batch_size: 64
+                        do_kl_annealing: true
+                        inference_n_units: 64
+                        inference_normalization: layer
+                        initial_alpha_temperature: 1.0
+                        kl_annealing_curve: tanh
+                        kl_annealing_sharpness: 5
+                        learn_alpha_temperature: true
+                        learn_covariances: true
+                        learn_means: true
+                        initial_means: {means_truth_dir}
+                        initial_covariances: {covs_truth_dir}
+                        learning_rate: 0.001
+                        model_n_units: 64
+                        model_normalization: layer
+                        n_epochs: 30
+                        n_kl_annealing_epochs: 10
+                        n_modes: 2
+                        sequence_length: 100
+                    init_kwargs:
+                        n_init: 1
+                        n_epochs: 1
+            save_dir: {save_dir}
+            indices: {indices_dir}
+            mode: bcv_1
+            """
+    config = yaml.safe_load(config)
+
+    cv = BiCrossValidation(config)
+    spatial_Y_train, temporal_Y_train = cv.full_train(row_train, column_Y,save_dir)
+
+    result_means = np.load(spatial_Y_train['means'])
+    result_covs = np.load(spatial_Y_train['covs'])
+    with open(temporal_Y_train, 'rb') as file:
+        alpha = pickle.load(file)
+
+    npt.assert_allclose(result_means, np.array(means_Y), rtol=1e-6, atol=1e-6)
+    npt.assert_allclose(result_covs, np.stack(covs_Y), rtol=1e-6, atol=1e-6)
+
+    # Test whether the inferred alphas are close to the ground truth
+    for truth, inferred in zip(alpha_truth, alpha):
+        mean_difference = np.mean(np.abs(truth - inferred))
+        npt.assert_array_less(mean_difference, 5e-2, err_msg=f"Mean difference {mean_difference} exceeds 5e-2")

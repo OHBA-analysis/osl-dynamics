@@ -1,8 +1,10 @@
 import os
 import json
+import yaml
 import numpy as np
 from sklearn.model_selection import ShuffleSplit, KFold
 from typing import Dict, Tuple, Generator, Optional, Any
+from osl_dynamics.config_api.pipeline import run_pipeline_from_file
 
 
 class CrossValidationSplit:
@@ -152,8 +154,123 @@ class CrossValidationSplit:
                 json.dump(split_dict, f, indent=4)
 
 class BiCrossValidation:
-    def __init__(self):
-        pass
+    """
+    Implement bi-cross-validation for evaluating dynamic functional connectivity models.
+    """
+
+    def __init__(self, config, n_temp_save=3):
+        """
+        Initializes the BiCrossValidation class with configuration settings.
+
+        Parameters
+        ----------
+        config : dict
+            Dictionary containing model training details, file paths, and configuration settings.
+        n_temp_save : int, optional
+            Number of temporary realisations to preserve in bi-cross-validation.
+        """
+
+        # Create save directory if it doesn't exist
+        self.save_dir = config['save_dir']
+        if not os.path.exists(self.save_dir):
+            os.makedirs(self.save_dir)
+
+        self.load_data = config['load_data']
+        self.model, self.model_kwargs = next(iter(config['model'].items()))
+
+        # Load indices
+        with open(config['indices'], 'r') as file:
+            indices = json.load(file)
+
+        self.row_train = indices['row_train']
+        self.row_test = indices['row_test']
+        self.column_X = indices.get('column_X', None)
+        self.column_Y = indices.get('column_Y', None)
+
+        self.bcv_variant = str(config.get('cv_variant', 'fu_perry'))
+        if self.bcv_variant not in ['fu_perry','owen_perry','smith','woolrich']:
+            raise ValueError(f'Bi Cross Validation variant {self.bcv_variant} not unavailable!')
+
+        # Determine if temporary results should be saved
+        _, bcv_index = config['mode'].rsplit("_", 1)
+        self.save_temp = int(bcv_index) <= n_temp_save
+
+    def _prepare_load_data_config(self,row,column,save_dir):
+        load_data_config = self.load_data
+        load_data_config.setdefault('kwargs', {})['store_dir'] = f'{save_dir}/tmp/'
+        load_data_config.setdefault('prepare', {}).setdefault('select', {})['sessions'] = row
+        load_data_config.setdefault('prepare', {}).setdefault('select', {})['channels'] = column
+        return load_data_config
+
+    def full_train(self, row, column, save_dir=None):
+        """Full training of the model"""
+        from osl_dynamics.config_api.wrappers import train_model
+
+         # Specify the save directory
+        if save_dir is None:
+            save_dir = os.path.join(self.save_dir, 'full_train/')
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        # Prepare the config
+        config = {}
+        config['model_type'] = self.model
+        config['data'] = self._prepare_load_data_config(row,column,save_dir)
+        config['output_dir'] = save_dir
+
+        # Add keys only if they exist in self.model_kwargs
+        for key in ["config_kwargs", "init_kwargs", "fit_kwargs"]:
+            if key in self.model_kwargs:
+                config[key] = self.model_kwargs[key]
+
+        # Now config will only contain the keys that exist in self.model_kwargs
+
+        with open(f'{save_dir}/config.yaml', 'w') as file:
+            yaml.safe_dump(config, file, default_flow_style=False)
+        return train_model(**config)
+
+    def validate(self):
+        if self.bcv_variant == 'fu_perry':
+            spatial_Y_train, temporal_Y_train = self.full_train(self.row_train, self.column_Y,
+                                                                save_dir=os.path.join(self.save_dir, 'Y_train/'))
+            spatial_X_train = self.infer_spatial(self.row_train, self.column_X, temporal_Y_train,
+                                                 save_dir=os.path.join(self.save_dir, 'X_train/'))
+            temporal_X_test = self.infer_temporal(self.row_test, self.column_X, spatial_X_train,
+                                                  save_dir=os.path.join(self.save_dir, 'X_test/'))
+            metric = self.calculate_error(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
+                                          save_dir=os.path.join(self.save_dir, 'Y_test/'))
+        elif self.bcv_variant == 'owen_perry':
+            spatial_X_train, temporal_X_train = self.full_train(self.row_train, self.column_X,
+                                                                save_dir=os.path.join(self.save_dir, 'X_train/'))
+            spatial_Y_train = self.infer_spatial(self.row_train, self.column_Y, temporal_X_train,
+                                                 save_dir=os.path.join(self.save_dir, 'Y_train/'))
+            temporal_X_test = self.infer_temporal(self.row_test, self.column_X, spatial_X_train,
+                                                  save_dir=os.path.join(self.save_dir, 'X_test/'))
+            metric = self.calculate_error(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
+                                          save_dir=os.path.join(self.save_dir, 'Y_test/'))
+        elif self.bcv_variant == 'smith':
+            spatial_XY_train, _ = self.full_train(self.row_train, sorted(self.column_X + self.column_Y),
+                                                  save_dir=os.path.join(self.save_dir, 'XY_train/'))
+            spatial_X_train, spatial_Y_train = self.split_column(self.column_X, self.column_Y, spatial_XY_train,
+                                                                 save_dir=[os.path.join(self.save_dir, 'X_train/'),
+                                                                           os.path.join(self.save_dir, 'Y_train/')]
+                                                                 )
+            temporal_X_test = self.infer_temporal(self.row_test, self.column_X, spatial_X_train,
+                                                  save_dir=os.path.join(self.save_dir, 'X_test/'))
+            metric = self.calculate_error(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
+                                          save_dir=os.path.join(self.save_dir, 'Y_test/'))
+        elif self.bcv_variant == 'woolrich':
+            _, temporal_X_traintest = self.full_train(sorted(self.row_train + self.row_test), self.column_X,
+                                                      save_dir=os.path.join(self.save_dir, 'X_traintest/'))
+            temporal_X_train, temporal_X_test = self.split_row(self.row_train, self.row_test, temporal_X_traintest,
+                                                               save_dir=[os.path.join(self.save_dir, 'X_train/'),
+                                                                         os.path.join(self.save_dir, 'X_test/')])
+            spatial_Y_train = self.infer_spatial(self.row_train, self.column_Y, temporal_X_train,
+                                                 save_dir=os.path.join(self.save_dir, 'Y_train/'))
+            metric = self.calculate_error(self.row_test, self.column_Y, temporal_X_test, spatial_Y_train,
+                                          save_dir=os.path.join(self.save_dir, 'Y_test/'))
+        return metric
+
 
 class NaiveCrossValidation:
     def __init__(self):
