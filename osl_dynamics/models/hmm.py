@@ -273,7 +273,7 @@ def _model_structure(config):
         config.initial_state_probs,
         config.learn_trans_prob,
         config.learn_initial_state_probs,
-        implementation="log",
+        implementation="rescale",
         dtype="float64",
         name="hid_state_inf",
     )
