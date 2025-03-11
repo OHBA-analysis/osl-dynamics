@@ -57,7 +57,7 @@ model.summary()
 #%% Train model
 
 # Initialization
-init_history = model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
+init_history = model.random_state_time_course_initialization(data, n_init=3, n_epochs=2)
 
 # Full training
 history = model.fit(data)
