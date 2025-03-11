@@ -217,7 +217,6 @@ def _model_structure(config):
     static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
         config.sequence_length,
         config.loss_calc,
-        dtype="float64",
         name="static_loss_scaling_factor",
     )
     static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
@@ -259,11 +258,7 @@ def _model_structure(config):
     )  # data not used
 
     # Log-likelihood
-    ll_layer = SeparateLogLikelihoodLayer(
-        config.n_states,
-        dtype="float64",
-        name="ll",
-    )
+    ll_layer = SeparateLogLikelihoodLayer(config.n_states, name="ll")
     ll = ll_layer([data, [mu], [D]])
 
     # Hidden state inference
@@ -280,9 +275,7 @@ def _model_structure(config):
     gamma, xi = hidden_state_inference_layer(ll)
 
     # Loss
-    ll_loss_layer = SumLogLikelihoodLossLayer(
-        config.loss_calc, dtype="float64", name="ll_loss"
-    )
+    ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
     ll_loss = ll_loss_layer([ll, gamma])
 
     return tf.keras.Model(inputs=data, outputs=[ll_loss, gamma, xi], name="HMM")
