@@ -1519,14 +1519,20 @@ class MarkovStateInferenceModelBase(ModelBase):
             # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1)
             # log(q(s_t, s_t+1)) ds_t ds_t+1
             first_term = xlogy(xi, xi)
-            first_term = np.sum(first_term, axis=(1, 2))
-            first_term = np.mean(first_term)
+            first_term = np.sum(first_term, axis=(1, 2, 3))
 
             # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
             second_term = xlogy(gamma, gamma)[:, 1:-1, :]
             second_term = np.sum(second_term, axis=(1, 2))
-            second_term = np.mean(second_term)
-            return first_term - second_term
+
+            # Average over batches
+            entropy = np.mean(first_term - second_term)
+
+            if self.config.loss_calc == "mean":
+                # Correct sum over time into an average
+                entropy /= self.config.sequence_length
+
+            return entropy
 
         def _get_posterior_expected_prior(gamma, xi):
             # P = int q(s_1:T) log p(s_1:T) ds
@@ -1539,15 +1545,20 @@ class MarkovStateInferenceModelBase(ModelBase):
             # first_term = int q(s_1) log p(s_1) ds_1
             first_term = xlogy(gamma[:, 0, :], initial_distribution[None, ...])
             first_term = np.sum(first_term, axis=1)
-            first_term = np.mean(first_term)
 
             # remaining_terms =
             # sum^{T-1}_t=1 int q(s_t, s_t+1) log p(s_t+1 | s_t}) ds_t ds_t+1
             remaining_terms = xlogy(xi, trans_prob[None, None, ...])
             remaining_terms = np.sum(remaining_terms, axis=(1, 2, 3))
-            remaining_terms = np.mean(remaining_terms)
 
-            return first_term + remaining_terms
+            # Average over batches
+            prior = np.mean(first_term + remaining_terms)
+
+            if self.config.loss_calc == "mean":
+                # Correct sum over time into an average
+                prior /= self.config.sequence_length
+
+            return prior
 
         if self.is_multi_gpu:
             raise ValueError(
@@ -1569,12 +1580,12 @@ class MarkovStateInferenceModelBase(ModelBase):
         free_energy = []
         for i in iterator:
             predictions = self.predict(dataset[i], **kwargs)
-            ll_loss = np.mean(predictions["ll_loss"])
+            nll = np.mean(predictions["ll_loss"])
             entropy = _get_posterior_entropy(predictions["gamma"], predictions["xi"])
             prior = _get_posterior_expected_prior(
                 predictions["gamma"], predictions["xi"]
             )
-            fe = ll_loss + entropy - prior
+            fe = nll + entropy - prior
             if self.config.model_name == "HIVE":
                 kl_loss = np.mean(predictions["kl_loss"])
                 fe += kl_loss
