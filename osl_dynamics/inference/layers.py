@@ -1944,7 +1944,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         return learnable_tensors_layer(1)
 
     def _baum_welch(self, log_B):
-        # Helper functions
+
         def _get_indices(time, batch_size):
             return tf.concat(
                 [
@@ -1953,19 +1953,6 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 ],
                 axis=1,
             )
-
-        def _rescale(probs, scale, indices, time, update_scale=True):
-            # Rescale probabilities to help with numerical stability (over/underflow)
-            if update_scale:
-                scale = tf.tensor_scatter_nd_update(
-                    scale, indices, tf.reduce_sum(probs[:, time], axis=-1)
-                )
-            probs = tf.tensor_scatter_nd_update(
-                probs,
-                indices,
-                probs[:, time] / tf.expand_dims(scale[:, time] + eps, axis=-1),
-            )
-            return probs, scale
 
         # Small error for improving the numerical stability of the log-likelihood
         eps = sys.float_info.epsilon
@@ -1983,6 +1970,21 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         Pi_0 = tf.cast(Pi_0, self.compute_dtype)
 
         if self.implementation == "rescale":
+
+            def _rescale(probs, scale, indices, time, update_scale=True):
+                # Rescale probabilities to help with numerical stability
+                # (over/underflow)
+                if update_scale:
+                    scale = tf.tensor_scatter_nd_update(
+                        scale, indices, tf.reduce_sum(probs[:, time], axis=-1)
+                    )
+                probs = tf.tensor_scatter_nd_update(
+                    probs,
+                    indices,
+                    probs[:, time] / tf.expand_dims(scale[:, time] + eps, axis=-1),
+                )
+                return probs, scale
+
             # Temporary variables used in the calculation
             alpha = tf.zeros(
                 [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
