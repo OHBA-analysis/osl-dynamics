@@ -17,7 +17,7 @@ from osl_dynamics.inference.layers import (
     SumLogLikelihoodLossLayer,
 )
 from osl_dynamics.models import obs_mod
-from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
+from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.models.inf_mod_base import (
     MarkovStateInferenceModelConfig,
     MarkovStateInferenceModelBase,
@@ -26,6 +26,78 @@ from osl_dynamics.models.inf_mod_base import (
 
 @dataclass
 class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
+    """Settings for the HMM.
+
+    Parameters
+    ----------
+    model_name : str
+        Model name.
+    n_states : int
+        Number of states.
+    n_channels : int
+        Number of channels.
+    sequence_length : int
+        Length of sequence passed to the inference network and generative model.
+
+    learn_means : bool
+        Should we make the mean vectors for each state trainable?
+    learn_covariances : bool
+        Should we make the covariance matrix for each state trainable?
+    initial_means : np.ndarray
+        Initialisation for mean vectors.
+    initial_covariances : np.ndarray
+        Initialisation for state covariances.
+        If :code:`diagonal_covariances=True` and full matrices are passed,
+        the diagonal is extracted.
+    covariances_epsilon : float
+        Error added to state covariances for numerical stability.
+    diagonal_covariances : bool
+        Should we learn diagonal state covariances?
+    means_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for mean vectors.
+    covariances_regularizer : tf.keras.regularizers.Regularizer
+        Regularizer for covariance matrices.
+
+    initial_trans_prob : np.ndarray
+        Initialisation for the transition probability matrix.
+    learn_trans_prob : bool
+        Should we make the transition probability matrix trainable?
+    trans_prob_update_delay : float
+        We update the transition probability matrix as
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the delay parameter.
+    trans_prob_update_forget : float
+        We update the transition probability matrix as
+        :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
+        where :code:`rho = (100 * epoch / n_epochs + 1 +
+        trans_prob_update_delay) ** -trans_prob_update_forget`.
+        This is the forget parameter.
+    initial_state_probs : np.ndarray
+        State probabilities at :code:`time=0`.
+    learn_initial_state_probs : bool
+        Should we make the initial state probabilities trainable?
+    baum_welch_implementation : str
+        Which implementation of the Baum-Welch algorithm should we use?
+        Either :code:`'log'` (default) or :code:`'rescale'`.
+
+    batch_size : int
+        Mini-batch size.
+    learning_rate : float
+        Learning rate.
+    n_epochs : int
+        Number of training epochs.
+    optimizer : str or tf.keras.optimizers.Optimizer
+        Optimizer to use.
+    loss_calc : str
+        How should we collapse the time dimension in the loss?
+        Either :code:`'mean'` or :code:`'sum'`.
+    multi_gpu : bool
+        Should be use multiple GPUs for training?
+    strategy : str
+        Strategy for distributed learning.
+    """
 
     model_name: str = "HMM"
 
@@ -57,6 +129,12 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
 
 
 class Model(MarkovStateInferenceModelBase):
+    """HMM class.
+
+    Parameters
+    ----------
+    config : osl_dynamics.models.hmm.Config
+    """
 
     config_type = Config
 
