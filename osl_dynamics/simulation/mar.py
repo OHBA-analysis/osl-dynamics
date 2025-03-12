@@ -1,6 +1,4 @@
-"""Multivariate autoregressive (MAR) observation model.
-
-"""
+"""Multivariate autoregressive (MAR) observation model."""
 
 import numpy as np
 

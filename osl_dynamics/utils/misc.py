@@ -1,6 +1,4 @@
-"""Miscellaneous utility classes and functions.
-
-"""
+"""Miscellaneous utility classes and functions."""
 
 import inspect
 import logging

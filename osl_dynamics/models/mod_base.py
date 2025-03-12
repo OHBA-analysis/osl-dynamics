@@ -1,6 +1,4 @@
-"""Base class for models.
-
-"""
+"""Base class for models."""
 
 import logging
 import os

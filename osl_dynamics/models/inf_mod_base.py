@@ -1,6 +1,4 @@
-"""Base classes inference models.
-
-"""
+"""Base classes inference models."""
 
 import logging
 from dataclasses import dataclass
@@ -208,7 +206,6 @@ class VariationalInferenceModelBase(ModelBase):
             training_data,
             shuffle=True,
             concatenate=True,
-            drop_last_batch=True,
         )
 
         # Calculate the number of batches to use
@@ -304,10 +301,8 @@ class VariationalInferenceModelBase(ModelBase):
             n_kl_annealing_epochs or original_n_kl_annealing_epochs
         )
 
-        # Make a list of tensorflow Datasets if the data
-        training_data = self.make_dataset(
-            training_data, shuffle=True, drop_last_batch=True
-        )
+        # Make a list of TensorFlow Datasets
+        training_data = self.make_dataset(training_data, shuffle=True)
 
         if not isinstance(training_data, list):
             raise ValueError(
@@ -420,7 +415,9 @@ class VariationalInferenceModelBase(ModelBase):
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True, drop_last_batch=True
+            training_data,
+            shuffle=True,
+            concatenate=True,
         )
 
         # Calculate the number of batches to use
@@ -1280,7 +1277,9 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True, drop_last_batch=True
+            training_data,
+            shuffle=True,
+            concatenate=True,
         )
 
         # Calculate the number of batches to use
@@ -1363,7 +1362,9 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True, drop_last_batch=True
+            training_data,
+            shuffle=True,
+            concatenate=True,
         )
 
         # Calculate the number of batches to use

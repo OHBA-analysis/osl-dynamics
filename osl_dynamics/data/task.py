@@ -1,6 +1,4 @@
-"""Functions to handle task data.
-
-"""
+"""Functions to handle task data."""
 
 import numpy as np
 

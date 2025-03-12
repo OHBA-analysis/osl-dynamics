@@ -1,6 +1,4 @@
-"""Hidden Markov Model (HMM) with a Possion observation model.
-
-"""
+"""Hidden Markov Model (HMM) with a Possion observation model."""
 
 import os
 import logging

@@ -1,6 +1,4 @@
-"""Functions to process data.
-
-"""
+"""Functions to process data."""
 
 import mne
 import numpy as np

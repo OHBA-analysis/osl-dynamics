@@ -1,6 +1,4 @@
-"""Functions related to Gaussian Mixture Models (GMMs).
-
-"""
+"""Functions related to Gaussian Mixture Models (GMMs)."""
 
 import logging
 

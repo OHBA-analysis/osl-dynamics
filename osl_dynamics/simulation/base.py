@@ -1,6 +1,4 @@
-"""Base simulation class.
-
-"""
+"""Base simulation class."""
 
 import numpy as np
 

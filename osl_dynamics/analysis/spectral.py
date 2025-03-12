@@ -1,6 +1,4 @@
-"""Functions to perform spectral analysis.
-
-"""
+"""Functions to perform spectral analysis."""
 
 import logging
 
