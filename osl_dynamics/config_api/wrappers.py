@@ -97,7 +97,7 @@ def train_hmm(
         #osl_dynamics.models.hmm.Config>`_. Defaults to::
 
             {'sequence_length': 200,
-             'batch_size': 512,
+             'batch_size': 256,
              'learning_rate': 0.01,
              'n_epochs': 20}.
     init_kwargs : dict, optional
