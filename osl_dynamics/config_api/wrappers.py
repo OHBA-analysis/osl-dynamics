@@ -126,7 +126,7 @@ def train_hmm(
     default_config_kwargs = {
         "n_channels": data.n_channels,
         "sequence_length": 200,
-        "batch_size": 512,
+        "batch_size": 256,
         "learning_rate": 0.01,
         "n_epochs": 20,
     }
