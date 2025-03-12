@@ -43,7 +43,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
-        self.validate_trans_prob_parameters()
+        self.validate_hmm_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 
@@ -267,7 +267,7 @@ def _model_structure(config):
         config.initial_state_probs,
         config.learn_trans_prob,
         config.learn_initial_state_probs,
-        implementation="rescale",
+        implementation=config.baum_welch_implementation,
         dtype="float64",
         name="hid_state_inf",
     )

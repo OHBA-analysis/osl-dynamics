@@ -1005,7 +1005,9 @@ class MarkovStateInferenceModelConfig:
     initial_state_probs: np.ndarray = None
     learn_initial_state_probs: bool = True
 
-    def validate_trans_prob_parameters(self):
+    baum_welch_implementation: str = "log"
+
+    def validate_hmm_parameters(self):
         if self.initial_trans_prob is not None:
             if (
                 not isinstance(self.initial_trans_prob, np.ndarray)
@@ -1025,6 +1027,9 @@ class MarkovStateInferenceModelConfig:
 
             if not all(np.isclose(np.sum(self.initial_state_probs), 1)):
                 raise ValueError("rows of initial_state_probs must sum to one.")
+
+        if self.baum_welch_implementation not in ["log", "rescale"]:
+            raise ValueError("baum_welch_implementation must be 'log' or 'rescale'.")
 
 
 class MarkovStateInferenceModelBase(ModelBase):

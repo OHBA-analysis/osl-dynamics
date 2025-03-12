@@ -187,7 +187,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
-        self.validate_trans_prob_parameters()
+        self.validate_hmm_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
         self.validate_embedding_parameters()
@@ -938,22 +938,21 @@ def _model_structure(config):
         [group_D, covs_dev]
     )  # shape = (None, n_states, n_channels, n_channels)
 
-    # -----------------------------------
-    # Get the log likelihood
+    # -------
+    # LL loss
 
-    # Layer definitions
-    ll_layer = SeparateLogLikelihoodLayer(
-        config.n_states, config.covariances_epsilon, name="ll"
-    )
-
-    # Data flow
+    # Log-likelihood for each state
+    ll_layer = SeparateLogLikelihoodLayer(config.n_states, name="ll")
     ll = ll_layer([data, mu, D])
 
     # Hidden state inference
     hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
         config.n_states,
         config.initial_trans_prob,
+        config.initial_state_probs,
         config.learn_trans_prob,
+        config.learn_initial_state_probs,
+        implementation=config.baum_welch_implementation,
         dtype="float64",
         name="hid_state_inf",
     )
