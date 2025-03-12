@@ -1531,60 +1531,6 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         return tf.expand_dims(nll_loss, axis=-1)
 
 
-class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
-    """Layer to calculate the log-likelihood loss assuming a categorical model
-    with Poisson observation model.
-
-    Parameters
-    ----------
-    n_states : int
-        Number of states.
-    calculation : str
-        Operation for reducing the time dimension. Either 'mean' or 'sum'.
-    kwargs : keyword arguments, optional
-        Keyword arguments to pass to the base class.
-    """
-
-    def __init__(self, n_states, calculation, **kwargs):
-        super().__init__(**kwargs)
-        self.n_states = n_states
-        self.calculation = calculation
-
-    def call(self, inputs, **kwargs):
-        x, log_rate, probs, session_id = inputs
-
-        if session_id is not None:
-            # Get the mean and covariance for the requested array
-            session_id = tf.cast(session_id, tf.int32)
-            log_rate = tf.gather(log_rate, session_id)
-
-        # Log-likelihood for each state
-        ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
-        for i in range(self.n_states):
-            poi = tfp.distributions.Poisson(
-                log_rate=tf.gather(log_rate, i, axis=-2),
-                allow_nan_stats=False,
-            )
-            a = poi.log_prob(x)
-            a = tf.reduce_sum(a, axis=-1)
-            ll_loss += probs[:, :, i] * a
-
-        if self.calculation == "sum":
-            # Sum over time dimension and average over the batch dimension
-            ll_loss = tf.reduce_sum(ll_loss, axis=1)
-            ll_loss = tf.reduce_mean(ll_loss, axis=0)
-        else:
-            # Average over time and batches
-            ll_loss = tf.reduce_mean(ll_loss, axis=(0, 1))
-
-        # Add the negative log-likelihood to the loss
-        nll_loss = -ll_loss
-        self.add_loss(nll_loss)
-        self.add_metric(nll_loss, name=self.name)
-
-        return tf.expand_dims(nll_loss, axis=-1)
-
-
 class ConcatEmbeddingsLayer(layers.Layer):
     """Layer for getting the concatenated embeddings.
 
@@ -2160,11 +2106,6 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         # Add states dimension
         x = tf.expand_dims(x, axis=2)
 
-        # Cast to desired data type
-        x = tf.cast(x, self.dtype)
-        mu = tf.cast(mu, self.dtype)
-        sigma = tf.cast(sigma, self.dtype)
-
         # Calculate log-likelihood for each state
         mvn = tfp.distributions.MultivariateNormalTriL(
             loc=mu,
@@ -2172,6 +2113,37 @@ class SeparateLogLikelihoodLayer(layers.Layer):
             allow_nan_stats=False,
         )
         log_likelihood = mvn.log_prob(x)
+
+        return log_likelihood  # shape = (None, sequence_length, n_states)
+
+
+class SeparatePoissonLogLikelihoodLayer(layers.Layer):
+    """Layer to calculate the log-likelihood for different HMM-Poisson states.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of states.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the keras.layers.Layer.
+    """
+
+    def __init__(self, n_states, **kwargs):
+        super().__init__(**kwargs)
+        self.n_states = n_states
+
+    def call(self, inputs, **kwargs):
+        x, log_rate = inputs
+
+        # Add the sequence length dimension
+        log_rate = tf.expand_dims(log_rate, axis=1)
+
+        # Add states dimension
+        x = tf.expand_dims(x, axis=2)
+
+        # Calculate log-likelihood for each state
+        poi = tfp.distributions.Poisson(log_rate=log_rate, allow_nan_stats=False)
+        log_likelihood = tf.reduce_sum(poi.log_prob(x), axis=-1)
 
         return log_likelihood  # shape = (None, sequence_length, n_states)
 

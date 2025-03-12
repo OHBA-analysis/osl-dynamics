@@ -1,19 +1,21 @@
 """Fully TF HMM."""
 
+import logging
 from dataclasses import dataclass
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers
+from tensorflow.keras import layers, utils
+from scipy.special import logsumexp
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
+    StaticLossScalingFactorLayer,
+    VectorsLayer,
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
-    VectorsLayer,
-    StaticLossScalingFactorLayer,
-    HiddenMarkovStateInferenceLayer,
     SeparateLogLikelihoodLayer,
+    HiddenMarkovStateInferenceLayer,
     SumLogLikelihoodLossLayer,
 )
 from osl_dynamics.models import obs_mod
@@ -22,6 +24,8 @@ from osl_dynamics.models.inf_mod_base import (
     MarkovStateInferenceModelConfig,
     MarkovStateInferenceModelBase,
 )
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -86,6 +90,9 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Mini-batch size.
     learning_rate : float
         Learning rate.
+    lr_decay : float
+        Decay for learning rate. Default is 0.1. We use
+        :code:`lr = learning_rate * exp(-lr_decay * epoch)`.
     n_epochs : int
         Number of training epochs.
     optimizer : str or tf.keras.optimizers.Optimizer
@@ -140,21 +147,7 @@ class Model(MarkovStateInferenceModelBase):
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(self.config)
-
-    def set_static_loss_scaling_factor(self, dataset):
-        """Set the :code:`n_batches` attribute of the
-        :code:`"static_loss_scaling_factor"` layer.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset
-            TensorFlow dataset.
-        """
-        layer_names = [layer.name for layer in self.model.layers]
-        if "static_loss_scaling_factor" in layer_names:
-            n_batches = dtf.get_n_batches(dataset)
-            self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
+        self.model = self._model_structure()
 
     def get_means(self):
         """Get the state means.
@@ -280,77 +273,237 @@ class Model(MarkovStateInferenceModelBase):
                 self.config.diagonal_covariances,
             )
 
+    def set_random_state_time_course_initialization(self, training_dataset):
+        """Sets the initial means/covariances based on a random state time course.
 
-def _model_structure(config):
-    # Inputs
-    data = layers.Input(
-        shape=(config.sequence_length, config.n_channels),
-        name="data",
-    )
+        Parameters
+        ----------
+        training_dataset : tf.data.Dataset
+            Training data.
+        """
+        _logger.info("Setting random means and covariances")
 
-    # Static loss scaling factor
-    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-        config.sequence_length,
-        config.loss_calc,
-        name="static_loss_scaling_factor",
-    )
-    static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+        # Mean and covariance for each state
+        means = np.zeros(
+            [self.config.n_states, self.config.n_channels], dtype=np.float32
+        )
+        covariances = np.zeros(
+            [self.config.n_states, self.config.n_channels, self.config.n_channels],
+            dtype=np.float32,
+        )
 
-    # Observation model
-    means_layer = VectorsLayer(
-        config.n_states,
-        config.n_channels,
-        config.learn_means,
-        config.initial_means,
-        config.means_regularizer,
-        name="means",
-    )
-    if config.diagonal_covariances:
-        covs_layer = DiagonalMatricesLayer(
+        n_batches = 0
+        for batch in training_dataset:
+            # Concatenate all the sequences in this batch
+            data = np.concatenate(batch["data"])
+
+            if data.shape[0] < 2 * self.config.n_channels:
+                raise ValueError(
+                    "Not enough time points in batch, "
+                    "increase batch_size or sequence_length"
+                )
+
+            # Sample a state time course using the initial transition
+            # probability matrix
+            stc = self.sample_state_time_course(data.shape[0])
+
+            # Make sure each state activates
+            non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+            while np.any(non_active_states):
+                new_stc = self.sample_state_time_course(data.shape[0])
+                new_active_states = np.sum(new_stc, axis=0) != 0
+                for j in range(self.config.n_states):
+                    if non_active_states[j] and new_active_states[j]:
+                        stc[:, j] = new_stc[:, j]
+                non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+
+            # Calculate the mean/covariance for each state for this batch
+            m = []
+            C = []
+            for j in range(self.config.n_states):
+                x = data[stc[:, j] == 1]
+                mu = np.mean(x, axis=0)
+                sigma = np.cov(x, rowvar=False)
+                m.append(mu)
+                C.append(sigma)
+            means += m
+            covariances += C
+            n_batches += 1
+
+        # Calculate the average from the running total
+        means /= n_batches
+        covariances /= n_batches
+
+        if self.config.learn_means:
+            # Set initial means
+            self.set_means(means, update_initializer=True)
+
+        if self.config.learn_covariances:
+            # Set initial covariances
+            self.set_covariances(covariances, update_initializer=True)
+
+    def evidence(self, dataset):
+        """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to evaluate the model evidence on.
+
+        Returns
+        -------
+        evidence : float
+            Model evidence.
+        """
+
+        def _evidence_predict_step(log_smoothing_distribution=None):
+            # Predict step for calculating the evidence
+            # p(s_t=j|x_{1:t-1}) = sum_i p(s_t=j|s_{t-1}=i) p(s_{t-1}=i|x_{1:t-1})
+            # log_smoothing_distribution.shape = (batch_size, n_states)
+            if log_smoothing_distribution is None:
+                initial_distribution = self.get_initial_state_probs()
+                log_prediction_distribution = np.broadcast_to(
+                    np.expand_dims(initial_distribution, axis=0),
+                    (batch_size, self.config.n_states),
+                )
+            else:
+                log_trans_prob = np.expand_dims(np.log(self.get_trans_prob()), axis=0)
+                log_smoothing_distribution = np.expand_dims(
+                    log_smoothing_distribution,
+                    axis=-1,
+                )
+                log_prediction_distribution = logsumexp(
+                    log_trans_prob + log_smoothing_distribution, axis=-2
+                )
+            return log_prediction_distribution
+
+        def _evidence_update_step(data, log_prediction_distribution):
+            # Update step for calculating the evidence
+            # p(s_t=j|x_{1:t}) = p(x_t|s_t=j) p(s_t=j|x_{1:t-1}) / p(x_t|x_{1:t-1})
+            # p(x_t|x_{1:t-1}) = sum_i p(x_t|s_t=i) p(s_t=i|x_{1:t-1})
+            # data.shape = (batch_size, n_channels)
+            # log_prediction_distribution.shape = (batch_size, n_states)
+
+            # Get the log-likelihood
+            means, covs = self.get_means_covariances()
+            ll_layer = self.model.get_layer("ll")
+            log_likelihood = ll_layer([data, means, covs])
+
+            log_smoothing_distribution = log_likelihood + log_prediction_distribution
+            predictive_log_likelihood = logsumexp(log_smoothing_distribution, axis=-1)
+
+            # Normalise the log smoothing distribution
+            log_smoothing_distribution -= np.expand_dims(
+                predictive_log_likelihood,
+                axis=-1,
+            )
+            return log_smoothing_distribution, predictive_log_likelihood
+
+        _logger.info("Getting model evidence")
+        dataset = self.make_dataset(dataset, concatenate=True)
+        n_batches = dtf.get_n_batches(dataset)
+
+        evidence = 0
+        for n, data in enumerate(dataset):
+            x = data["data"]
+            print("Batch {}/{}".format(n + 1, n_batches))
+            pb_i = utils.Progbar(self.config.sequence_length)
+            batch_size = tf.shape(x)[0]
+            batch_evidence = np.zeros(batch_size, dtype=np.float32)
+            log_smoothing_distribution = None
+            for t in range(self.config.sequence_length):
+                # Prediction step
+                log_prediction_distribution = _evidence_predict_step(
+                    log_smoothing_distribution
+                )
+
+                # Update step
+                (
+                    log_smoothing_distribution,
+                    predictive_log_likelihood,
+                ) = _evidence_update_step(x[:, t, :], log_prediction_distribution)
+
+                # Update the batch evidence
+                batch_evidence += predictive_log_likelihood
+                pb_i.add(1)
+            evidence += np.mean(batch_evidence)
+
+        return evidence / n_batches
+
+    def _model_structure(self):
+        """Build the model structure."""
+
+        config = self.config
+
+        # Inputs
+        data = layers.Input(
+            shape=(config.sequence_length, config.n_channels),
+            name="data",
+        )
+
+        # Static loss scaling factor
+        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+            config.sequence_length,
+            config.loss_calc,
+            name="static_loss_scaling_factor",
+        )
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+
+        # Observation model
+        means_layer = VectorsLayer(
             config.n_states,
             config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
+            config.learn_means,
+            config.initial_means,
+            config.means_regularizer,
+            name="means",
         )
-    else:
-        covs_layer = CovarianceMatricesLayer(
+        if config.diagonal_covariances:
+            covs_layer = DiagonalMatricesLayer(
+                config.n_states,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        else:
+            covs_layer = CovarianceMatricesLayer(
+                config.n_states,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        mu = means_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # data not used
+        D = covs_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # data not used
+
+        # Log-likelihood
+        ll_layer = SeparateLogLikelihoodLayer(config.n_states, name="ll")
+        ll = ll_layer([data, [mu], [D]])
+
+        # Hidden state inference
+        hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
             config.n_states,
-            config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
+            config.initial_trans_prob,
+            config.initial_state_probs,
+            config.learn_trans_prob,
+            config.learn_initial_state_probs,
+            implementation=config.baum_welch_implementation,
+            dtype="float64",
+            name="hid_state_inf",
         )
-    mu = means_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # data not used
-    D = covs_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # data not used
+        gamma, xi = hidden_state_inference_layer(ll)
 
-    # Log-likelihood
-    ll_layer = SeparateLogLikelihoodLayer(config.n_states, name="ll")
-    ll = ll_layer([data, [mu], [D]])
+        # Loss
+        ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
+        ll_loss = ll_loss_layer([ll, gamma])
 
-    # Hidden state inference
-    hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
-        config.n_states,
-        config.initial_trans_prob,
-        config.initial_state_probs,
-        config.learn_trans_prob,
-        config.learn_initial_state_probs,
-        implementation=config.baum_welch_implementation,
-        dtype="float64",
-        name="hid_state_inf",
-    )
-    gamma, xi = hidden_state_inference_layer(ll)
-
-    # Loss
-    ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
-    ll_loss = ll_loss_layer([ll, gamma])
-
-    return tf.keras.Model(inputs=data, outputs=[ll_loss, gamma, xi], name="HMM")
+        return tf.keras.Model(inputs=data, outputs=[ll_loss, gamma, xi], name="HMM")
