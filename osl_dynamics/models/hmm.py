@@ -209,7 +209,6 @@ def _model_structure(config):
     # Inputs
     data = layers.Input(
         shape=(config.sequence_length, config.n_channels),
-        dtype="float64",
         name="data",
     )
 

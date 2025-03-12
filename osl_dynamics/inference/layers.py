@@ -1943,10 +1943,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         learnable_tensors_layer = self.layers[1]
         return learnable_tensors_layer(1)
 
-    def _baum_welch(self, B):
-        # Small error for improving the numerical stability of the log-likelihood
-        eps = sys.float_info.epsilon
-
+    def _baum_welch(self, log_B):
         # Helper functions
         def _get_indices(time, batch_size):
             return tf.concat(
@@ -1970,27 +1967,39 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             )
             return probs, scale
 
+        # Small error for improving the numerical stability of the log-likelihood
+        eps = sys.float_info.epsilon
+
         # Hyperparameters
-        batch_size = tf.shape(B)[0]
-        sequence_length = tf.shape(B)[1]
+        batch_size = tf.shape(log_B)[0]
+        sequence_length = tf.shape(log_B)[1]
 
         # Transition probability matrix
         P = self.get_trans_prob()
-        Pi_0 = self.get_initial_state_probs()
-
         P = tf.cast(P, self.compute_dtype)
+
+        # Initial state probailities
+        Pi_0 = self.get_initial_state_probs()
         Pi_0 = tf.cast(Pi_0, self.compute_dtype)
 
-        # Temporary variables used in the calculation
-        alpha = tf.zeros(
-            [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
-        )
-        beta = tf.zeros(
-            [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
-        )
-        scale = tf.zeros([batch_size, sequence_length], dtype=self.compute_dtype)
-
         if self.implementation == "rescale":
+            # Temporary variables used in the calculation
+            alpha = tf.zeros(
+                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+            )
+            beta = tf.zeros(
+                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+            )
+            scale = tf.zeros([batch_size, sequence_length], dtype=self.compute_dtype)
+
+            # Renormalise the log-likelihood for numerical stability
+            max_values = tf.reduce_max(log_B, axis=-1, keepdims=True)
+            max_values = tf.minimum(max_values, 0.0)
+            log_B -= max_values
+
+            # Calculate likelihood
+            B = tf.exp(log_B)
+
             # Forward pass
             for i in range(sequence_length):
                 indices = _get_indices(i, batch_size)
@@ -2030,49 +2039,62 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             xi /= tf.reduce_sum(xi, axis=(2, 3), keepdims=True)
 
         if self.implementation == "log":
-            # We assume B is log(B)
-            P = tf.math.log(P)
-            Pi_0 = tf.math.log(Pi_0)
+            # Temporary variables used in the calculation
+            log_alpha = tf.zeros(
+                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+            )
+            log_beta = tf.zeros(
+                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+            )
+
+            # Calculate log probabilities
+            log_P = tf.math.log(P)
+            log_Pi_0 = tf.math.log(Pi_0)
 
             # Forward pass
             for i in range(sequence_length):
                 indices = _get_indices(i, batch_size)
                 if i == 0:
-                    values = Pi_0 + B[:, 0]
+                    values = log_Pi_0 + log_B[:, 0]
                 else:
                     values = (
                         tf.reduce_logsumexp(
-                            tf.expand_dims(alpha[:, i - 1], axis=1) + tf.transpose(P),
+                            tf.expand_dims(log_alpha[:, i - 1], axis=1)
+                            + tf.transpose(log_P),
                             axis=-1,
                         )
-                        + B[:, i]
+                        + log_B[:, i]
                     )
-                alpha = tf.tensor_scatter_nd_update(alpha, indices, values)
+                log_alpha = tf.tensor_scatter_nd_update(log_alpha, indices, values)
 
             # Backward pass
             for i in range(sequence_length, 0, -1):
                 indices = _get_indices(i - 1, batch_size)
                 if i == sequence_length:
-                    values = tf.zeros_like(beta[:, -1])
+                    values = tf.zeros_like(log_beta[:, -1])
                 else:
                     values = tf.reduce_logsumexp(
-                        tf.expand_dims(beta[:, i] + B[:, i], axis=1) + P,
+                        tf.expand_dims(log_beta[:, i] + log_B[:, i], axis=1) + log_P,
                         axis=-1,
                     )
-                beta = tf.tensor_scatter_nd_update(beta, indices, values)
+                log_beta = tf.tensor_scatter_nd_update(log_beta, indices, values)
 
             # Marginal probabilities
-            gamma = alpha + beta
-            gamma -= tf.reduce_logsumexp(gamma, axis=-1, keepdims=True)
+            log_gamma = log_alpha + log_beta
+            log_gamma -= tf.reduce_logsumexp(log_gamma, axis=-1, keepdims=True)
 
             # Joint probabilities
-            b = beta[:, 1:] + B[:, 1:]
-            xi = P + tf.expand_dims(alpha[:, :-1], axis=3) + tf.expand_dims(b, axis=2)
-            xi -= tf.reduce_logsumexp(xi, axis=(2, 3), keepdims=True)
+            log_b = log_beta[:, 1:] + log_B[:, 1:]
+            log_xi = (
+                log_P
+                + tf.expand_dims(log_alpha[:, :-1], axis=3)
+                + tf.expand_dims(log_b, axis=2)
+            )
+            log_xi -= tf.reduce_logsumexp(log_xi, axis=(2, 3), keepdims=True)
 
             # Convert from log probabilities to probabilities
-            gamma = tf.exp(gamma)
-            xi = tf.exp(xi)
+            gamma = tf.exp(log_gamma)
+            xi = tf.exp(log_xi)
 
         return gamma, xi
 
@@ -2083,19 +2105,10 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         return sum_xi / sum_gamma
 
     def call(self, log_B, **kwargs):
-        if self.implementation == "rescale":
-            # Renormalise the log-likelihood for numerical stability
-            max_values = tf.reduce_max(log_B, axis=-1, keepdims=True)
-            max_values = tf.minimum(max_values, 0.0)
-            log_B -= max_values
-            B = tf.exp(log_B)
-        else:
-            B = log_B
-
         @tf.custom_gradient
-        def posterior(B):
+        def posterior(log_B):
             # Calculate marginal (gamma) and joint (xi) posterior
-            gamma, xi = self._baum_welch(B)
+            gamma, xi = self._baum_welch(log_B)
 
             # Calculate gradient for the transition probability matrix
             def grad(*args, variables):
@@ -2114,7 +2127,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
             return (gamma, xi), grad
 
-        return posterior(B)
+        return posterior(log_B)
 
 
 class SeparateLogLikelihoodLayer(layers.Layer):
