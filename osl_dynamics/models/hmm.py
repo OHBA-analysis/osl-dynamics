@@ -1,6 +1,4 @@
-"""Fully TF HMM.
-
-"""
+"""Fully TF HMM."""
 
 from dataclasses import dataclass
 
