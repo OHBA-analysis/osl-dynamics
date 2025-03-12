@@ -1319,8 +1319,8 @@ class MarkovStateInferenceModelBase(ModelBase):
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
+        self.reset()
         self.set_weights(best_weights)
-        self.reset_kl_annealing_factor()
 
         return best_history
 
@@ -1402,8 +1402,8 @@ class MarkovStateInferenceModelBase(ModelBase):
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
+        self.reset()
         self.set_weights(best_weights)
-        self.reset_kl_annealing_factor()
 
         return best_history
 
@@ -1526,24 +1526,3 @@ class MarkovStateInferenceModelBase(ModelBase):
             free_energy.append(fe)
 
         return np.mean(free_energy)
-
-    def set_static_loss_scaling_factor(self, dataset):
-        """Set the :code:`n_batches` attribute of the
-        :code:`"static_loss_scaling_factor"` layer.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset
-            TensorFlow dataset.
-        """
-        layer_names = [layer.name for layer in self.model.layers]
-        if "static_loss_scaling_factor" in layer_names:
-            n_batches = dtf.get_n_batches(dataset)
-            self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
-
-    def reset_kl_annealing_factor(self):
-        """Method to reset KL annealing factor.
-
-        Should be overwritten in subclass.
-        """
-        pass
