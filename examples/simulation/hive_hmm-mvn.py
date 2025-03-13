@@ -25,7 +25,7 @@ tf_ops.gpu_growth()
 config = Config(
     n_states=5,
     n_channels=20,
-    sequence_length=200,
+    sequence_length=100,
     n_sessions=100,
     embeddings_dim=5,
     spatial_embeddings_dim=2,
@@ -38,7 +38,7 @@ config = Config(
     learn_means=False,
     learn_covariances=True,
     batch_size=64,
-    learning_rate=0.005,
+    learning_rate=0.001,
     lr_decay=0.1,
     n_epochs=40,
     learn_trans_prob=True,
@@ -89,7 +89,7 @@ model.set_dev_parameters_initializer(training_data)
 
 # Model initialization
 model.random_state_time_course_initialization(
-    training_data, n_epochs=5, n_init=5, take=1
+    training_data, n_epochs=3, n_init=10, take=1
 )
 
 # Full model training

@@ -1,5 +1,6 @@
 """Base classes inference models."""
 
+import sys
 import logging
 from dataclasses import dataclass
 from typing import Literal
@@ -11,6 +12,7 @@ from scipy.special import xlogy, logsumexp
 from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
+from osl_dynamics import array_ops
 from osl_dynamics.simulation import HMM
 from osl_dynamics.inference import callbacks, optimizers
 from osl_dynamics.inference.initializers import WeightInitializer
@@ -953,54 +955,22 @@ class VariationalInferenceModelBase(ModelBase):
         free_energy = ll_loss + kl_loss
         return free_energy
 
-    def bayesian_information_criterion(self, dataset):
-        """Calculate the Bayesian Information Criterion (BIC) of the model
-        for a given dataset.
-
-        Note this method uses free energy as an approximate to the negative
-        log-likelihood.
-
-        Parameters
-        ----------
-        dataset : osl_dynamics.data.Data
-            Dataset to calculate the BIC for.
-
-        Returns
-        -------
-        bic : float
-            Bayesian Information Criterion for the model (for each sequence).
-        """
-        loss = self.free_energy(dataset)
-
-        if self.config.loss_calc == "sum":
-            loss /= self.config.sequence_length
-
-        n_params = self.get_n_params_generative_model()
-        n_sequences = dtf.get_n_sequences(
-            dataset.time_series(concatenate=True), self.config.sequence_length
-        )
-
-        bic = (
-            2 * loss
-            + (np.log(self.config.sequence_length) + np.log(n_sequences))
-            * n_params
-            / n_sequences
-            / self.config.sequence_length
-        )
-        return bic
-
 
 @dataclass
 class MarkovStateInferenceModelConfig:
     """Settings needed for inferring a Markov chain for hidden states."""
 
-    # Transition probability matrix
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
     trans_prob_update_delay: float = 5  # alpha
     trans_prob_update_forget: float = 0.7  # beta
 
-    def validate_trans_prob_parameters(self):
+    initial_state_probs: np.ndarray = None
+    learn_initial_state_probs: bool = True
+
+    baum_welch_implementation: str = "log"
+
+    def validate_hmm_parameters(self):
         if self.initial_trans_prob is not None:
             if (
                 not isinstance(self.initial_trans_prob, np.ndarray)
@@ -1010,6 +980,19 @@ class MarkovStateInferenceModelConfig:
 
             if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
                 raise ValueError("rows of initial_trans_prob must sum to one.")
+
+        if self.initial_state_probs is not None:
+            if (
+                not isinstance(self.initial_state_probs, np.ndarray)
+                or self.initial_trans_prob.ndim != 1
+            ):
+                raise ValueError("initial_state_probs must be a 1D numpy array.")
+
+            if not all(np.isclose(np.sum(self.initial_state_probs), 1)):
+                raise ValueError("rows of initial_state_probs must sum to one.")
+
+        if self.baum_welch_implementation not in ["log", "rescale"]:
+            raise ValueError("baum_welch_implementation must be 'log' or 'rescale'.")
 
 
 class MarkovStateInferenceModelBase(ModelBase):
@@ -1176,6 +1159,82 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return alpha
 
+    def get_viterbi_path(self, dataset, concatenate=False):
+        """Get the Viterbi path with the Viterbi algorithm.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for
+            each session.
+        concatenate : bool, optional
+            Should we concatenate the Viterbi path for each session?
+
+        Returns
+        -------
+        viterbi_path : list or np.ndarray
+            Viterbi path with shape (n_sessions, n_samples) or (n_samples,).
+        """
+        Pi_0 = self.get_initial_state_probs()
+        P = self.get_trans_prob()
+        n_states = P.shape[0]
+
+        eps = sys.float_info.epsilon
+        log_Pi_0 = np.log(Pi_0 + eps)
+        log_P = np.log(P + eps)
+
+        batch_size = self.config.batch_size
+        sequence_length = self.config.sequence_length
+        n_states = self.config.n_states
+
+        def _viterbi_path(x):
+            log_B = self.get_log_likelihood(x)
+            log_prob = np.empty([batch_size, sequence_length, n_states], dtype=float)
+            prev = np.empty([batch_size, sequence_length, n_states], dtype=int)
+
+            # Recursion
+            log_prob[:, 0] = log_Pi_0[np.newaxis, :] + log_B[:, 0]
+            for t in range(1, sequence_length):
+                p = (
+                    log_prob[:, t - 1][..., np.newaxis]
+                    + log_P[np.newaxis, ...]
+                    + log_B[:, t][..., np.newaxis]
+                )
+                log_prob[:, t] = np.max(p, axis=-2)
+                prev[:, t] = np.argmax(p, axis=-2)
+
+            # Backtrace
+            path = np.empty([batch_size, sequence_length], dtype=int)
+            path[:, -1] = np.argmax(log_prob[:, -1], axis=-1)
+            for t in range(sequence_length - 2, -1, -1):
+                path[:, t] = prev[np.arange(batch_size), t + 1, path[:, t + 1]]
+
+            return path
+
+        dataset = self.make_dataset(dataset)
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting Viterbi path")
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting Viterbi path")
+
+        viterbi_path = []
+        for i in iterator:
+            path = []
+            for data in dataset[i]:
+                x = data["data"]  # (batch_size, sequence_length, n_states)
+                vp = np.concatenate(_viterbi_path(x))  # concat over sequences
+                path.append(vp)
+            path = np.concatenate(path)  # concat over batches
+            path = array_ops.get_one_hot(path, n_states)
+            viterbi_path.append(path)
+
+        if concatenate or len(viterbi_path) == 1:
+            viterbi_path = np.concatenate(viterbi_path)
+
+        return viterbi_path
+
     def get_trans_prob(self):
         """Get the transition probability matrix.
 
@@ -1187,8 +1246,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
         return hidden_state_inference_layer.get_trans_prob().numpy()
 
-    def get_initial_distribution(self):
-        """Get the initial distribution.
+    def get_initial_state_probs(self):
+        """Get the initial state probability distribution.
 
         Returns
         -------
@@ -1196,7 +1255,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             Initial distribution. Shape is (n_states,).
         """
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.initial_state_probs
+        return hidden_state_inference_layer.get_initial_state_probs().numpy()
 
     def set_trans_prob(self, trans_prob, update_initializer=True):
         """Set the transition probability matrix.
@@ -1303,8 +1362,8 @@ class MarkovStateInferenceModelBase(ModelBase):
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
+        self.reset()
         self.set_weights(best_weights)
-        self.reset_kl_annealing_factor()
 
         return best_history
 
@@ -1386,8 +1445,8 @@ class MarkovStateInferenceModelBase(ModelBase):
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
+        self.reset()
         self.set_weights(best_weights)
-        self.reset_kl_annealing_factor()
 
         return best_history
 
@@ -1475,8 +1534,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         """
         trans_prob = self.get_trans_prob()
         sim = HMM(trans_prob)
-        stc = sim.generate_states(n_samples)
-        return stc
+        return sim.generate_states(n_samples)
 
     def free_energy(self, dataset, **kwargs):
         """Get the variational free energy of HMM-based models.
@@ -1499,7 +1557,6 @@ class MarkovStateInferenceModelBase(ModelBase):
             Variational free energy.
         """
 
-        # Helper functions
         def _get_posterior_entropy(gamma, xi):
             # E = int q(s_1:T) log q(s_1:T) ds_1:T
             #   = sum_{t=1}^{T-1} int q(s_t,s_{t+1}) log q(s_t,s_{t+1}) ds_t ds_{t+1}
@@ -1508,35 +1565,46 @@ class MarkovStateInferenceModelBase(ModelBase):
             # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1)
             # log(q(s_t, s_t+1)) ds_t ds_t+1
             first_term = xlogy(xi, xi)
-            first_term = np.sum(first_term, axis=(1, 2))
-            first_term = np.mean(first_term)
+            first_term = np.sum(first_term, axis=(1, 2, 3))
 
             # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
             second_term = xlogy(gamma, gamma)[:, 1:-1, :]
             second_term = np.sum(second_term, axis=(1, 2))
-            second_term = np.mean(second_term)
-            return first_term - second_term
+
+            # Average over batches
+            entropy = np.mean(first_term - second_term)
+
+            if self.config.loss_calc == "mean":
+                # Correct sum over time into an average
+                entropy /= self.config.sequence_length
+
+            return entropy
 
         def _get_posterior_expected_prior(gamma, xi):
             # P = int q(s_1:T) log p(s_1:T) ds
             #   = int q(s_1) log p(s_1) ds_1
             #     + sum_{t=1}^{T-1} int q(s_t,s_{t+1}) log p(s_{t+1}|s_t) ds_t ds_{t+1}
 
-            initial_distribution = self.get_initial_distribution()
+            initial_distribution = self.get_initial_state_probs()
             trans_prob = self.get_trans_prob()
 
             # first_term = int q(s_1) log p(s_1) ds_1
             first_term = xlogy(gamma[:, 0, :], initial_distribution[None, ...])
             first_term = np.sum(first_term, axis=1)
-            first_term = np.mean(first_term)
 
             # remaining_terms =
             # sum^{T-1}_t=1 int q(s_t, s_t+1) log p(s_t+1 | s_t}) ds_t ds_t+1
             remaining_terms = xlogy(xi, trans_prob[None, None, ...])
             remaining_terms = np.sum(remaining_terms, axis=(1, 2, 3))
-            remaining_terms = np.mean(remaining_terms)
 
-            return first_term + remaining_terms
+            # Average over batches
+            prior = np.mean(first_term + remaining_terms)
+
+            if self.config.loss_calc == "mean":
+                # Correct sum over time into an average
+                prior /= self.config.sequence_length
+
+            return prior
 
         if self.is_multi_gpu:
             raise ValueError(
@@ -1546,16 +1614,24 @@ class MarkovStateInferenceModelBase(ModelBase):
             )
 
         dataset = self.make_dataset(dataset, concatenate=False)
-        _logger.info("Getting free energy")
+
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting free energy")
+            kwargs["verbose"] = 0
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting free energy")
+
         free_energy = []
-        for ds in dataset:
-            predictions = self.predict(ds, **kwargs)
-            ll_loss = np.mean(predictions["ll_loss"])
+        for i in iterator:
+            predictions = self.predict(dataset[i], **kwargs)
+            nll = np.mean(predictions["ll_loss"])
             entropy = _get_posterior_entropy(predictions["gamma"], predictions["xi"])
             prior = _get_posterior_expected_prior(
                 predictions["gamma"], predictions["xi"]
             )
-            fe = ll_loss + entropy - prior
+            fe = nll + entropy - prior
             if self.config.model_name == "HIVE":
                 kl_loss = np.mean(predictions["kl_loss"])
                 fe += kl_loss
@@ -1577,13 +1653,12 @@ class MarkovStateInferenceModelBase(ModelBase):
             Model evidence.
         """
 
-        # Helper functions
         def _evidence_predict_step(log_smoothing_distribution=None):
             # Predict step for calculating the evidence
             # p(s_t=j|x_{1:t-1}) = sum_i p(s_t=j|s_{t-1}=i) p(s_{t-1}=i|x_{1:t-1})
             # log_smoothing_distribution.shape = (batch_size, n_states)
             if log_smoothing_distribution is None:
-                initial_distribution = self.get_initial_distribution()
+                initial_distribution = self.get_initial_state_probs()
                 log_prediction_distribution = np.broadcast_to(
                     np.expand_dims(initial_distribution, axis=0),
                     (batch_size, self.config.n_states),
@@ -1606,11 +1681,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             # data.shape = (batch_size, n_channels)
             # log_prediction_distribution.shape = (batch_size, n_states)
 
-            # Get the log-likelihood
-            means, covs = self.get_means_covariances()
-            ll_layer = self.model.get_layer("ll")
-            log_likelihood = ll_layer([data, means, covs])
-
+            log_likelihood = self.get_log_likelihood(data[:, np.newaxis])[:, 0]
             log_smoothing_distribution = log_likelihood + log_prediction_distribution
             predictive_log_likelihood = logsumexp(log_smoothing_distribution, axis=-1)
 
@@ -1619,6 +1690,7 @@ class MarkovStateInferenceModelBase(ModelBase):
                 predictive_log_likelihood,
                 axis=-1,
             )
+
             return log_smoothing_distribution, predictive_log_likelihood
 
         _logger.info("Getting model evidence")
@@ -1649,5 +1721,8 @@ class MarkovStateInferenceModelBase(ModelBase):
                 batch_evidence += predictive_log_likelihood
                 pb_i.add(1)
             evidence += np.mean(batch_evidence)
+
+        if self.config.loss_calc == "mean":
+            evidence /= self.config.sequence_length
 
         return evidence / n_batches

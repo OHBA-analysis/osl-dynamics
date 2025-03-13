@@ -906,11 +906,7 @@ def _model_structure(config):
     mix_session_means_covs_layer = MixSessionSpecificParametersLayer(
         name="mix_session_means_covs"
     )
-    ll_loss_layer = LogLikelihoodLossLayer(
-        config.covariances_epsilon,
-        config.loss_calc,
-        name="ll_loss",
-    )
+    ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
 
     # Data flow
     m, C = mix_session_means_covs_layer([alpha, mu, D])

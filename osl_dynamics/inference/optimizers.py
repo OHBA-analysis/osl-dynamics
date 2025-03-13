@@ -29,7 +29,6 @@ class ExponentialMovingAverage(Optimizer):
     @tf.function
     def _resource_apply_dense(self, grad, var):
         # grad should be the new value for var
-        grad = tf.cast(grad, var.dtype)
         return var.assign((1.0 - self.decay) * var + self.decay * grad)
 
 
@@ -71,7 +70,7 @@ class MarkovStateModelOptimizer(Optimizer):
         )
 
     def _resource_apply_dense(self, grad, var, **kwargs):
-        if "hid_state_inf_kernel" in var.name:
+        if "hid_state_inf" in var.name:
             # This is a HiddenMarkovStateInferenceLayer, use a moving
             # average to update the transition probability matrix
             updated_var = self.ema_optimizer._resource_apply_dense(grad, var)

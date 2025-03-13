@@ -57,7 +57,7 @@ model.summary()
 #%% Train model
 
 # Initialization
-init_history = model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
+init_history = model.random_state_time_course_initialization(data, n_init=3, n_epochs=2)
 
 # Full training
 history = model.fit(data)
@@ -69,6 +69,7 @@ model.save(model_dir)
 # Calculate the free energy
 free_energy = model.free_energy(data)
 history["free_energy"] = free_energy
+print("Free energy:", free_energy)
 
 # Save training history and free energy
 pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))

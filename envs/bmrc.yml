@@ -111,7 +111,6 @@ dependencies:
       - nilearn==0.10.2
       - notebook==7.2.2
       - notebook-shim==0.2.4
-      - numba==0.58.0
       - numpy==1.23.5
       - oauthlib==3.2.2
       - opt-einsum==3.4.0
