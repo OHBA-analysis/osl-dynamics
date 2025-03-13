@@ -14,12 +14,14 @@ See Also
 - `MATLAB HMM-MAR Toolbox <https://github.com/OHBA-analysis/HMM-MAR>`_.
 """
 
+import os
 import logging
 from dataclasses import dataclass
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
@@ -37,6 +39,8 @@ from osl_dynamics.models.inf_mod_base import (
     MarkovStateInferenceModelConfig,
     MarkovStateInferenceModelBase,
 )
+from osl_dynamics.analysis.modes import hmm_dual_estimation
+from osl_dynamics.utils.misc import set_logging_level
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -317,6 +321,158 @@ class Model(MarkovStateInferenceModelBase):
         if "static_loss_scaling_factor" in layer_names:
             n_batches = dtf.get_n_batches(dataset)
             self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
+
+    def dual_estimation(self, training_data, alpha=None, concatenate=False, n_jobs=1):
+        """Dual estimation to get session-specific observation model parameters.
+        This function is the wrapper for the :code:`hmm_dual_estimation` function.
+
+        Here, we estimate the state means and covariances for sessions
+        with the posterior distribution of the states held fixed.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data or list of tf.data.Dataset
+            Prepared training data object.
+        alpha : list of np.ndarray, optional
+            Posterior distribution of the states. Shape is
+            (n_sessions, n_samples, n_states).
+        concatenate : bool, optional
+            Should we concatenate the data across sessions?
+        n_jobs : int, optional
+            Number of jobs to run in parallel.
+
+        Returns
+        -------
+        means : np.ndarray
+            Session-specific means. Shape is (n_sessions, n_states, n_channels).
+        covariances : np.ndarray
+            Session-specific covariances.
+            Shape is (n_sessions, n_states, n_channels, n_channels).
+        """
+        if alpha is None:
+            # Get the posterior
+            alpha = self.get_alpha(training_data, concatenate=concatenate)
+
+        if isinstance(alpha, np.ndarray):
+            alpha = [alpha]
+
+        # Get the session-specific data
+        if isinstance(training_data, list):
+            data = []
+            for d in training_data:
+                subject_data = []
+                for batch in d:
+                    subject_data.append(np.concatenate(batch["data"]))
+                data.append(np.concatenate(subject_data))
+        else:
+            data = training_data.time_series(prepared=True, concatenate=concatenate)
+
+        if isinstance(data, np.ndarray):
+            data = [data]
+
+        # Make sure the data and alpha have the same number of samples
+        data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
+
+        # Dual estimation
+        if self.config.learn_covariances:
+            means, covariances = hmm_dual_estimation(
+                data,
+                alpha,
+                zero_mean=(not self.config.learn_means),
+                eps=self.config.covariances_epsilon,
+                n_jobs=n_jobs,
+            )
+            if not self.config.learn_means:
+                means = self.get_means()
+                # get initial means (this is not necessarily the same as
+                # the zero means)
+        else:
+            covariances = self.get_covariances()
+
+        return means, covariances
+
+    def fine_tuning(
+        self,
+        training_data,
+        n_epochs=None,
+        learning_rate=None,
+        store_dir="tmp",
+    ):
+        """Fine tuning the model for each session.
+
+        Here, we estimate the posterior distribution (state probabilities)
+        and observation model using the data from a single session with the
+        group-level transition probability matrix held fixed.
+
+        Parameters
+        ----------
+        training_data : osl_dynamics.data.Data
+            Training dataset.
+        n_epochs : int, optional
+            Number of epochs to train for. Defaults to the value in the
+            :code:`config` used to create the model.
+        learning_rate : float, optional
+            Learning rate. Defaults to the value in the :code:`config` used
+            to create the model.
+        store_dir : str, optional
+            Directory to temporarily store the model in.
+
+        Returns
+        -------
+        alpha : list of np.ndarray
+            Session-specific state probabilities.
+            Each element has shape (n_samples, n_states).
+        means : np.ndarray
+            Session-specific means. Shape is (n_sessions, n_states, n_channels).
+        covariances : np.ndarray
+            Session-specific covariances.
+            Shape is (n_sessions, n_states, n_channels, n_channels).
+        """
+        # Save group-level model parameters
+        os.makedirs(store_dir, exist_ok=True)
+        self.save_weights(f"{store_dir}/weights.h5")
+
+        # Temporarily change hyperparameters
+        original_n_epochs = self.config.n_epochs
+        original_learning_rate = self.config.learning_rate
+        self.config.n_epochs = n_epochs or self.config.n_epochs
+        self.config.learning_rate = learning_rate or self.config.learning_rate
+
+        # Layers to fix (i.e. make non-trainable)
+        fixed_layers = ["hid_state_inf"]
+
+        # Fine tune on sessions
+        alpha = []
+        means = []
+        covariances = []
+        with self.set_trainable(fixed_layers, False), set_logging_level(
+            _logger, logging.WARNING
+        ):
+            for i in trange(training_data.n_sessions, desc="Fine tuning"):
+                # Train on this session
+                with training_data.set_keep(i):
+                    self.fit(training_data, verbose=0)
+                    a = self.get_alpha(
+                        training_data,
+                        concatenate=True,
+                        verbose=0,
+                    )
+
+                # Get the inferred parameters
+                m, c = self.get_means_covariances()
+                alpha.append(a)
+                means.append(m)
+                covariances.append(c)
+
+                # Reset back to group-level model parameters
+                self.load_weights(f"{store_dir}/weights.h5")
+                self.compile()
+
+        # Reset hyperparameters
+        self.config.n_epochs = original_n_epochs
+        self.config.learning_rate = original_learning_rate
+
+        return alpha, np.array(means), np.array(covariances)
 
     def _model_structure(self):
         """Build the model structure."""
