@@ -1,4 +1,18 @@
-"""Fully TF HMM."""
+"""Hidden Markov Model (HMM) with a Multivariate Normal observation model.
+
+See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
+/hmm.html>`_ for a description of this model.
+
+See Also
+--------
+- D. Vidaurre, et al., "Spectrally resolved fast transient brain states in
+  electrophysiological data". `Neuroimage 126, 81-95 (2016)
+  <https://www.sciencedirect.com/science/article/pii/S1053811915010691>`_.
+- D. Vidaurre, et al., "Discovering dynamic brain networks from big data in
+  rest and task". `Neuroimage 180, 646-656 (2018)
+  <https://www.sciencedirect.com/science/article/pii/S1053811917305487>`_.
+- `MATLAB HMM-MAR Toolbox <https://github.com/OHBA-analysis/HMM-MAR>`_.
+"""
 
 import logging
 from dataclasses import dataclass
