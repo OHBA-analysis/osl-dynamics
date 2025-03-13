@@ -113,7 +113,6 @@ dependencies:
     - nilearn==0.10.2
     - notebook==7.2.1
     - notebook-shim==0.2.4
-    - numba==0.58.0
     - numpy==1.23.5
     - numpydoc==1.7.0
     - oauthlib==3.2.2

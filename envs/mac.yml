@@ -1,13 +1,12 @@
 name: osld
 channels:
-- conda-forge
+  - conda-forge
 dependencies:
   - python
   - pip
   - jupyter
   - matplotlib
   - mne
-  - numba
   - nibabel
   - nilearn
   - numpy
