@@ -694,13 +694,6 @@ class ModelBase:
         if single_gpu:
             config_dict["multi_gpu"] = False
 
-        if version in ["<1.1.6", "1.1.6", "1.1.7"]:
-            raise ValueError(
-                f"model was trained using osl-dynamics version {version}. "
-                + "This is incompatible with the current version. "
-                + "Please revert to v1.1.7 to load this model."
-            )
-
         # Create config object
         config = cls.config_type(**config_dict)
 
@@ -716,10 +709,6 @@ class ModelBase:
             checkpoint.restore(
                 tf.train.latest_checkpoint(f"{dirname}/checkpoints")
             ).expect_partial()
-
-            # For HMM, also need to load the trans prob
-            if config_dict["model_name"] == "HMM":
-                model.trans_prob = np.load(f"{dirname}/trans_prob.npy")
         else:
             model.load_weights(f"{dirname}/weights").expect_partial()
 
