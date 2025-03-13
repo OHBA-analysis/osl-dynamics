@@ -332,7 +332,7 @@ class Model(MarkovStateInferenceModelBase):
             # Get the log-likelihood
             means, covs = self.get_means_covariances()
             ll_layer = self.model.get_layer("ll")
-            log_likelihood = ll_layer([data, means, covs])
+            log_likelihood = ll_layer([data[:, np.newaxis], [means], [covs]])[:, 0]
 
             log_smoothing_distribution = log_likelihood + log_prediction_distribution
             predictive_log_likelihood = logsumexp(log_smoothing_distribution, axis=-1)
@@ -342,6 +342,7 @@ class Model(MarkovStateInferenceModelBase):
                 predictive_log_likelihood,
                 axis=-1,
             )
+
             return log_smoothing_distribution, predictive_log_likelihood
 
         _logger.info("Getting model evidence")
@@ -372,6 +373,9 @@ class Model(MarkovStateInferenceModelBase):
                 batch_evidence += predictive_log_likelihood
                 pb_i.add(1)
             evidence += np.mean(batch_evidence)
+
+        if self.config.loss_calc == "mean":
+            evidence /= self.config.sequence_length
 
         return evidence / n_batches
 

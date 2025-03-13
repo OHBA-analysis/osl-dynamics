@@ -69,6 +69,7 @@ model.save(model_dir)
 # Calculate the free energy
 free_energy = model.free_energy(data)
 history["free_energy"] = free_energy
+print("Free energy:", free_energy)
 
 # Save training history and free energy
 pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
