@@ -193,7 +193,7 @@ class Model(MarkovStateInferenceModelBase):
 
         Returns
         -------
-        means : np.ndarary
+        means : np.ndarray
             State means.
         covariances : np.ndarray
             State covariances.
@@ -203,6 +203,24 @@ class Model(MarkovStateInferenceModelBase):
     def get_observation_model_parameters(self):
         """Wrapper for :code:`get_means_covariances`."""
         return self.get_means_covariances()
+
+    def get_n_params_generative_model(self):
+        """Get the number of trainable parameters in the generative model.
+
+        Returns
+        -------
+        n_params : int
+            Number of parameters in the generative model.
+        """
+        n_params = 0
+        for var in self.trainable_weights:
+            if "means" in var.name or "covs" in var.name:
+                n_params += np.prod(var.shape)
+            if "trans_prob" in var.name:
+                n_params += var.shape[0] * (var.shape[0] - 1)
+            if "initial_state_probs" in var.name:
+                n_params += var.shape[0] - 1
+        return int(n_params)
 
     def get_log_likelihood(self, x):
         """Get log-likelihood.
@@ -307,20 +325,6 @@ class Model(MarkovStateInferenceModelBase):
                 self.config.covariances_epsilon,
                 self.config.diagonal_covariances,
             )
-
-    def set_static_loss_scaling_factor(self, dataset):
-        """Set the :code:`n_batches` attribute of the
-        :code:`"static_loss_scaling_factor"` layer.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset
-            TensorFlow dataset.
-        """
-        layer_names = [layer.name for layer in self.model.layers]
-        if "static_loss_scaling_factor" in layer_names:
-            n_batches = dtf.get_n_batches(dataset)
-            self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
 
     def dual_estimation(self, training_data, alpha=None, concatenate=False, n_jobs=1):
         """Dual estimation to get session-specific observation model parameters.
