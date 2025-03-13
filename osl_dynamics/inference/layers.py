@@ -1890,7 +1890,6 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         return learnable_tensors_layer(1)
 
     def _baum_welch(self, log_B):
-
         def _get_indices(time, batch_size):
             return tf.concat(
                 [
@@ -1901,7 +1900,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             )
 
         # Small error for improving the numerical stability of the log-likelihood
-        eps = sys.float_info.epsilon
+        eps = tf.experimental.numpy.finfo(self.compute_dtype).eps
 
         # Hyperparameters
         batch_size = tf.shape(log_B)[0]
@@ -1996,8 +1995,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             )
 
             # Calculate log probabilities
-            log_P = tf.math.log(P)
-            log_Pi_0 = tf.math.log(Pi_0)
+            log_P = tf.math.log(P + eps)
+            log_Pi_0 = tf.math.log(Pi_0 + eps)
 
             # Forward pass
             for i in range(sequence_length):
