@@ -1,15 +1,18 @@
 """Base classes inference models."""
 
+import sys
 import logging
 from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
 import tensorflow as tf
-from scipy.special import xlogy
+from tensorflow.keras import utils
+from scipy.special import xlogy, logsumexp
 from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
+from osl_dynamics import array_ops
 from osl_dynamics.simulation import HMM
 from osl_dynamics.inference import callbacks, optimizers
 from osl_dynamics.inference.initializers import WeightInitializer
@@ -1192,6 +1195,82 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return alpha
 
+    def get_viterbi_path(self, dataset, concatenate=False):
+        """Get the Viterbi path with the Viterbi algorithm.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Prediction dataset. This can be a list of datasets, one for
+            each session.
+        concatenate : bool, optional
+            Should we concatenate the Viterbi path for each session?
+
+        Returns
+        -------
+        viterbi_path : list or np.ndarray
+            Viterbi path with shape (n_sessions, n_samples) or (n_samples,).
+        """
+        Pi_0 = self.get_initial_state_probs()
+        P = self.get_trans_prob()
+        n_states = P.shape[0]
+
+        eps = sys.float_info.epsilon
+        log_Pi_0 = np.log(Pi_0 + eps)
+        log_P = np.log(P + eps)
+
+        batch_size = self.config.batch_size
+        sequence_length = self.config.sequence_length
+        n_states = self.config.n_states
+
+        def _viterbi_path(x):
+            log_B = self.get_log_likelihood(x)
+            log_prob = np.empty([batch_size, sequence_length, n_states], dtype=float)
+            prev = np.empty([batch_size, sequence_length, n_states], dtype=int)
+
+            # Recursion
+            log_prob[:, 0] = log_Pi_0[np.newaxis, :] + log_B[:, 0]
+            for t in range(1, sequence_length):
+                p = (
+                    log_prob[:, t - 1][..., np.newaxis]
+                    + log_P[np.newaxis, ...]
+                    + log_B[:, t][..., np.newaxis]
+                )
+                log_prob[:, t] = np.max(p, axis=-2)
+                prev[:, t] = np.argmax(p, axis=-2)
+
+            # Backtrace
+            path = np.empty([batch_size, sequence_length], dtype=int)
+            path[:, -1] = np.argmax(log_prob[:, -1], axis=-1)
+            for t in range(sequence_length - 2, -1, -1):
+                path[:, t] = prev[np.arange(batch_size), t + 1, path[:, t + 1]]
+
+            return path
+
+        dataset = self.make_dataset(dataset)
+        n_datasets = len(dataset)
+        if len(dataset) > 1:
+            iterator = trange(n_datasets, desc="Getting Viterbi path")
+        else:
+            iterator = range(n_datasets)
+            _logger.info("Getting Viterbi path")
+
+        viterbi_path = []
+        for i in iterator:
+            path = []
+            for data in dataset[i]:
+                x = data["data"]  # (batch_size, sequence_length, n_states)
+                vp = np.concatenate(_viterbi_path(x))  # concat over sequences
+                path.append(vp)
+            path = np.concatenate(path)  # concat over batches
+            path = array_ops.get_one_hot(path, n_states)
+            viterbi_path.append(path)
+
+        if concatenate or len(viterbi_path) == 1:
+            viterbi_path = np.concatenate(viterbi_path)
+
+        return viterbi_path
+
     def get_trans_prob(self):
         """Get the transition probability matrix.
 
@@ -1595,3 +1674,91 @@ class MarkovStateInferenceModelBase(ModelBase):
             free_energy.append(fe)
 
         return np.mean(free_energy)
+
+    def evidence(self, dataset):
+        """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
+
+        Parameters
+        ----------
+        dataset : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to evaluate the model evidence on.
+
+        Returns
+        -------
+        evidence : float
+            Model evidence.
+        """
+
+        def _evidence_predict_step(log_smoothing_distribution=None):
+            # Predict step for calculating the evidence
+            # p(s_t=j|x_{1:t-1}) = sum_i p(s_t=j|s_{t-1}=i) p(s_{t-1}=i|x_{1:t-1})
+            # log_smoothing_distribution.shape = (batch_size, n_states)
+            if log_smoothing_distribution is None:
+                initial_distribution = self.get_initial_state_probs()
+                log_prediction_distribution = np.broadcast_to(
+                    np.expand_dims(initial_distribution, axis=0),
+                    (batch_size, self.config.n_states),
+                )
+            else:
+                log_trans_prob = np.expand_dims(np.log(self.get_trans_prob()), axis=0)
+                log_smoothing_distribution = np.expand_dims(
+                    log_smoothing_distribution,
+                    axis=-1,
+                )
+                log_prediction_distribution = logsumexp(
+                    log_trans_prob + log_smoothing_distribution, axis=-2
+                )
+            return log_prediction_distribution
+
+        def _evidence_update_step(data, log_prediction_distribution):
+            # Update step for calculating the evidence
+            # p(s_t=j|x_{1:t}) = p(x_t|s_t=j) p(s_t=j|x_{1:t-1}) / p(x_t|x_{1:t-1})
+            # p(x_t|x_{1:t-1}) = sum_i p(x_t|s_t=i) p(s_t=i|x_{1:t-1})
+            # data.shape = (batch_size, n_channels)
+            # log_prediction_distribution.shape = (batch_size, n_states)
+
+            log_likelihood = self.get_log_likelihood(data[:, np.newaxis])[:, 0]
+            log_smoothing_distribution = log_likelihood + log_prediction_distribution
+            predictive_log_likelihood = logsumexp(log_smoothing_distribution, axis=-1)
+
+            # Normalise the log smoothing distribution
+            log_smoothing_distribution -= np.expand_dims(
+                predictive_log_likelihood,
+                axis=-1,
+            )
+
+            return log_smoothing_distribution, predictive_log_likelihood
+
+        _logger.info("Getting model evidence")
+        dataset = self.make_dataset(dataset, concatenate=True)
+        n_batches = dtf.get_n_batches(dataset)
+
+        evidence = 0
+        for n, data in enumerate(dataset):
+            x = data["data"]
+            print("Batch {}/{}".format(n + 1, n_batches))
+            pb_i = utils.Progbar(self.config.sequence_length)
+            batch_size = tf.shape(x)[0]
+            batch_evidence = np.zeros(batch_size, dtype=np.float32)
+            log_smoothing_distribution = None
+            for t in range(self.config.sequence_length):
+                # Prediction step
+                log_prediction_distribution = _evidence_predict_step(
+                    log_smoothing_distribution
+                )
+
+                # Update step
+                (
+                    log_smoothing_distribution,
+                    predictive_log_likelihood,
+                ) = _evidence_update_step(x[:, t, :], log_prediction_distribution)
+
+                # Update the batch evidence
+                batch_evidence += predictive_log_likelihood
+                pb_i.add(1)
+            evidence += np.mean(batch_evidence)
+
+        if self.config.loss_calc == "mean":
+            evidence /= self.config.sequence_length
+
+        return evidence / n_batches

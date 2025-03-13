@@ -142,6 +142,24 @@ class Model(MarkovStateInferenceModelBase):
         """Wrapper for :code:`get_log_rates`."""
         return self.get_log_rates()
 
+    def get_log_likelihood(self, x):
+        """Get log-likelihood.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to calculate log-likelihood for.
+            Shape must be (batch_size, sequence_length, n_channels).
+
+        Returns
+        -------
+        log_likelihood : np.ndarray
+            Log-likelihood. Shape is (batch_size,).
+        """
+        log_rate = self.get_log_rates()
+        ll_layer = self.model.get_layer("ll")
+        return ll_layer([x, [log_rate]]).numpy()
+
     def set_log_rates(self, log_rates, update_initializer=True):
         """Set the state :code:`log_rates`.
 
