@@ -57,7 +57,7 @@ def concatenate_datasets(datasets):
     return full_dataset
 
 
-def create_dataset(data, sequence_length, step_size):
+def create_dataset(data, sequence_length, step_size, drop_last_batch=False):
     """Creates a TensorFlow dataset of batched time series data.
 
     Parameters
@@ -69,6 +69,8 @@ def create_dataset(data, sequence_length, step_size):
         Sequence length to batch the data.
     step_size : int
         Number of samples to slide the sequence across the data.
+    drop_last_batch : bool, optional
+        Should we drop the last batch if it is smaller than the batch size?
 
     Returns
     -------
@@ -80,13 +82,16 @@ def create_dataset(data, sequence_length, step_size):
     # Generate a non-overlapping sequence dataset
     if step_size == sequence_length:
         dataset = Dataset.from_tensor_slices(data)
-        dataset = dataset.batch(sequence_length, drop_remainder=True)
+        dataset = dataset.batch(sequence_length, drop_remainder=drop_last_batch)
 
     # Create an overlapping multiple model input dataset
     else:
 
         def batch_windows(*windows):
-            batched = [w.batch(sequence_length, drop_remainder=True) for w in windows]
+            batched = [
+                w.batch(sequence_length, drop_remainder=drop_last_batch)
+                for w in windows
+            ]
             return Dataset.zip(tuple(batched))
 
         def tuple_to_dict(*d):
@@ -101,7 +106,7 @@ def create_dataset(data, sequence_length, step_size):
         dataset = dataset.window(
             sequence_length,
             step_size,
-            drop_remainder=True,
+            drop_remainder=drop_last_batch,
         )
         dataset = dataset.flat_map(batch_windows)
         dataset = dataset.map(tuple_to_dict)
@@ -109,7 +114,7 @@ def create_dataset(data, sequence_length, step_size):
     return dataset
 
 
-def save_tfrecord(data, sequence_length, step_size, filepath):
+def save_tfrecord(data, sequence_length, step_size, filepath, drop_last_batch=False):
     """Save dataset to a TFRecord file.
 
     Parameters
@@ -123,11 +128,13 @@ def save_tfrecord(data, sequence_length, step_size, filepath):
         Number of samples to slide the sequence across the data.
     filepath : str
         Path to save the TFRecord file.
+    drop_last_batch : bool, optional
+        Should we drop the last batch if it is smaller than the batch size?
     """
     import tensorflow as tf  # moved here to avoid slow imports
     from tensorflow.train import Feature, Features, Example, BytesList
 
-    dataset = create_dataset(data, sequence_length, step_size)
+    dataset = create_dataset(data, sequence_length, step_size, drop_last_batch)
 
     # Helper function to serialize a sequence to a tensorflow example
     # byte string
