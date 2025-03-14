@@ -289,9 +289,13 @@ class SampleGammaDistributionLayer(layers.Layer):
         super().__init__(**kwargs)
         self.epsilon = epsilon
         if do_annealing:
-            self.annealing_factor = tf.Variable(0.0, trainable=False)
+            self.annealing_factor = tf.Variable(
+                0.0, trainable=False, name="gamma_anneal_factor"
+            )
         else:
-            self.annealing_factor = tf.Variable(1.0, trainable=False)
+            self.annealing_factor = tf.Variable(
+                1.0, trainable=False, name="gamma_anneal_factor"
+            )
 
     def call(self, inputs, training=None, **kwargs):
         """This method accepts the shape and rate and outputs the samples."""
@@ -374,7 +378,9 @@ class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
 
     def __init__(self, temperature, **kwargs):
         super().__init__(**kwargs)
-        self.temperature = tf.Variable(temperature, trainable=False, dtype=tf.float32)
+        self.temperature = tf.Variable(
+            temperature, trainable=False, dtype=tf.float32, name="gs_temperature"
+        )
 
     def call(self, inputs, **kwargs):
         """This method accepts logits and outputs samples."""
@@ -1292,9 +1298,13 @@ class KLLossLayer(layers.Layer):
     def __init__(self, do_annealing, **kwargs):
         super().__init__(**kwargs)
         if do_annealing:
-            self.annealing_factor = tf.Variable(0.0, trainable=False)
+            self.annealing_factor = tf.Variable(
+                0.0, trainable=False, name="kl_anneal_factor"
+            )
         else:
-            self.annealing_factor = tf.Variable(1.0, trainable=False)
+            self.annealing_factor = tf.Variable(
+                1.0, trainable=False, name="kl_anneal_factor"
+            )
 
     def call(self, inputs, **kwargs):
         if isinstance(inputs, list):
