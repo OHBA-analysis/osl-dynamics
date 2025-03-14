@@ -1,5 +1,6 @@
 """Custom Tensorflow callbacks."""
 
+import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import tanh
@@ -354,3 +355,58 @@ class CheckpointCallback(callbacks.Callback):
             )
         if (epoch + 1) % self.save_freq == 0:
             self.checkpoint.save(file_prefix=self.checkpoint_prefix)
+
+
+class TensorBoardCallback(callbacks.TensorBoard):
+    """Callback to log training information to TensorBoard.
+
+    This callback extends `tf.keras.callbacks.TensorBoard` by also logging the initial weights.
+
+    Parameters
+    ----------
+    log_dir : str, optional
+        Path to a directory where the log files will be written.
+        Defaults to None, in which case the logs will be written to a current directory.
+    log_initial : bool, optional
+        Whether to log the initial weights or not. Defaults to True.
+    kwargs : dict
+        Additional arguments to pass to the :code:`tf.keras.callbacks.TensorBoard` callback.
+    """
+
+    def __init__(self, log_dir=None, log_initial=True, **kwargs):
+        # Create log directory if it does not exist
+        self._log_dir = log_dir
+        self._make_log_dir()
+
+        # Get arguments
+        self.log_initial = log_initial  # enable or disable initial weight logging
+        self.initial_weights_logged = False  # log status
+
+        super().__init__(log_dir=self._log_dir, **kwargs)
+
+    def _make_log_dir(self):
+        if self._log_dir is None:
+            self._log_dir = os.path.join(os.getcwd(), "logs")
+        os.makedirs(self._log_dir, exist_ok=True)
+
+    def on_train_begin(self, logs=None):
+        # Call the parent method first
+        super().on_train_begin(logs)
+
+        # Log the initial weights once
+        if self.log_initial and not self.initial_weights_logged:
+            # Create a subdirectory for the initial weights
+            init_log_dir = os.path.join(self._log_dir, "initial_weights")
+            os.makedirs(init_log_dir, exist_ok=True)
+            writer = tf.summary.create_file_writer(init_log_dir)
+
+            # Log the initial weights
+            with writer.as_default():
+                for weight in self.model.weights:
+                    tf.summary.histogram(weight.name, weight, step=0)
+                writer.flush()  # ensure all buffered data are written to disk
+
+            self.initial_weights_logged = True
+            print(
+                "Initial weights logged. You can launch TensorBoard to view the histograms."
+            )
