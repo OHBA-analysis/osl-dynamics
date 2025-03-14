@@ -18,9 +18,8 @@ dependencies:
   - scikit-learn
   - seaborn
   - tqdm
-  - tensorflow==2.18
+  - tensorflow==2.15
   - tensorflow-probability
-  - tf-keras
   - cudatoolkit
   - cudnn
   - pip:
