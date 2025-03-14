@@ -32,7 +32,7 @@ For a Mac, the installation of TensorFlow is slightly different to a Linux compu
 
 Note, you may also need to do
 ```
-pip install tensorflow-metal==0.7.0
+pip install tensorflow-metal==1.1
 ```
 to get your GPUs working. See [here](https://developer.apple.com/metal/tensorflow-plugin/) for further details.
 
@@ -46,17 +46,17 @@ If you have already installed [OSL](https://github.com/OHBA-analysis/osl) you ca
 ```
 conda activate osl
 cd osl-dynamics
-pip install tensorflow==2.11.0
-pip install tensorflow-probability==0.19.0
+pip install tensorflow==2.15
+pip install tensorflow-probability==0.23
 pip install -e .
 ```
 Note, if you're using a Mac computer you need to install TensorFlow with the following instead:
 ```
-pip install tensorflow-macos==2.11.0
+pip install tensorflow-macos==2.15
 ```
 You may also need to install `tensorflow-metal` with
 ```
-pip install tensorflow-metal==0.7.0
+pip install tensorflow-metal==0.1.1
 ```
 to use any GPUs that maybe available. See [here](https://developer.apple.com/metal/tensorflow-plugin/) for further details.
 
@@ -70,7 +70,7 @@ osl-dynamics has been tested with the following versions:
 | 2.12 | 0.19  |
 | 2.13 | 0.20  |
 | 2.14 | 0.22  |
-| 2.15 | 0.22  |
+| 2.15 | 0.23  |
 
 ### Test GPUs are working
 
@@ -135,9 +135,9 @@ This will create a new directory called `dist`.
 
 5. Test the build by installing in a test conda environment, e.g. with
 ```
-conda create --name test python=3.10.14
+conda create --name test python=3.11.11
 conda activate test
-pip install tensorflow==2.11.0 tensorflow-probability==0.19.0
+pip install tensorflow==2.15 tensorflow-probability==0.23
 pip install dist/<build>.whl
 python examples/simulation/hmm_hmm-mvn.py
 python examples/simulation/dynemo_hmm-mvn.py
