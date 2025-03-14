@@ -1,0 +1,25 @@
+name: osld
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - pip
+  - jupyter
+  - matplotlib
+  - mne
+  - nibabel
+  - nilearn
+  - numpy
+  - osfclient
+  - pandas
+  - pyyaml
+  - pqdm
+  - scipy
+  - scikit-learn
+  - seaborn
+  - tqdm
+  - tensorflow==2.18
+  - tensorflow-probability
+  - tf-keras
+  pip:
+    - osl-dynamics
