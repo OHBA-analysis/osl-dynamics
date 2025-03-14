@@ -20,5 +20,5 @@ dependencies:
   - tqdm
   - tensorflow==2.15
   - tensorflow-probability
-  pip:
+  - pip:
     - osl-dynamics
