@@ -3,7 +3,7 @@
 import sys
 import logging
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, Union
 
 import numpy as np
 import tensorflow as tf
@@ -960,7 +960,7 @@ class VariationalInferenceModelBase(ModelBase):
 class MarkovStateInferenceModelConfig:
     """Settings needed for inferring a Markov chain for hidden states."""
 
-    initial_trans_prob: np.ndarray = None
+    initial_trans_prob: Union[np.ndarray,str] = None
     learn_trans_prob: bool = True
     trans_prob_update_delay: float = 5  # alpha
     trans_prob_update_forget: float = 0.7  # beta
