@@ -76,12 +76,9 @@ osl-dynamics has been tested with the following versions:
 
 You can use the following to check if TensorFlow is using any GPUs you have available:
 ```
-conda activate osld
-python
->> import tensorflow as tf
->> print(tf.test.is_gpu_available())
+python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
-This should print `True` if you have GPUs available (and `False` otherwise).
+This should return a list of GPUs.
 
 ### Removing osl-dynamics
 
@@ -133,14 +130,9 @@ python -m build
 ```
 This will create a new directory called `dist`.
 
-5. Test the build by installing in a test conda environment, e.g. with
+5. Test the build by installing with
 ```
-conda create --name test python=3.11.11
-conda activate test
-pip install tensorflow==2.15 tensorflow-probability==0.23
 pip install dist/<build>.whl
-python examples/simulation/hmm_hmm-mvn.py
-python examples/simulation/dynemo_hmm-mvn.py
 ```
 
 6. Upload the distribution to PyPI with
