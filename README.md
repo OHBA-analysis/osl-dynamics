@@ -71,6 +71,7 @@ osl-dynamics has been tested with the following versions:
 | 2.13 | 0.20  |
 | 2.14 | 0.22  |
 | 2.15 | 0.23  |
+| 2.18 | 0.25  |
 
 ### Test GPUs are working
 

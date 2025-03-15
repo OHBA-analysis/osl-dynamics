@@ -2,7 +2,7 @@ name: osld
 channels:
   - conda-forge
 dependencies:
-  - python
+  - python=3.12
   - pip
   - jupyter
   - matplotlib
@@ -19,6 +19,6 @@ dependencies:
   - seaborn
   - tqdm
   - pip:
-    - tensorflow[and-cuda]
-    - tensorflow-probability[tf]
+    - tensorflow[and-cuda]==2.18
+    - tensorflow-probability[tf]==0.25
     - osl-dynamics
