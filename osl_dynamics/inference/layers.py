@@ -1843,6 +1843,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
     ----------
     n_states : int
         Number of states.
+    sequence_length : int
+        Length of the sequence.
     initial_trans_prob : np.ndarray
         Initial transition probability matrix.
         Shape must be (n_states, n_states).
@@ -1865,6 +1867,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
     def __init__(
         self,
         n_states,
+        sequence_length,
         initial_trans_prob,
         initial_state_probs,
         learn_trans_prob,
@@ -1875,6 +1878,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
     ):
         super().__init__(**kwargs)
         self.n_states = n_states
+        self.sequence_length = sequence_length
         self.use_stationary_distribution = use_stationary_distribution
 
         # Implementation for Baum-Welch algorithm
@@ -1943,11 +1947,11 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             return self.get_stationary_distribution()
         else:
             learnable_tensors_layer = self.layers[0]
-            return learnable_tensors_layer(1)
+            return learnable_tensors_layer(tf.constant(1))
 
     def get_trans_prob(self):
         learnable_tensors_layer = self.layers[1]
-        return learnable_tensors_layer(1)
+        return learnable_tensors_layer(tf.constant(1))
 
     def _baum_welch(self, log_B):
         def _get_indices(time, batch_size):
@@ -2008,7 +2012,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             B = tf.exp(log_B)
 
             # Forward pass
-            for i in range(sequence_length):
+            for i in range(self.sequence_length):
                 indices = _get_indices(i, batch_size)
                 if i == 0:
                     values = Pi_0 * B[:, 0]
@@ -2024,9 +2028,9 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 alpha, scale = _rescale(alpha, scale, indices, i)
 
             # Backward pass
-            for i in range(sequence_length, 0, -1):
+            for i in range(self.sequence_length, 0, -1):
                 indices = _get_indices(i - 1, batch_size)
-                if i == sequence_length:
+                if i == self.sequence_length:
                     values = tf.ones_like(beta[:, -1])
                 else:
                     values = tf.reduce_sum(
@@ -2059,7 +2063,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             log_Pi_0 = tf.math.log(Pi_0 + eps)
 
             # Forward pass
-            for i in range(sequence_length):
+            for i in range(self.sequence_length):
                 indices = _get_indices(i, batch_size)
                 if i == 0:
                     values = log_Pi_0 + log_B[:, 0]
@@ -2075,9 +2079,9 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 log_alpha = tf.tensor_scatter_nd_update(log_alpha, indices, values)
 
             # Backward pass
-            for i in range(sequence_length, 0, -1):
+            for i in range(self.sequence_length, 0, -1):
                 indices = _get_indices(i - 1, batch_size)
-                if i == sequence_length:
+                if i == self.sequence_length:
                     values = tf.zeros_like(log_beta[:, -1])
                 else:
                     values = tf.reduce_logsumexp(
@@ -2136,6 +2140,11 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
         return posterior(log_B)
 
+    def compute_output_shape(self, input_shape):
+        output_shape_0 = input_shape
+        output_shape_1 = [input_shape[0], input_shape[1], self.n_states, self.n_states]
+        return (output_shape_0, tuple(output_shape_1))
+
 
 class SeparateLogLikelihoodLayer(layers.Layer):
     """Layer to calculate the log-likelihood for different HMM states.
@@ -2159,8 +2168,8 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         # sigma.shape = (None, n_states, n_channels, n_channels)
 
         # Add the sequence length dimension
-        mu = tf.expand_dims(mu, axis=1)
-        sigma = tf.expand_dims(sigma, axis=1)
+        mu = tf.expand_dims(mu, axis=-3)
+        sigma = tf.expand_dims(sigma, axis=-4)
 
         # Add states dimension
         x = tf.expand_dims(x, axis=2)
@@ -2174,6 +2183,10 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         log_likelihood = mvn.log_prob(x)
 
         return log_likelihood  # shape = (None, sequence_length, n_states)
+
+    def compute_output_shape(self, input_shape):
+        output_shape = input_shape[0]
+        return output_shape
 
 
 class SeparatePoissonLogLikelihoodLayer(layers.Layer):

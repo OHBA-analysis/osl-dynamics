@@ -217,7 +217,7 @@ class VariationalInferenceModelBase(ModelBase):
             _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
-        best_loss = np.Inf
+        best_loss = np.inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
@@ -247,7 +247,7 @@ class VariationalInferenceModelBase(ModelBase):
                 best_history = history
                 best_weights = self.get_weights()
 
-        if best_loss == np.Inf:
+        if best_loss == np.inf:
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
@@ -320,7 +320,7 @@ class VariationalInferenceModelBase(ModelBase):
         )
 
         # Train the model a few times and keep the best one
-        best_loss = np.Inf
+        best_loss = np.inf
         losses = []
         for subject in subjects_to_use:
             _logger.info(f"Using subject {subject}")
@@ -429,7 +429,7 @@ class VariationalInferenceModelBase(ModelBase):
             _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
-        best_loss = np.Inf
+        best_loss = np.inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
@@ -456,7 +456,7 @@ class VariationalInferenceModelBase(ModelBase):
                 best_history = history
                 best_weights = self.get_weights()
 
-        if best_loss == np.Inf:
+        if best_loss == np.inf:
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
@@ -1057,7 +1057,9 @@ class MarkovStateInferenceModelBase(ModelBase):
         decay = (
             1 + self.config.trans_prob_update_delay
         ) ** -self.config.trans_prob_update_forget
-        ema_optimizer = optimizers.ExponentialMovingAverage(decay)
+        ema_optimizer = optimizers.ExponentialMovingAverage(
+            self.config.learning_rate, decay
+        )
 
         # Optimizer for all other trainable parameters
         base_optimizer = tf.keras.optimizers.get(
@@ -1331,7 +1333,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
-        best_loss = np.Inf
+        best_loss = np.inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
@@ -1358,7 +1360,7 @@ class MarkovStateInferenceModelBase(ModelBase):
                 best_history = history
                 best_weights = self.get_weights()
 
-        if best_loss == np.Inf:
+        if best_loss == np.inf:
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
@@ -1416,7 +1418,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
-        best_loss = np.Inf
+        best_loss = np.inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
@@ -1441,7 +1443,7 @@ class MarkovStateInferenceModelBase(ModelBase):
                 best_history = history
                 best_weights = self.get_weights()
 
-        if best_loss == np.Inf:
+        if best_loss == np.inf:
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")

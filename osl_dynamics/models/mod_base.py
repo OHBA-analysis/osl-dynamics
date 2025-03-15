@@ -559,7 +559,7 @@ class ModelBase:
         """
         self.save_config(dirname)
         self.save_weights(
-            f"{dirname}/weights"
+            f"{dirname}/model_weights.weights.h5"
         )  # will use the keras method: self.model.save_weights()
 
     def set_static_loss_scaling_factor(self, dataset):
@@ -706,7 +706,7 @@ class ModelBase:
                 tf.train.latest_checkpoint(f"{dirname}/checkpoints")
             ).expect_partial()
         else:
-            model.load_weights(f"{dirname}/weights").expect_partial()
+            model.load_weights(f"{dirname}/model_weights.weights.h5").expect_partial()
 
         return model
 
