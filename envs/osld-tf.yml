@@ -18,7 +18,7 @@ dependencies:
   - scikit-learn
   - seaborn
   - tqdm
-  - tensorflow==2.15
-  - tensorflow-probability
   - pip:
+    - tensorflow
+    - tensorflow-probability[tf]
     - osl-dynamics

@@ -18,9 +18,7 @@ dependencies:
   - scikit-learn
   - seaborn
   - tqdm
-  - tensorflow==2.15
-  - tensorflow-probability
-  - cudatoolkit
-  - cudnn
   - pip:
+    - tensorflow[and-cuda]
+    - tensorflow-probability[tf]
     - osl-dynamics
