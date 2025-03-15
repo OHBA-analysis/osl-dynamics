@@ -145,7 +145,7 @@ class Data:
 
         # Get data preparation attributes if there's a pickle file in the
         # input directory
-        if not isinstance(inputs, list):
+        if not isinstance(inputs, list) and not isinstance(inputs, np.ndarray):
             self.load_preparation(inputs)
 
         # Store raw data in the arrays attribute
