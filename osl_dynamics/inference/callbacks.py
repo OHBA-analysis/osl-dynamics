@@ -1,5 +1,6 @@
 """Custom Tensorflow callbacks."""
 
+import os
 import numpy as np
 import tensorflow as tf
 from tensorflow import tanh
@@ -354,3 +355,200 @@ class CheckpointCallback(callbacks.Callback):
             )
         if (epoch + 1) % self.save_freq == 0:
             self.checkpoint.save(file_prefix=self.checkpoint_prefix)
+
+
+class TensorBoardCallback(callbacks.TensorBoard):
+    """Callback to log training information to TensorBoard.
+
+    This callback extends `tf.keras.callbacks.TensorBoard` by also logging the initial weights.
+
+    Parameters
+    ----------
+    log_dir : str, optional
+        Path to a directory where the log files will be written.
+        Defaults to None, in which case the logs will be written to a current directory.
+    log_initial : bool, optional
+        Whether to log the initial weights or not. Defaults to True.
+    kwargs : dict
+        Additional arguments to pass to the :code:`tf.keras.callbacks.TensorBoard` callback.
+    """
+
+    def __init__(self, log_dir=None, log_initial=True, **kwargs):
+        # Create log directory if it does not exist
+        self._log_dir = log_dir
+        self._make_log_dir()
+
+        # Get arguments
+        self.log_initial = log_initial  # enable or disable initial weight logging
+        self.initial_weights_logged = False  # log status
+
+        super().__init__(log_dir=self._log_dir, **kwargs)
+
+    def _make_log_dir(self):
+        if self._log_dir is None:
+            self._log_dir = os.path.join(os.getcwd(), "logs")
+        os.makedirs(self._log_dir, exist_ok=True)
+
+    def on_train_begin(self, logs=None):
+        # Call the parent method first
+        super().on_train_begin(logs)
+
+        # Log the initial weights once
+        if self.log_initial and not self.initial_weights_logged:
+            # Create a subdirectory for the initial weights
+            init_log_dir = os.path.join(self._log_dir, "initial_weights")
+            os.makedirs(init_log_dir, exist_ok=True)
+            writer = tf.summary.create_file_writer(init_log_dir)
+
+            # Log the initial weights
+            with writer.as_default():
+                for weight in self.model.weights:
+                    tf.summary.histogram(weight.name, weight, step=0)
+                writer.flush()  # ensure all buffered data are written to disk
+
+            self.initial_weights_logged = True
+            print(
+                "Initial weights logged. You can launch TensorBoard to view the histograms."
+            )
+
+
+class GradientMonitoringCallback(tf.keras.callbacks.Callback):
+    """Callback for logging gradients during the model training.
+
+    Parameters
+    ----------
+    sample_dataset : tf.data.Dataset
+        A dataset containing a representative batch of data used to compute gradients.
+    log_dir : str, optional
+        Path to a directory where gradient logs will be saved.
+        Defaults to None, in which case the logs will be written to a current directory.
+    print_stats : bool, optional
+        Wheter to print the summary statistics (mean, std, min, max, L2 norm) for each variable.
+        Defaults to True.
+    """
+
+    def __init__(
+        self,
+        sample_dataset,
+        log_dir=None,
+        print_stats=True,
+    ):
+        super().__init__()
+        self.sample_dataset = sample_dataset
+        self.print_stats = print_stats
+
+        # Prepare a log directory
+        if log_dir is None:
+            log_dir = os.path.join(os.getcwd(), "logs/gradients")
+        os.makedirs(log_dir, exist_ok=True)
+        self.writer = tf.summary.create_file_writer(log_dir)
+
+    @tf.function
+    def compute_gradients(self, inputs):
+        """Compute gradients for a given input batch.
+
+        Parameters
+        ----------
+        inputs : tf.Tensor
+            Input batch.
+        """
+        n_losses = 1
+        if "HMM" not in self.model.name:
+            n_losses += 1
+
+        with tf.GradientTape() as tape:
+            outputs = self.model(inputs, training=True)[:n_losses]
+            loss = tf.reduce_sum(outputs)
+        return tape.gradient(loss, self.model.trainable_variables)
+
+    def on_epoch_end(self, epoch, logs=None):
+        """Action to perform at the end of an epoch.
+
+        Parameters
+        ---------
+        epochs : int
+            Integer, index of epoch.
+        logs : dict, optional
+            Results for this training epoch, and for the validation epoch if
+            validation is performed.
+        """
+        # Initialize accumulators for each trainable variable
+        accumulated_gradients = [None] * len(self.model.trainable_variables)
+        batch_count = 0
+
+        # Compute the loss and gradients on the sample dataset
+        for batch in self.sample_dataset:
+            inputs = batch["data"]
+            gradients = self.compute_gradients(inputs)
+
+            # Accumulate gradients
+            for i, grad in enumerate(gradients):
+                if grad is not None:
+                    if accumulated_gradients[i] is None:
+                        accumulated_gradients[i] = grad
+                    else:
+                        accumulated_gradients[i] += grad
+            batch_count += 1
+
+        # Average gradients over the batches
+        if batch_count > 0:
+            averaged_gradients = [
+                grad / batch_count if grad is not None else None
+                for grad in accumulated_gradients
+            ]
+        else:
+            averaged_gradients = accumulated_gradients
+
+        # Group gradients by layer
+        layer_gradients = {}
+        for grad, var in zip(averaged_gradients, self.model.trainable_variables):
+            var_name = var.name
+            layer_name = var_name.split("/")[0]  # get the first part as the layer name.
+            if grad is not None:
+                layer_gradients.setdefault(layer_name, []).append((grad, var))
+
+        # Log and print gradient summary statistics for each layer
+        with self.writer.as_default():
+            for layer, grad_var_pairs in layer_gradients.items():
+                if self.print_stats:
+                    print(f"\nLayer: {layer}")
+                for grad, var in grad_var_pairs:
+                    if grad is not None:
+                        grad_mean = tf.reduce_mean(grad)
+                        grad_std = tf.math.reduce_std(grad)
+                        grad_min = tf.reduce_min(grad)
+                        grad_max = tf.reduce_max(grad)
+                        grad_norm = tf.norm(grad)
+
+                        # Print summary statistics.
+                        if self.print_stats:
+                            print(f"  {var.name}:")
+                            print(
+                                f"    Mean: {grad_mean.numpy():.5f}, Std: {grad_std.numpy():.5f}"
+                            )
+                            print(
+                                f"    Min: {grad_min.numpy():.5f}, Max: {grad_max.numpy():.5f}"
+                            )
+                            print(f"    L2 Norm: {grad_norm.numpy():.5f}")
+
+                        # Log gradient histogram and scalar summaries.
+                        tf.summary.histogram(f"gradients/{var.name}", grad, step=epoch)
+                        tf.summary.scalar(
+                            f"gradients/{var.name}_mean", grad_mean, step=epoch
+                        )
+                        tf.summary.scalar(
+                            f"gradients/{var.name}_std", grad_std, step=epoch
+                        )
+                        tf.summary.scalar(
+                            f"gradients/{var.name}_min", grad_min, step=epoch
+                        )
+                        tf.summary.scalar(
+                            f"gradients/{var.name}_max", grad_max, step=epoch
+                        )
+                        tf.summary.scalar(
+                            f"gradients/{var.name}_norm", grad_norm, step=epoch
+                        )
+                    else:
+                        if self.print_stats:
+                            print(f"  {var.name}: Gradient is None")
+            self.writer.flush()
