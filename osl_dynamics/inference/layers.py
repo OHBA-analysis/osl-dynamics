@@ -425,6 +425,11 @@ class SoftmaxLayer(layers.Layer):
             )
         ]
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
+
     def call(self, inputs, **kwargs):
         temperature = self.layers[0](inputs)
         return activations.softmax(inputs / temperature, axis=-1)
@@ -509,12 +514,12 @@ class LearnableTensorLayer(layers.Layer):
 
         # Add regularization to the loss and display while training
         self.add_loss(reg)
-        self.add_metric(reg, name=self.name)
+        # self.add_metric(reg, name=self.name)
 
     def build(self, input_shape):
         # Create a weight for the tensor
         self.tensor = self.add_weight(
-            "tensor",
+            name="tensor",
             shape=self.shape,
             dtype=tf.float32,
             initializer=self.tensor_initializer,
@@ -594,6 +599,11 @@ class VectorsLayer(layers.Layer):
                 name=self.name + "_kernel",
             )
         ]
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         """
@@ -692,6 +702,11 @@ class CovarianceMatricesLayer(layers.Layer):
                 name=self.name + "_kernel",
             )
         ]
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         """
@@ -792,6 +807,11 @@ class CorrelationMatricesLayer(layers.Layer):
             )
         ]
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
+
     def call(self, inputs, **kwargs):
         """
         Note
@@ -890,6 +910,11 @@ class DiagonalMatricesLayer(layers.Layer):
             )
         ]
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
+
     def call(self, inputs, **kwargs):
         """
         Note
@@ -976,6 +1001,11 @@ class DampedOscillatorLayer(layers.Layer):
 
         self.layers = [self.damping, self.frequency, self.amplitude]
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
+
     def call(self, inputs, **kwargs):
         """Calculate damped oscillator.
 
@@ -1042,6 +1072,11 @@ class DampedOscillatorCovarianceMatricesLayer(layers.Layer):
         )
 
         self.layers = [self.oscillator_layer]
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         """Retrieve the covariance matrices.
@@ -1112,6 +1147,11 @@ class MatrixLayer(layers.Layer):
             raise ValueError("Please use constraint='diagonal' or 'covariance.'")
 
         self.layers = [self.matrix_layer]
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         """
@@ -1209,7 +1249,7 @@ class LogLikelihoodLossLayer(layers.Layer):
         # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
         self.add_loss(nll_loss)
-        self.add_metric(nll_loss, name=self.name)
+        # self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
 
@@ -1306,7 +1346,7 @@ class KLLossLayer(layers.Layer):
 
         # Add to loss
         self.add_loss(kl_loss)
-        self.add_metric(kl_loss, name=self.name)
+        # self.add_metric(kl_loss, name=self.name)
 
         return tf.expand_dims(kl_loss, axis=-1)
 
@@ -1366,6 +1406,12 @@ class InferenceRNNLayer(layers.Layer):
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+            input_shape = layer.compute_output_shape(input_shape)
+        self.built = True
+
     def call(self, inputs, **kwargs):
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
@@ -1424,6 +1470,12 @@ class ModelRNNLayer(layers.Layer):
             self.layers.append(NormalizationLayer(norm_type))
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+            input_shape = layer.compute_output_shape(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         for layer in self.layers:
@@ -1496,13 +1548,10 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         self.calculation = calculation
 
     def call(self, inputs, **kwargs):
-        x, mu, sigma, probs, session_id = inputs
+        x, mu, sigma, probs = inputs
 
-        if session_id is not None:
-            # Get the mean and covariance for the requested array
-            session_id = tf.cast(session_id, tf.int32)
-            mu = tf.gather(mu, session_id)
-            sigma = tf.gather(sigma, session_id)
+        # Add a small error for numerical stability
+        sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
         # Log-likelihood for each state
         ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
@@ -1526,7 +1575,7 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
         self.add_loss(nll_loss)
-        self.add_metric(nll_loss, name=self.name)
+        # self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
 
@@ -1720,6 +1769,12 @@ class MultiLayerPerceptronLayer(layers.Layer):
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+            input_shape = layer.compute_output_shape(input_shape)
+        self.built = True
+
     def call(
         self,
         inputs,
@@ -1738,7 +1793,7 @@ class MultiLayerPerceptronLayer(layers.Layer):
             reg *= self.regularizer_factor
             reg *= static_loss_scaling_factor
             self.add_loss(reg)
-            self.add_metric(reg, name=self.name)
+            # self.add_metric(reg, name=self.name)
         return inputs
 
 
@@ -1867,6 +1922,11 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         # We use self.layers for compatibility with
         # initializers.reinitialize_model_weights
         self.layers = [initial_state_probs_layer, trans_prob_layer]
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def get_stationary_distribution(self):
         trans_prob = self.get_trans_prob()
@@ -2176,7 +2236,7 @@ class SumLogLikelihoodLossLayer(layers.Layer):
 
         nll_loss = -ll_loss
         self.add_loss(nll_loss)
-        self.add_metric(nll_loss, name=self.name)
+        # self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
 
@@ -2233,6 +2293,11 @@ class EmbeddingLayer(layers.Layer):
         )
         self.layers = [self.embedding_layer]
         self.unit_norm = unit_norm
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         output = self.embedding_layer(inputs)

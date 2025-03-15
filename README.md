@@ -16,23 +16,21 @@ We recommend installing osl-dynamics within a virtual environment. You can do th
 
 Below we describe how to install osl-dynamics from source. We recommend using the conda environment files in `/envs`.
 
-### Linux
+### Linux/Mac
 
 ```
 git clone https://github.com/OHBA-analysis/osl-dynamics.git
 cd osl-dynamics
-conda env create -f envs/linux.yml
+conda env create -f envs/osld-tf.yml
 conda activate osld
 pip install -e .
 ```
 
-### Mac
+If you want GPU support, use the `osld-tf-cuda.yml` environment file.
 
-For a Mac, the installation of TensorFlow is slightly different to a Linux computer. We recommend using the lines above replacing the Linux environment file `envs/linux.yml` with the Mac environment file `envs/mac.yml`.
-
-Note, you may also need to do
+If you are using a Mac, you may also need to install
 ```
-pip install tensorflow-metal==0.7.0
+pip install tensorflow-metal==1.1
 ```
 to get your GPUs working. See [here](https://developer.apple.com/metal/tensorflow-plugin/) for further details.
 
@@ -42,46 +40,33 @@ If you are using a Windows computer, we recommend first installing Linux (Ubuntu
 
 ### Within an osl environment
 
-If you have already installed [OSL](https://github.com/OHBA-analysis/osl) you can install osl-dynamics in the `osl` environment with:
+If you have already installed [osl-ephys](https://github.com/OHBA-analysis/osl-ephys) you can install osl-dynamics in the `osl` environment with:
 ```
 conda activate osl
 cd osl-dynamics
-pip install tensorflow==2.11.0
-pip install tensorflow-probability==0.19.0
+pip install tensorflow==2.18
+pip install tensorflow-probability[tf]==0.25
 pip install -e .
 ```
-Note, if you're using a Mac computer you need to install TensorFlow with the following instead:
+
+If you want GPU support, install TensorFlow with
 ```
-pip install tensorflow-macos==2.11.0
+pip install tensorflow[and-cuda]==2.18
 ```
-You may also need to install `tensorflow-metal` with
+
+If you're using a Mac, you may also need to install:
 ```
-pip install tensorflow-metal==0.7.0
+pip install tensorflow-metal==1.1
 ```
 to use any GPUs that maybe available. See [here](https://developer.apple.com/metal/tensorflow-plugin/) for further details.
-
-### TensorFlow versions
-
-osl-dynamics has been tested with the following versions:
-
-| tensorflow  | tensorflow-probability |
-| ------------- | ------------- |
-| 2.11 | 0.19  |
-| 2.12 | 0.19  |
-| 2.13 | 0.20  |
-| 2.14 | 0.22  |
-| 2.15 | 0.22  |
 
 ### Test GPUs are working
 
 You can use the following to check if TensorFlow is using any GPUs you have available:
 ```
-conda activate osld
-python
->> import tensorflow as tf
->> print(tf.test.is_gpu_available())
+python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
-This should print `True` if you have GPUs available (and `False` otherwise).
+This should return a list of GPUs.
 
 ### Removing osl-dynamics
 
@@ -133,14 +118,9 @@ python -m build
 ```
 This will create a new directory called `dist`.
 
-5. Test the build by installing in a test conda environment, e.g. with
+5. Test the build by installing with
 ```
-conda create --name test python=3.10.14
-conda activate test
-pip install tensorflow==2.11.0 tensorflow-probability==0.19.0
 pip install dist/<build>.whl
-python examples/simulation/hmm_hmm-mvn.py
-python examples/simulation/dynemo_hmm-mvn.py
 ```
 
 6. Upload the distribution to PyPI with

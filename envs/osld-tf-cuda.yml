@@ -20,5 +20,6 @@ dependencies:
   - seaborn
   - tqdm
   - pip:
-    - tensorflow==2.18
+    - tensorflow[and-cuda]==2.18
     - tensorflow-probability[tf]==0.25
+    - osl-dynamics
