@@ -1,6 +1,4 @@
-"""Helper functions for TensorFlow operations.
-
-"""
+"""Helper functions for TensorFlow operations."""
 
 import logging
 import os

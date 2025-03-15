@@ -1,6 +1,4 @@
-"""Parcellation related classes and functions.
-
-"""
+"""Parcellation related classes and functions."""
 
 import nibabel as nib
 import numpy as np

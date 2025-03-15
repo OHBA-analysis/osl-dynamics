@@ -1,6 +1,4 @@
-"""Simulations for time series data.
-
-"""
+"""Simulations for time series data."""
 
 from osl_dynamics.simulation.base import Simulation
 from osl_dynamics.simulation.mar import MAR

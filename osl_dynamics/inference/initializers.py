@@ -1,6 +1,4 @@
-"""Initializers for TensorFlow layers.
-
-"""
+"""Initializers for TensorFlow layers."""
 
 import numpy as np
 import tensorflow as tf

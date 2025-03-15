@@ -1,6 +1,4 @@
-"""Functions for reading and writing data.
-
-"""
+"""Functions for reading and writing data."""
 
 import logging
 from os import listdir, path

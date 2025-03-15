@@ -1,6 +1,4 @@
-"""Functions to calculate static properties of time series data.
-
-"""
+"""Functions to calculate static properties of time series data."""
 
 import logging
 

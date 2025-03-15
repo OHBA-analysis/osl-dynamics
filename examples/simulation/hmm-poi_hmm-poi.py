@@ -42,7 +42,8 @@ config = Config(
     learn_log_rates=True,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=50,
+    lr_decay=0,
+    n_epochs=20,
 )
 
 model = Model(config)
@@ -53,8 +54,8 @@ model.summary()
 # Initialization
 init_history = model.random_state_time_course_initialization(
     data,
-    n_init=3,
-    n_epochs=1,
+    n_init=5,
+    n_epochs=2,
     take=1,
 )
 

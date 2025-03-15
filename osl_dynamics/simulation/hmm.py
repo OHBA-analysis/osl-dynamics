@@ -1,6 +1,4 @@
-"""Classes for simulating Hidden Markov Models (HMMs).
-
-"""
+"""Classes for simulating Hidden Markov Models (HMMs)."""
 
 import warnings
 import numpy as np

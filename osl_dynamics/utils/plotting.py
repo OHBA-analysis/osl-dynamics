@@ -1,6 +1,4 @@
-"""Plotting functions.
-
-"""
+"""Plotting functions."""
 
 import logging
 from itertools import zip_longest

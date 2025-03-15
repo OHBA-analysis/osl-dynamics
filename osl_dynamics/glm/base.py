@@ -417,8 +417,10 @@ class GLM:
         tstats : np.ndarray
             t-statistics. Shape is (n_contrasts, *target_dims).
         """
-        copes = copes or self.copes
-        varcopes = varcopes or self.varcopes
+        if copes is None:
+            copes = self.copes
+        if varcopes is None:
+            varcopes = self.varcopes
         return copes / np.sqrt(varcopes)
 
     @property

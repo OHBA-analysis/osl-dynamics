@@ -1,6 +1,4 @@
-"""Multivariate normal observation model.
-
-"""
+"""Multivariate normal observation model."""
 
 import numpy as np
 

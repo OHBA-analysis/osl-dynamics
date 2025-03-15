@@ -1,6 +1,4 @@
-"""Utility classes and functions related to the models.
-
-"""
+"""Utility classes and functions related to the models."""
 
 import re
 

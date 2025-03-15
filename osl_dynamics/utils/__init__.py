@@ -1,6 +1,4 @@
-"""Utility/helper classes and functions.
-
-"""
+"""Utility/helper classes and functions."""
 
 from osl_dynamics.utils import misc
 from osl_dynamics.utils import model

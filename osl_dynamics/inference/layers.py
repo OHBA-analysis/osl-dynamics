@@ -1172,17 +1172,14 @@ class LogLikelihoodLossLayer(layers.Layer):
 
     Parameters
     ----------
-    epsilon : float
-        Error added to the covariance matrices for numerical stability.
     calculation : str
         Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, calculation, **kwargs):
+    def __init__(self, calculation, **kwargs):
         super().__init__(**kwargs)
-        self.epsilon = epsilon
         self.calculation = calculation
 
     def call(self, inputs):
@@ -1190,9 +1187,6 @@ class LogLikelihoodLossLayer(layers.Layer):
         The method takes the data, mean vector and covariance matrix.
         """
         x, mu, sigma = inputs
-
-        # Add a small error for numerical stability
-        sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
         # Multivariate normal distribution
         mvn = tfp.distributions.MultivariateNormalTriL(
@@ -1490,25 +1484,19 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
     ----------
     n_states : int
         Number of states.
-    epsilon : float
-        Error added to the covariances for numerical stability.
     calculation : str
         Operation for reducing the time dimension. Either 'mean' or 'sum'.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, n_states, epsilon, calculation, **kwargs):
+    def __init__(self, n_states, calculation, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
-        self.epsilon = epsilon
         self.calculation = calculation
 
     def call(self, inputs, **kwargs):
         x, mu, sigma, probs, session_id = inputs
-
-        # Add a small error for numerical stability
-        sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
         if session_id is not None:
             # Get the mean and covariance for the requested array
@@ -1525,60 +1513,6 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
                 allow_nan_stats=False,
             )
             a = mvn.log_prob(x)
-            ll_loss += probs[:, :, i] * a
-
-        if self.calculation == "sum":
-            # Sum over time dimension and average over the batch dimension
-            ll_loss = tf.reduce_sum(ll_loss, axis=1)
-            ll_loss = tf.reduce_mean(ll_loss, axis=0)
-        else:
-            # Average over time and batches
-            ll_loss = tf.reduce_mean(ll_loss, axis=(0, 1))
-
-        # Add the negative log-likelihood to the loss
-        nll_loss = -ll_loss
-        self.add_loss(nll_loss)
-        self.add_metric(nll_loss, name=self.name)
-
-        return tf.expand_dims(nll_loss, axis=-1)
-
-
-class CategoricalPoissonLogLikelihoodLossLayer(layers.Layer):
-    """Layer to calculate the log-likelihood loss assuming a categorical model
-    with Poisson observation model.
-
-    Parameters
-    ----------
-    n_states : int
-        Number of states.
-    calculation : str
-        Operation for reducing the time dimension. Either 'mean' or 'sum'.
-    kwargs : keyword arguments, optional
-        Keyword arguments to pass to the base class.
-    """
-
-    def __init__(self, n_states, calculation, **kwargs):
-        super().__init__(**kwargs)
-        self.n_states = n_states
-        self.calculation = calculation
-
-    def call(self, inputs, **kwargs):
-        x, log_rate, probs, session_id = inputs
-
-        if session_id is not None:
-            # Get the mean and covariance for the requested array
-            session_id = tf.cast(session_id, tf.int32)
-            log_rate = tf.gather(log_rate, session_id)
-
-        # Log-likelihood for each state
-        ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
-        for i in range(self.n_states):
-            poi = tfp.distributions.Poisson(
-                log_rate=tf.gather(log_rate, i, axis=-2),
-                allow_nan_stats=False,
-            )
-            a = poi.log_prob(x)
-            a = tf.reduce_sum(a, axis=-1)
             ll_loss += probs[:, :, i] * a
 
         if self.calculation == "sum":
@@ -1856,9 +1790,16 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         Number of states.
     initial_trans_prob : np.ndarray
         Initial transition probability matrix.
-        Shape must be (n_states, n_states.)
-    learn : bool
+        Shape must be (n_states, n_states).
+    initial_state_probs : np.ndarray
+        Initial transition probability matrix.
+        Shape must be (n_states,)
+    learn_trans_prob : bool
         Should we learn the transition probability matrix?
+    learn_initial_state_probs : bool
+        Should we learn the initial state probabilities?
+    implementation : str, optional
+        'rescale' or 'log' implementation of the Baum-Welch algorithm.
     use_stationary_distribution : bool, optional
         Should we use the stationary distribution (estimated from the
         transition probability matrix) for the initial state probabilities?
@@ -1870,50 +1811,62 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         self,
         n_states,
         initial_trans_prob,
-        learn,
+        initial_state_probs,
+        learn_trans_prob,
+        learn_initial_state_probs,
+        implementation="rescale",
         use_stationary_distribution=False,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self.n_states = n_states
+        self.use_stationary_distribution = use_stationary_distribution
 
-        # Default initial transition probability matrix
+        # Implementation for Baum-Welch algorithm
+        if implementation not in ["rescale", "log"]:
+            raise ValueError("implementation should be 'rescale' or 'log'.")
+        self.implementation = implementation
+
+        # Initial state probabilities
+        if initial_state_probs is None:
+            initial_state_probs = np.ones(self.n_states) / self.n_states
+
+        if initial_state_probs.shape != (n_states,):
+            raise ValueError(f"initial_trans_prob shape must be ({n_states},).")
+        initial_state_probs = initial_state_probs.astype("float32")
+
+        initial_state_probs_layer = LearnableTensorLayer(
+            shape=(n_states,),
+            learn=learn_initial_state_probs,
+            initializer=osld_initializers.WeightInitializer(initial_state_probs),
+            initial_value=initial_state_probs,
+            regularizer=None,
+            name=self.name + "_initial_state_probs_kernel",
+        )
+
+        # Transition probability matrix
         if initial_trans_prob is None:
             initial_trans_prob = np.ones((n_states, n_states)) * 0.1 / (n_states - 1)
             np.fill_diagonal(initial_trans_prob, 0.9)
 
-        # Validation
         if initial_trans_prob.shape != (n_states, n_states):
             raise ValueError(
                 f"initial_trans_prob shape must be ({n_states}, {n_states})."
             )
         initial_trans_prob = initial_trans_prob.astype("float32")
 
-        # Initializer
-        initial_value = initial_trans_prob
-        initializer = osld_initializers.WeightInitializer(initial_value)
+        trans_prob_layer = LearnableTensorLayer(
+            shape=(n_states, n_states),
+            learn=learn_trans_prob,
+            initializer=osld_initializers.WeightInitializer(initial_trans_prob),
+            initial_value=initial_trans_prob,
+            regularizer=None,
+            name=self.name + "_trans_prob_kernel",
+        )
 
         # We use self.layers for compatibility with
         # initializers.reinitialize_model_weights
-        self.layers = [
-            LearnableTensorLayer(
-                shape=(n_states, n_states),
-                learn=learn,
-                initializer=initializer,
-                initial_value=initial_value,
-                regularizer=None,
-                name=self.name + "_kernel",
-            )
-        ]
-
-        # Small error for improving the numerical stability of
-        # the log-likelihood
-        self.eps = sys.float_info.epsilon
-
-        # Initial state probabilities
-        self.use_stationary_distribution = use_stationary_distribution
-        if not use_stationary_distribution:
-            self.initial_state_probs = tf.ones(self.n_states) / self.n_states
+        self.layers = [initial_state_probs_layer, trans_prob_layer]
 
     def get_stationary_distribution(self):
         trans_prob = self.get_trans_prob()
@@ -1925,12 +1878,18 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         stationary_distribution /= tf.reduce_sum(stationary_distribution)
         return stationary_distribution
 
+    def get_initial_state_probs(self):
+        if self.use_stationary_distribution:
+            return self.get_stationary_distribution()
+        else:
+            learnable_tensors_layer = self.layers[0]
+            return learnable_tensors_layer(1)
+
     def get_trans_prob(self):
-        learnable_tensors_layer = self.layers[0]
+        learnable_tensors_layer = self.layers[1]
         return learnable_tensors_layer(1)
 
     def _baum_welch(self, log_B):
-        # Helper functions
         def _get_indices(time, batch_size):
             return tf.concat(
                 [
@@ -1940,111 +1899,163 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 axis=1,
             )
 
-        def _rescale(log_probs, log_scale, indices, time, update_scale=True):
-            # Rescale probabilities to help with numerical
-            # stability (over/underflow)
-            if update_scale:
-                log_scale = tf.tensor_scatter_nd_update(
-                    log_scale, indices, tf.reduce_logsumexp(log_probs[:, time], axis=-1)
-                )
-            log_probs = tf.tensor_scatter_nd_update(
-                log_probs,
-                indices,
-                log_probs[:, time] - tf.expand_dims(log_scale[:, time], axis=-1),
-            )
-            return log_probs, log_scale
+        # Small error for improving the numerical stability of the log-likelihood
+        eps = tf.experimental.numpy.finfo(self.compute_dtype).eps
 
         # Hyperparameters
         batch_size = tf.shape(log_B)[0]
         sequence_length = tf.shape(log_B)[1]
 
         # Transition probability matrix
-        P = tf.stop_gradient(self.get_trans_prob())
-        if self.use_stationary_distribution:
-            Pi_0 = tf.stop_gradient(self.get_stationary_distribution())
-        else:
-            Pi_0 = self.initial_state_probs
-
+        P = self.get_trans_prob()
         P = tf.cast(P, self.compute_dtype)
+
+        # Initial state probailities
+        Pi_0 = self.get_initial_state_probs()
         Pi_0 = tf.cast(Pi_0, self.compute_dtype)
 
-        log_P = tf.math.log(P)
-        log_Pi_0 = tf.math.log(Pi_0)
+        if self.implementation == "rescale":
 
-        # Temporary variables used in the calculation
-        log_alpha = tf.zeros_like(log_B, dtype=self.compute_dtype)
-        log_beta = tf.zeros_like(log_B, dtype=self.compute_dtype)
-        log_scale = tf.zeros((batch_size, sequence_length), dtype=self.compute_dtype)
+            def _rescale(probs, scale, indices, time, update_scale=True):
+                # Rescale probabilities to help with numerical stability
+                # (over/underflow)
+                if update_scale:
+                    scale = tf.tensor_scatter_nd_update(
+                        scale, indices, tf.reduce_sum(probs[:, time], axis=-1)
+                    )
+                probs = tf.tensor_scatter_nd_update(
+                    probs,
+                    indices,
+                    probs[:, time] / tf.expand_dims(scale[:, time] + eps, axis=-1),
+                )
+                return probs, scale
 
-        # Forward pass
-        for i in range(sequence_length):
-            indices = _get_indices(i, batch_size)
-            if i == 0:
-                values = log_Pi_0 + log_B[:, 0]
-            else:
-                values = (
-                    tf.reduce_logsumexp(
-                        tf.expand_dims(log_alpha[:, i - 1], axis=1)
-                        + tf.transpose(log_P),
+            # Temporary variables used in the calculation
+            alpha = tf.zeros(
+                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+            )
+            beta = tf.zeros(
+                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+            )
+            scale = tf.zeros([batch_size, sequence_length], dtype=self.compute_dtype)
+
+            # Renormalise the log-likelihood for numerical stability
+            max_values = tf.reduce_max(log_B, axis=-1, keepdims=True)
+            max_values = tf.minimum(max_values, 0.0)
+            log_B -= max_values
+
+            # Calculate likelihood
+            B = tf.exp(log_B)
+
+            # Forward pass
+            for i in range(sequence_length):
+                indices = _get_indices(i, batch_size)
+                if i == 0:
+                    values = Pi_0 * B[:, 0]
+                else:
+                    values = (
+                        tf.reduce_sum(
+                            tf.expand_dims(alpha[:, i - 1], axis=1) * tf.transpose(P),
+                            axis=-1,
+                        )
+                        * B[:, i]
+                    )
+                alpha = tf.tensor_scatter_nd_update(alpha, indices, values)
+                alpha, scale = _rescale(alpha, scale, indices, i)
+
+            # Backward pass
+            for i in range(sequence_length, 0, -1):
+                indices = _get_indices(i - 1, batch_size)
+                if i == sequence_length:
+                    values = tf.ones_like(beta[:, -1])
+                else:
+                    values = tf.reduce_sum(
+                        tf.expand_dims(beta[:, i] * B[:, i], axis=1) * P,
                         axis=-1,
                     )
-                    + log_B[:, i]
-                )
-            log_alpha = tf.tensor_scatter_nd_update(log_alpha, indices, values)
-            log_alpha, log_scale = _rescale(log_alpha, log_scale, indices, i)
+                beta = tf.tensor_scatter_nd_update(beta, indices, values)
+                beta, _ = _rescale(beta, scale, indices, i - 1, update_scale=False)
 
-        # Backward pass
-        for i in range(sequence_length, 0, -1):
-            indices = _get_indices(i - 1, batch_size)
-            if i == sequence_length:
-                values = tf.zeros_like(log_beta[:, -1])
-            else:
-                values = tf.reduce_logsumexp(
-                    tf.expand_dims(log_beta[:, i] + log_B[:, i], axis=1) + log_P,
-                    axis=-1,
-                )
-            log_beta = tf.tensor_scatter_nd_update(log_beta, indices, values)
-            log_beta, _ = _rescale(
-                log_beta, log_scale, indices, i - 1, update_scale=False
+            # Marginal probabilities
+            gamma = alpha * beta
+            gamma /= tf.reduce_sum(gamma, axis=-1, keepdims=True)
+
+            # Joint probabilities
+            b = beta[:, 1:] * B[:, 1:]
+            xi = P * tf.expand_dims(alpha[:, :-1], axis=3) * tf.expand_dims(b, axis=2)
+            xi /= tf.reduce_sum(xi, axis=(2, 3), keepdims=True)
+
+        if self.implementation == "log":
+            # Temporary variables used in the calculation
+            log_alpha = tf.zeros(
+                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+            )
+            log_beta = tf.zeros(
+                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
             )
 
-        # Marginal probabilities
-        log_gamma = log_alpha + log_beta
-        log_gamma -= tf.reduce_logsumexp(log_gamma, axis=-1, keepdims=True)
+            # Calculate log probabilities
+            log_P = tf.math.log(P + eps)
+            log_Pi_0 = tf.math.log(Pi_0 + eps)
 
-        # Joint probabilities
-        log_b = log_beta[:, 1:] + log_B[:, 1:]
-        log_xi = (
-            log_P
-            + tf.expand_dims(log_alpha[:, :-1], axis=3)
-            + tf.expand_dims(log_b, axis=2)
-        )
-        log_xi -= tf.reduce_logsumexp(log_xi, axis=(2, 3), keepdims=True)
+            # Forward pass
+            for i in range(sequence_length):
+                indices = _get_indices(i, batch_size)
+                if i == 0:
+                    values = log_Pi_0 + log_B[:, 0]
+                else:
+                    values = (
+                        tf.reduce_logsumexp(
+                            tf.expand_dims(log_alpha[:, i - 1], axis=1)
+                            + tf.transpose(log_P),
+                            axis=-1,
+                        )
+                        + log_B[:, i]
+                    )
+                log_alpha = tf.tensor_scatter_nd_update(log_alpha, indices, values)
 
-        return log_gamma, log_xi
+            # Backward pass
+            for i in range(sequence_length, 0, -1):
+                indices = _get_indices(i - 1, batch_size)
+                if i == sequence_length:
+                    values = tf.zeros_like(log_beta[:, -1])
+                else:
+                    values = tf.reduce_logsumexp(
+                        tf.expand_dims(log_beta[:, i] + log_B[:, i], axis=1) + log_P,
+                        axis=-1,
+                    )
+                log_beta = tf.tensor_scatter_nd_update(log_beta, indices, values)
 
-    def _trans_prob_update(self, log_gamma, log_xi):
-        # Update for the transition probability matrix
-        log_sum_xi = tf.reduce_logsumexp(log_xi, axis=1)
-        log_sum_gamma = tf.reduce_logsumexp(log_gamma[:, :-1], axis=1)
-        log_sum_gamma = tf.expand_dims(log_sum_gamma, axis=-1)
-        log_phi_interim = tf.reduce_logsumexp(log_sum_xi, axis=0) - tf.reduce_logsumexp(
-            log_sum_gamma, axis=0
-        )
-        return tf.exp(log_phi_interim)
+            # Marginal probabilities
+            log_gamma = log_alpha + log_beta
+            log_gamma -= tf.reduce_logsumexp(log_gamma, axis=-1, keepdims=True)
+
+            # Joint probabilities
+            log_b = log_beta[:, 1:] + log_B[:, 1:]
+            log_xi = (
+                log_P
+                + tf.expand_dims(log_alpha[:, :-1], axis=3)
+                + tf.expand_dims(log_b, axis=2)
+            )
+            log_xi -= tf.reduce_logsumexp(log_xi, axis=(2, 3), keepdims=True)
+
+            # Convert from log probabilities to probabilities
+            gamma = tf.exp(log_gamma)
+            xi = tf.exp(log_xi)
+
+        return gamma, xi
+
+    def _trans_prob_update(self, gamma, xi):
+        sum_xi = tf.reduce_sum(xi, axis=(0, 1))
+        sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=(0, 1))
+        sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
+        return sum_xi / sum_gamma
 
     def call(self, log_B, **kwargs):
-        log_B = tf.stop_gradient(log_B)
-
-        # Renormalise the log-likelihood for numerical stability
-        max_values = tf.reduce_max(log_B, axis=-1, keepdims=True)
-        max_values = tf.minimum(max_values, 0.0)
-        log_B -= max_values
-
         @tf.custom_gradient
         def posterior(log_B):
             # Calculate marginal (gamma) and joint (xi) posterior
-            log_gamma, log_xi = self._baum_welch(log_B)
+            gamma, xi = self._baum_welch(log_B)
 
             # Calculate gradient for the transition probability matrix
             def grad(*args, variables):
@@ -2055,12 +2066,13 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 #
                 # This is accounted for when updating the variable
                 # in inference.optimizers.ExponentialMovingAverageOptimizer
-                phi_interim = self._trans_prob_update(log_gamma, log_xi)
-
+                phi_interim = self._trans_prob_update(gamma, xi)
                 phi_interim = tf.cast(phi_interim, tf.float32)
-                return None, [phi_interim]
+                pi0_interim = tf.reduce_mean(gamma[:, 0], axis=0)
+                pi0_interim = tf.cast(pi0_interim, tf.float32)
+                return None, [pi0_interim, phi_interim]
 
-            return (tf.exp(log_gamma), tf.exp(log_xi)), grad
+            return (gamma, xi), grad
 
         return posterior(log_B)
 
@@ -2072,40 +2084,65 @@ class SeparateLogLikelihoodLayer(layers.Layer):
     ----------
     n_states : int
         Number of states.
-    epsilon : float
-        Error added to the covariance matrices for numerical stability.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the keras.layers.Layer.
     """
 
-    def __init__(self, n_states, epsilon, **kwargs):
+    def __init__(self, n_states, **kwargs):
         super().__init__(**kwargs)
         self.n_states = n_states
-        self.epsilon = epsilon
 
     def call(self, inputs, **kwargs):
         x, mu, sigma = inputs
         # x.shape = (None, sequence_length, n_channels)
         # mu.shape = (None, n_states, n_channels)
         # sigma.shape = (None, n_states, n_channels, n_channels)
-        sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
-        n_states = tf.shape(mu)[1]
-
-        # add the sequence dimension
+        # Add the sequence length dimension
         mu = tf.expand_dims(mu, axis=1)
         sigma = tf.expand_dims(sigma, axis=1)
 
+        # Add states dimension
+        x = tf.expand_dims(x, axis=2)
+
         # Calculate log-likelihood for each state
-        log_likelihood = tf.TensorArray(tf.float32, size=n_states)
-        for state in range(n_states):
-            mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=tf.gather(mu, state, axis=-2),
-                scale_tril=tf.linalg.cholesky(tf.gather(sigma, state, axis=-3)),
-                allow_nan_stats=False,
-            )
-            log_likelihood = log_likelihood.write(state, mvn.log_prob(x))
-        log_likelihood = tf.transpose(log_likelihood.stack(), perm=[1, 2, 0])
+        mvn = tfp.distributions.MultivariateNormalTriL(
+            loc=mu,
+            scale_tril=tf.linalg.cholesky(sigma),
+            allow_nan_stats=False,
+        )
+        log_likelihood = mvn.log_prob(x)
+
+        return log_likelihood  # shape = (None, sequence_length, n_states)
+
+
+class SeparatePoissonLogLikelihoodLayer(layers.Layer):
+    """Layer to calculate the log-likelihood for different HMM-Poisson states.
+
+    Parameters
+    ----------
+    n_states : int
+        Number of states.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the keras.layers.Layer.
+    """
+
+    def __init__(self, n_states, **kwargs):
+        super().__init__(**kwargs)
+        self.n_states = n_states
+
+    def call(self, inputs, **kwargs):
+        x, log_rate = inputs
+
+        # Add the sequence length dimension
+        log_rate = tf.expand_dims(log_rate, axis=1)
+
+        # Add states dimension
+        x = tf.expand_dims(x, axis=2)
+
+        # Calculate log-likelihood for each state
+        poi = tfp.distributions.Poisson(log_rate=log_rate, allow_nan_stats=False)
+        log_likelihood = tf.reduce_sum(poi.log_prob(x), axis=-1)
 
         return log_likelihood  # shape = (None, sequence_length, n_states)
 

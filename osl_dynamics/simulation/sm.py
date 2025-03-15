@@ -1,6 +1,4 @@
-"""Classes for simulating a soft mixture of modes.
-
-"""
+"""Classes for simulating a soft mixture of modes."""
 
 import numpy as np
 from scipy.special import softmax

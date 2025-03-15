@@ -864,11 +864,7 @@ class Model(VariationalInferenceModelBase):
         covs_layer = self._select_covariance_layer()
         mix_means_layer = MixVectorsLayer(name="mix_means")
         mix_covs_layer = MixMatricesLayer(name="mix_covs")
-        ll_loss_layer = LogLikelihoodLossLayer(
-            config.covariances_epsilon,
-            config.loss_calc,
-            name="ll_loss",
-        )
+        ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
 
         # Data flow
         mu = means_layer(

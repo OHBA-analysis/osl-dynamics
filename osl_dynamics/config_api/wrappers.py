@@ -531,15 +531,15 @@ def train_hmm(
         .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html\
         #osl_dynamics.models.hmm.Config>`_. Defaults to::
 
-            {'sequence_length': 2000,
-             'batch_size': 32,
+            {'sequence_length': 200,
+             'batch_size': 256,
              'learning_rate': 0.01,
              'n_epochs': 20}.
     init_kwargs : dict, optional
         Keyword arguments to pass to
         :code:`Model.random_state_time_course_initialization`. Defaults to::
 
-            {'n_init': 3, 'n_epochs': 1}.
+            {'n_init': 5, 'n_epochs': 2}.
     fit_kwargs : dict, optional
         Keyword arguments to pass to the :code:`Model.fit`. No defaults.
     save_inf_params : bool, optional
@@ -560,8 +560,8 @@ def train_hmm(
     _logger.info("Building model")
     default_config_kwargs = {
         "n_channels": data.n_channels,
-        "sequence_length": 2000,
-        "batch_size": 32,
+        "sequence_length": 200,
+        "batch_size": 256,
         "learning_rate": 0.01,
         "n_epochs": 20,
     }
@@ -572,7 +572,7 @@ def train_hmm(
     model.summary()
 
     # Initialisation
-    default_init_kwargs = {"n_init": 3, "n_epochs": 1}
+    default_init_kwargs = {"n_init": 5, "n_epochs": 2}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
     init_history = model.random_state_time_course_initialization(

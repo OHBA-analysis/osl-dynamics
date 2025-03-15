@@ -1,6 +1,4 @@
-"""Base class for models.
-
-"""
+"""Base class for models."""
 
 import logging
 import os
@@ -425,6 +423,36 @@ class ModelBase:
             concatenate=concatenate,
         )
 
+    def bayesian_information_criterion(self, dataset):
+        """Calculate the Bayesian Information Criterion (BIC) of the model
+        for a given dataset.
+
+        Note this method uses free energy as an approximate to the negative
+        log-likelihood.
+
+        Parameters
+        ----------
+        dataset : osl_dynamics.data.Data
+            Dataset to calculate the BIC for.
+
+        Returns
+        -------
+        bic : float
+            Bayesian Information Criterion for the model (for each sequence).
+        """
+        n_sequences = dtf.get_n_sequences(
+            dataset.time_series(concatenate=True), self.config.sequence_length
+        )
+        n = self.config.sequence_length * n_sequences
+        k = self.get_n_params_generative_model()
+
+        if self.config.loss_calc == "mean":
+            k /= self.config.sequence_length
+
+        nll = self.free_energy(dataset)
+
+        return k * np.log(n) + 2 * nll
+
     def summary_string(self):
         """Return a summary of the model as a string.
 
@@ -666,13 +694,6 @@ class ModelBase:
         if single_gpu:
             config_dict["multi_gpu"] = False
 
-        if version in ["<1.1.6", "1.1.6", "1.1.7"]:
-            raise ValueError(
-                f"model was trained using osl-dynamics version {version}. "
-                + "This is incompatible with the current version. "
-                + "Please revert to v1.1.7 to load this model."
-            )
-
         # Create config object
         config = cls.config_type(**config_dict)
 
@@ -688,10 +709,6 @@ class ModelBase:
             checkpoint.restore(
                 tf.train.latest_checkpoint(f"{dirname}/checkpoints")
             ).expect_partial()
-
-            # For HMM, also need to load the trans prob
-            if config_dict["model_name"] == "HMM":
-                model.trans_prob = np.load(f"{dirname}/trans_prob.npy")
         else:
             model.load_weights(f"{dirname}/weights").expect_partial()
 
