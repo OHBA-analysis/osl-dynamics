@@ -281,8 +281,8 @@ class ModelBase:
                 kwargs,
             )
 
-        # Set the scaling factor for losses that are associated with static
-        # quantities
+        # Set the scaling factor for losses that are associated
+        # with static quantities
         self.set_static_loss_scaling_factor(x)
 
         history = self.model.fit(*args, **kwargs)

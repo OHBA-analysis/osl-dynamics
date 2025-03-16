@@ -488,6 +488,7 @@ class Model(MarkovStateInferenceModelBase):
             shape=(config.sequence_length, config.n_channels),
             name="data",
         )
+        inputs = {"data": data}
 
         # Static loss scaling factor
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
@@ -555,4 +556,4 @@ class Model(MarkovStateInferenceModelBase):
         ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
         ll_loss = ll_loss_layer([ll, gamma])
 
-        return tf.keras.Model(inputs=data, outputs=[ll_loss, gamma, xi], name="HMM")
+        return tf.keras.Model(inputs=inputs, outputs=[ll_loss, gamma, xi], name="HMM")

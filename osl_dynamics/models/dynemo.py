@@ -633,9 +633,10 @@ class Model(VariationalInferenceModelBase):
         config = self.config
 
         # Layer for input
-        inputs = layers.Input(
+        data = layers.Input(
             shape=(config.sequence_length, config.n_channels), name="data"
         )
+        inputs = {"data": data}
 
         # Static loss scaling factor
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
@@ -643,12 +644,12 @@ class Model(VariationalInferenceModelBase):
             config.loss_calc,
             name="static_loss_scaling_factor",
         )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
         # Inference RNN:
         # - Learns q(theta) ~ N(theta | inf_mu, inf_sigma), where
-        #     - inf_mu    ~ affine(RNN(inputs_<=t))
-        #     - inf_sigma ~ softplus(RNN(inputs_<=t))
+        #     - inf_mu    ~ affine(RNN(data_<=t))
+        #     - inf_sigma ~ softplus(RNN(data_<=t))
 
         # Definition of layers
         data_drop_layer = layers.Dropout(config.inference_dropout, name="data_drop")
@@ -681,7 +682,7 @@ class Model(VariationalInferenceModelBase):
         )
 
         # Data flow
-        data_drop = data_drop_layer(inputs)
+        data_drop = data_drop_layer(data)
         inf_rnn = inf_rnn_layer(data_drop)
         inf_mu = inf_mu_layer(inf_rnn)
         inf_sigma = inf_sigma_layer(inf_rnn)
@@ -711,14 +712,14 @@ class Model(VariationalInferenceModelBase):
 
         # Data flow
         mu = means_layer(
-            inputs, static_loss_scaling_factor=static_loss_scaling_factor
-        )  # inputs not used
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # data not used
         D = covs_layer(
-            inputs, static_loss_scaling_factor=static_loss_scaling_factor
-        )  # inputs not used
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # data not used
         m = mix_means_layer([alpha, mu])
         C = mix_covs_layer([alpha, D])
-        ll_loss = ll_loss_layer([inputs, m, C])
+        ll_loss = ll_loss_layer([data, m, C])
 
         # Model RNN:
         # - Learns p(theta_t |theta_<t) ~ N(theta_t | mod_mu, mod_sigma), where
