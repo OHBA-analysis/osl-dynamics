@@ -224,6 +224,12 @@ class BatchTrain:
         """Prepares the training configuration."""
         new_config = config.copy()
 
+        # Handle cross-validation splits
+        mode_name, mode_index = mode.rsplit('_', 1)
+        if mode_name != 'repeat':
+            new_config['indices'] = os.path.join(new_config['save_dir'],
+                                                 f'{mode_name}_partition/fold_indices_{mode_index}.json')
+
         # Preserve only the relevant model
         model_config = new_config['model'].get(model, {})
         new_config['model'] = {model: model_config}
@@ -237,11 +243,7 @@ class BatchTrain:
         new_config['mode'] = mode
         new_config['save_dir'] = os.path.join(config['save_dir'], f'{model}_state_{n_states}/{mode}/')
 
-        # Handle cross-validation splits
-        mode_name, mode_index = mode.rsplit('_', 1)
-        if mode_name != 'repeat':
-            new_config['indices'] = os.path.join(new_config['save_dir'],
-                                                 f'{mode_name}_partition/fold_indices_{mode_index}.json')
+
 
         return new_config
 
