@@ -318,6 +318,10 @@ def infer_spatial(
     np.save(f'{inf_params_dir}/means.npy',results[0])
     np.save(f'{inf_params_dir}/covs.npy',results[1])
 
+    # Delete the temporary directory created by the Data class
+    if data is not None:
+        data.delete_dir()
+
     spatial_params = {'means':f'{inf_params_dir}/means.npy','covariances':f'{inf_params_dir}/covs.npy'}
 
     return spatial_params
@@ -491,6 +495,10 @@ def calculate_log_likelihood(
         json.dump({'log_likelihood': log_likelihood}, file)
 
     _logger.info(f"Computed log-likelihood: {log_likelihood}")
+
+    # Delete the temporary directory created by the Data class
+    if data is not None:
+        data.delete_dir()
 
     return log_likelihood
 
