@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Union
 from itertools import product
 
-from ..evaluate.cross_validation import CrossValidationSplit
+from ..evaluate.cross_validation import CrossValidationSplit, BiCrossValidation
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -229,10 +229,10 @@ class BatchTrain:
         new_config['model'] = {model: model_config}
 
         if model != 'dynemo':
-            new_config['n_states'] = int(n_states)
+            new_config['model'][model]['config_kwargs']['n_states'] = int(n_states)
         else:
-            new_config['n_modes'] = int(n_states)
-            new_config.pop('n_states', None)
+            new_config['model'][model]['config_kwargs']['n_modes'] = int(n_states)
+            new_config['model'][model]['config_kwargs'].pop('n_states', None)
 
         new_config['mode'] = mode
         new_config['save_dir'] = os.path.join(config['save_dir'], f'{model}_state_{n_states}/{mode}/')
@@ -286,12 +286,14 @@ class BatchTrain:
 
     def _handle_ncv(self):
         """Handles naive cross-validation training."""
+        '''
         ncv = NCV(self.config)
         ncv.validate()
+        '''
 
     def _handle_bcv(self):
         """Handles bi-cross-validation training."""
-        bcv = BCV(self.config)
+        bcv = BiCrossValidation(self.config)
         bcv.validate()
 
     def _handle_repeat(self):
