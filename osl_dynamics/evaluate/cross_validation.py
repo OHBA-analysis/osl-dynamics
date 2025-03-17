@@ -147,8 +147,8 @@ class CrossValidationSplit:
             split_dict = {
                 "row_train": to_sorted_list(row_train),
                 "row_test": to_sorted_list(row_test),
-                "column_train": to_sorted_list(col_train),
-                "column_test": to_sorted_list(col_test),
+                "column_X": to_sorted_list(col_train),
+                "column_Y": to_sorted_list(col_test),
             }
             with open(os.path.join(save_dir, f"fold_indices_{i + 1}.json"), "w") as f:
                 json.dump(split_dict, f, indent=4)
