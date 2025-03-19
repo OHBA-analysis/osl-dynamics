@@ -419,6 +419,8 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
     ----------
     sample_dataset : tf.data.Dataset
         A dataset containing a representative batch of data used to compute gradients.
+    loss_indices : int or list of int
+        Indices of the losses in the model output.
     log_dir : str, optional
         Path to a directory where gradient logs will be saved.
         Defaults to None, in which case the logs will be written to a current directory.
@@ -430,12 +432,18 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
     def __init__(
         self,
         sample_dataset,
+        loss_indices,
         log_dir=None,
         print_stats=True,
     ):
         super().__init__()
         self.sample_dataset = sample_dataset
+        self.loss_indices = loss_indices
         self.print_stats = print_stats
+
+        # Validate inputs
+        if isinstance(loss_indices, int):
+            self.loss_indices = [loss_indices]
 
         # Prepare a log directory
         if log_dir is None:
@@ -446,19 +454,20 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
     @tf.function
     def compute_gradients(self, inputs):
         """Compute gradients for a given input batch.
+        If there is more than one loss, losses are summed before computing gradients.
 
         Parameters
         ----------
         inputs : tf.Tensor
             Input batch.
         """
-        n_losses = 1
-        if "HMM" not in self.model.name:
-            n_losses += 1
-
         with tf.GradientTape() as tape:
-            outputs = self.model(inputs, training=True)[:n_losses]
-            loss = tf.reduce_sum(outputs)
+            outputs = self.model(inputs, training=True)
+            if len(self.loss_indices) > 1:
+                loss = [outputs[idx] for idx in self.loss_indices]
+                loss = tf.add_n(loss)
+            else:
+                loss = outputs[self.loss_indices]
         return tape.gradient(loss, self.model.trainable_variables)
 
     def on_epoch_end(self, epoch, logs=None):
