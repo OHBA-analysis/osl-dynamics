@@ -558,7 +558,9 @@ class VariationalInferenceModelBase(ModelBase):
         in the model.
         """
         if self.config.do_kl_annealing:
-            kl_loss_layer = self.model.get_layer("kl_loss")
+            kl_loss_layer = self.model.get_layer(
+                "encoder"
+            ).temporal_prior_layer.kl_loss_layer
             kl_loss_layer.annealing_factor.assign(0.0)
 
     def reset_weights(self, keep=None):
@@ -789,7 +791,7 @@ class VariationalInferenceModelBase(ModelBase):
             step_size = None
 
         dataset = self.make_dataset(dataset, step_size=step_size)
-        alpha_layer = self.model.get_layer("alpha")
+        alpha_layer = self.model.get_layer("encoder").alpha_layer
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
@@ -862,8 +864,9 @@ class VariationalInferenceModelBase(ModelBase):
             step_size = None
 
         dataset = self.make_dataset(dataset, step_size=step_size)
-        alpha_layer = self.model.get_layer("alpha")
-        beta_layer = self.model.get_layer("beta")
+        encoder_layer = self.model.get_layer("encoder")
+        alpha_layer = encoder_layer.alpha_layer
+        beta_layer = encoder_layer.beta_layer
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
