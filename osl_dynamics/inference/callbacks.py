@@ -383,7 +383,7 @@ class TensorBoardCallback(callbacks.TensorBoard):
         # Get arguments
         self.log_initial = log_initial  # enable or disable initial weight logging
         self.initial_weights_logged = False  # log status
-        self.step_offset = step_offset # offset to add to the epoch number
+        self.step_offset = step_offset  # offset to add to the epoch number
 
         super().__init__(log_dir=self._log_dir, **kwargs)
 
@@ -419,7 +419,7 @@ class TensorBoardCallback(callbacks.TensorBoard):
         global_epoch = epoch + self.step_offset
 
         self._log_epoch_metrics(global_epoch, logs)
-        
+
         if self.histogram_freq and global_epoch % self.histogram_freq == 0:
             self._log_weights(global_epoch)
 
@@ -492,15 +492,15 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
             else:
                 loss = outputs[self.loss_indices[0]]
         return tape.gradient(loss, self.model.trainable_variables)
-    
+
     def _convert_grad_to_dense(self, gradient):
         """Convert a gradient to a dense tensor if necessary.
-        
+
         Parameters
         ----------
         gradient : tf.Tensor, tf.IndexedSlices, tf.SparseTensor
             Gradient to convert to a dense tensor.
-        
+
         Returns
         -------
         converted_gradient : tf.Tensor
@@ -564,11 +564,15 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
 
         # Group gradients by layer
         layer_gradients = {}
-        for i, (grad, var) in enumerate(zip(averaged_gradients, self.model.trainable_variables)):
+        for i, (grad, var) in enumerate(
+            zip(averaged_gradients, self.model.trainable_variables)
+        ):
             var_name = var.name
             layer_name = var_name.split("/")[0]  # get the first part as the layer name.
             if grad is not None:
-                layer_gradients.setdefault(layer_name, []).append((grad, var, sparse_flags[i]))
+                layer_gradients.setdefault(layer_name, []).append(
+                    (grad, var, sparse_flags[i])
+                )
 
         # Log and print gradient summary statistics for each layer
         with self.writer.as_default():
@@ -595,7 +599,9 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
                         # Compute statistics for non-zero entries
                         nonzero_mask = tf.not_equal(grad, 0)
                         nonzero_vals = tf.boolean_mask(grad, nonzero_mask)
-                        nonzero_ratio = tf.cast(tf.size(nonzero_vals), tf.float32) / tf.cast(tf.size(grad), tf.float32)
+                        nonzero_ratio = tf.cast(
+                            tf.size(nonzero_vals), tf.float32
+                        ) / tf.cast(tf.size(grad), tf.float32)
 
                         # Print summary statistics
                         if self.print_stats:
@@ -608,13 +614,19 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
                             )
                             print(f"    L2 Norm: {grad_norm.numpy():.5f}")
                             if flag:
-                                print(f"    Non-zero ratio: {nonzero_ratio.numpy():.5f}")
+                                print(
+                                    f"    Non-zero ratio: {nonzero_ratio.numpy():.5f}"
+                                )
 
                         # Log gradient histogram and scalar summaries
                         if not self.log_as_dense and flag:
-                            tf.summary.histogram(f"gradients/{var.name}_nonzero", logged_grad, step=step)
+                            tf.summary.histogram(
+                                f"gradients/{var.name}_nonzero", logged_grad, step=step
+                            )
                         else:
-                            tf.summary.histogram(f"gradients/{var.name}", grad, step=step)
+                            tf.summary.histogram(
+                                f"gradients/{var.name}", grad, step=step
+                            )
                         tf.summary.scalar(
                             f"gradients/{var.name}_mean", grad_mean, step=step
                         )
@@ -631,7 +643,9 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
                             f"gradients/{var.name}_norm", grad_norm, step=step
                         )
                         tf.summary.scalar(
-                            f"gradients/{var.name}_nonzero_ratio", nonzero_ratio, step=step
+                            f"gradients/{var.name}_nonzero_ratio",
+                            nonzero_ratio,
+                            step=step,
                         )
                     else:
                         if self.print_stats:
