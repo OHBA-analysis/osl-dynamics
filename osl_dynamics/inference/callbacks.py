@@ -369,11 +369,13 @@ class TensorBoardCallback(callbacks.TensorBoard):
         Defaults to None, in which case the logs will be written to a current directory.
     log_initial : bool, optional
         Whether to log the initial weights or not. Defaults to True.
+    step_offset : int, optional
+        Offset to add to the epoch number when logging gradients. Defaults to 0.
     kwargs : dict
         Additional arguments to pass to the :code:`tf.keras.callbacks.TensorBoard` callback.
     """
 
-    def __init__(self, log_dir=None, log_initial=True, **kwargs):
+    def __init__(self, log_dir=None, log_initial=True, step_offset=0, **kwargs):
         # Create log directory if it does not exist
         self._log_dir = log_dir
         self._make_log_dir()
@@ -381,6 +383,7 @@ class TensorBoardCallback(callbacks.TensorBoard):
         # Get arguments
         self.log_initial = log_initial  # enable or disable initial weight logging
         self.initial_weights_logged = False  # log status
+        self.step_offset = step_offset # offset to add to the epoch number
 
         super().__init__(log_dir=self._log_dir, **kwargs)
 
@@ -411,6 +414,18 @@ class TensorBoardCallback(callbacks.TensorBoard):
                 "Initial weights logged. You can launch TensorBoard to view the histograms."
             )
 
+    def on_epoch_end(self, epoch, logs=None):
+        # Compute a continuous global step by adding an offset
+        global_epoch = epoch + self.step_offset
+
+        self._log_epoch_metrics(global_epoch, logs)
+        
+        if self.histogram_freq and global_epoch % self.histogram_freq == 0:
+            self._log_weights(global_epoch)
+
+        if self.embeddings_freq and global_epoch % self.embeddings_freq == 0:
+            self._log_embeddings(global_epoch)
+
 
 class GradientMonitoringCallback(tf.keras.callbacks.Callback):
     """Callback for logging gradients during the model training.
@@ -427,6 +442,8 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
     log_as_dense : bool, optional
         Whether to log gradients as dense tensors or not. Defaults to True.
         If False, only non-zero gradients will be logged (if the gradient is sparse).
+    step_offset : int, optional
+        Offset to add to the epoch number when logging gradients. Defaults to 0.
     print_stats : bool, optional
         Wheter to print the summary statistics (mean, std, min, max, L2 norm) for each variable.
         Defaults to True.
@@ -438,12 +455,14 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
         loss_indices,
         log_dir=None,
         log_as_dense=True,
+        step_offset=0,
         print_stats=True,
     ):
         super().__init__()
         self.sample_dataset = sample_dataset
         self.loss_indices = loss_indices
         self.log_as_dense = log_as_dense
+        self.step_offset = step_offset
         self.print_stats = print_stats
 
         # Validate inputs
@@ -506,6 +525,9 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
+        # Define logging step
+        step = epoch + self.step_offset
+
         # Initialize accumulators for each trainable variable
         accumulated_gradients = [None] * len(self.model.trainable_variables)
         sparse_flags = [True] * len(self.model.trainable_variables)
@@ -590,26 +612,26 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
 
                         # Log gradient histogram and scalar summaries
                         if not self.log_as_dense and flag:
-                            tf.summary.histogram(f"gradients/{var.name}_nonzero", logged_grad, step=epoch)
+                            tf.summary.histogram(f"gradients/{var.name}_nonzero", logged_grad, step=step)
                         else:
-                            tf.summary.histogram(f"gradients/{var.name}", grad, step=epoch)
+                            tf.summary.histogram(f"gradients/{var.name}", grad, step=step)
                         tf.summary.scalar(
-                            f"gradients/{var.name}_mean", grad_mean, step=epoch
+                            f"gradients/{var.name}_mean", grad_mean, step=step
                         )
                         tf.summary.scalar(
-                            f"gradients/{var.name}_std", grad_std, step=epoch
+                            f"gradients/{var.name}_std", grad_std, step=step
                         )
                         tf.summary.scalar(
-                            f"gradients/{var.name}_min", grad_min, step=epoch
+                            f"gradients/{var.name}_min", grad_min, step=step
                         )
                         tf.summary.scalar(
-                            f"gradients/{var.name}_max", grad_max, step=epoch
+                            f"gradients/{var.name}_max", grad_max, step=step
                         )
                         tf.summary.scalar(
-                            f"gradients/{var.name}_norm", grad_norm, step=epoch
+                            f"gradients/{var.name}_norm", grad_norm, step=step
                         )
                         tf.summary.scalar(
-                            f"gradients/{var.name}_nonzero_ratio", nonzero_ratio, step=epoch
+                            f"gradients/{var.name}_nonzero_ratio", nonzero_ratio, step=step
                         )
                     else:
                         if self.print_stats:
