@@ -9,6 +9,7 @@ from typing import Union
 from itertools import product
 
 from ..evaluate.cross_validation import CrossValidationSplit, BiCrossValidation
+from ..config_api.wrappers import train_model
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -305,17 +306,19 @@ class BatchTrain:
         self._run_pipeline(self.config['save_dir'])
 
     def _run_pipeline(self, save_dir: str, indices_path: str = None):
-        from osl_dynamics.config_api.pipeline import run_pipeline_from_file
         """Runs the training pipeline with the given save directory and optional indices."""
-        prepare_config = {'load_data': self.config['load_data']}
+        # Get model and model_kwargs
         model, model_kwargs = next(iter(self.config['model'].items()))
-        prepare_config[f'train_{model}'] = model_kwargs
 
-        #if model != 'dynemo':
-        #    prepare_config[f'train_{model}']['config_kwargs']['n_states'] = self.config['n_states']
-        #else:
-        #    prepare_config[f'train_{model}']['config_kwargs']['n_modes'] = self.config['n_modes']
+        prepare_config = {'model_type':model,
+                           'data':self.config['load_data'],
+                           'output_dir':save_dir}
 
+        # Add keys only if they exist in self.model_kwargs
+        for key in ["config_kwargs", "init_kwargs", "fit_kwargs"]:
+            if key in model_kwargs:
+                prepare_config[key] = model_kwargs[key]
+        prepare_config['data'].setdefault('kwargs', {})['store_dir'] = f'{save_dir}/tmp/'
         if indices_path:
             prepare_config['keep_list'] = indices_path
 
@@ -323,4 +326,4 @@ class BatchTrain:
         with open(config_path, 'w') as file:
             yaml.safe_dump(prepare_config, file, default_flow_style=False)
 
-        run_pipeline_from_file(config_path, save_dir)
+        train_model(**prepare_config)
