@@ -446,7 +446,7 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
         Offset to add to the epoch number when logging gradients. Defaults to 0.
     print_stats : bool, optional
         Wheter to print the summary statistics (mean, std, min, max, L2 norm) for each variable.
-        Defaults to True.
+        Defaults to False.
     """
 
     def __init__(
@@ -456,7 +456,7 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
         log_dir=None,
         log_as_dense=True,
         step_offset=0,
-        print_stats=True,
+        print_stats=False,
     ):
         super().__init__()
         self.sample_dataset = sample_dataset
@@ -581,7 +581,6 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
                     print(f"\nLayer: {layer}")
                 for grad, var, flag in grad_var_pairs:
                     if grad is not None:
-
                         if not self.log_as_dense and flag:
                             # Log only non-zero entries, given that the gradient is sparse
                             logged_grad = tf.boolean_mask(grad, tf.not_equal(grad, 0))
