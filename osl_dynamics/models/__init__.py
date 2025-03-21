@@ -9,6 +9,7 @@ from osl_dynamics.models import (
     hmm_poi,
     hive,
     dive,
+    dyneste,
 )
 from osl_dynamics.utils import misc
 
@@ -19,6 +20,7 @@ models = {
     "HMM-Poisson": hmm_poi.Model,
     "HIVE": hive.Model,
     "DIVE": dive.Model,
+    "DyNeStE": dyneste.Model,
 }
 
 
