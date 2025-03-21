@@ -243,7 +243,7 @@ class BatchTrain:
         new_config['mode'] = mode
         new_config['save_dir'] = os.path.join(config['save_dir'], f'{model}_state_{n_states}/{mode}/')
 
-
+        new_config.pop('n_states')
 
         return new_config
 
@@ -300,20 +300,21 @@ class BatchTrain:
 
     def _handle_repeat(self):
         """Handles repeated training mode."""
-        temp_save_dir = os.path.join(self.config['save_dir'], 'tmp/')
-        os.makedirs(temp_save_dir, exist_ok=True)
-        self._run_pipeline(temp_save_dir)
+        #temp_save_dir = os.path.join(self.config['save_dir'], 'tmp/')
+        #os.makedirs(temp_save_dir, exist_ok=True)
+        self._run_pipeline(self.config['save_dir'])
 
     def _run_pipeline(self, save_dir: str, indices_path: str = None):
+        from osl_dynamics.config_api.pipeline import run_pipeline_from_file
         """Runs the training pipeline with the given save directory and optional indices."""
         prepare_config = {'load_data': self.config['load_data']}
         model, model_kwargs = next(iter(self.config['model'].items()))
         prepare_config[f'train_{model}'] = model_kwargs
 
-        if model != 'dynemo':
-            prepare_config[f'train_{model}']['config_kwargs']['n_states'] = self.config['n_states']
-        else:
-            prepare_config[f'train_{model}']['config_kwargs']['n_modes'] = self.config['n_modes']
+        #if model != 'dynemo':
+        #    prepare_config[f'train_{model}']['config_kwargs']['n_states'] = self.config['n_states']
+        #else:
+        #    prepare_config[f'train_{model}']['config_kwargs']['n_modes'] = self.config['n_modes']
 
         if indices_path:
             prepare_config['keep_list'] = indices_path
