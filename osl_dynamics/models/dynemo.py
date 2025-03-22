@@ -773,16 +773,16 @@ class Model(VariationalInferenceModelBase):
         ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
 
         # ---------- Forward pass ---------- #
-        inputs = tf.keras.layers.Input(
+        data = tf.keras.layers.Input(
             shape=(config.sequence_length, config.n_channels), name="data"
         )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
-
-        alpha, theta_norm, kl_loss = encoder_layer(inputs)
-        mu = means_layer(inputs, static_loss_scaling_factor=static_loss_scaling_factor)
-        D = covs_layer(inputs, static_loss_scaling_factor=static_loss_scaling_factor)
+        inputs = {"data": data}
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+        alpha, theta_norm, kl_loss = encoder_layer(data)
+        mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
+        D = covs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         m, C = decoder_layer([mu, D, alpha])
-        ll_loss = ll_loss_layer([inputs, m, C])
+        ll_loss = ll_loss_layer([data, m, C])
 
         return tf.keras.Model(
             inputs=inputs,
