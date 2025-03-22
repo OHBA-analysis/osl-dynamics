@@ -1,18 +1,9 @@
 """Custom TensorFlow optimizers."""
 
-from packaging import version
-
 import tensorflow as tf
 
-if version.parse(tf.__version__) < version.parse("2.12"):
-    from keras.optimizers.optimizer_v2.optimizer_v2 import OptimizerV2 as Optimizer
-elif version.parse(tf.__version__) < version.parse("2.13"):
-    from keras.optimizers.legacy.optimizer_v2 import OptimizerV2 as Optimizer
-else:
-    from keras.optimizers.legacy import Optimizer
 
-
-class ExponentialMovingAverage(Optimizer):
+class ExponentialMovingAverage(tf.keras.optimizers.Optimizer):
     """Optimizer for applying a exponential moving average update.
 
     Parameters
@@ -22,67 +13,52 @@ class ExponentialMovingAverage(Optimizer):
         calculated as :code:`(1-decay) * old + decay * new`.
     """
 
-    def __init__(self, decay=0.1):
-        super().__init__(name="EMAOptimizer")
+    def __init__(self, learning_rate, decay=0.1):
+        super().__init__(learning_rate, name="EMAOptimizer")
         self.decay = decay
 
-    @tf.function
-    def _resource_apply_dense(self, grad, var):
-        # grad should be the new value for var
-        return var.assign((1.0 - self.decay) * var + self.decay * grad)
+    def update_step(self, gradient, variable, learning_rate):
+        value = (1.0 - self.decay) * variable + self.decay * gradient
+        self.assign(variable, value)
 
 
-class MarkovStateModelOptimizer(Optimizer):
+class MarkovStateModelOptimizer(tf.keras.optimizers.Optimizer):
     """Optimizer for a model containing a hidden state Markov chain.
 
     Parameters
     ----------
-    ema_optimizer : osl_dynamics.inference.optimizers.ExponentialMovingAverage
-        Exponential moving average optimizer for the transition
-        probability matrix.
     base_optimizer : tf.keras.optimizers.Optimizer
         A TensorFlow optimizer for all other trainable model variables.
+    ema_optimizer : osl_dynamics.inference.optimizers.ExponentialMovingAverage
+        Exponential moving average optimizer.
+    ema_variable : list
+        List of trainable variables to update with the EMA optimizer.
     learning_rate : float
         Learning rate for the base optimizer.
     """
 
-    def __init__(self, ema_optimizer, base_optimizer, learning_rate):
-        super().__init__(name="MarkovStateModelOptimizer")
-
-        # Set learning rate for this optimizer (needed to avoid and error)
-        self._set_hyper("learning_rate", learning_rate)
-
-        # Moving average optimizer for the transition probability matrix
-        self.ema_optimizer = ema_optimizer
-
-        # Optimizer for all other trainable variables
+    def __init__(self, base_optimizer, ema_optimizer, ema_variables, learning_rate):
+        super().__init__(learning_rate, name="MarkovStateModelOptimizer")
         self.base_optimizer = base_optimizer
-        self.base_optimizer._set_hyper("learning_rate", self.learning_rate)
+        self.ema_optimizer = ema_optimizer
+        self.ema_variable_ids = [id(v) for v in ema_variables]
 
-    def _create_slots(self, var_list):
-        self.base_optimizer._create_slots(var_list)
+    def apply_gradients(self, grads_and_vars, **kwargs):
+        # Split variables
+        base_grads, base_vars = [], []
+        ema_grads, ema_vars = [], []
+        for g, v in grads_and_vars:
+            if id(v) in self.ema_variable_ids:
+                ema_grads.append(g)
+                ema_vars.append(v)
+            else:
+                base_grads.append(g)
+                base_vars.append(v)
 
-    def _prepare_local(self, var_device, var_dtype, apply_state):
-        return self.base_optimizer._prepare_local(
-            var_device,
-            var_dtype,
-            apply_state,
-        )
+        # Apply gradients with the base optimizer
+        if base_grads and base_vars:
+            self.base_optimizer.apply_gradients(zip(base_grads, base_vars))
 
-    def _resource_apply_dense(self, grad, var, **kwargs):
-        if "hid_state_inf" in var.name:
-            # This is a HiddenMarkovStateInferenceLayer, use a moving
-            # average to update the transition probability matrix
-            updated_var = self.ema_optimizer._resource_apply_dense(grad, var)
-        else:
-            # This is a normal TensorFlow variable,
-            # use the base optimizer to update this variable
-            updated_var = self.base_optimizer._resource_apply_dense(
-                grad,
-                var,
-                **kwargs,
-            )
-        return updated_var
-
-    def _resource_apply_sparse(self, *args, **kwargs):
-        return self.base_optimizer._resource_apply_sparse(*args, **kwargs)
+        # Apply gradients with the EMA optimizer
+        if ema_grads and ema_vars:
+            self.ema_optimizer.apply_gradients(zip(ema_grads, ema_vars))

@@ -238,7 +238,7 @@ class Model(MarkovStateInferenceModelBase):
         """
         means, covs = self.get_means_covariances()
         ll_layer = self.model.get_layer("ll")
-        return ll_layer([x, [means], [covs]]).numpy()
+        return ll_layer([x, [means], [covs]])
 
     def set_means(self, means, update_initializer=True):
         """Set the state means.
@@ -488,6 +488,7 @@ class Model(MarkovStateInferenceModelBase):
             shape=(config.sequence_length, config.n_channels),
             name="data",
         )
+        inputs = {"data": data}
 
         # Static loss scaling factor
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
@@ -535,11 +536,12 @@ class Model(MarkovStateInferenceModelBase):
 
         # Log-likelihood
         ll_layer = SeparateLogLikelihoodLayer(config.n_states, name="ll")
-        ll = ll_layer([data, [mu], [D]])
+        ll = ll_layer([data, mu, D])
 
         # Hidden state inference
         hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
             config.n_states,
+            config.sequence_length,
             config.initial_trans_prob,
             config.initial_state_probs,
             config.learn_trans_prob,
@@ -554,4 +556,4 @@ class Model(MarkovStateInferenceModelBase):
         ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
         ll_loss = ll_loss_layer([ll, gamma])
 
-        return tf.keras.Model(inputs=data, outputs=[ll_loss, gamma, xi], name="HMM")
+        return tf.keras.Model(inputs=inputs, outputs=[ll_loss, gamma, xi], name="HMM")

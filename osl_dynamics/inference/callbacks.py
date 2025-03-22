@@ -225,7 +225,9 @@ class KLAnnealingCallback(callbacks.Callback):
             new_value = 1.0
 
         # Update the annealing factor in the layer that calculates the KL loss
-        kl_loss_layer = self.model.get_layer("kl_loss")
+        kl_loss_layer = self.model.get_layer(
+            "encoder"
+        ).temporal_prior_layer.kl_loss_layer
         kl_loss_layer.annealing_factor.assign(new_value)
 
         # Annealing factor for gamma sampling
@@ -236,6 +238,8 @@ class KLAnnealingCallback(callbacks.Callback):
         if "covs_dev_mag" in self.model.layers:
             covs_dev_mag_layer = self.model.get_layer("covs_dev_mag")
             covs_dev_mag_layer.annealing_factor.assign(new_value)
+
+        logs["kl_factor"] = new_value
 
 
 class EMADecayCallback(callbacks.Callback):

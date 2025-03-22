@@ -42,7 +42,7 @@ def get_observation_model_parameter(model, layer_name):
             f"Layer name {layer_name} not in available layers {available_layers}."
         )
     obs_layer = model.get_layer(layer_name)
-    obs_parameter = obs_layer(1)
+    obs_parameter = obs_layer(tf.constant(1))
     return obs_parameter.numpy()
 
 

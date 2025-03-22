@@ -435,6 +435,11 @@ class SoftmaxLayer(layers.Layer):
             )
         ]
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
+
     def call(self, inputs, **kwargs):
         temperature = self.layers[0](inputs)
         return activations.softmax(inputs / temperature, axis=-1)
@@ -519,12 +524,12 @@ class LearnableTensorLayer(layers.Layer):
 
         # Add regularization to the loss and display while training
         self.add_loss(reg)
-        self.add_metric(reg, name=self.name)
+        # self.add_metric(reg, name=self.name)
 
     def build(self, input_shape):
         # Create a weight for the tensor
         self.tensor = self.add_weight(
-            "tensor",
+            name="tensor",
             shape=self.shape,
             dtype=tf.float32,
             initializer=self.tensor_initializer,
@@ -604,6 +609,11 @@ class VectorsLayer(layers.Layer):
                 name=self.name + "_kernel",
             )
         ]
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         """
@@ -702,6 +712,11 @@ class CovarianceMatricesLayer(layers.Layer):
                 name=self.name + "_kernel",
             )
         ]
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         """
@@ -802,6 +817,11 @@ class CorrelationMatricesLayer(layers.Layer):
             )
         ]
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
+
     def call(self, inputs, **kwargs):
         """
         Note
@@ -900,6 +920,11 @@ class DiagonalMatricesLayer(layers.Layer):
             )
         ]
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
+
     def call(self, inputs, **kwargs):
         """
         Note
@@ -986,6 +1011,11 @@ class DampedOscillatorLayer(layers.Layer):
 
         self.layers = [self.damping, self.frequency, self.amplitude]
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
+
     def call(self, inputs, **kwargs):
         """Calculate damped oscillator.
 
@@ -1052,6 +1082,11 @@ class DampedOscillatorCovarianceMatricesLayer(layers.Layer):
         )
 
         self.layers = [self.oscillator_layer]
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         """Retrieve the covariance matrices.
@@ -1122,6 +1157,11 @@ class MatrixLayer(layers.Layer):
             raise ValueError("Please use constraint='diagonal' or 'covariance.'")
 
         self.layers = [self.matrix_layer]
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         """
@@ -1219,7 +1259,7 @@ class LogLikelihoodLossLayer(layers.Layer):
         # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
         self.add_loss(nll_loss)
-        self.add_metric(nll_loss, name=self.name)
+        # self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
 
@@ -1320,7 +1360,7 @@ class KLLossLayer(layers.Layer):
 
         # Add to loss
         self.add_loss(kl_loss)
-        self.add_metric(kl_loss, name=self.name)
+        # self.add_metric(kl_loss, name=self.name)
 
         return tf.expand_dims(kl_loss, axis=-1)
 
@@ -1380,6 +1420,12 @@ class InferenceRNNLayer(layers.Layer):
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+            input_shape = layer.compute_output_shape(input_shape)
+        self.built = True
+
     def call(self, inputs, **kwargs):
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
@@ -1438,6 +1484,12 @@ class ModelRNNLayer(layers.Layer):
             self.layers.append(NormalizationLayer(norm_type))
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+            input_shape = layer.compute_output_shape(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         for layer in self.layers:
@@ -1510,13 +1562,10 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         self.calculation = calculation
 
     def call(self, inputs, **kwargs):
-        x, mu, sigma, probs, session_id = inputs
+        x, mu, sigma, probs = inputs
 
-        if session_id is not None:
-            # Get the mean and covariance for the requested array
-            session_id = tf.cast(session_id, tf.int32)
-            mu = tf.gather(mu, session_id)
-            sigma = tf.gather(sigma, session_id)
+        # Add a small error for numerical stability
+        sigma = add_epsilon(sigma, self.epsilon, diag=True)
 
         # Log-likelihood for each state
         ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
@@ -1540,7 +1589,7 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
         self.add_loss(nll_loss)
-        self.add_metric(nll_loss, name=self.name)
+        # self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
 
@@ -1734,6 +1783,12 @@ class MultiLayerPerceptronLayer(layers.Layer):
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+            input_shape = layer.compute_output_shape(input_shape)
+        self.built = True
+
     def call(
         self,
         inputs,
@@ -1752,7 +1807,7 @@ class MultiLayerPerceptronLayer(layers.Layer):
             reg *= self.regularizer_factor
             reg *= static_loss_scaling_factor
             self.add_loss(reg)
-            self.add_metric(reg, name=self.name)
+            # self.add_metric(reg, name=self.name)
         return inputs
 
 
@@ -1802,6 +1857,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
     ----------
     n_states : int
         Number of states.
+    sequence_length : int
+        Length of the sequence.
     initial_trans_prob : np.ndarray
         Initial transition probability matrix.
         Shape must be (n_states, n_states).
@@ -1824,6 +1881,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
     def __init__(
         self,
         n_states,
+        sequence_length,
         initial_trans_prob,
         initial_state_probs,
         learn_trans_prob,
@@ -1834,6 +1892,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
     ):
         super().__init__(**kwargs)
         self.n_states = n_states
+        self.sequence_length = sequence_length
         self.use_stationary_distribution = use_stationary_distribution
 
         # Implementation for Baum-Welch algorithm
@@ -1882,6 +1941,11 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         # initializers.reinitialize_model_weights
         self.layers = [initial_state_probs_layer, trans_prob_layer]
 
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
+
     def get_stationary_distribution(self):
         trans_prob = self.get_trans_prob()
         eigval, eigvec = tf.linalg.eig(trans_prob)
@@ -1897,11 +1961,11 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             return self.get_stationary_distribution()
         else:
             learnable_tensors_layer = self.layers[0]
-            return learnable_tensors_layer(1)
+            return learnable_tensors_layer(tf.constant(1))
 
     def get_trans_prob(self):
         learnable_tensors_layer = self.layers[1]
-        return learnable_tensors_layer(1)
+        return learnable_tensors_layer(tf.constant(1))
 
     def _baum_welch(self, log_B):
         def _get_indices(time, batch_size):
@@ -1962,33 +2026,53 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             B = tf.exp(log_B)
 
             # Forward pass
-            for i in range(sequence_length):
+            def cond(i, alpha, scale):
+                return i < self.sequence_length
+
+            def body(i, alpha, scale):
                 indices = _get_indices(i, batch_size)
-                if i == 0:
-                    values = Pi_0 * B[:, 0]
-                else:
-                    values = (
+                values = tf.cond(
+                    tf.equal(i, 0),
+                    lambda: Pi_0 * B[:, 0],
+                    lambda: (
                         tf.reduce_sum(
                             tf.expand_dims(alpha[:, i - 1], axis=1) * tf.transpose(P),
                             axis=-1,
                         )
                         * B[:, i]
-                    )
+                    ),
+                )
                 alpha = tf.tensor_scatter_nd_update(alpha, indices, values)
                 alpha, scale = _rescale(alpha, scale, indices, i)
+                return i + 1, alpha, scale
+
+            i = tf.constant(0)
+            _, alpha, scale = tf.while_loop(
+                cond=cond, body=body, loop_vars=[i, alpha, scale]
+            )
 
             # Backward pass
-            for i in range(sequence_length, 0, -1):
+            def cond(i, beta, scale):
+                return i > 0
+
+            def body(i, beta, scale):
                 indices = _get_indices(i - 1, batch_size)
-                if i == sequence_length:
-                    values = tf.ones_like(beta[:, -1])
-                else:
-                    values = tf.reduce_sum(
+                values = tf.cond(
+                    tf.equal(i, self.sequence_length),
+                    lambda: tf.ones_like(beta[:, -1]),
+                    lambda: tf.reduce_sum(
                         tf.expand_dims(beta[:, i] * B[:, i], axis=1) * P,
                         axis=-1,
-                    )
+                    ),
+                )
                 beta = tf.tensor_scatter_nd_update(beta, indices, values)
                 beta, _ = _rescale(beta, scale, indices, i - 1, update_scale=False)
+                return i - 1, beta, scale
+
+            i = tf.constant(self.sequence_length)
+            _, beta, scale = tf.while_loop(
+                cond=cond, body=body, loop_vars=[i, beta, scale]
+            )
 
             # Marginal probabilities
             gamma = alpha * beta
@@ -2013,32 +2097,48 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             log_Pi_0 = tf.math.log(Pi_0 + eps)
 
             # Forward pass
-            for i in range(sequence_length):
+            def cond(i, log_alpha):
+                return i < self.sequence_length
+
+            def body(i, log_alpha):
                 indices = _get_indices(i, batch_size)
-                if i == 0:
-                    values = log_Pi_0 + log_B[:, 0]
-                else:
-                    values = (
+                values = tf.cond(
+                    tf.equal(i, 0),
+                    lambda: log_Pi_0 + log_B[:, 0],
+                    lambda: (
                         tf.reduce_logsumexp(
                             tf.expand_dims(log_alpha[:, i - 1], axis=1)
                             + tf.transpose(log_P),
                             axis=-1,
                         )
                         + log_B[:, i]
-                    )
+                    ),
+                )
                 log_alpha = tf.tensor_scatter_nd_update(log_alpha, indices, values)
+                return i + 1, log_alpha
+
+            i = tf.constant(0)
+            _, log_alpha = tf.while_loop(cond=cond, body=body, loop_vars=[i, log_alpha])
 
             # Backward pass
-            for i in range(sequence_length, 0, -1):
+            def cond(i, log_beta):
+                return i > 0
+
+            def body(i, log_beta):
                 indices = _get_indices(i - 1, batch_size)
-                if i == sequence_length:
-                    values = tf.zeros_like(log_beta[:, -1])
-                else:
-                    values = tf.reduce_logsumexp(
+                values = tf.cond(
+                    tf.equal(i, self.sequence_length),
+                    lambda: tf.zeros_like(log_beta[:, -1]),
+                    lambda: tf.reduce_logsumexp(
                         tf.expand_dims(log_beta[:, i] + log_B[:, i], axis=1) + log_P,
                         axis=-1,
-                    )
+                    ),
+                )
                 log_beta = tf.tensor_scatter_nd_update(log_beta, indices, values)
+                return i - 1, log_beta
+
+            i = tf.constant(self.sequence_length)
+            _, log_beta = tf.while_loop(cond=cond, body=body, loop_vars=[i, log_beta])
 
             # Marginal probabilities
             log_gamma = log_alpha + log_beta
@@ -2071,24 +2171,39 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             # Calculate marginal (gamma) and joint (xi) posterior
             gamma, xi = self._baum_welch(log_B)
 
-            # Calculate gradient for the transition probability matrix
-            def grad(*args, variables):
+            # Calculate gradient
+            def grad(*args, **kwargs):
                 # Note, this function actually returns the estimated
                 # value for what the transition probability matrix
                 # should be based on the joint and marginal posterior
-                # rather than the gradient.
+                # rather than the gradient (i.e. change in the parameter).
                 #
                 # This is accounted for when updating the variable
                 # in inference.optimizers.ExponentialMovingAverageOptimizer
-                phi_interim = self._trans_prob_update(gamma, xi)
-                phi_interim = tf.cast(phi_interim, tf.float32)
-                pi0_interim = tf.reduce_mean(gamma[:, 0], axis=0)
-                pi0_interim = tf.cast(pi0_interim, tf.float32)
-                return None, [pi0_interim, phi_interim]
+
+                if len(kwargs) == 0:
+                    # No trainable variables to calculate the gradient for
+                    return
+
+                grads = []
+                variables = kwargs["variables"]
+                for v in variables:
+                    if "trans_prob" in v.name:
+                        update = self._trans_prob_update(gamma, xi)
+                    if "initial_state_probs" in v.name:
+                        update = tf.reduce_mean(gamma[:, 0], axis=0)
+                    update = tf.cast(update, tf.float32)
+                    grads.append(update)
+                return None, grads
 
             return (gamma, xi), grad
 
         return posterior(log_B)
+
+    def compute_output_shape(self, input_shape):
+        output_shape_0 = input_shape
+        output_shape_1 = [input_shape[0], input_shape[1], self.n_states, self.n_states]
+        return (output_shape_0, tuple(output_shape_1))
 
 
 class SeparateLogLikelihoodLayer(layers.Layer):
@@ -2113,8 +2228,8 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         # sigma.shape = (None, n_states, n_channels, n_channels)
 
         # Add the sequence length dimension
-        mu = tf.expand_dims(mu, axis=1)
-        sigma = tf.expand_dims(sigma, axis=1)
+        mu = tf.expand_dims(mu, axis=-3)
+        sigma = tf.expand_dims(sigma, axis=-4)
 
         # Calculate log-likelihood for each state
         log_likelihood = tf.TensorArray(tf.float32, size=self.n_states)
@@ -2128,6 +2243,10 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         log_likelihood = tf.transpose(log_likelihood.stack(), perm=[1, 2, 0])
 
         return log_likelihood  # shape = (None, sequence_length, n_states)
+
+    def compute_output_shape(self, input_shape):
+        output_shape = input_shape[0]
+        return output_shape
 
 
 class SeparatePoissonLogLikelihoodLayer(layers.Layer):
@@ -2190,7 +2309,7 @@ class SumLogLikelihoodLossLayer(layers.Layer):
 
         nll_loss = -ll_loss
         self.add_loss(nll_loss)
-        self.add_metric(nll_loss, name=self.name)
+        # self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
 
@@ -2247,6 +2366,11 @@ class EmbeddingLayer(layers.Layer):
         )
         self.layers = [self.embedding_layer]
         self.unit_norm = unit_norm
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
 
     def call(self, inputs, **kwargs):
         output = self.embedding_layer(inputs)
