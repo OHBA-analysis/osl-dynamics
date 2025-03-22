@@ -4,7 +4,6 @@ channels:
 dependencies:
   - python=3.12
   - pip
-  - cmake
   - jupyter
   - matplotlib
   - mne
@@ -19,6 +18,6 @@ dependencies:
   - scikit-learn
   - seaborn
   - tqdm
-  - pip:
-    - tensorflow==2.18
-    - tensorflow-probability[tf]==0.25
+  - tensorflow==2.18
+  - tensorflow-probability==0.25
+  - tf-keras==2.18

@@ -1544,7 +1544,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         return sim.generate_states(n_samples)
 
     def free_energy(self, dataset, **kwargs):
-        """Get the variational free energy of HMM-based models.
+        r"""Get the variational free energy of HMM-based models.
 
         This calculates:
 
