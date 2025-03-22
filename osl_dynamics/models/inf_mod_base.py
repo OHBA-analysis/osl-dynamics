@@ -1028,8 +1028,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
 
         # Callback for updating the the decay rate used in the
-        # EMA update of the transition probability matrix
-        trans_prob_decay_callback = callbacks.EMADecayCallback(
+        # EMA update of the HMM parameters
+        ema_prob_decay_callback = callbacks.EMADecayCallback(
             delay=self.config.trans_prob_update_delay,
             forget=self.config.trans_prob_update_forget,
             n_epochs=self.config.n_epochs,
@@ -1039,7 +1039,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         args, kwargs = replace_argument(
             self.model.fit,
             "callbacks",
-            [lr_callback, trans_prob_decay_callback],
+            [lr_callback, ema_prob_decay_callback],
             args,
             kwargs,
             append=True,
@@ -1056,13 +1056,14 @@ class MarkovStateInferenceModelBase(ModelBase):
             Optimizer to use when compiling.
         """
 
-        # Moving average optimizer for the transition probability matrix
+        # EMA optimizer for HMM state parameters
         decay = (
             1 + self.config.trans_prob_update_delay
         ) ** -self.config.trans_prob_update_forget
         ema_optimizer = optimizers.ExponentialMovingAverage(
             self.config.learning_rate, decay
         )
+        ema_variables = self.model.get_layer("hid_state_inf").trainable_variables
 
         # Optimizer for all other trainable parameters
         base_optimizer = tf.keras.optimizers.get(
@@ -1076,8 +1077,9 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # Combine into a single optimizer for the model
         optimizer = optimizers.MarkovStateModelOptimizer(
-            ema_optimizer,
             base_optimizer,
+            ema_optimizer,
+            ema_variables,
             learning_rate=self.config.learning_rate,
         )
 

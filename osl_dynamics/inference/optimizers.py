@@ -3,7 +3,7 @@
 import tensorflow as tf
 
 
-class ExponentialMovingAverage(tf.keras.Optimizer):
+class ExponentialMovingAverage(tf.keras.optimizers.Optimizer):
     """Optimizer for applying a exponential moving average update.
 
     Parameters
@@ -18,41 +18,47 @@ class ExponentialMovingAverage(tf.keras.Optimizer):
         self.decay = decay
 
     def update_step(self, gradient, variable, learning_rate):
-        learning_rate = tf.cast(learning_rate, variable.dtype)
-        gradient = tf.cast(gradient, variable.dtype)
-        self.assign(variable, (1.0 - self.decay) * variable + self.decay * gradient)
+        value = (1.0 - self.decay) * variable + self.decay * gradient
+        self.assign(variable, value)
 
 
-class MarkovStateModelOptimizer(tf.keras.Optimizer):
+class MarkovStateModelOptimizer(tf.keras.optimizers.Optimizer):
     """Optimizer for a model containing a hidden state Markov chain.
 
     Parameters
     ----------
-    ema_optimizer : osl_dynamics.inference.optimizers.ExponentialMovingAverage
-        Exponential moving average optimizer for the transition
-        probability matrix.
     base_optimizer : tf.keras.optimizers.Optimizer
         A TensorFlow optimizer for all other trainable model variables.
+    ema_optimizer : osl_dynamics.inference.optimizers.ExponentialMovingAverage
+        Exponential moving average optimizer.
+    ema_variable : list
+        List of trainable variables to update with the EMA optimizer.
     learning_rate : float
         Learning rate for the base optimizer.
     """
 
-    def __init__(self, ema_optimizer, base_optimizer, learning_rate):
+    def __init__(self, base_optimizer, ema_optimizer, ema_variables, learning_rate):
         super().__init__(learning_rate, name="MarkovStateModelOptimizer")
-
-        # Moving average optimizer for the transition probability matrix
-        self.ema_optimizer = ema_optimizer
-
-        # Optimizer for all other trainable variables
         self.base_optimizer = base_optimizer
+        self.ema_optimizer = ema_optimizer
+        self.ema_variable_ids = [id(v) for v in ema_variables]
 
-    def build(self, var_list):
-        self.base_optimizer.build(
-            [v for v in var_list if "hid_state_inf" not in v.name]
-        )
+    def apply_gradients(self, grads_and_vars, **kwargs):
+        # Split variables
+        base_grads, base_vars = [], []
+        ema_grads, ema_vars = [], []
+        for g, v in grads_and_vars:
+            if id(v) in self.ema_variable_ids:
+                ema_grads.append(g)
+                ema_vars.append(v)
+            else:
+                base_grads.append(g)
+                base_vars.append(v)
 
-    def update_step(self, gradient, variable, learning_rate):
-        if "hid_state_inf" in variable.name:
-            self.ema_optimizer.update_step(gradient, variable, learning_rate)
-        else:
-            self.base_optimizer.update_step(gradient, variable, learning_rate)
+        # Apply gradients with the base optimizer
+        if base_grads and base_vars:
+            self.base_optimizer.apply_gradients(zip(base_grads, base_vars))
+
+        # Apply gradients with the EMA optimizer
+        if ema_grads and ema_vars:
+            self.ema_optimizer.apply_gradients(zip(ema_grads, ema_vars))

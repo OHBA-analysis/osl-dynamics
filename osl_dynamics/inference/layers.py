@@ -2022,33 +2022,53 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             B = tf.exp(log_B)
 
             # Forward pass
-            for i in range(self.sequence_length):
+            def cond(i, alpha, scale):
+                return i < self.sequence_length
+
+            def body(i, alpha, scale):
                 indices = _get_indices(i, batch_size)
-                if i == 0:
-                    values = Pi_0 * B[:, 0]
-                else:
-                    values = (
+                values = tf.cond(
+                    tf.equal(i, 0),
+                    lambda: Pi_0 * B[:, 0],
+                    lambda: (
                         tf.reduce_sum(
                             tf.expand_dims(alpha[:, i - 1], axis=1) * tf.transpose(P),
                             axis=-1,
                         )
                         * B[:, i]
-                    )
+                    ),
+                )
                 alpha = tf.tensor_scatter_nd_update(alpha, indices, values)
                 alpha, scale = _rescale(alpha, scale, indices, i)
+                return i + 1, alpha, scale
+
+            i = tf.constant(0)
+            _, alpha, scale = tf.while_loop(
+                cond=cond, body=body, loop_vars=[i, alpha, scale]
+            )
 
             # Backward pass
-            for i in range(self.sequence_length, 0, -1):
+            def cond(i, beta, scale):
+                return i > 0
+
+            def body(i, beta, scale):
                 indices = _get_indices(i - 1, batch_size)
-                if i == self.sequence_length:
-                    values = tf.ones_like(beta[:, -1])
-                else:
-                    values = tf.reduce_sum(
+                values = tf.cond(
+                    tf.equal(i, self.sequence_length),
+                    lambda: tf.ones_like(beta[:, -1]),
+                    lambda: tf.reduce_sum(
                         tf.expand_dims(beta[:, i] * B[:, i], axis=1) * P,
                         axis=-1,
-                    )
+                    ),
+                )
                 beta = tf.tensor_scatter_nd_update(beta, indices, values)
                 beta, _ = _rescale(beta, scale, indices, i - 1, update_scale=False)
+                return i - 1, beta, scale
+
+            i = tf.constant(self.sequence_length)
+            _, beta, scale = tf.while_loop(
+                cond=cond, body=body, loop_vars=[i, beta, scale]
+            )
 
             # Marginal probabilities
             gamma = alpha * beta
@@ -2073,32 +2093,48 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             log_Pi_0 = tf.math.log(Pi_0 + eps)
 
             # Forward pass
-            for i in range(self.sequence_length):
+            def cond(i, log_alpha):
+                return i < self.sequence_length
+
+            def body(i, log_alpha):
                 indices = _get_indices(i, batch_size)
-                if i == 0:
-                    values = log_Pi_0 + log_B[:, 0]
-                else:
-                    values = (
+                values = tf.cond(
+                    tf.equal(i, 0),
+                    lambda: log_Pi_0 + log_B[:, 0],
+                    lambda: (
                         tf.reduce_logsumexp(
                             tf.expand_dims(log_alpha[:, i - 1], axis=1)
                             + tf.transpose(log_P),
                             axis=-1,
                         )
                         + log_B[:, i]
-                    )
+                    ),
+                )
                 log_alpha = tf.tensor_scatter_nd_update(log_alpha, indices, values)
+                return i + 1, log_alpha
+
+            i = tf.constant(0)
+            _, log_alpha = tf.while_loop(cond=cond, body=body, loop_vars=[i, log_alpha])
 
             # Backward pass
-            for i in range(self.sequence_length, 0, -1):
+            def cond(i, log_beta):
+                return i > 0
+
+            def body(i, log_beta):
                 indices = _get_indices(i - 1, batch_size)
-                if i == self.sequence_length:
-                    values = tf.zeros_like(log_beta[:, -1])
-                else:
-                    values = tf.reduce_logsumexp(
+                values = tf.cond(
+                    tf.equal(i, self.sequence_length),
+                    lambda: tf.zeros_like(log_beta[:, -1]),
+                    lambda: tf.reduce_logsumexp(
                         tf.expand_dims(log_beta[:, i] + log_B[:, i], axis=1) + log_P,
                         axis=-1,
-                    )
+                    ),
+                )
                 log_beta = tf.tensor_scatter_nd_update(log_beta, indices, values)
+                return i - 1, log_beta
+
+            i = tf.constant(self.sequence_length)
+            _, log_beta = tf.while_loop(cond=cond, body=body, loop_vars=[i, log_beta])
 
             # Marginal probabilities
             log_gamma = log_alpha + log_beta
@@ -2131,20 +2167,30 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             # Calculate marginal (gamma) and joint (xi) posterior
             gamma, xi = self._baum_welch(log_B)
 
-            # Calculate gradient for the transition probability matrix
-            def grad(*args, variables):
+            # Calculate gradient
+            def grad(*args, **kwargs):
                 # Note, this function actually returns the estimated
                 # value for what the transition probability matrix
                 # should be based on the joint and marginal posterior
-                # rather than the gradient.
+                # rather than the gradient (i.e. change in the parameter).
                 #
                 # This is accounted for when updating the variable
                 # in inference.optimizers.ExponentialMovingAverageOptimizer
-                phi_interim = self._trans_prob_update(gamma, xi)
-                phi_interim = tf.cast(phi_interim, tf.float32)
-                pi0_interim = tf.reduce_mean(gamma[:, 0], axis=0)
-                pi0_interim = tf.cast(pi0_interim, tf.float32)
-                return None, [pi0_interim, phi_interim]
+
+                if len(kwargs) == 0:
+                    # No trainable variables to calculate the gradient for
+                    return
+
+                grads = []
+                variables = kwargs["variables"]
+                for v in variables:
+                    if "trans_prob" in v.name:
+                        update = self._trans_prob_update(gamma, xi)
+                    if "initial_state_probs" in v.name:
+                        update = tf.reduce_mean(gamma[:, 0], axis=0)
+                    update = tf.cast(update, tf.float32)
+                    grads.append(update)
+                return None, grads
 
             return (gamma, xi), grad
 
