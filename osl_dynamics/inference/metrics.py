@@ -95,7 +95,7 @@ def dice_coefficient(sequence_1, sequence_2):
 
 
 def frobenius_norm(A, B):
-    """Calculates the Frobenius norm of the difference of two matrices.
+    r"""Calculates the Frobenius norm of the difference of two matrices.
 
     The Frobenius norm is calculated as
     :math:`\sqrt{\displaystyle\sum_{ij} |a_{ij} - b_{ij}|^2}`.
@@ -181,7 +181,7 @@ def pairwise_matrix_correlations(matrices, remove_diagonal=False):
 
 
 def riemannian_distance(M1, M2, threshold=1e-3):
-    """Calculate the Riemannian distance between two matrices.
+    r"""Calculate the Riemannian distance between two matrices.
 
     The Riemannian distance is defined as
     :math:`d = \sqrt{\displaystyle\sum \log(\mathrm{eig}(M_1 * M_2))}`.
