@@ -10,33 +10,75 @@ If you find this toolbox useful, please cite:
 
 ## Installation
 
-### Conda
+We recommend using the conda environment files in `/envs`, which can be installed using [Miniforge](https://conda-forge.org/download/) (or [Anaconda](https://www.anaconda.com/docs/getting-started/anaconda/install)/[Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install)) and [Mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html).
 
-We recommend installing osl-dynamics within a virtual environment. You can do this with [Anaconda](https://docs.anaconda.com/free/anaconda/install/index.html) (or [miniconda](https://docs.conda.io/projects/miniconda/en/latest/miniconda-install.html).
+### Conda / Mamba
 
-Below we describe how to install osl-dynamics from source. We recommend using the conda environment files in `/envs`.
+Miniforge (`conda`) can be installed with:
+```
+wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+bash Miniforge3-$(uname)-$(uname -m).sh
+rm Miniforge3-$(uname)-$(uname -m).sh
+```
+
+Mamba (`mamba`) can be installed with:
+```
+conda install -n base -c conda-forge mamba
+```
 
 ### Linux/Mac
 
 ```
+wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/conda-envs/envs/osld-tf.yml
+mamba env create -f osld-tf.yml
+rm osld-tf.yml
+```
+If you have a GPU, then use the `osld-tf-cuda.yml` environment.
+
+### Windows
+
+If you are using a Windows computer, we recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions [here](https://ubuntu.com/wsl). Then follow the instructions above in the Ubuntu terminal.
+
+### Source code
+
+An editable local copy of the GitHub repo can be installed within the `osld` environment (created above):
+```
+conda activate osld
 git clone https://github.com/OHBA-analysis/osl-dynamics.git
 cd osl-dynamics
-conda env create -f envs/osld-tf.yml
+pip install -e .
+```
+
+### hbaws (Oxford)
+
+On the OHBA workstation (hbaws), install Miniforge and Mamba using the instructions above and install osl-dynamics using:
+```
+git clone https://github.com/OHBA-analysis/osl-dynamics.git
+cd osl-dynamics
+mamba env create -f envs/hbaws.yml
 conda activate osld
 pip install -e .
 ```
 
-If you want GPU support, use the `osld-tf-cuda.yml` environment file.
+### BMRC (Oxford)
 
-If you are using a Mac, you may also need to install
+On the Biomedical Research Computing (BMRC) cluster, `mamba` is available as a software module:
 ```
-pip install tensorflow-metal==1.1
+module load Miniforge3
 ```
-to get your GPUs working. See [here](https://developer.apple.com/metal/tensorflow-plugin/) for further details.
+On `compg017` you will need to set the following to use conda:
+```
+unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
+```
 
-### Windows
-
-If you are using a Windows computer, we recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions [here](https://ubuntu.com/wsl). Then following the instructions above in the Ubuntu terminal.
+osl-dynamics can be installed with:
+```
+git clone https://github.com/OHBA-analysis/osl-dynamics.git
+cd osl-dynamics
+mamba env create -f envs/bmrc.yml
+conda activate osld
+pip install -e .
+```
 
 ### Within an osl environment
 
@@ -44,21 +86,15 @@ If you have already installed [osl-ephys](https://github.com/OHBA-analysis/osl-e
 ```
 conda activate osl
 cd osl-dynamics
-pip install tensorflow==2.18
+pip install tensorflow==2.19
 pip install tensorflow-probability[tf]==0.25
 pip install -e .
 ```
 
 If you want GPU support, install TensorFlow with
 ```
-pip install tensorflow[and-cuda]==2.18
+pip install tensorflow[and-cuda]==2.19
 ```
-
-If you're using a Mac, you may also need to install:
-```
-pip install tensorflow-metal==1.1
-```
-to use any GPUs that maybe available. See [here](https://developer.apple.com/metal/tensorflow-plugin/) for further details.
 
 ### Test GPUs are working
 
@@ -80,7 +116,7 @@ rm -rf osl-dynamics
 
 The read the docs page should be automatically updated whenever there's a new commit on the `main` branch.
 
-The documentation is included as docstrings in the source code. Please write docstrings to any classes or functions you add following the [numpy style](https://numpydoc.readthedocs.io/en/latest/format.html). The API reference documentation will only be automatically generated if the docstrings are written correctly. The documentation directory `/doc` also contains `.rst` files that provide additional info regarding installation, development, the models, etc.
+The documentation is included as docstrings in the source code. The API reference documentation will only be automatically generated if the docstrings are written correctly. The documentation directory `/doc` also contains `.rst` files that provide additional info regarding installation, development, the models, etc.
 
 To compile the documentation locally you need to install the required packages (sphinx, etc.) in your conda environment:
 ```
