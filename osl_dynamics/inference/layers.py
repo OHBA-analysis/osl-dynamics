@@ -382,12 +382,16 @@ class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
             temperature, trainable=False, dtype=tf.float32, name="gs_temperature"
         )
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         """This method accepts logits and outputs samples."""
-        gs = tfp.distributions.RelaxedOneHotCategorical(
-            temperature=self.temperature, logits=inputs
-        )
-        return gs.sample()
+        if training:
+            gs = tfp.distributions.RelaxedOneHotCategorical(
+                temperature=self.temperature, logits=inputs
+            )
+            return gs.sample()
+        else:
+            softmaxed_logits = tf.nn.softmax(inputs / self.temperature, axis=-1)
+            return softmaxed_logits
 
 
 class SampleOneHotCategoricalDistributionLayer(layers.Layer):

@@ -66,18 +66,17 @@ On the Biomedical Research Computing (BMRC) cluster, `mamba` is available as a s
 ```
 module load Miniforge3
 ```
-On `compg017` you will need to set the following to use conda:
-```
-unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
-```
-
-osl-dynamics can be installed with:
+and osl-dynamics can be installed with:
 ```
 git clone https://github.com/OHBA-analysis/osl-dynamics.git
 cd osl-dynamics
 mamba env create -f envs/bmrc.yml
 conda activate osld
 pip install -e .
+```
+The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
+```
+unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
 ```
 
 ### Within an osl environment
