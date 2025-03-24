@@ -492,3 +492,68 @@ def first_eigenvector(matrix: np.ndarray):
     eigenvector = np.squeeze(eigenvector)
     # Ensure that the returned eigenvector has norm 1
     return eigenvector / (np.linalg.norm(eigenvector) + 1e-10)
+
+def demean_list(data, demean_index=-1):
+    '''
+    demean across a list of lists.
+    Return the de-meaned list
+    Parameters
+    ----------
+    data: list
+        the input list to be demeaned
+    demean_index: int, optional
+        The index to use as the baseline for demeaning. If -1, demean across the mean of all data points.
+    Returns
+    -------
+    demeaned_data: list
+        the demeaned data. Nan values are chopped out.
+    '''
+    # Check whether the input is a list
+    print('#############################')
+    print('We are in the function')
+    print('Demean_index is: ', demean_index)
+    print('############################')
+    if not isinstance(data, list):
+        raise TypeError('The input should be a list of lists!')
+    data = np.array(data)
+    print('data shape is:', data.shape)
+    if not data.ndim == 2:
+        raise ValueError('The input should be a list of lists!')
+    if demean_index == -1:
+        data -= np.nanmean(data, axis=0, keepdims=True)
+    else:
+        if demean_index < 0 or demean_index >= data.shape[0]:
+            raise IndexError('demean_index out of range')
+        mean_values = data[demean_index: demean_index + 1, :]
+        data = data - mean_values
+
+        print(data)
+
+    return [[elem for elem in row if not np.isnan(elem)] for row in data]
+
+
+def filter_nan_values(data):
+    '''
+    Filter out the nan values across a list of lists.
+    Return the filtered list
+    Parameters
+    ----------
+    data: list
+        the input list to be filtered
+
+    Returns
+    -------
+    filtered_data: list
+        the filtered data. Nan values are chopped out.
+        '''
+    # Check whether the input is a list
+    if not isinstance(data, list):
+        raise TypeError('The input should be a list of lists!')
+    filtered_data = []
+    for sublist in data:
+        if not isinstance(sublist, list):
+            raise TypeError('The input should be a list of lists!')
+        filtered_sublist = [item for item in sublist if not np.isnan(item)]
+        filtered_data.append(filtered_sublist)
+
+    return filtered_data
