@@ -2027,33 +2027,53 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             B = tf.exp(log_B)
 
             # Forward pass
-            for i in range(self.sequence_length):
+            def cond(i, alpha, scale):
+                return i < self.sequence_length
+
+            def body(i, alpha, scale):
                 indices = _get_indices(i, batch_size)
-                if i == 0:
-                    values = Pi_0 * B[:, 0]
-                else:
-                    values = (
+                values = tf.cond(
+                    tf.equal(i, 0),
+                    lambda: Pi_0 * B[:, 0],
+                    lambda: (
                         tf.reduce_sum(
                             tf.expand_dims(alpha[:, i - 1], axis=1) * tf.transpose(P),
                             axis=-1,
                         )
                         * B[:, i]
-                    )
+                    ),
+                )
                 alpha = tf.tensor_scatter_nd_update(alpha, indices, values)
                 alpha, scale = _rescale(alpha, scale, indices, i)
+                return i + 1, alpha, scale
+
+            i = tf.constant(0)
+            _, alpha, scale = tf.while_loop(
+                cond=cond, body=body, loop_vars=[i, alpha, scale]
+            )
 
             # Backward pass
-            for i in range(self.sequence_length, 0, -1):
+            def cond(i, beta, scale):
+                return i > 0
+
+            def body(i, beta, scale):
                 indices = _get_indices(i - 1, batch_size)
-                if i == self.sequence_length:
-                    values = tf.ones_like(beta[:, -1])
-                else:
-                    values = tf.reduce_sum(
+                values = tf.cond(
+                    tf.equal(i, self.sequence_length),
+                    lambda: tf.ones_like(beta[:, -1]),
+                    lambda: tf.reduce_sum(
                         tf.expand_dims(beta[:, i] * B[:, i], axis=1) * P,
                         axis=-1,
-                    )
+                    ),
+                )
                 beta = tf.tensor_scatter_nd_update(beta, indices, values)
                 beta, _ = _rescale(beta, scale, indices, i - 1, update_scale=False)
+                return i - 1, beta, scale
+
+            i = tf.constant(self.sequence_length)
+            _, beta, scale = tf.while_loop(
+                cond=cond, body=body, loop_vars=[i, beta, scale]
+            )
 
             # Marginal probabilities
             gamma = alpha * beta
@@ -2066,11 +2086,13 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
         if self.implementation == "log":
             # Temporary variables used in the calculation
-            log_alpha = tf.TensorArray(
-                dtype=self.compute_dtype, size=self.sequence_length
+            log_alpha = tf.zeros(
+                [batch_size, self.sequence_length, self.n_states],
+                dtype=self.compute_dtype,
             )
-            log_beta = tf.TensorArray(
-                dtype=self.compute_dtype, size=self.sequence_length
+            log_beta = tf.zeros(
+                [batch_size, self.sequence_length, self.n_states],
+                dtype=self.compute_dtype,
             )
 
             # Calculate log probabilities
@@ -2078,32 +2100,48 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             log_Pi_0 = tf.math.log(Pi_0 + eps)
 
             # Forward pass
-            log_alpha = log_alpha.write(0, log_Pi_0 + log_B[:, 0])
-            for i in tf.range(1, self.sequence_length):
-                prev_alpha = log_alpha.read(i - 1)
-                values = (
-                    tf.reduce_logsumexp(
-                        tf.expand_dims(prev_alpha, axis=1) + tf.transpose(log_P),
-                        axis=-1,
-                    )
-                    + log_B[:, i]
+            def cond(i, log_alpha):
+                return i < self.sequence_length
+
+            def body(i, log_alpha):
+                indices = _get_indices(i, batch_size)
+                values = tf.cond(
+                    tf.equal(i, 0),
+                    lambda: log_Pi_0 + log_B[:, 0],
+                    lambda: (
+                        tf.reduce_logsumexp(
+                            tf.expand_dims(log_alpha[:, i - 1], axis=1)
+                            + tf.transpose(log_P),
+                            axis=-1,
+                        )
+                        + log_B[:, i]
+                    ),
                 )
-                log_alpha = log_alpha.write(i, values)
+                log_alpha = tf.tensor_scatter_nd_update(log_alpha, indices, values)
+                return i + 1, log_alpha
+
+            i = tf.constant(0)
+            _, log_alpha = tf.while_loop(cond=cond, body=body, loop_vars=[i, log_alpha])
 
             # Backward pass
-            log_beta = log_beta.write(
-                self.sequence_length - 1,
-                tf.zeros([batch_size, self.n_states], dtype=self.compute_dtype),
-            )
-            for i in tf.range(self.sequence_length - 2, -1, -1):
-                next_beta = log_beta.read(i + 1)
-                values = tf.reduce_logsumexp(
-                    tf.expand_dims(next_beta + log_B[:, i + 1], axis=1) + log_P, axis=-1
-                )
-                log_beta = log_beta.write(i, values)
+            def cond(i, log_beta):
+                return i > 0
 
-            log_alpha = tf.transpose(log_alpha.stack(), [1, 0, 2])
-            log_beta = tf.transpose(log_beta.stack(), [1, 0, 2])
+            def body(i, log_beta):
+                indices = _get_indices(i - 1, batch_size)
+                values = tf.cond(
+                    tf.equal(i, self.sequence_length),
+                    lambda: tf.zeros_like(log_beta[:, -1]),
+                    lambda: tf.reduce_logsumexp(
+                        tf.expand_dims(log_beta[:, i] + log_B[:, i], axis=1) + log_P,
+                        axis=-1,
+                    ),
+                )
+                log_beta = tf.tensor_scatter_nd_update(log_beta, indices, values)
+                return i - 1, log_beta
+
+            i = tf.constant(self.sequence_length)
+            _, log_beta = tf.while_loop(cond=cond, body=body, loop_vars=[i, log_beta])
 
             # Marginal probabilities
             log_gamma = log_alpha + log_beta
