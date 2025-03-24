@@ -44,6 +44,9 @@ class MarkovStateModelOptimizer(tf.keras.optimizers.Optimizer):
         self.ema_variable_ids = [id(v) for v in ema_variables]
 
     def apply_gradients(self, grads_and_vars, **kwargs):
+        # Update base optimizer learning rate
+        self.base_optimizer.learning_rate.assign(self.learning_rate)
+
         # Split variables
         base_grads, base_vars = [], []
         ema_grads, ema_vars = [], []
