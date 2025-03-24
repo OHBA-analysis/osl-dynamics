@@ -381,6 +381,98 @@ def list_stds(list_of_lists):
     """
     return apply_to_lists(list_of_lists, func=np.std)
 
+def hrf_function(t, alpha1=6, alpha2=16, beta1=1, beta2=1, c=1/6, normalize=False):
+    """
+    Generates a hemodynamic response function (HRF) using a two-gamma function model.
+
+    Parameters
+    ----------
+    t : array-like
+        The time vector in seconds over which to evaluate the HRF.
+    alpha1 : float, optional
+        Shape parameter for the first gamma function (default is 6).
+    alpha2 : float, optional
+        Shape parameter for the second (undershoot) gamma function (default is 16).
+    beta1 : float, optional
+        Rate parameter for the first gamma function (default is 1).
+    beta2 : float, optional
+        Rate parameter for the second (undershoot) gamma function (default is 1).
+    c : float, optional
+        Scaling factor for the second gamma function (default is 1/6).
+    normalize : bool, optional
+        If True, scales the HRF so that convolving a unit-variance signal will
+        maintain unit variance (default is False).
+
+    Returns
+    -------
+    hrf : array
+        The HRF values corresponding to the time points in `t`.
+
+    Notes
+    -----
+    The function models the BOLD response with two gamma functions: a positive peak followed by
+    a delayed undershoot.
+    """
+    from scipy.special import gamma
+    # First gamma function (positive peak)
+    gamma1 = (t ** (alpha1 - 1)) * (beta1 ** alpha1) * np.exp(-beta1 * t) / gamma(alpha1)
+
+    # Second gamma function (undershoot)
+    gamma2 = (t ** (alpha2 - 1)) * (beta2 ** alpha2) * np.exp(-beta2 * t) / gamma(alpha2)
+
+    # HRF as the combination of both gamma functions
+    hrf = gamma1 - c * gamma2
+
+    # Normalize HRF if required
+    if normalize:
+        hrf /= np.sqrt(np.sum(hrf ** 2))
+
+    return hrf
+
+
+def apply_hrf(x, tr, hrf_length=30, normalize=False):
+    """
+    Convolves an input neuronal time series with a hemodynamic response function (HRF).
+
+    Parameters
+    ----------
+    x : np.ndarray, shape (N_timepoints, N_channels)
+        The neuronal time series to which the HRF will be applied. Each column corresponds
+        to the time series of a different channel.
+    tr : float
+        The time resolution (repetition time, TR) of the input data in seconds (default is 2.0 seconds).
+    hrf_length : int, optional
+        The duration of the HRF in seconds (default is 30 seconds).
+    normalize : bool, optional
+        If True, normalizes the HRF so that convolving a unit-variance signal will maintain unit variance.
+
+
+    Returns
+    -------
+    y : np.ndarray, shape (N_timepoints, N_channels)
+        The time series after convolution with the HRF, with the same shape as the input `x`.
+
+    Notes
+    -----
+    The function convolves the neuronal time series with the HRF for each channel. The HRF is
+    modeled by the two-gamma function as implemented in `hrf_function`. The resulting signal is
+    a smoother and delayed version of the original signal, reflecting how fMRI BOLD signal is
+    generated in response to neuronal activity.
+    """
+    from scipy.signal import convolve
+    # Create time vector for HRF
+    t = np.arange(0, hrf_length, tr)
+    hrf = hrf_function(t,normalize=normalize)
+
+    # Convolve the signal for each channel
+    N_timepoints, N_channels = x.shape
+    y = np.zeros_like(x)
+
+    for ch in range(N_channels):
+        y[:, ch] = convolve(x[:, ch], hrf, mode='full')[:N_timepoints]
+
+    return y
+
 def first_eigenvector(matrix: np.ndarray):
     """
     Compute the first eigenvector (corresponding to the largest eigenvector)
