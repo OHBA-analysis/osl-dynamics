@@ -380,3 +380,23 @@ def list_stds(list_of_lists):
         Numpy array with the standard deviation of each list.
     """
     return apply_to_lists(list_of_lists, func=np.std)
+
+def first_eigenvector(matrix: np.ndarray):
+    """
+    Compute the first eigenvector (corresponding to the largest eigenvector)
+    of a symmetric matrix
+    Parameters
+    ----------
+    matrix: numpy.ndarray
+    N * N. Symmetric matrix.
+
+    Returns
+    -------
+    eigenvector: numpy.ndarray
+    N: the first eigenvector.
+    """
+    from scipy.sparse.linalg import eigsh
+    _, eigenvector = eigsh(matrix,k=1,which='LM')
+    eigenvector = np.squeeze(eigenvector)
+    # Ensure that the returned eigenvector has norm 1
+    return eigenvector / (np.linalg.norm(eigenvector) + 1e-10)
