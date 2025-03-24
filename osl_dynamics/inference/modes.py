@@ -433,6 +433,40 @@ def match_modes(*mode_time_courses, return_order=False):
     else:
         return matched_mode_time_courses
 
+def hungarian_pair(matrix,distance=False):
+    """
+    Use the Hungarian algorithm to pair different modes using the matrix as the metric.
+
+    Parameters
+    ----------
+    matrix : np.ndarray
+        Distance/correlation matrix as the metric for pairing. The shape is (M, M).
+    distance : bool, optional
+        Whether the matrix measures distance (True) or correlation (False). Default is False.
+
+    Returns
+    -------
+    tuple
+        A tuple containing the following elements:
+
+        indices : dict
+            A dictionary containing the row and column indices after reordering based on the Hungarian algorithm.
+            It has the following structure:
+            {'row': [row_index_1, row_index_2, ...], 'col': [col_index_1, col_index_2, ...]}
+
+        matrix_reordered : np.ndarray
+            The input matrix reordered based on the row and column indices obtained from the Hungarian algorithm.
+    """
+    if distance:
+        row_indices, col_indices = optimize.linear_sum_assignment(matrix)
+    else:
+        row_indices, col_indices = optimize.linear_sum_assignment(np.max(matrix) - matrix)
+
+    indices = {'row':row_indices.tolist(),'col':col_indices.tolist()}
+    matrix_reordered = matrix[row_indices,:]
+    matrix_reordered = matrix_reordered[:,col_indices]
+    return indices, matrix_reordered
+
 
 def reduce_state_time_course(state_time_course):
     """Remove states that don't activate from a state time course.
