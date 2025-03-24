@@ -1980,9 +1980,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         # Small error for improving the numerical stability of the log-likelihood
         eps = tf.experimental.numpy.finfo(self.compute_dtype).eps
 
-        # Hyperparameters
+        # Batch size
         batch_size = tf.shape(log_B)[0]
-        sequence_length = tf.shape(log_B)[1]
 
         # Transition probability matrix
         P = self.get_trans_prob()
@@ -2010,12 +2009,16 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
             # Temporary variables used in the calculation
             alpha = tf.zeros(
-                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+                [batch_size, self.sequence_length, self.n_states],
+                dtype=self.compute_dtype,
             )
             beta = tf.zeros(
-                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+                [batch_size, self.sequence_length, self.n_states],
+                dtype=self.compute_dtype,
             )
-            scale = tf.zeros([batch_size, sequence_length], dtype=self.compute_dtype)
+            scale = tf.zeros(
+                [batch_size, self.sequence_length], dtype=self.compute_dtype
+            )
 
             # Renormalise the log-likelihood for numerical stability
             max_values = tf.reduce_max(log_B, axis=-1, keepdims=True)
@@ -2086,10 +2089,12 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         if self.implementation == "log":
             # Temporary variables used in the calculation
             log_alpha = tf.zeros(
-                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+                [batch_size, self.sequence_length, self.n_states],
+                dtype=self.compute_dtype,
             )
             log_beta = tf.zeros(
-                [batch_size, sequence_length, self.n_states], dtype=self.compute_dtype
+                [batch_size, self.sequence_length, self.n_states],
+                dtype=self.compute_dtype,
             )
 
             # Calculate log probabilities
