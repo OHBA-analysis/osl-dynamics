@@ -17,6 +17,7 @@ from osl_dynamics.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
 from osl_dynamics.utils.parcellation import Parcellation
+from osl_dynamics.array_ops import demean_list,filter_nan_values
 
 
 _logger = logging.getLogger("osl-dynamics")
