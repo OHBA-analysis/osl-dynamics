@@ -149,7 +149,7 @@ class IndexParser:
             with open(f'{self.save_dir}config_root.yaml', 'w') as file:
                 yaml.dump(config, file, default_flow_style=False)
 
-    def parse(self, index: int = 0):
+    def parse(self, index: int = 0,run_training=True):
         """
         Parse the configuration file and train the model given the index
 
@@ -187,8 +187,13 @@ class IndexParser:
         ### Update the save_dir
         new_config['save_dir'] = f'{new_config["save_dir"]}/{model}_state_{n_states}/{mode}/'
         '''
-        batch_train = BatchTrain(self.config, model, n_states, mode)
-        batch_train.model_train()
+        if run_training:
+            batch_train = BatchTrain(self.config, model, n_states, mode)
+            batch_train.model_train()
+        else:
+
+            return model, n_states, mode, f'{self.save_dir}/{model}_state_{n_states}/{mode}/'
+
 
     def make_list(self):
         """
@@ -373,6 +378,7 @@ class BatchAnalysis:
         metrics = {model: {str(int(num)): [] for num in n_states_list} for model in models}
         for i in range(len(self.config_list)):
 
+            '''
             config = self.indexparser.parse(i)
             model = next(iter(config['model']))
 
@@ -383,6 +389,8 @@ class BatchAnalysis:
 
             save_dir = config['save_dir']
             mode = config['mode']
+            '''
+            model, n_states, mode,save_dir = self.indexparser.parse(i,run_training=False)
             if 'bcv' in mode:
                 try:
                     with open(os.path.join(save_dir, folder, 'metrics.json'), 'r') as file:
