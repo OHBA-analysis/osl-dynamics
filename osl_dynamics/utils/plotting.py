@@ -2437,3 +2437,386 @@ def plot_wavelet(
         save(fig, filename)
     elif create_fig:
         return fig, ax
+
+def plot_mode_pairing(
+        metrics,
+        indices=None,
+        x_label=None,
+        y_label=None,
+        title=None,
+        fig_kwargs=None,
+        sns_kwargs=None,
+        ax=None,
+        filename=None,
+
+):
+    """
+    Plot the states/modes pairing using the metrics
+    Parameters
+    ----------
+    metrics: np.ndarray
+        measure the similarity/distance between states/modes.
+    indices: dict, optional
+        Indices as xticks and yticks.
+        The format should be {'row':[state_1, state_2,...state_N_1],'col':[state_1, state_2,...state_N_2]}
+    x_label : str, optional
+        Label for x-axis.
+    y_label : str, optional
+        Label for y-axis.
+    title : str, optional
+        Figure title.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    sns_kwargs : dict, optional
+        Arguments to pass to :code:`sns.heatmap()`.
+    ax : matplotlib.axes.axes, optional
+        Axis object to plot on.
+    filename : str, optional
+        Output filename.
+
+    Returns
+    -------
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    """
+
+    # Validation
+    if ax is not None:
+        if filename is not None:
+            raise ValueError(
+                "Please use plotting.save() to save the figure instead of the "
+                + "filename argument."
+            )
+        if isinstance(ax, np.ndarray):
+            raise ValueError("Only pass one axis.")
+
+    if fig_kwargs is None:
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (8, 6),
+                          # "xtick.labelsize": 13,
+                          # "ytick.labelsize": 13,
+                          }
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    if sns_kwargs is None:
+        sns_kwargs = {}
+    default_sns_kwargs = {  # "font_scale": 1.2,
+        "cmap": "coolwarm",
+        "square": True,
+        "linewidths": 0.5,
+        # "cbar_kws": {"shrink": 0.75},
+        "fmt": ".2f"
+    }
+    sns_kwargs = override_dict_defaults(default_sns_kwargs, sns_kwargs)
+    # Set up the figure and axis
+
+    # Create figure
+    create_fig = ax is None
+    if create_fig:
+        fig, ax = create_figure(**fig_kwargs)
+
+    # Create a heatmap of the correlation matrix
+    ax = sns.heatmap(data=metrics, ax=ax, **sns_kwargs)
+    # Set xticks and yticks
+    if indices is not None:
+        ax.set_xticks(np.arange(len(indices["col"])) + 0.5, indices["col"], fontsize=18)
+        ax.set_yticks(np.arange(len(indices["row"])) + 0.5, indices["row"], fontsize=18)
+
+    # Set title and axis labels
+    ax.set_title(title, fontsize=20)
+    ax.set_xlabel(x_label, fontsize=20)
+    ax.set_ylabel(y_label, fontsize=20)
+
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=18)  # Set colorbar tick label font size
+
+    # Save the figure if a filename has been pass
+    if filename is not None:
+        save(fig, filename, tight_layout=True)
+    elif create_fig:
+        return fig, ax
+
+def plot_mode_no_pairing(
+        metrics,
+        x_label=None,
+        y_label=None,
+        title=None,
+        fig_kwargs=None,
+        sns_kwargs=None,
+        ax=None,
+        filename=None,
+
+):
+    """
+    Plot the states/modes pairing using the metrics
+    Parameters
+    ----------
+    metrics: np.ndarray
+        measure the similarity/distance between states/modes.
+    x_label : str, optional
+        Label for x-axis.
+    y_label : str, optional
+        Label for y-axis.
+    title : str, optional
+        Figure title.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    sns_kwargs : dict, optional
+        Arguments to pass to :code:`sns.heatmap()`.
+    ax : matplotlib.axes.axes, optional
+        Axis object to plot on.
+    filename : str, optional
+        Output filename.
+
+    Returns
+    -------
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    """
+
+    # Validation
+    if ax is not None:
+        if filename is not None:
+            raise ValueError(
+                "Please use plotting.save() to save the figure instead of the "
+                + "filename argument."
+            )
+        if isinstance(ax, np.ndarray):
+            raise ValueError("Only pass one axis.")
+
+    if fig_kwargs is None:
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (8, 6),
+                          # "xtick.labelsize": 13,
+                          # "ytick.labelsize": 13,
+                          }
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    if sns_kwargs is None:
+        sns_kwargs = {}
+    default_sns_kwargs = {  # "font_scale": 1.2,
+        "cmap": "coolwarm",
+        "square": True,
+        "linewidths": 0.5,
+        # "cbar_kws": {"shrink": 0.75,},
+        "fmt": ".2f"
+    }
+    sns_kwargs = override_dict_defaults(default_sns_kwargs, sns_kwargs)
+    # Set up the figure and axis
+
+    # Create figure
+    create_fig = ax is None
+    if create_fig:
+        fig, ax = create_figure(**fig_kwargs)
+
+    # Create a heatmap of the correlation matrix
+    ax = sns.heatmap(data=metrics, ax=ax, **sns_kwargs)
+    # Set xticks and yticks
+    ax.set_xticks(np.arange(metrics.shape[1]) + 0.5, np.arange(metrics.shape[1]), fontsize=18)
+    ax.set_yticks(np.arange(metrics.shape[0]) + 0.5, np.arange(metrics.shape[0]), fontsize=18)
+
+    # Set title and axis labels
+    ax.set_title(title, fontsize=20)
+    ax.set_xlabel(x_label, fontsize=20)
+    ax.set_ylabel(y_label, fontsize=20)
+
+    cbar = ax.collections[0].colorbar
+    cbar.ax.tick_params(labelsize=18)  # Set colorbar tick label font size
+
+    # Save the figure if a filename has been pass
+    if filename is not None:
+        save(fig, filename, tight_layout=True)
+    elif create_fig:
+        return fig, ax
+
+
+
+def plot_box(
+        data,
+        labels=None,
+        plot_samples=True,
+        mark_best=True,
+        demean=False,
+        demean_index=0,
+        inset_start_index=None,
+        y_range=None,
+        x_label=None,
+        y_label=None,
+        title=None,
+        plot_kwargs=None,
+        scatter_kwargs=None,
+        text_kwargs=None,
+        fig_kwargs=None,
+        ax=None,
+        filename=None,
+        xtick_step=2,
+):
+    """Basic box plot.
+
+    Parameters
+    ----------
+    data : list of np.ndarray
+        Raw data to plot
+    labels : list of str or int, optional
+        Labels for each box plot
+    plot_samples: bool, optional
+        Whether to plot the original samples
+    mark_best: bool, optional
+        Whether to mark the best performed model.
+    demean: bool, optional
+        Whether to demean *across* the list
+    demean_index: int, optional
+        The index to use as the baseline for demeaning. If -1, demean across the mean of all data points.
+    inset_start_index: int, optional
+        If specified, add an inset using data and labels
+        starting from the index.
+    y_range : list, optional
+        Minimum and maximum for y-axis.
+    x_label : str, optional
+        Label for x-axis.
+    y_label : str, optional
+        Label for y-axis.
+    title : str, optional
+        Figure title.
+    plot_kwargs : dict, optional
+        Arguments to pass to the `ax.boxplot <https://matplotlib.org/stable\
+        /api/_as_gen/matplotlib.axes.Axes.boxplot.html>`_ method.Defaults to
+        :code:`{"showmeans": True,'showfliers':False}`.
+    scatter_kwargs: dict, optional
+        Arguments to pass to the `ax.scatter <https://matplotlib.org/stable\
+        /api/_as_gen/matplotlib.axes.Axes.scatter.html>`_ method.Defaults to
+        :code:`{"alpha": 0.8,'s':10.0}`.
+    text_kwargs: dict, optional
+        Arguments to pass to the `ax.text <https://matplotlib.org/stable\
+        /api/_as_gen/matplotlib.axes.Axes.text.html>`_ method.Defaults to
+        :code:`{'fontsize': 'large','ha':'center','va':'bottom'}`.
+    fig_kwargs : dict, optional
+        Arguments to pass to :code:`plt.subplots()`.
+    ax : plt.axes, optional
+        Axis object to plot on.
+    filename : str, optional
+        Output filename.
+
+    Returns
+    -------
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    """
+
+    # Validation
+    if labels is not None:
+        if isinstance(labels, str):
+            labels = [labels]
+        else:
+            if len(labels) != len(data):
+                raise ValueError("Incorrect number of labels or data passed.")
+    else:
+        labels = [None] * len(data)
+
+    if y_range is None:
+        y_range = [None, None]
+
+    if ax is not None:
+        if filename is not None:
+            raise ValueError(
+                "Please use plotting.save() to save the figure instead of the "
+                + "filename argument."
+            )
+        if isinstance(ax, np.ndarray):
+            raise ValueError("Only pass one axis.")
+
+    if fig_kwargs is None:
+        fig_kwargs = {}
+    default_fig_kwargs = {"figsize": (6, 5)}
+    fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    if plot_kwargs is None:
+        plot_kwargs = {}
+    default_plot_kwargs = {"showmeans": True, 'showfliers': False}
+    plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
+
+    # Create figure
+    create_fig = ax is None
+    if create_fig:
+        fig, ax = create_figure(**fig_kwargs)
+
+    if demean:
+        data = demean_list(data,demean_index=demean_index)
+
+    data = filter_nan_values(data)
+
+    # Box plot
+    bp = ax.boxplot(data, labels=labels, **plot_kwargs)
+
+    # Plot the original samples
+
+    if plot_samples:
+        cmap = plt.get_cmap('viridis')
+        default_scatter_kwargs = {'alpha': 0.8, 's': 10}
+        scatter_kwargs = override_dict_defaults(default_scatter_kwargs, scatter_kwargs)
+        for i, (label, points) in enumerate(zip(labels, data)):
+            x = np.random.normal(i + 1, 0.04, size=len(points))  # Add jitter to x-coordinates for better visualization
+            for j in range(len(x)):
+                ax.scatter(x[j], points[j], color=cmap(j / len(x)), **scatter_kwargs)
+
+    # Set axis range
+    if (y_range[0] is not None) and (y_range[1] is not None):
+        ax.set_ylim(y_range[0], y_range[1])
+    else:
+        ax.relim()
+        ax.autoscale_view()
+
+    if mark_best:
+        default_text_kwargs = {'fontsize': 'xx-large', 'ha': 'center', 'va': 'bottom'}
+        text_kwargs = override_dict_defaults(default_text_kwargs, text_kwargs)
+        # Add asterisk at maximum median value box
+        data_median = [np.nanmedian(d) for d in data]
+        # Deal with the nan values.
+        data_median = [-np.inf if np.isnan(m) else m for m in data_median]
+        max_median_index = np.argmax(data_median)
+        ax.text(max_median_index + 1, ax.get_ylim()[1], '*', **text_kwargs)
+        # ax.text(max_median_index + 1, bp['caps'][max_median_index * 2 + 1].get_data()[1], '*', ha='center', va='bottom')
+
+    if inset_start_index is not None:
+        small_ax = fig.add_axes([0.65, 0.3, 0.3, 0.3])  # Adjust these values as needed for positioning
+        small_bp = small_ax.boxplot(data[inset_start_index:], labels=labels[inset_start_index:], **plot_kwargs)
+
+        # Apply xtick_step to the inset plot
+        max_inset_position = len(data) - inset_start_index
+        inset_xtick_positions = list(range(1, max_inset_position + 1, xtick_step))
+        small_ax.set_xticks(inset_xtick_positions)
+        small_ax.set_xticklabels([str(pos + inset_start_index) for pos in inset_xtick_positions], rotation=45)
+
+
+    # set x-ticks
+    # Set x-ticks every two positions
+    xtick_positions = list(range(1, len(labels) + 1, 2))  # 1, 3, 5, ...
+    xtick_labels = [labels[i] for i in range(0, len(labels), 2)]  # label0, label2, label4, ...
+
+    ax.set_xticks(xtick_positions)
+    ax.set_xticklabels(xtick_labels)
+
+    # Set title and axis labels
+    ax.set_title(title,fontsize=20)
+    ax.xaxis.set_tick_params(labelsize=15)
+    ax.yaxis.set_tick_params(labelsize=15)
+    ax.set_xlabel(x_label,fontsize=20)
+    ax.set_ylabel(y_label,fontsize=20)
+
+    # Save the figure if a filename has been pass
+    if filename is not None:
+        save(fig, filename, tight_layout=True)
+    elif create_fig:
+        return fig, ax
