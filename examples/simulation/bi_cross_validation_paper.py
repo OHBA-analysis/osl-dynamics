@@ -371,6 +371,56 @@ def dynemo_ukb(save_dir):
         np.savetxt(f'{save_dir}{10001 + i}.txt', data)
         np.save(f'{save_dir}truth/{10001 + i}_mode_time_course.npy', time_course)
 
+def dynemo_ukb_six_modes(save_dir):
+    import pickle
+    from osl_dynamics.simulation.mvn import MVN
+
+    save_dir = f'{save_dir}/dynemo_ukb_six_modes/'
+    os.makedirs(f'{save_dir}truth/', exist_ok=True)
+
+    n_subjects = 500
+    ukb_dir = './results_final/real/ICA_50_UKB/dynemo_state_9/repeat_1/inf_params/'
+
+    # Load alpha and covariances
+    with open(f"{ukb_dir}/alp.pkl", "rb") as f:
+        alpha = pickle.load(f)[:n_subjects]
+    covariances = np.load(f'{ukb_dir}/covs.npy')
+
+    # Define which modes to remove
+    all_modes = np.arange(covariances.shape[0])
+    modes_to_remove = [2, 5, 8]
+    modes_to_keep = [m for m in all_modes if m not in modes_to_remove]
+
+    # Filter covariances to exclude unwanted modes
+    covariances = covariances[modes_to_keep]
+    np.save(f'{save_dir}truth/state_covariances.npy', covariances)
+
+    # Set up simulator with reduced covariances
+    mvn = MVN(means='zero', covariances=covariances)
+
+    for i in range(n_subjects):
+        time_course = alpha[i]  # shape: (n_timepoints, n_modes)
+
+        # Log max values of suppressed modes before removing
+        for mode in modes_to_remove:
+            max_val = np.max(time_course[:, mode])
+            print(f"Subject {10001 + i} - max activation of mode {mode}: {max_val:.4f}")
+
+        # Remove the columns for the dropped modes
+        time_course = time_course[:, modes_to_keep]
+
+        # (Optional) renormalize
+        # row_sums = time_course.sum(axis=1, keepdims=True)
+        # time_course = time_course / np.clip(row_sums, 1e-6, None)
+
+        # Simulate with reduced time course
+        data = mvn.simulate_data(time_course)
+
+        # Save simulated data and cleaned mode time course
+        np.savetxt(f'{save_dir}{10001 + i}.txt', data)
+        np.save(f'{save_dir}truth/{10001 + i}_mode_time_course.npy', time_course)
+
+
 
 def dynemo_meg(save_dir):
     import pickle
@@ -430,6 +480,9 @@ def main(simulation_list=None):
         soft_mixing(save_dir)
     if 'dynemo_UKB' in simulation_list:
         dynemo_ukb(save_dir)
+
+    if 'dynemo_UKB_six_modes' in simulation_list:
+        dynemo_ukb_six_modes(save_dir)
 
     if 'dynemo_fair' in simulation_list:
         dynemo_fair(save_dir)
