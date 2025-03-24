@@ -1,5 +1,6 @@
 """Metrics for evaluating model performance."""
 
+import warnings
 import numpy as np
 from scipy.linalg import eigvalsh
 from sklearn.metrics import confusion_matrix as sklearn_confusion_matrix
@@ -364,3 +365,71 @@ def pairwise_l2_distance(arrays, batch_dims=0):
             axis=tuple(range(pairwise_axis + 2, arrays.ndim + 1)),
         )
     )
+
+def regularisation(matrices, eps=1e-6):
+    """
+    Regularise a bunch of matrices by adding eps to the diagonal
+    Parameters
+    ----------
+    matrices: np.ndarray
+        The set of matrices with shape (M, N, N) or (N, N)
+    eps: float
+        The regularisation on the diagonal
+
+    Returns
+    -------
+    regularised_matrices: np.ndarray
+        The shape is (M, N, N) or (N, N).
+    """
+    if matrices.ndim == 2:
+        N = len(matrices)
+    elif matrices.ndim == 3:
+        _, N, _ = matrices.shape
+    else:
+        return ValueError('Matrices dimension is incorrect!')
+
+    return matrices + np.eye(N) * eps
+
+def twopair_riemannian_distance(matrices_1,matrices_2,eps_value=[0,1e-9,1e-8,1e-7,1e-6,1e-5],threshold:float=1e-3):
+    """
+    Compute the Riemannian distance between two sets of matrices
+    Parameters
+    ----------
+    matrices_1: np.ndarray
+        The first set of positive semi-definite matrices.
+        The shape is (N_modes_1, N_channels, N_channels).
+    matrices_1: np.ndarray
+        The second set of positive semi-definite matrices.
+        The shape is (N_modes_2, N_channels, N_channels).
+    eps: list,optional
+        The regularisation factor to try.
+    threshold: float
+        Threshold to apply when there are negative eigenvalues. Must be positive.
+    Returns
+    riemannian_distances: np.ndarray
+        Riemannian distance. The shape is (N_modes_1,N_modes_2)
+    -------
+    """
+    M1,N1,P1 = matrices_1.shape
+    M2,N2,P2 = matrices_2.shape
+    assert N1 == P1
+    assert N1 == N2
+    assert P1 == P2
+
+    matrices_1.astype(np.float64)
+    matrices_2.astype(np.float64)
+    riemannian_distances = np.zeros([M1,M2])
+    for eps in eps_value:
+        try:
+            for i in trange(M1, desc="Computing Riemannian distances"):
+                for j in range(M2):
+                    riemannian_distances[i][j] = riemannian_distance(
+                        regularisation(matrices_1[i],eps),
+                        regularisation(matrices_2[j],eps),
+                        threshold=threshold
+                    )
+            return riemannian_distances
+        except np.linalg.LinAlgError:
+            warnings.warn(f'Calculation of Riemannian distance failed for eps={eps}')
+
+    raise ValueError('Riemannian distance failed for all eps values!')
