@@ -163,8 +163,6 @@ class IndexParser:
 
         model, n_states, mode = config_list.iloc[index]
 
-        _logger.info(f"Configuration: {self.config}")
-        _logger.info(f"Model: {model}, n_states: {n_states}, mode: {mode}")
         '''
         # concatenate three parts of the dictionary
         new_config = copy.deepcopy(self.config)
@@ -188,10 +186,11 @@ class IndexParser:
         new_config['save_dir'] = f'{new_config["save_dir"]}/{model}_state_{n_states}/{mode}/'
         '''
         if run_training:
+            _logger.info(f"Configuration: {self.config}")
+            _logger.info(f"Model: {model}, n_states: {n_states}, mode: {mode}")
             batch_train = BatchTrain(self.config, model, n_states, mode)
             batch_train.model_train()
         else:
-
             return model, n_states, mode, f'{self.save_dir}/{model}_state_{n_states}/{mode}/'
 
 
