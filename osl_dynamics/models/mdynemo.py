@@ -282,11 +282,6 @@ class TemporalPriorLayer(tf.keras.layers.Layer):
             name="fc_kl_div",
         )
 
-        self.kl_loss_layer = KLLossLayer(
-            config.do_kl_annealing,
-            name="kl_loss",
-        )
-
         self.layers = [
             self.concatenate_layer,
             self.theta_norm_drop_layer,
@@ -297,7 +292,6 @@ class TemporalPriorLayer(tf.keras.layers.Layer):
             self.fc_mod_mu_layer,
             self.fc_mod_sigma_layer,
             self.fc_kl_div_layer,
-            self.kl_loss_layer,
         ]
 
     def call(self, inputs):
@@ -325,8 +319,7 @@ class TemporalPriorLayer(tf.keras.layers.Layer):
         fc_kl_div = self.fc_kl_div_layer(
             [fc_inf_mu, fc_inf_sigma, fc_mod_mu, fc_mod_sigma],
         )
-        kl_loss = self.kl_loss_layer([power_kl_div, fc_kl_div])
-        return kl_loss
+        return power_kl_div, fc_kl_div
 
 
 class EncoderLayer(tf.keras.layers.Layer):
@@ -416,7 +409,7 @@ class EncoderLayer(tf.keras.layers.Layer):
         fc_theta_norm = self.fc_theta_norm_layer(fc_theta)
         beta = self.beta_layer(fc_theta_norm)
 
-        kl_loss = self.temporal_prior_layer(
+        power_kl_div, fc_kl_div = self.temporal_prior_layer(
             [
                 power_inf_mu,
                 power_inf_sigma,
@@ -427,7 +420,7 @@ class EncoderLayer(tf.keras.layers.Layer):
             ]
         )
 
-        return alpha, beta, power_theta_norm, fc_theta_norm, kl_loss
+        return alpha, beta, power_theta_norm, fc_theta_norm, power_kl_div, fc_kl_div
 
 
 class DecoderLayer(tf.keras.layers.Layer):
@@ -796,6 +789,7 @@ class Model(VariationalInferenceModelBase):
             config.corrs_regularizer,
             name="corrs",
         )
+        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
         ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
 
         # ---------- Forward pass ---------- #
@@ -804,13 +798,15 @@ class Model(VariationalInferenceModelBase):
         )
         static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
 
-        alpha, beta, power_theta_norm, fc_theta_norm, kl_loss = encoder_layer(inputs)
+        alpha, beta, power_theta_norm, fc_theta_norm, power_kl_div, fc_kl_div = (
+            encoder_layer(inputs)
+        )
         mu = means_layer(inputs, static_loss_scaling_factor=static_loss_scaling_factor)
         E = stds_layer(inputs, static_loss_scaling_factor=static_loss_scaling_factor)
         R = corrs_layer(inputs, static_loss_scaling_factor=static_loss_scaling_factor)
         m, C = decoder_layer([mu, E, R, alpha, beta])
-
         ll_loss = ll_loss_layer([inputs, m, C])
+        kl_loss = kl_loss_layer([power_kl_div, fc_kl_div])
 
         return tf.keras.Model(
             inputs=inputs,

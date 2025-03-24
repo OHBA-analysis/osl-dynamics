@@ -228,7 +228,6 @@ class TemporalPriorLayer(tf.keras.layers.Layer):
         self.kl_div_layer = KLDivergenceLayer(
             config.theta_std_epsilon, config.loss_calc, name="kl_div"
         )
-        self.kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
         self.layers = [
             self.theta_norm_drop_layer,
@@ -236,7 +235,6 @@ class TemporalPriorLayer(tf.keras.layers.Layer):
             self.mod_mu_layer,
             self.mod_sigma_layer,
             self.kl_div_layer,
-            self.kl_loss_layer,
         ]
 
     def call(self, inputs):
@@ -247,9 +245,8 @@ class TemporalPriorLayer(tf.keras.layers.Layer):
         mod_mu = self.mod_mu_layer(mod_rnn)
         mod_sigma = self.mod_sigma_layer(mod_rnn)
         kl_div = self.kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
-        kl_loss = self.kl_loss_layer(kl_div)
 
-        return kl_loss
+        return kl_div
 
 
 class EncoderLayer(tf.keras.layers.Layer):
@@ -307,9 +304,9 @@ class EncoderLayer(tf.keras.layers.Layer):
         theta = self.theta_layer([inf_mu, inf_sigma])
         theta_norm = self.theta_norm_layer(theta)
         alpha = self.alpha_layer(theta_norm)
-        kl_loss = self.temporal_prior_layer([inf_mu, inf_sigma, theta_norm])
+        kl_div = self.temporal_prior_layer([inf_mu, inf_sigma, theta_norm])
 
-        return alpha, theta_norm, kl_loss
+        return alpha, theta_norm, kl_div
 
 
 class DecoderLayer(tf.keras.layers.Layer):
@@ -770,6 +767,7 @@ class Model(VariationalInferenceModelBase):
             name="means",
         )
         covs_layer = self._select_covariance_layer()
+        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
         ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
 
         # ---------- Forward pass ---------- #
@@ -778,11 +776,12 @@ class Model(VariationalInferenceModelBase):
         )
         inputs = {"data": data}
         static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-        alpha, theta_norm, kl_loss = encoder_layer(data)
+        alpha, theta_norm, kl_div = encoder_layer(data)
         mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         D = covs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         m, C = decoder_layer([mu, D, alpha])
         ll_loss = ll_loss_layer([data, m, C])
+        kl_loss = kl_loss_layer(kl_div)
 
         return tf.keras.Model(
             inputs=inputs,

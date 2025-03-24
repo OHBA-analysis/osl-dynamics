@@ -18,6 +18,7 @@ from osl_dynamics.utils import plotting
 os.makedirs("figures", exist_ok=True)
 
 # GPU settings
+tf_ops.select_gpu(1)
 tf_ops.gpu_growth()
 
 # Settings
@@ -94,7 +95,7 @@ model.random_subset_initialization(training_data, n_init=5, n_epochs=3, take=1)
 # Full training
 print("Training model")
 history = model.fit(training_data)
-model.save("tmp")
+
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)
 print(f"Free energy: {free_energy}")

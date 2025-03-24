@@ -613,6 +613,24 @@ class Model(MarkovStateInferenceModelBase):
         self.reset()
 
 
+class TFGatherLayer(layers.Layer):
+
+    def call(self, inputs):
+        data, idx = inputs
+        return tf.gather(data, idx, axis=0)
+
+
+class BroadcastLayer(layers.Layer):
+    def __init__(self, n_modes, n_channels, **kwargs):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+
+    def call(self, inputs):
+        data, batch_size = inputs
+        return tf.broadcast_to(data, (batch_size, self.n_modes, self.n_channels))
+
+
 def _model_structure(config):
     # Inputs
     data = layers.Input(
@@ -768,10 +786,8 @@ def _model_structure(config):
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
         means_dev_map = means_dev_map_layer(means_dev_decoder)
-        norm_means_dev_map = tf.gather(
-            norm_means_dev_map_layer(means_dev_map),
-            session_id[:, 0],
-            axis=0,
+        norm_means_dev_map = TFGatherLayer()(
+            [norm_means_dev_map_layer(means_dev_map), session_id[:, 0]]
         )
         # shape = (None, n_states, n_channels)
 
@@ -797,9 +813,8 @@ def _model_structure(config):
             shape=(config.n_states, config.n_channels),
             name="means_dev",
         )
-        means_dev = tf.broadcast_to(
-            means_dev_layer(data),
-            (batch_size, config.n_states, config.n_channels),
+        means_dev = BroadcastLayer(config.n_states, config.n_channels)(
+            [means_dev_layer(data), batch_size]
         )
 
     # ----------------------
@@ -876,10 +891,8 @@ def _model_structure(config):
             static_loss_scaling_factor=static_loss_scaling_factor,
         )
         covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
-        norm_covs_dev_map = tf.gather(
-            norm_covs_dev_map_layer(covs_dev_map),
-            session_id[:, 0],
-            axis=0,
+        norm_covs_dev_map = TFGatherLayer()(
+            [norm_covs_dev_map_layer(covs_dev_map), session_id[:, 0]]
         )
 
         # Get the deviation magnitudes (scale deviation maps globally)
@@ -946,6 +959,7 @@ def _model_structure(config):
     # Hidden state inference
     hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
         config.n_states,
+        config.sequence_length,
         config.initial_trans_prob,
         config.initial_state_probs,
         config.learn_trans_prob,

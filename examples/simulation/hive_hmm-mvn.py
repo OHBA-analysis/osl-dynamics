@@ -19,6 +19,7 @@ from osl_dynamics.utils import plotting, set_random_seed
 os.makedirs("figures", exist_ok=True)
 
 # GPU settings
+tf_ops.select_gpu(1)
 tf_ops.gpu_growth()
 
 # Settings
@@ -88,6 +89,7 @@ model.set_regularizers(training_data)
 model.set_dev_parameters_initializer(training_data)
 
 # Model initialization
+# model.random_subset_initialization(training_data, n_epochs=3, n_init=5, take=1)
 model.random_state_time_course_initialization(
     training_data, n_epochs=3, n_init=10, take=1
 )

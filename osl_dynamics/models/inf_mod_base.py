@@ -558,9 +558,7 @@ class VariationalInferenceModelBase(ModelBase):
         in the model.
         """
         if self.config.do_kl_annealing:
-            kl_loss_layer = self.model.get_layer(
-                "encoder"
-            ).temporal_prior_layer.kl_loss_layer
+            kl_loss_layer = self.model.get_layer("kl_loss")
             kl_loss_layer.annealing_factor.assign(0.0)
 
     def reset_weights(self, keep=None):

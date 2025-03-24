@@ -273,7 +273,7 @@ class BatchSizeLayer(layers.Layer):
 class SampleGammaDistributionLayer(layers.Layer):
     """Layer for sampling from a Gamma distribution.
 
-    This layer is a wrapper for `tfp.distributions.Gamma 
+    This layer is a wrapper for `tfp.distributions.Gamma
     <https://www.tensorflow.org/probability/api_docs/python/tfp\
     /distributions/Gamma>`_.
 
@@ -312,20 +312,18 @@ class SampleGammaDistributionLayer(layers.Layer):
 
         alpha = tf.gather(alpha, session_id, axis=0)  # shape = (None, n_states, 1)
         beta = tf.gather(beta, session_id, axis=0)  # shape = (None, n_states, 1)
+        output = alpha / beta
         if training:
-            output = alpha / beta
-            if self.annealing_factor > 0:
-                N = tfp.distributions.Gamma(
-                    concentration=alpha,
-                    rate=beta,
-                    allow_nan_stats=False,
-                )
-                output = (
-                    1 - self.annealing_factor
-                ) * output + self.annealing_factor * N.sample()
-            return output
+            N = tfp.distributions.Gamma(
+                concentration=alpha,
+                rate=beta,
+                allow_nan_stats=False,
+            )
+            output = (
+                1 - self.annealing_factor
+            ) * output + self.annealing_factor * N.sample()
 
-        return alpha / beta
+        return output
 
 
 class SampleNormalDistributionLayer(layers.Layer):
@@ -2424,3 +2422,24 @@ class TFConstantLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         return tf.constant(self.values)
+
+
+class SequentialLayer(layers.Layer):
+    """Sequential layer.
+
+    Parameters
+    ----------
+    layers : list
+        List of layers.
+    """
+
+    def __init__(self, layers, **kwargs):
+        super().__init__(**kwargs)
+        self.layers = []
+        for layer in layers:
+            self.layers.append(layer)
+
+    def call(self, inputs, **kwargs):
+        for layer in self.layers:
+            inputs = layer(inputs, **kwargs)
+        return inputs
