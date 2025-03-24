@@ -24,7 +24,7 @@ from ..analysis.power import independent_components_to_surface_maps as ic2surfac
 from ..analysis.workbench import render
 from ..utils.misc import override_dict_defaults
 from ..utils.plotting import plot_box, plot_alpha, plot_violin, plot_mode_pairing, plot_matrices, plot_brain_surface
-from ..array_ops import cov2corr, first_eigenvector
+from ..array_ops import cov2corr, first_eigenvector,demean_list,filter_nan_values
 
 _logger = logging.getLogger("osl-dynamics")
 
