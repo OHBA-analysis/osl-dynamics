@@ -1564,9 +1564,6 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
     def call(self, inputs, **kwargs):
         x, mu, sigma, probs = inputs
 
-        # Add a small error for numerical stability
-        sigma = add_epsilon(sigma, self.epsilon, diag=True)
-
         # Log-likelihood for each state
         ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
         for i in range(self.n_states):
