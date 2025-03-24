@@ -15,7 +15,7 @@ class ExponentialMovingAverage(tf.keras.optimizers.Optimizer):
 
     def __init__(self, learning_rate, decay=0.1):
         super().__init__(learning_rate, name="EMAOptimizer")
-        self.decay = decay
+        self.decay = tf.Variable(decay, trainable=False, name="ema_decay")
 
     def update_step(self, gradient, variable, learning_rate):
         value = (1.0 - self.decay) * variable + self.decay * gradient

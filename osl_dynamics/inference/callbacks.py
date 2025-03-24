@@ -280,7 +280,7 @@ class EMADecayCallback(callbacks.Callback):
         # Update the decay parameter in the optimizer
         # Here we are assuming a MarkovStateModelOptimizer is being used
         ema_optimizer = self.model.optimizer.ema_optimizer
-        ema_optimizer.decay = new_value
+        ema_optimizer.decay.assign(new_value)
 
 
 class SaveBestCallback(callbacks.ModelCheckpoint):
