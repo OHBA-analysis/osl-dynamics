@@ -2078,7 +2078,7 @@ class SessionLabels:
             raise ValueError("values must be a 1D array.")
 
         if self.label_type == "categorical":
-            self.values = self.values.astype(np.int32)
+            self.values = self.values.astype(np.float32)
             self.n_classes = len(np.unique(self.values))
         else:
             self.values = self.values.astype(np.float32)
