@@ -1,9 +1,18 @@
 """Custom TensorFlow optimizers."""
 
+from packaging import version
+
 import tensorflow as tf
 
+if version.parse(tf.__version__) < version.parse("2.12"):
+    from keras.optimizers.optimizer_v2.optimizer_v2 import OptimizerV2 as Optimizer
+elif version.parse(tf.__version__) < version.parse("2.13"):
+    from keras.optimizers.legacy.optimizer_v2 import OptimizerV2 as Optimizer
+else:
+    from keras.optimizers import Optimizer
 
-class ExponentialMovingAverage(tf.keras.optimizers.Optimizer):
+
+class ExponentialMovingAverage(Optimizer):
     """Optimizer for applying a exponential moving average update.
 
     Parameters
@@ -22,7 +31,7 @@ class ExponentialMovingAverage(tf.keras.optimizers.Optimizer):
         self.assign(variable, value)
 
 
-class MarkovStateModelOptimizer(tf.keras.optimizers.Optimizer):
+class MarkovStateModelOptimizer(Optimizer):
     """Optimizer for a model containing a hidden state Markov chain.
 
     Parameters
