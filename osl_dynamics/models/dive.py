@@ -284,145 +284,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
                 )
 
 
-class TemporalPriorLayer(tf.keras.layers.Layer):
-    def __init__(self, config, **kwargs):
-        super().__init__(**kwargs)
-        self.theta_norm_drop_layer = tf.keras.layers.Dropout(
-            config.model_dropout,
-            name="theta_norm_drop",
-        )
-        self.mod_rnn_layer = ModelRNNLayer(
-            config.model_rnn,
-            config.model_normalization,
-            config.model_activation,
-            config.model_n_layers,
-            config.model_n_units,
-            config.model_dropout,
-            config.model_regularizer,
-            name="mod_rnn",
-        )
-        self.mod_mu_layer = tf.keras.layers.Dense(config.n_modes, name="mod_mu")
-        self.mod_sigma_layer = tf.keras.layers.Dense(
-            config.n_modes, activation="softplus", name="mod_sigma"
-        )
-        self.kl_div_layer = KLDivergenceLayer(
-            config.theta_std_epsilon, config.loss_calc, name="kl_div"
-        )
-
-        self.layers = [
-            self.theta_norm_drop_layer,
-            self.mod_rnn_layer,
-            self.mod_mu_layer,
-            self.mod_sigma_layer,
-            self.kl_div_layer,
-        ]
-
-    def call(self, inputs):
-        inf_mu, inf_sigma, theta_norm = inputs
-
-        theta_norm_drop = self.theta_norm_drop_layer(theta_norm)
-        mod_rnn = self.mod_rnn_layer(theta_norm_drop)
-        mod_mu = self.mod_mu_layer(mod_rnn)
-        mod_sigma = self.mod_sigma_layer(mod_rnn)
-        kl_div = self.kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
-
-        return kl_div
-
-
-class EncoderLayer(tf.keras.layers.Layer):
-    def __init__(self, config, **kwargs):
-        super().__init__(**kwargs)
-        self.data_drop_layer = tf.keras.layers.Dropout(
-            config.inference_dropout, name="data_drop"
-        )
-        self.inf_rnn_layer = InferenceRNNLayer(
-            config.inference_rnn,
-            config.inference_normalization,
-            config.inference_activation,
-            config.inference_n_layers,
-            config.inference_n_units,
-            config.inference_dropout,
-            config.inference_regularizer,
-            name="inf_rnn",
-        )
-
-        self.inf_mu_layer = tf.keras.layers.Dense(config.n_modes, name="inf_mu")
-        self.inf_sigma_layer = tf.keras.layers.Dense(
-            config.n_modes, activation="softplus", name="inf_sigma"
-        )
-        self.theta_layer = SampleNormalDistributionLayer(
-            config.theta_std_epsilon,
-            name="theta",
-        )
-        self.theta_norm_layer = NormalizationLayer(
-            config.theta_normalization,
-            name="theta_norm",
-        )
-        self.alpha_layer = SoftmaxLayer(
-            config.initial_alpha_temperature,
-            config.learn_alpha_temperature,
-            name="alpha",
-        )
-        self.temporal_prior_layer = TemporalPriorLayer(config, name="temporal_prior")
-
-        self.layers = [
-            self.data_drop_layer,
-            self.inf_rnn_layer,
-            self.inf_mu_layer,
-            self.inf_sigma_layer,
-            self.theta_layer,
-            self.theta_norm_layer,
-            self.alpha_layer,
-            self.temporal_prior_layer,
-        ]
-
-    def call(self, inputs):
-        data_drop = self.data_drop_layer(inputs)
-        inf_rnn = self.inf_rnn_layer(data_drop)
-        inf_mu = self.inf_mu_layer(inf_rnn)
-        inf_sigma = self.inf_sigma_layer(inf_rnn)
-        theta = self.theta_layer([inf_mu, inf_sigma])
-        theta_norm = self.theta_norm_layer(theta)
-        alpha = self.alpha_layer(theta_norm)
-        kl_div = self.temporal_prior_layer([inf_mu, inf_sigma, theta_norm])
-
-        return alpha, theta_norm, kl_div
-
-
-class SessionEmbeddingsLayer(tf.keras.layers.Layer):
-    def __init__(self, config, **kwargs):
-        super().__init__(**kwargs)
-        self.config = config
-        self.layers = []
-        for session_label in config.session_labels:
-            self.layers.append(
-                EmbeddingLayer(
-                    session_label.n_classes,
-                    config.embeddings_dim,
-                    config.unit_norm_embeddings,
-                    name=f"{session_label.name}_embeddings",
-                )
-            )
-
-    def build(self, input_shape):
-        for layer in self.layers:
-            layer.build(input_shape)
-
-    def call(self, inputs):
-        embeddings = tf.zeros(
-            (self.config.n_sessions, self.config.embeddings_dim), dtype=tf.float32
-        )
-        for i, session_label in enumerate(self.config.session_labels):
-            embeddings += self.layers[i](
-                tf.constant(session_label.values, dtype=tf.int32)
-            )
-
-        return embeddings
-
-    def compute_output_shape(self, input_shape):
-        return (self.config.n_sessions, self.config.embeddings_dim)
-
-
 class Model(VariationalInferenceModelBase):
     """DIVE.
 
@@ -435,7 +296,580 @@ class Model(VariationalInferenceModelBase):
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(self.config)
+
+        class TemporalPriorLayer(tf.keras.layers.Layer):
+            def __init__(self, config, **kwargs):
+                super().__init__(**kwargs)
+                self.theta_norm_drop_layer = tf.keras.layers.Dropout(
+                    config.model_dropout,
+                    name="theta_norm_drop",
+                )
+                self.mod_rnn_layer = ModelRNNLayer(
+                    config.model_rnn,
+                    config.model_normalization,
+                    config.model_activation,
+                    config.model_n_layers,
+                    config.model_n_units,
+                    config.model_dropout,
+                    config.model_regularizer,
+                    name="mod_rnn",
+                )
+                self.mod_mu_layer = tf.keras.layers.Dense(config.n_modes, name="mod_mu")
+                self.mod_sigma_layer = tf.keras.layers.Dense(
+                    config.n_modes, activation="softplus", name="mod_sigma"
+                )
+                self.kl_div_layer = KLDivergenceLayer(
+                    config.theta_std_epsilon, config.loss_calc, name="kl_div"
+                )
+
+                self.layers = [
+                    self.theta_norm_drop_layer,
+                    self.mod_rnn_layer,
+                    self.mod_mu_layer,
+                    self.mod_sigma_layer,
+                    self.kl_div_layer,
+                ]
+
+            def call(self, inputs):
+                inf_mu, inf_sigma, theta_norm = inputs
+
+                theta_norm_drop = self.theta_norm_drop_layer(theta_norm)
+                mod_rnn = self.mod_rnn_layer(theta_norm_drop)
+                mod_mu = self.mod_mu_layer(mod_rnn)
+                mod_sigma = self.mod_sigma_layer(mod_rnn)
+                kl_div = self.kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
+
+                return kl_div
+
+        class EncoderLayer(tf.keras.layers.Layer):
+            def __init__(self, config, **kwargs):
+                super().__init__(**kwargs)
+                self.data_drop_layer = tf.keras.layers.Dropout(
+                    config.inference_dropout, name="data_drop"
+                )
+                self.inf_rnn_layer = InferenceRNNLayer(
+                    config.inference_rnn,
+                    config.inference_normalization,
+                    config.inference_activation,
+                    config.inference_n_layers,
+                    config.inference_n_units,
+                    config.inference_dropout,
+                    config.inference_regularizer,
+                    name="inf_rnn",
+                )
+
+                self.inf_mu_layer = tf.keras.layers.Dense(config.n_modes, name="inf_mu")
+                self.inf_sigma_layer = tf.keras.layers.Dense(
+                    config.n_modes, activation="softplus", name="inf_sigma"
+                )
+                self.theta_layer = SampleNormalDistributionLayer(
+                    config.theta_std_epsilon,
+                    name="theta",
+                )
+                self.theta_norm_layer = NormalizationLayer(
+                    config.theta_normalization,
+                    name="theta_norm",
+                )
+                self.alpha_layer = SoftmaxLayer(
+                    config.initial_alpha_temperature,
+                    config.learn_alpha_temperature,
+                    name="alpha",
+                )
+                self.temporal_prior_layer = TemporalPriorLayer(
+                    config, name="temporal_prior"
+                )
+
+                self.layers = [
+                    self.data_drop_layer,
+                    self.inf_rnn_layer,
+                    self.inf_mu_layer,
+                    self.inf_sigma_layer,
+                    self.theta_layer,
+                    self.theta_norm_layer,
+                    self.alpha_layer,
+                    self.temporal_prior_layer,
+                ]
+
+            def call(self, inputs):
+                data_drop = self.data_drop_layer(inputs)
+                inf_rnn = self.inf_rnn_layer(data_drop)
+                inf_mu = self.inf_mu_layer(inf_rnn)
+                inf_sigma = self.inf_sigma_layer(inf_rnn)
+                theta = self.theta_layer([inf_mu, inf_sigma])
+                theta_norm = self.theta_norm_layer(theta)
+                alpha = self.alpha_layer(theta_norm)
+                kl_div = self.temporal_prior_layer([inf_mu, inf_sigma, theta_norm])
+
+                return alpha, theta_norm, kl_div
+
+        class SessionEmbeddingsLayer(tf.keras.layers.Layer):
+            def __init__(self, config, **kwargs):
+                super().__init__(**kwargs)
+                self.config = config
+                self.layers = []
+                for session_label in config.session_labels:
+                    self.layers.append(
+                        EmbeddingLayer(
+                            session_label.n_classes,
+                            config.embeddings_dim,
+                            config.unit_norm_embeddings,
+                            name=f"{session_label.name}_embeddings",
+                        )
+                    )
+
+            def build(self, input_shape):
+                for layer in self.layers:
+                    layer.build(input_shape)
+
+            def call(self, inputs):
+                embeddings = tf.zeros(
+                    (self.config.n_sessions, self.config.embeddings_dim),
+                    dtype=tf.float32,
+                )
+                for i, session_label in enumerate(self.config.session_labels):
+                    embeddings += self.layers[i](
+                        tf.constant(session_label.values, dtype=tf.int32)
+                    )
+
+                return embeddings
+
+            def compute_output_shape(self, input_shape):
+                return (self.config.n_sessions, self.config.embeddings_dim)
+
+        class TFGatherLayer(layers.Layer):
+            def call(self, inputs):
+                data, idx = inputs
+                return tf.gather(data, idx, axis=0)
+
+        class BroadcastLayer(layers.Layer):
+            def __init__(self, n_modes, n_channels, **kwargs):
+                super().__init__(**kwargs)
+                self.n_modes = n_modes
+                self.n_channels = n_channels
+
+            def call(self, inputs):
+                data, batch_size = inputs
+                return tf.broadcast_to(
+                    data, (batch_size, self.n_modes, self.n_channels)
+                )
+
+        config = self.config
+
+        # Inputs
+        data = layers.Input(
+            shape=(config.sequence_length, config.n_channels),
+            dtype=tf.float32,
+            name="data",
+        )
+        batch_size_layer = BatchSizeLayer(name="batch_size")
+        batch_size = batch_size_layer(data)
+
+        encoder_layer = EncoderLayer(config, name="encoder")
+
+        # Static loss scaling factor
+        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+            config.sequence_length,
+            config.loss_calc,
+            name="static_loss_scaling_factor",
+        )
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+
+        session_id = layers.Input(
+            shape=(config.sequence_length,),
+            dtype=tf.int32,
+            name="session_id",
+        )
+        session_label_layers = dict()
+        session_labels = dict()
+        label_embeddings_layers = dict()
+        label_embeddings = []
+        for session_label in config.session_labels:
+            session_label_layers[session_label.name] = TFConstantLayer(
+                values=session_label.values,
+                name=f"{session_label.name}_constant",
+            )
+            session_labels[session_label.name] = session_label_layers[
+                session_label.name
+            ](data)
+            label_embeddings_layers[session_label.name] = (
+                EmbeddingLayer(
+                    session_label.n_classes,
+                    config.embeddings_dim,
+                    config.unit_norm_embeddings,
+                    name=f"{session_label.name}_embeddings",
+                )
+                if session_label.label_type == "categorical"
+                else layers.Dense(
+                    config.embeddings_dim, name=f"{session_label.name}_embeddings"
+                )
+            )
+            label_embeddings.append(
+                label_embeddings_layers[session_label.name](
+                    session_labels[session_label.name]
+                )
+            )
+
+        embeddings_layer = AddLayer(name="embeddings")
+        embeddings = embeddings_layer(label_embeddings)
+
+        alpha, theta_norm, kl_div = encoder_layer(data)
+
+        # -----------------
+        # Observation model
+
+        # Group level observation model parameters
+        group_means_layer = VectorsLayer(
+            config.n_modes,
+            config.n_channels,
+            config.learn_means,
+            config.initial_means,
+            config.means_regularizer,
+            name="group_means",
+        )
+        group_covs_layer = CovarianceMatricesLayer(
+            config.n_modes,
+            config.n_channels,
+            config.learn_covariances,
+            config.initial_covariances,
+            config.covariances_epsilon,
+            config.covariances_regularizer,
+            name="group_covs",
+        )
+
+        group_mu = group_means_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )
+        group_D = group_covs_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )
+
+        # ---------------
+        # Mean deviations
+
+        # Layer definitions
+        if config.learn_means:
+            means_spatial_embeddings_layer = layers.Dense(
+                config.spatial_embeddings_dim,
+                name="means_spatial_embeddings",
+            )
+            means_concat_embeddings_layer = ConcatEmbeddingsLayer(
+                name="means_concat_embeddings",
+            )
+            means_dev_decoder_layer = MultiLayerPerceptronLayer(
+                config.dev_n_layers,
+                config.dev_n_units,
+                config.dev_normalization,
+                config.dev_activation,
+                config.dev_dropout,
+                config.dev_regularizer,
+                config.dev_regularizer_factor,
+                name="means_dev_decoder",
+            )
+            means_dev_map_layer = layers.Dense(
+                config.n_channels,
+                name="means_dev_map",
+            )
+            norm_means_dev_map_layer = layers.LayerNormalization(
+                axis=-1, scale=False, name="norm_means_dev_map"
+            )
+
+            means_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
+                shape=(config.n_sessions, config.n_modes, 1),
+                learn=config.learn_means,
+                initializer=osld_initializers.RandomWeightInitializer(
+                    tfp.math.softplus_inverse(0.0), 0.1
+                ),
+                name="means_dev_mag_inf_alpha_input",
+            )
+            means_dev_mag_inf_alpha_layer = layers.Activation(
+                "softplus", name="means_dev_mag_inf_alpha"
+            )
+            means_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
+                shape=(config.n_sessions, config.n_modes, 1),
+                learn=config.learn_means,
+                initializer=osld_initializers.RandomWeightInitializer(
+                    tfp.math.softplus_inverse(5.0), 0.1
+                ),
+                name="means_dev_mag_inf_beta_input",
+            )
+            means_dev_mag_inf_beta_layer = layers.Activation(
+                "softplus", name="means_dev_mag_inf_beta"
+            )
+            means_dev_mag_layer = SampleGammaDistributionLayer(
+                config.covariances_epsilon, config.do_kl_annealing, name="means_dev_mag"
+            )
+
+            means_dev_layer = layers.Multiply(name="means_dev")
+
+            # Data flow to get mean deviations
+
+            # Get the concatenated embeddings
+            means_spatial_embeddings = means_spatial_embeddings_layer(group_mu)
+            means_concat_embeddings = means_concat_embeddings_layer(
+                [embeddings, means_spatial_embeddings]
+            )  # shape = (n_sessions, n_modes, embeddings_dim + spatial_embeddings_dim)
+
+            # Get the mean deviation maps (no global magnitude information)
+            means_dev_decoder = means_dev_decoder_layer(
+                means_concat_embeddings,
+                static_loss_scaling_factor=static_loss_scaling_factor,
+            )
+            means_dev_map = means_dev_map_layer(means_dev_decoder)
+            norm_means_dev_map = TFGatherLayer()(
+                [norm_means_dev_map_layer(means_dev_map), session_id[:, 0]]
+            )
+            # shape = (None, n_modes, n_channels)
+
+            # Get the deviation magnitudes (scale deviation maps globally)
+            means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(data)
+            means_dev_mag_inf_alpha = means_dev_mag_inf_alpha_layer(
+                means_dev_mag_inf_alpha_input
+            )
+            means_dev_mag_inf_beta_input = means_dev_mag_inf_beta_input_layer(data)
+            means_dev_mag_inf_beta = means_dev_mag_inf_beta_layer(
+                means_dev_mag_inf_beta_input
+            )
+            means_dev_mag = means_dev_mag_layer(
+                [
+                    means_dev_mag_inf_alpha,
+                    means_dev_mag_inf_beta,
+                    session_id,
+                ]
+            )
+            means_dev = means_dev_layer([means_dev_mag, norm_means_dev_map])
+        else:
+            means_dev_layer = ZeroLayer(
+                shape=(config.n_modes, config.n_channels),
+                name="means_dev",
+            )
+            means_dev = BroadcastLayer(config.n_modes, config.n_channels)(
+                [means_dev_layer(data), batch_size]
+            )
+
+        # ----------------------
+        # Covariances deviations
+
+        # Layer definitions
+        if config.learn_covariances:
+            covs_spatial_embeddings_layer = layers.Dense(
+                config.spatial_embeddings_dim,
+                name="covs_spatial_embeddings",
+            )
+            covs_concat_embeddings_layer = ConcatEmbeddingsLayer(
+                name="covs_concat_embeddings",
+            )
+
+            covs_dev_decoder_layer = MultiLayerPerceptronLayer(
+                config.dev_n_layers,
+                config.dev_n_units,
+                config.dev_normalization,
+                config.dev_activation,
+                config.dev_dropout,
+                config.dev_regularizer,
+                config.dev_regularizer_factor,
+                name="covs_dev_decoder",
+            )
+            covs_dev_map_layer = layers.Dense(
+                config.n_channels * (config.n_channels + 1) // 2,
+                name="covs_dev_map",
+            )
+            norm_covs_dev_map_layer = layers.LayerNormalization(
+                axis=-1, scale=False, name="norm_covs_dev_map"
+            )
+
+            covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
+                shape=(config.n_sessions, config.n_modes, 1),
+                learn=config.learn_covariances,
+                initializer=osld_initializers.RandomWeightInitializer(
+                    tfp.math.softplus_inverse(0.0), 0.1
+                ),
+                name="covs_dev_mag_inf_alpha_input",
+            )
+            covs_dev_mag_inf_alpha_layer = layers.Activation(
+                "softplus", name="covs_dev_mag_inf_alpha"
+            )
+            covs_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
+                shape=(config.n_sessions, config.n_modes, 1),
+                learn=config.learn_covariances,
+                initializer=osld_initializers.RandomWeightInitializer(
+                    tfp.math.softplus_inverse(5.0), 0.1
+                ),
+                name="covs_dev_mag_inf_beta_input",
+            )
+            covs_dev_mag_inf_beta_layer = layers.Activation(
+                "softplus", name="covs_dev_mag_inf_beta"
+            )
+            covs_dev_mag_layer = SampleGammaDistributionLayer(
+                config.covariances_epsilon, config.do_kl_annealing, name="covs_dev_mag"
+            )
+            covs_dev_layer = layers.Multiply(name="covs_dev")
+
+            # Data flow to get covariances deviations
+
+            # Get the concatenated embeddings
+            covs_spatial_embeddings = covs_spatial_embeddings_layer(
+                InverseCholeskyLayer(config.covariances_epsilon)(group_D)
+            )
+            covs_concat_embeddings = covs_concat_embeddings_layer(
+                [embeddings, covs_spatial_embeddings]
+            )
+
+            # Get the covariance deviation maps (no global magnitude information)
+            covs_dev_decoder = covs_dev_decoder_layer(
+                covs_concat_embeddings,
+                static_loss_scaling_factor=static_loss_scaling_factor,
+            )
+            covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
+            norm_covs_dev_map = TFGatherLayer()(
+                [norm_covs_dev_map_layer(covs_dev_map), session_id[:, 0]]
+            )
+
+            # Get the deviation magnitudes (scale deviation maps globally)
+            covs_dev_mag_inf_alpha_input = covs_dev_mag_inf_alpha_input_layer(data)
+            covs_dev_mag_inf_alpha = covs_dev_mag_inf_alpha_layer(
+                covs_dev_mag_inf_alpha_input
+            )
+            covs_dev_mag_inf_beta_input = covs_dev_mag_inf_beta_input_layer(data)
+            covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(
+                covs_dev_mag_inf_beta_input
+            )
+
+            covs_dev_mag = covs_dev_mag_layer(
+                [
+                    covs_dev_mag_inf_alpha,
+                    covs_dev_mag_inf_beta,
+                    session_id,
+                ]
+            )
+            # covs_dev_mag.shape = (None, n_modes, 1)
+            covs_dev = covs_dev_layer([covs_dev_mag, norm_covs_dev_map])
+            # covs_dev.shape = (None, n_modes, n_channels * (n_channels + 1) // 2)
+        else:
+            covs_dev_layer = ZeroLayer(
+                shape=(
+                    config.n_modes,
+                    config.n_channels * (config.n_channels + 1) // 2,
+                ),
+                name="covs_dev",
+            )
+            covs_dev = tf.broadcast_to(
+                covs_dev_layer(data),
+                (
+                    batch_size,
+                    config.n_modes,
+                    config.n_channels * (config.n_channels + 1) // 2,
+                ),
+            )
+
+        # ----------------------------------------
+        # Add deviations to group level parameters
+
+        # Layer definitions
+        session_means_layer = SessionParamLayer(
+            "means", config.covariances_epsilon, name="session_means"
+        )
+        session_covs_layer = SessionParamLayer(
+            "covariances", config.covariances_epsilon, name="session_covs"
+        )
+
+        # Data flow
+        mu = session_means_layer(
+            [group_mu, means_dev]
+        )  # shape = (None, n_modes, n_channels)
+        D = session_covs_layer(
+            [group_D, covs_dev]
+        )  # shape = (None, n_modes, n_channels, n_channels)
+
+        # -----------------------------------
+        # Mix the session specific paraemters
+        # and get the conditional likelihood
+
+        # Layer definitions
+        mix_session_means_covs_layer = MixSessionSpecificParametersLayer(
+            name="mix_session_means_covs"
+        )
+        ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
+
+        # Data flow
+        m, C = mix_session_means_covs_layer([alpha, mu, D])
+        ll_loss = ll_loss_layer([data, m, C])
+
+        # ---------
+        # KL losses
+
+        # For the observation model (static KL loss)
+        if config.learn_means:
+            # Layer definitions
+            means_dev_mag_mod_beta_layer = layers.Dense(
+                1,
+                activation="softplus",
+                name="means_dev_mag_mod_beta",
+            )
+
+            means_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
+                config.covariances_epsilon, name="means_dev_mag_kl_loss"
+            )
+
+            # Data flow
+            means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(means_dev_decoder)
+            means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(
+                [
+                    means_dev_mag_inf_alpha,
+                    means_dev_mag_inf_beta,
+                    means_dev_mag_mod_beta,
+                ],
+                static_loss_scaling_factor=static_loss_scaling_factor,
+            )
+        else:
+            means_dev_mag_kl_loss_layer = ZeroLayer(
+                (),
+                name="means_dev_mag_kl_loss",
+            )
+            means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(data)
+
+        if config.learn_covariances:
+            # Layer definitions
+            covs_dev_mag_mod_beta_layer = layers.Dense(
+                1,
+                activation="softplus",
+                name="covs_dev_mag_mod_beta",
+            )
+
+            covs_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
+                config.covariances_epsilon, name="covs_dev_mag_kl_loss"
+            )
+
+            # Data flow
+            covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
+                covs_dev_decoder,
+            )
+            covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
+                [
+                    covs_dev_mag_inf_alpha,
+                    covs_dev_mag_inf_beta,
+                    covs_dev_mag_mod_beta,
+                ],
+                static_loss_scaling_factor=static_loss_scaling_factor,
+            )
+        else:
+            covs_dev_mag_kl_loss_layer = ZeroLayer((), name="covs_dev_mag_kl_loss")
+            covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(data)
+
+        # Total KL loss
+        # Layer definitions
+        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
+
+        # Data flow
+        kl_loss = kl_loss_layer(
+            [kl_div, means_dev_mag_kl_loss, covs_dev_mag_kl_loss],
+        )
+
+        self.model = tf.keras.Model(
+            inputs=[data, session_id],
+            outputs=[ll_loss, kl_loss, theta_norm],
+            name="DIVE",
+        )
+        self.output_names = ["ll_loss", "kl_loss", "theta"]
 
     def get_group_means(self):
         """Get the group level mode means.
@@ -665,436 +1099,3 @@ class Model(VariationalInferenceModelBase):
         raise AttributeError(
             " 'Model' object has no attribute 'random_subject_initialization'."
         )
-
-
-class TFGatherLayer(layers.Layer):
-
-    def call(self, inputs):
-        data, idx = inputs
-        return tf.gather(data, idx, axis=0)
-
-
-class BroadcastLayer(layers.Layer):
-    def __init__(self, n_modes, n_channels, **kwargs):
-        super().__init__(**kwargs)
-        self.n_modes = n_modes
-        self.n_channels = n_channels
-
-    def call(self, inputs):
-        data, batch_size = inputs
-        return tf.broadcast_to(data, (batch_size, self.n_modes, self.n_channels))
-
-
-def _model_structure(config):
-    # Inputs
-    data = layers.Input(
-        shape=(config.sequence_length, config.n_channels),
-        dtype=tf.float32,
-        name="data",
-    )
-    batch_size_layer = BatchSizeLayer(name="batch_size")
-    batch_size = batch_size_layer(data)
-
-    encoder_layer = EncoderLayer(config, name="encoder")
-
-    # Static loss scaling factor
-    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-        config.sequence_length,
-        config.loss_calc,
-        name="static_loss_scaling_factor",
-    )
-    static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-
-    session_id = layers.Input(
-        shape=(config.sequence_length,),
-        dtype=tf.int32,
-        name="session_id",
-    )
-    session_label_layers = dict()
-    session_labels = dict()
-    label_embeddings_layers = dict()
-    label_embeddings = []
-    for session_label in config.session_labels:
-        session_label_layers[session_label.name] = TFConstantLayer(
-            values=session_label.values,
-            name=f"{session_label.name}_constant",
-        )
-        session_labels[session_label.name] = session_label_layers[session_label.name](
-            data
-        )
-        label_embeddings_layers[session_label.name] = (
-            EmbeddingLayer(
-                session_label.n_classes,
-                config.embeddings_dim,
-                config.unit_norm_embeddings,
-                name=f"{session_label.name}_embeddings",
-            )
-            if session_label.label_type == "categorical"
-            else layers.Dense(
-                config.embeddings_dim, name=f"{session_label.name}_embeddings"
-            )
-        )
-        label_embeddings.append(
-            label_embeddings_layers[session_label.name](
-                session_labels[session_label.name]
-            )
-        )
-
-    embeddings_layer = AddLayer(name="embeddings")
-    embeddings = embeddings_layer(label_embeddings)
-
-    alpha, theta_norm, kl_div = encoder_layer(data)
-
-    # -----------------
-    # Observation model
-
-    # Group level observation model parameters
-    group_means_layer = VectorsLayer(
-        config.n_modes,
-        config.n_channels,
-        config.learn_means,
-        config.initial_means,
-        config.means_regularizer,
-        name="group_means",
-    )
-    group_covs_layer = CovarianceMatricesLayer(
-        config.n_modes,
-        config.n_channels,
-        config.learn_covariances,
-        config.initial_covariances,
-        config.covariances_epsilon,
-        config.covariances_regularizer,
-        name="group_covs",
-    )
-
-    group_mu = group_means_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )
-    group_D = group_covs_layer(
-        data, static_loss_scaling_factor=static_loss_scaling_factor
-    )
-
-    # ---------------
-    # Mean deviations
-
-    # Layer definitions
-    if config.learn_means:
-        means_spatial_embeddings_layer = layers.Dense(
-            config.spatial_embeddings_dim,
-            name="means_spatial_embeddings",
-        )
-        means_concat_embeddings_layer = ConcatEmbeddingsLayer(
-            name="means_concat_embeddings",
-        )
-        means_dev_decoder_layer = MultiLayerPerceptronLayer(
-            config.dev_n_layers,
-            config.dev_n_units,
-            config.dev_normalization,
-            config.dev_activation,
-            config.dev_dropout,
-            config.dev_regularizer,
-            config.dev_regularizer_factor,
-            name="means_dev_decoder",
-        )
-        means_dev_map_layer = layers.Dense(
-            config.n_channels,
-            name="means_dev_map",
-        )
-        norm_means_dev_map_layer = layers.LayerNormalization(
-            axis=-1, scale=False, name="norm_means_dev_map"
-        )
-
-        means_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
-            shape=(config.n_sessions, config.n_modes, 1),
-            learn=config.learn_means,
-            initializer=osld_initializers.RandomWeightInitializer(
-                tfp.math.softplus_inverse(0.0), 0.1
-            ),
-            name="means_dev_mag_inf_alpha_input",
-        )
-        means_dev_mag_inf_alpha_layer = layers.Activation(
-            "softplus", name="means_dev_mag_inf_alpha"
-        )
-        means_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
-            shape=(config.n_sessions, config.n_modes, 1),
-            learn=config.learn_means,
-            initializer=osld_initializers.RandomWeightInitializer(
-                tfp.math.softplus_inverse(5.0), 0.1
-            ),
-            name="means_dev_mag_inf_beta_input",
-        )
-        means_dev_mag_inf_beta_layer = layers.Activation(
-            "softplus", name="means_dev_mag_inf_beta"
-        )
-        means_dev_mag_layer = SampleGammaDistributionLayer(
-            config.covariances_epsilon, config.do_kl_annealing, name="means_dev_mag"
-        )
-
-        means_dev_layer = layers.Multiply(name="means_dev")
-
-        # Data flow to get mean deviations
-
-        # Get the concatenated embeddings
-        means_spatial_embeddings = means_spatial_embeddings_layer(group_mu)
-        means_concat_embeddings = means_concat_embeddings_layer(
-            [embeddings, means_spatial_embeddings]
-        )  # shape = (n_sessions, n_modes, embeddings_dim + spatial_embeddings_dim)
-
-        # Get the mean deviation maps (no global magnitude information)
-        means_dev_decoder = means_dev_decoder_layer(
-            means_concat_embeddings,
-            static_loss_scaling_factor=static_loss_scaling_factor,
-        )
-        means_dev_map = means_dev_map_layer(means_dev_decoder)
-        norm_means_dev_map = TFGatherLayer()(
-            [norm_means_dev_map_layer(means_dev_map), session_id[:, 0]]
-        )
-        # shape = (None, n_modes, n_channels)
-
-        # Get the deviation magnitudes (scale deviation maps globally)
-        means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(data)
-        means_dev_mag_inf_alpha = means_dev_mag_inf_alpha_layer(
-            means_dev_mag_inf_alpha_input
-        )
-        means_dev_mag_inf_beta_input = means_dev_mag_inf_beta_input_layer(data)
-        means_dev_mag_inf_beta = means_dev_mag_inf_beta_layer(
-            means_dev_mag_inf_beta_input
-        )
-        means_dev_mag = means_dev_mag_layer(
-            [
-                means_dev_mag_inf_alpha,
-                means_dev_mag_inf_beta,
-                session_id,
-            ]
-        )
-        means_dev = means_dev_layer([means_dev_mag, norm_means_dev_map])
-    else:
-        means_dev_layer = ZeroLayer(
-            shape=(config.n_modes, config.n_channels),
-            name="means_dev",
-        )
-        means_dev = BroadcastLayer(config.n_modes, config.n_channels)(
-            [means_dev_layer(data), batch_size]
-        )
-
-    # ----------------------
-    # Covariances deviations
-
-    # Layer definitions
-    if config.learn_covariances:
-        covs_spatial_embeddings_layer = layers.Dense(
-            config.spatial_embeddings_dim,
-            name="covs_spatial_embeddings",
-        )
-        covs_concat_embeddings_layer = ConcatEmbeddingsLayer(
-            name="covs_concat_embeddings",
-        )
-
-        covs_dev_decoder_layer = MultiLayerPerceptronLayer(
-            config.dev_n_layers,
-            config.dev_n_units,
-            config.dev_normalization,
-            config.dev_activation,
-            config.dev_dropout,
-            config.dev_regularizer,
-            config.dev_regularizer_factor,
-            name="covs_dev_decoder",
-        )
-        covs_dev_map_layer = layers.Dense(
-            config.n_channels * (config.n_channels + 1) // 2,
-            name="covs_dev_map",
-        )
-        norm_covs_dev_map_layer = layers.LayerNormalization(
-            axis=-1, scale=False, name="norm_covs_dev_map"
-        )
-
-        covs_dev_mag_inf_alpha_input_layer = LearnableTensorLayer(
-            shape=(config.n_sessions, config.n_modes, 1),
-            learn=config.learn_covariances,
-            initializer=osld_initializers.RandomWeightInitializer(
-                tfp.math.softplus_inverse(0.0), 0.1
-            ),
-            name="covs_dev_mag_inf_alpha_input",
-        )
-        covs_dev_mag_inf_alpha_layer = layers.Activation(
-            "softplus", name="covs_dev_mag_inf_alpha"
-        )
-        covs_dev_mag_inf_beta_input_layer = LearnableTensorLayer(
-            shape=(config.n_sessions, config.n_modes, 1),
-            learn=config.learn_covariances,
-            initializer=osld_initializers.RandomWeightInitializer(
-                tfp.math.softplus_inverse(5.0), 0.1
-            ),
-            name="covs_dev_mag_inf_beta_input",
-        )
-        covs_dev_mag_inf_beta_layer = layers.Activation(
-            "softplus", name="covs_dev_mag_inf_beta"
-        )
-        covs_dev_mag_layer = SampleGammaDistributionLayer(
-            config.covariances_epsilon, config.do_kl_annealing, name="covs_dev_mag"
-        )
-        covs_dev_layer = layers.Multiply(name="covs_dev")
-
-        # Data flow to get covariances deviations
-
-        # Get the concatenated embeddings
-        covs_spatial_embeddings = covs_spatial_embeddings_layer(
-            InverseCholeskyLayer(config.covariances_epsilon)(group_D)
-        )
-        covs_concat_embeddings = covs_concat_embeddings_layer(
-            [embeddings, covs_spatial_embeddings]
-        )
-
-        # Get the covariance deviation maps (no global magnitude information)
-        covs_dev_decoder = covs_dev_decoder_layer(
-            covs_concat_embeddings,
-            static_loss_scaling_factor=static_loss_scaling_factor,
-        )
-        covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
-        norm_covs_dev_map = TFGatherLayer()(
-            [norm_covs_dev_map_layer(covs_dev_map), session_id[:, 0]]
-        )
-
-        # Get the deviation magnitudes (scale deviation maps globally)
-        covs_dev_mag_inf_alpha_input = covs_dev_mag_inf_alpha_input_layer(data)
-        covs_dev_mag_inf_alpha = covs_dev_mag_inf_alpha_layer(
-            covs_dev_mag_inf_alpha_input
-        )
-        covs_dev_mag_inf_beta_input = covs_dev_mag_inf_beta_input_layer(data)
-        covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(covs_dev_mag_inf_beta_input)
-
-        covs_dev_mag = covs_dev_mag_layer(
-            [
-                covs_dev_mag_inf_alpha,
-                covs_dev_mag_inf_beta,
-                session_id,
-            ]
-        )
-        # covs_dev_mag.shape = (None, n_modes, 1)
-        covs_dev = covs_dev_layer([covs_dev_mag, norm_covs_dev_map])
-        # covs_dev.shape = (None, n_modes, n_channels * (n_channels + 1) // 2)
-    else:
-        covs_dev_layer = ZeroLayer(
-            shape=(
-                config.n_modes,
-                config.n_channels * (config.n_channels + 1) // 2,
-            ),
-            name="covs_dev",
-        )
-        covs_dev = tf.broadcast_to(
-            covs_dev_layer(data),
-            (
-                batch_size,
-                config.n_modes,
-                config.n_channels * (config.n_channels + 1) // 2,
-            ),
-        )
-
-    # ----------------------------------------
-    # Add deviations to group level parameters
-
-    # Layer definitions
-    session_means_layer = SessionParamLayer(
-        "means", config.covariances_epsilon, name="session_means"
-    )
-    session_covs_layer = SessionParamLayer(
-        "covariances", config.covariances_epsilon, name="session_covs"
-    )
-
-    # Data flow
-    mu = session_means_layer(
-        [group_mu, means_dev]
-    )  # shape = (None, n_modes, n_channels)
-    D = session_covs_layer(
-        [group_D, covs_dev]
-    )  # shape = (None, n_modes, n_channels, n_channels)
-
-    # -----------------------------------
-    # Mix the session specific paraemters
-    # and get the conditional likelihood
-
-    # Layer definitions
-    mix_session_means_covs_layer = MixSessionSpecificParametersLayer(
-        name="mix_session_means_covs"
-    )
-    ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
-
-    # Data flow
-    m, C = mix_session_means_covs_layer([alpha, mu, D])
-    ll_loss = ll_loss_layer([data, m, C])
-
-    # ---------
-    # KL losses
-
-    # For the observation model (static KL loss)
-    if config.learn_means:
-        # Layer definitions
-        means_dev_mag_mod_beta_layer = layers.Dense(
-            1,
-            activation="softplus",
-            name="means_dev_mag_mod_beta",
-        )
-
-        means_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
-            config.covariances_epsilon, name="means_dev_mag_kl_loss"
-        )
-
-        # Data flow
-        means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(means_dev_decoder)
-        means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(
-            [
-                means_dev_mag_inf_alpha,
-                means_dev_mag_inf_beta,
-                means_dev_mag_mod_beta,
-            ],
-            static_loss_scaling_factor=static_loss_scaling_factor,
-        )
-    else:
-        means_dev_mag_kl_loss_layer = ZeroLayer(
-            (),
-            name="means_dev_mag_kl_loss",
-        )
-        means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(data)
-
-    if config.learn_covariances:
-        # Layer definitions
-        covs_dev_mag_mod_beta_layer = layers.Dense(
-            1,
-            activation="softplus",
-            name="covs_dev_mag_mod_beta",
-        )
-
-        covs_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
-            config.covariances_epsilon, name="covs_dev_mag_kl_loss"
-        )
-
-        # Data flow
-        covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
-            covs_dev_decoder,
-        )
-        covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
-            [
-                covs_dev_mag_inf_alpha,
-                covs_dev_mag_inf_beta,
-                covs_dev_mag_mod_beta,
-            ],
-            static_loss_scaling_factor=static_loss_scaling_factor,
-        )
-    else:
-        covs_dev_mag_kl_loss_layer = ZeroLayer((), name="covs_dev_mag_kl_loss")
-        covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(data)
-
-    # Total KL loss
-    # Layer definitions
-    kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
-
-    # Data flow
-    kl_loss = kl_loss_layer(
-        [kl_div, means_dev_mag_kl_loss, covs_dev_mag_kl_loss],
-    )
-
-    return tf.keras.Model(
-        inputs=[data, session_id],
-        outputs=[ll_loss, kl_loss, theta_norm],
-        name="DIVE",
-    )

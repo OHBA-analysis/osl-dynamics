@@ -572,23 +572,6 @@ class VariationalInferenceModelBase(ModelBase):
         super().reset_weights(keep=keep)
         self.reset_kl_annealing_factor()
 
-    def predict(self, *args, **kwargs):
-        """Wrapper for the standard keras predict method.
-
-        Returns
-        -------
-        predictions : dict
-            Dictionary with labels for each prediction.
-        """
-        predictions = self.model.predict(*args, **kwargs)
-        if not self.config.multiple_dynamics:
-            return_names = ["ll_loss", "kl_loss", "theta"]
-        else:
-            return_names = ["ll_loss", "kl_loss", "power_theta", "fc_theta"]
-        predictions_dict = dict(zip(return_names, predictions))
-
-        return predictions_dict
-
     def get_theta(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
     ):
@@ -1083,21 +1066,6 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # Compile
         self.model.compile(optimizer)
-
-    def predict(self, *args, **kwargs):
-        """Wrapper for the standard keras predict method.
-
-        Returns
-        -------
-        predictions : dict
-            Dictionary with labels for each prediction.
-        """
-        predictions = self.model.predict(*args, **kwargs)
-        if self.config.model_name == "HIVE":
-            names = ["ll_loss", "kl_loss", "gamma", "xi"]
-        else:
-            names = ["ll_loss", "gamma", "xi"]
-        return dict(zip(names, predictions))
 
     def get_alpha(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
