@@ -526,6 +526,10 @@ class Model(VariationalInferenceModelBase):
             config.means_regularizer,
             name="group_means",
         )
+        group_mu = group_means_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )
+
         group_covs_layer = CovarianceMatricesLayer(
             config.n_modes,
             config.n_channels,
@@ -534,10 +538,6 @@ class Model(VariationalInferenceModelBase):
             config.covariances_epsilon,
             config.covariances_regularizer,
             name="group_covs",
-        )
-
-        group_mu = group_means_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
         )
         group_D = group_covs_layer(
             data, static_loss_scaling_factor=static_loss_scaling_factor
@@ -764,18 +764,16 @@ class Model(VariationalInferenceModelBase):
         # ----------------------------------------
         # Add deviations to group level parameters
 
-        # Layer definitions
         session_means_layer = SessionParamLayer(
             "means", config.covariances_epsilon, name="session_means"
         )
-        session_covs_layer = SessionParamLayer(
-            "covariances", config.covariances_epsilon, name="session_covs"
-        )
-
-        # Data flow
         mu = session_means_layer(
             [group_mu, means_dev]
         )  # shape = (None, n_modes, n_channels)
+
+        session_covs_layer = SessionParamLayer(
+            "covariances", config.covariances_epsilon, name="session_covs"
+        )
         D = session_covs_layer(
             [group_D, covs_dev]
         )  # shape = (None, n_modes, n_channels, n_channels)
@@ -784,14 +782,12 @@ class Model(VariationalInferenceModelBase):
         # Mix the session specific paraemters
         # and get the conditional likelihood
 
-        # Layer definitions
         mix_session_means_covs_layer = MixSessionSpecificParametersLayer(
             name="mix_session_means_covs"
         )
-        ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
-
-        # Data flow
         m, C = mix_session_means_covs_layer([alpha, mu, D])
+
+        ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
         ll_loss = ll_loss_layer([data, m, C])
 
         # ---------
@@ -799,19 +795,16 @@ class Model(VariationalInferenceModelBase):
 
         # For the observation model (static KL loss)
         if config.learn_means:
-            # Layer definitions
             means_dev_mag_mod_beta_layer = layers.Dense(
                 1,
                 activation="softplus",
                 name="means_dev_mag_mod_beta",
             )
+            means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(means_dev_decoder)
 
             means_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
                 config.covariances_epsilon, name="means_dev_mag_kl_loss"
             )
-
-            # Data flow
-            means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(means_dev_decoder)
             means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(
                 [
                     means_dev_mag_inf_alpha,
@@ -828,20 +821,17 @@ class Model(VariationalInferenceModelBase):
             means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(data)
 
         if config.learn_covariances:
-            # Layer definitions
             covs_dev_mag_mod_beta_layer = layers.Dense(
                 1,
                 activation="softplus",
                 name="covs_dev_mag_mod_beta",
             )
+            covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
+                covs_dev_decoder,
+            )
 
             covs_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
                 config.covariances_epsilon, name="covs_dev_mag_kl_loss"
-            )
-
-            # Data flow
-            covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
-                covs_dev_decoder,
             )
             covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
                 [
@@ -856,20 +846,17 @@ class Model(VariationalInferenceModelBase):
             covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(data)
 
         # Total KL loss
-        # Layer definitions
         kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
-
-        # Data flow
         kl_loss = kl_loss_layer(
             [kl_div, means_dev_mag_kl_loss, covs_dev_mag_kl_loss],
         )
 
-        self.model = tf.keras.Model(
-            inputs=[data, session_id],
-            outputs=[ll_loss, kl_loss, theta_norm],
-            name="DIVE",
-        )
-        self.output_names = ["ll_loss", "kl_loss", "theta"]
+        # ------------
+        # Create model
+        inputs = [data, session_id]
+        outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "theta": theta_norm}
+        name = config.model_name
+        self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
     def get_group_means(self):
         """Get the group level mode means.

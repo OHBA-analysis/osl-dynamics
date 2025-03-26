@@ -362,6 +362,10 @@ class Model(MarkovStateInferenceModelBase):
             config.means_regularizer,
             name="group_means",
         )
+        group_mu = group_means_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )
+
         group_covs_layer = CovarianceMatricesLayer(
             config.n_states,
             config.n_channels,
@@ -370,10 +374,6 @@ class Model(MarkovStateInferenceModelBase):
             config.covariances_epsilon,
             config.covariances_regularizer,
             name="group_covs",
-        )
-
-        group_mu = group_means_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
         )
         group_D = group_covs_layer(
             data, static_loss_scaling_factor=static_loss_scaling_factor
@@ -604,18 +604,16 @@ class Model(MarkovStateInferenceModelBase):
         # ----------------------------------------
         # Add deviations to group level parameters
 
-        # Layer definitions
         session_means_layer = SessionParamLayer(
             "means", config.covariances_epsilon, name="session_means"
         )
-        session_covs_layer = SessionParamLayer(
-            "covariances", config.covariances_epsilon, name="session_covs"
-        )
-
-        # Data flow
         mu = session_means_layer(
             [group_mu, means_dev]
         )  # shape = (None, n_states, n_channels)
+
+        session_covs_layer = SessionParamLayer(
+            "covariances", config.covariances_epsilon, name="session_covs"
+        )
         D = session_covs_layer(
             [group_D, covs_dev]
         )  # shape = (None, n_states, n_channels, n_channels)
@@ -650,19 +648,16 @@ class Model(MarkovStateInferenceModelBase):
 
         # For the observation model (static KL loss)
         if config.learn_means:
-            # Layer definitions
             means_dev_mag_mod_beta_layer = layers.Dense(
                 1,
                 activation="softplus",
                 name="means_dev_mag_mod_beta",
             )
+            means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(means_dev_decoder)
 
             means_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
                 config.covariances_epsilon, name="means_dev_mag_kl_loss"
             )
-
-            # Data flow
-            means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(means_dev_decoder)
             means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(
                 [
                     means_dev_mag_inf_alpha,
@@ -679,20 +674,17 @@ class Model(MarkovStateInferenceModelBase):
             means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(data)
 
         if config.learn_covariances:
-            # Layer definitions
             covs_dev_mag_mod_beta_layer = layers.Dense(
                 1,
                 activation="softplus",
                 name="covs_dev_mag_mod_beta",
             )
+            covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
+                covs_dev_decoder,
+            )
 
             covs_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
                 config.covariances_epsilon, name="covs_dev_mag_kl_loss"
-            )
-
-            # Data flow
-            covs_dev_mag_mod_beta = covs_dev_mag_mod_beta_layer(
-                covs_dev_decoder,
             )
             covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
                 [
@@ -707,18 +699,15 @@ class Model(MarkovStateInferenceModelBase):
             covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(data)
 
         # Total KL loss
-        # Layer definitions
         kl_loss_layer = KLLossLayer(do_annealing=config.do_kl_annealing, name="kl_loss")
-
-        # Data flow
         kl_loss = kl_loss_layer([means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
 
-        self.model = tf.keras.Model(
-            inputs=[data, session_id],
-            outputs=[ll_loss, kl_loss, gamma, xi],
-            name="HIVE",
-        )
-        self.output_names = ["ll_loss", "kl_loss", "gamma", "xi"]
+        # ------------
+        # Create model
+        inputs = [data, session_id]
+        outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "gamma": gamma, "xi": xi}
+        name = config.model_name
+        self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
     def fit(self, *args, kl_annealing_callback=None, **kwargs):
         """Wrapper for the standard keras fit method.

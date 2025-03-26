@@ -288,18 +288,6 @@ class ModelBase:
         history = self.model.fit(*args, **kwargs)
         return history.history
 
-    def predict(self, *args, **kwargs):
-        """Wrapper for the standard keras predict method.
-
-        Returns
-        -------
-        predictions : dict
-            Dictionary with labels for each prediction.
-        """
-        predictions = self.model.predict(*args, **kwargs)
-        names = self.output_names
-        return dict(zip(names, predictions))
-
     def load_weights(self, filepath):
         """Load weights of the model from a file.
 

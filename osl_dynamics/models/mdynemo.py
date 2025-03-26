@@ -528,7 +528,6 @@ class Model(VariationalInferenceModelBase):
         data = tf.keras.layers.Input(
             shape=(config.sequence_length, config.n_channels), name="data"
         )
-        inputs = {"data": data}
         static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
         (
@@ -546,17 +545,16 @@ class Model(VariationalInferenceModelBase):
         ll_loss = ll_loss_layer([data, m, C])
         kl_loss = kl_loss_layer([power_kl_div, fc_kl_div])
 
-        self.model = tf.keras.Model(
-            inputs=inputs,
-            outputs=[ll_loss, kl_loss, power_theta_norm, fc_theta_norm],
-            name="M-DyNeMo",
-        )
-        self.output_names = [
-            "ll_loss",
-            "kl_loss",
-            "power_theta",
-            "fc_theta",
-        ]
+        # ---------- Create model ---------- #
+        inputs = {"data": data}
+        outputs = {
+            "ll_loss": ll_loss,
+            "kl_loss": kl_loss,
+            "power_theta": power_theta,
+            "fc_theta": fc_theta,
+        }
+        name = config.model_name
+        self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
     def get_means(self):
         """Get the mode means.

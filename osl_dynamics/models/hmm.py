@@ -172,7 +172,6 @@ class Model(MarkovStateInferenceModelBase):
             shape=(config.sequence_length, config.n_channels),
             name="data",
         )
-        inputs = {"data": data}
 
         # Static loss scaling factor
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
@@ -240,10 +239,11 @@ class Model(MarkovStateInferenceModelBase):
         ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
         ll_loss = ll_loss_layer([ll, gamma])
 
-        self.model = tf.keras.Model(
-            inputs=inputs, outputs=[ll_loss, gamma, xi], name="HMM"
-        )
-        self.output_names = ["ll_loss", "gamma", "xi"]
+        # Create model
+        inputs = {"data": data}
+        outputs = {"ll_loss": ll_loss, "gamma": gamma, "xi": xi}
+        name = config.model_name
+        self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
     def get_means(self):
         """Get the state means.

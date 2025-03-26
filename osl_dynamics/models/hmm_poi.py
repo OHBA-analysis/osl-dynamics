@@ -156,10 +156,11 @@ class Model(MarkovStateInferenceModelBase):
         ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
         ll_loss = ll_loss_layer([ll, gamma])
 
-        self.model = tf.keras.Model(
-            inputs=data, outputs=[ll_loss, gamma, xi], name="HMM-Poisson"
-        )
-        self.output_names = ["ll_loss", "gamma", "xi"]
+        # Create model
+        inputs = {"data": data}
+        outputs = {"ll_loss": ll_loss, "gamma": gamma, "xi": xi}
+        name = config.model_name
+        self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
     def get_log_rates(self):
         """Get the state :code:`log_rates`.
