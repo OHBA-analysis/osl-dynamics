@@ -208,6 +208,7 @@ class VariationalInferenceModelBase(ModelBase):
             training_data,
             shuffle=True,
             concatenate=True,
+            drop_last_batch=True,
         )
 
         # Calculate the number of batches to use
@@ -420,6 +421,7 @@ class VariationalInferenceModelBase(ModelBase):
             training_data,
             shuffle=True,
             concatenate=True,
+            drop_last_batch=True,
         )
 
         # Calculate the number of batches to use
@@ -1295,6 +1297,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             training_data,
             shuffle=True,
             concatenate=True,
+            drop_last_batch=True,
         )
 
         # Calculate the number of batches to use
@@ -1380,6 +1383,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             training_data,
             shuffle=True,
             concatenate=True,
+            drop_last_batch=True,
         )
 
         # Calculate the number of batches to use

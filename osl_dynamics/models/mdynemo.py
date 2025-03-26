@@ -531,9 +531,14 @@ class Model(VariationalInferenceModelBase):
         inputs = {"data": data}
         static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
 
-        alpha, beta, power_theta_norm, fc_theta_norm, power_kl_div, fc_kl_div = (
-            encoder_layer(data)
-        )
+        (
+            alpha,
+            beta,
+            power_theta_norm,
+            fc_theta_norm,
+            power_kl_div,
+            fc_kl_div,
+        ) = encoder_layer(data)
         mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         E = stds_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         R = corrs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
