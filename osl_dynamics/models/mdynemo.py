@@ -550,8 +550,8 @@ class Model(VariationalInferenceModelBase):
         outputs = {
             "ll_loss": ll_loss,
             "kl_loss": kl_loss,
-            "power_theta": power_theta,
-            "fc_theta": fc_theta,
+            "power_theta": power_theta_norm,
+            "fc_theta": fc_theta_norm,
         }
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)

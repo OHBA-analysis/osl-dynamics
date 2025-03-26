@@ -2269,7 +2269,7 @@ class SeparatePoissonLogLikelihoodLayer(layers.Layer):
         x, log_rate = inputs
 
         # Add the sequence length dimension
-        log_rate = tf.expand_dims(log_rate, axis=1)
+        log_rate = tf.expand_dims(tf.expand_dims(log_rate, axis=0), axis=0)
 
         # Add states dimension
         x = tf.expand_dims(x, axis=2)

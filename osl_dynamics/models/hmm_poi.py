@@ -137,11 +137,12 @@ class Model(MarkovStateInferenceModelBase):
 
         # Log-likelihood
         ll_layer = SeparatePoissonLogLikelihoodLayer(config.n_states, name="ll")
-        ll = ll_layer([data, [log_rates]])
+        ll = ll_layer([data, log_rates])
 
         # Hidden state inference
         hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
             config.n_states,
+            config.sequence_length,
             config.initial_trans_prob,
             config.initial_state_probs,
             config.learn_trans_prob,
