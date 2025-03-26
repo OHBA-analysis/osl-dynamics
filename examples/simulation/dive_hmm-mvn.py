@@ -12,13 +12,14 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.dive import Config, Model
-from osl_dynamics.utils import plotting
+from osl_dynamics.utils import plotting, set_random_seed
+
+set_random_seed(0)
 
 # Create directory to hold plots
 os.makedirs("figures", exist_ok=True)
 
 # GPU settings
-tf_ops.select_gpu(1)
 tf_ops.gpu_growth()
 
 # Settings
@@ -26,7 +27,7 @@ config = Config(
     n_modes=5,
     n_channels=20,
     n_sessions=100,
-    embeddings_dim=2,
+    embeddings_dim=5,
     spatial_embeddings_dim=2,
     sequence_length=200,
     inference_n_units=128,
@@ -42,12 +43,12 @@ config = Config(
     dev_activation="tanh",
     dev_normalization="layer",
     dev_regularizer="l1",
-    dev_regularizer_factor=10,
+    dev_regularizer_factor=0.01,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=20,
-    batch_size=64,
+    batch_size=32,
     learning_rate=0.005,
     lr_decay=0.1,
     n_epochs=40,
@@ -62,11 +63,11 @@ sim = simulation.MSess_HMM_MVN(
     session_covariances="random",
     n_states=config.n_modes,
     n_channels=config.n_channels,
-    n_covariances_act=2,
+    n_covariances_act=5,
     n_sessions=config.n_sessions,
     embeddings_dim=config.embeddings_dim,
     spatial_embeddings_dim=config.spatial_embeddings_dim,
-    embeddings_scale=0.001,
+    embeddings_scale=0.005,
     n_groups=3,
     between_group_scale=0.2,
     stay_prob=0.9,
@@ -76,12 +77,12 @@ training_data = data.Data(sim.time_series)
 training_data.add_session_labels(
     "session_id", np.arange(config.n_sessions), "categorical"
 )
-training_data.add_session_labels("group_id", sim.assigned_groups, "categorical")
-config.session_labels = training_data.get_session_labels()
 
 # Build model
 model = Model(config)
 model.summary()
+
+print("Before training: ", model.model.optimizer)
 
 # Set regularizers
 model.set_regularizers(training_data)
@@ -110,7 +111,7 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # Fractional occupancies
 print("Fractional occupancies (Simulation):", modes.fractional_occupancies(sim_stc))
-print("Fractional occupancies (DyNeMo):", modes.fractional_occupancies(inf_stc))
+print("Fractional occupancies (DIVE):", modes.fractional_occupancies(inf_stc))
 
 # Plot the simulated and inferred embeddings with group labels
 sim_embeddings = sim.embeddings
@@ -148,3 +149,6 @@ plotting.plot_scatter(
 axes[0].set_title("Simulation")
 axes[1].set_title("Inferred")
 plotting.save(fig, filename="figures/embeddings.png")
+
+# Delete temporary directory
+training_data.delete_dir()

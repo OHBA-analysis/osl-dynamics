@@ -15,11 +15,12 @@ from osl_dynamics.models.hive import Config, Model
 from osl_dynamics.utils import plotting, set_random_seed
 
 
+set_random_seed(0)
+
 # Directory for plots
 os.makedirs("figures", exist_ok=True)
 
 # GPU settings
-tf_ops.select_gpu(1)
 tf_ops.gpu_growth()
 
 # Settings
@@ -38,7 +39,7 @@ config = Config(
     dev_regularizer_factor=0.01,
     learn_means=False,
     learn_covariances=True,
-    batch_size=64,
+    batch_size=16,
     learning_rate=0.001,
     lr_decay=0.1,
     n_epochs=40,
@@ -47,7 +48,6 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=20,
-    unit_norm_embeddings=True,
 )
 
 # Simulate data
@@ -75,8 +75,6 @@ training_data = data.Data(sim.time_series)
 training_data.add_session_labels(
     "session_id", np.arange(config.n_sessions), "categorical"
 )
-training_data.add_session_labels("group_id", sim.assigned_groups, "categorical")
-config.session_labels = training_data.get_session_labels()
 
 # Build model
 model = Model(config)
@@ -89,7 +87,6 @@ model.set_regularizers(training_data)
 model.set_dev_parameters_initializer(training_data)
 
 # Model initialization
-# model.random_subset_initialization(training_data, n_epochs=3, n_init=5, take=1)
 model.random_state_time_course_initialization(
     training_data, n_epochs=3, n_init=10, take=1
 )

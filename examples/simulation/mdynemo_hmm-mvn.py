@@ -54,9 +54,7 @@ sim = simulation.MDyn_HMM_MVN(
 sim.standardize()
 training_data = data.Data(sim.time_series)
 
-training_data.prepare(
-    {"pca": {"n_pca_components": config.n_channels}, "standardize": {}}
-)
+training_data.prepare({"pca": {"n_pca_components": config.n_channels}})
 config.pca_components = training_data.pca_components
 
 # Build model
