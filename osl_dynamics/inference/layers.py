@@ -2310,6 +2310,21 @@ class SumLogLikelihoodLossLayer(layers.Layer):
         return tf.expand_dims(nll_loss, axis=-1)
 
 
+class TFBroadcastToLayer(layers.Layer):
+    """Wrapper for `tf.broadcast_to \
+        <https://www.tensorflow.org/api_docs/python/tf/broadcast_to>`_.
+    """
+
+    def __init__(self, n_modes, n_channels, **kwargs):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+
+    def call(self, inputs):
+        data, batch_size = inputs
+        return tf.broadcast_to(data, (batch_size, self.n_modes, self.n_channels))
+
+
 class TFGatherLayer(layers.Layer):
     """Wrapper for `tf.gather \
         <https://www.tensorflow.org/api_docs/python/tf/gather>`_.

@@ -39,6 +39,8 @@ from osl_dynamics.inference.layers import (
     BatchSizeLayer,
     AddLayer,
     TFConstantLayer,
+    TFGatherLayer,
+    TFBroadcastToLayer,
     EmbeddingLayer,
 )
 from osl_dynamics.data import SessionLabels
@@ -436,23 +438,6 @@ class Model(VariationalInferenceModelBase):
             def compute_output_shape(self, input_shape):
                 return (self.config.n_sessions, self.config.embeddings_dim)
 
-        class TFGatherLayer(layers.Layer):
-            def call(self, inputs):
-                data, idx = inputs
-                return tf.gather(data, idx, axis=0)
-
-        class BroadcastLayer(layers.Layer):
-            def __init__(self, n_modes, n_channels, **kwargs):
-                super().__init__(**kwargs)
-                self.n_modes = n_modes
-                self.n_channels = n_channels
-
-            def call(self, inputs):
-                data, batch_size = inputs
-                return tf.broadcast_to(
-                    data, (batch_size, self.n_modes, self.n_channels)
-                )
-
         config = self.config
 
         # Inputs
@@ -615,7 +600,7 @@ class Model(VariationalInferenceModelBase):
                 static_loss_scaling_factor=static_loss_scaling_factor,
             )
             means_dev_map = means_dev_map_layer(means_dev_decoder)
-            norm_means_dev_map = TFGatherLayer()(
+            norm_means_dev_map = TFGatherLayer(axis=0)(
                 [norm_means_dev_map_layer(means_dev_map), session_id[:, 0]]
             )
             # shape = (None, n_modes, n_channels)
@@ -642,7 +627,7 @@ class Model(VariationalInferenceModelBase):
                 shape=(config.n_modes, config.n_channels),
                 name="means_dev",
             )
-            means_dev = BroadcastLayer(config.n_modes, config.n_channels)(
+            means_dev = TFBroadcastToLayer(config.n_modes, config.n_channels)(
                 [means_dev_layer(data), batch_size]
             )
 
@@ -720,7 +705,7 @@ class Model(VariationalInferenceModelBase):
                 static_loss_scaling_factor=static_loss_scaling_factor,
             )
             covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
-            norm_covs_dev_map = TFGatherLayer()(
+            norm_covs_dev_map = TFGatherLayer(axis=0)(
                 [norm_covs_dev_map_layer(covs_dev_map), session_id[:, 0]]
             )
 
