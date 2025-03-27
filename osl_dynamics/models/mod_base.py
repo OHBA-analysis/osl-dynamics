@@ -153,6 +153,8 @@ class ModelBase:
         optimizer : str or tf.keras.optimizers.Optimizer
             Optimizer to use when compiling.
         """
+
+        # Optimizer
         if optimizer is None:
             optimizer = optimizers.get(
                 {
@@ -163,7 +165,38 @@ class ModelBase:
                     },
                 }
             )
+
+        # Compile
         self.model.compile(optimizer)
+
+        # Add losses to metrics to print during training
+        self.add_metrics_for_loss()
+
+    def add_metrics_for_loss(self):
+        """Add a metric for each model output loss."""
+
+        # Create metric for each model output that is a loss
+        loss_metric = []
+        for name in self.output_names:
+            if "loss" in name:
+                metric = tf.keras.metrics.Mean(name=name)
+                loss_metric.append(metric)
+        self.model.loss_metric = loss_metric
+
+        # Get the original compute_metrics methods
+        old_compute_metrics = self.model.compute_metrics
+
+        # New method for calculating metrics
+        def compute_metrics(x, y, y_pred, sample_weight=None):
+            metrics = old_compute_metrics(x, y, y_pred, sample_weight)
+            for metric in self.loss_metric:
+                name = metric.name
+                metric.update_state(y_pred[name])
+                metrics[name] = metric.result()
+            return metrics
+
+        # Override the original Keras method
+        self.model.compute_metrics = compute_metrics
 
     def fit(
         self,

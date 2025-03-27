@@ -1067,7 +1067,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         )
 
         # Compile
-        self.model.compile(optimizer)
+        super().compile(optimizer)
 
     def get_alpha(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
