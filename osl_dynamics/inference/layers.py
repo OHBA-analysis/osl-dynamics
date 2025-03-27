@@ -520,9 +520,8 @@ class LearnableTensorLayer(layers.Layer):
         reg = self.regularizer(tensor)
         reg *= static_loss_scaling_factor
 
-        # Add regularization to the loss and display while training
+        # Add regularization to the loss
         self.add_loss(reg)
-        # self.add_metric(reg, name=self.name)
 
     def build(self, input_shape):
         # Create a weight for the tensor
@@ -1257,7 +1256,6 @@ class LogLikelihoodLossLayer(layers.Layer):
         # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
         self.add_loss(nll_loss)
-        # self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
 
@@ -1358,7 +1356,6 @@ class KLLossLayer(layers.Layer):
 
         # Add to loss
         self.add_loss(kl_loss)
-        # self.add_metric(kl_loss, name=self.name)
 
         return tf.expand_dims(kl_loss, axis=-1)
 
@@ -1584,7 +1581,6 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
         self.add_loss(nll_loss)
-        # self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
 
@@ -1802,7 +1798,6 @@ class MultiLayerPerceptronLayer(layers.Layer):
             reg *= self.regularizer_factor
             reg *= static_loss_scaling_factor
             self.add_loss(reg)
-            # self.add_metric(reg, name=self.name)
         return inputs
 
 
@@ -2308,9 +2303,9 @@ class SumLogLikelihoodLossLayer(layers.Layer):
             # Average over time and batches
             ll_loss = tf.reduce_mean(ll_loss, axis=(0, 1))
 
+        # Add the negative log-likelihood to the loss
         nll_loss = -ll_loss
         self.add_loss(nll_loss)
-        # self.add_metric(nll_loss, name=self.name)
 
         return tf.expand_dims(nll_loss, axis=-1)
 
