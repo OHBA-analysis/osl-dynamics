@@ -301,24 +301,6 @@ class Model(MarkovStateInferenceModelBase):
                 n_params += var.shape[0] - 1
         return int(n_params)
 
-    def get_log_likelihood(self, x):
-        """Get log-likelihood.
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Data to calculate log-likelihood for.
-            Shape must be (batch_size, sequence_length, n_channels).
-
-        Returns
-        -------
-        log_likelihood : np.ndarray
-            Log-likelihood. Shape is (batch_size,).
-        """
-        means, covs = self.get_means_covariances()
-        ll_layer = self.model.get_layer("ll")
-        return ll_layer([x, [means], [covs]])
-
     def set_means(self, means, update_initializer=True):
         """Set the state means.
 
