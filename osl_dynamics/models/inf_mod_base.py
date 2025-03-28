@@ -1536,11 +1536,10 @@ class MarkovStateInferenceModelBase(ModelBase):
                 + "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
-        ll_layer = self.model.get_layer("ll")
         obs_mod_params = self.get_observation_model_parameters()
-        ll_layer = self.model.get_layer("ll")
         args = [x] + list(obs_mod_params)
-        return ll_layer(args)
+        ll_layer = self.model.get_layer("ll")
+        return ll_layer(args).numpy()
 
     def get_posterior_entropy(self, gamma, xi):
         r"""Posterior entropy.
