@@ -14,7 +14,7 @@ from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.utils import plotting
 
 # Create directory to hold plots
-os.makedirs("figures", exist_ok=True)
+os.makedirs("figures_init", exist_ok=True)
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -31,7 +31,7 @@ config = Config(
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=False,
-    learn_covariances=True,
+    learn_covariances=False,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
@@ -46,9 +46,12 @@ sim = simulation.MixedSine_MVN(
     n_samples=25600,
     n_modes=config.n_modes,
     n_channels=config.n_channels,
-    relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
-    amplitudes=[6, 5, 4, 3, 2, 1],
-    frequencies=[1, 2, 3, 4, 6, 8],
+    #relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
+    #amplitudes=[6, 5, 4, 3, 2, 1],
+    #frequencies=[1, 2, 3, 4, 6, 8],
+    relative_activation=[1, 1, 1, 1, 1, 1],
+    amplitudes=[1, 1, 1, 1, 1, 1],
+    frequencies=[1.2, 2.2, 3.2, 4.2, 6.2, 8.2],
     sampling_frequency=250,
     means="zero",
     covariances="random",
@@ -64,6 +67,7 @@ plotting.plot_separate_time_series(
 # Build model
 model = Model(config)
 model.summary()
+model.set_covariances(sim.covariances)
 
 print("Training model")
 history = model.fit(
@@ -105,6 +109,8 @@ print("Correlation (DyNeMo vs Simulation):", corr)
 sim_cov = sim.covariances
 inf_cov = model.get_covariances()[orders[1]]
 
+sim_alp = sim_alp[:2000]
+inf_alp = inf_alp[:2000]
 sim_tvcov = np.sum(
     sim_alp[:, :, np.newaxis, np.newaxis] * sim_cov[np.newaxis, :, :, :], axis=1
 )
