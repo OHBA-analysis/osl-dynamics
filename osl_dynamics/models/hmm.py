@@ -495,7 +495,7 @@ class Model(MarkovStateInferenceModelBase):
         """
         # Save group-level model parameters
         os.makedirs(store_dir, exist_ok=True)
-        self.save_weights(f"{store_dir}/weights.h5")
+        self.save_weights(f"{store_dir}/model.weights.h5")
 
         # Temporarily change hyperparameters
         original_n_epochs = self.config.n_epochs
@@ -530,7 +530,7 @@ class Model(MarkovStateInferenceModelBase):
                 covariances.append(c)
 
                 # Reset back to group-level model parameters
-                self.load_weights(f"{store_dir}/weights.h5")
+                self.load_weights(f"{store_dir}/model.weights.h5")
                 self.compile()
 
         # Reset hyperparameters

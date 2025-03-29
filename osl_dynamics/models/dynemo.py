@@ -630,7 +630,7 @@ class Model(VariationalInferenceModelBase):
         """
         # Save the group level model
         os.makedirs(store_dir, exist_ok=True)
-        self.save_weights(f"{store_dir}/model_weights.weights.h5")
+        self.save_weights(f"{store_dir}/model.weights.h5")
 
         # Save original training hyperparameters
         original_n_epochs = self.config.n_epochs
@@ -667,7 +667,7 @@ class Model(VariationalInferenceModelBase):
                 covariances.append(c)
 
                 # Reset back to group-level model parameters
-                self.load_weights(f"{store_dir}/model_weights.weights.h5")
+                self.load_weights(f"{store_dir}/model.weights.h5")
                 self.compile()
 
         # Reset hyperparameters
