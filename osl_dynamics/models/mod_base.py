@@ -582,7 +582,7 @@ class ModelBase:
         """Saves config object and weights of the model.
 
         This is a wrapper for :code:`self.save_config` and
-        :code:`self.save_weights`.
+        :code:`self.model.save_weights`.
 
         Parameters
         ----------
@@ -591,9 +591,7 @@ class ModelBase:
             the model.
         """
         self.save_config(dirname)
-        self.save_weights(
-            f"{dirname}/model.weights.h5"
-        )  # will use the keras method: self.model.save_weights()
+        self.model.save_weights(f"{dirname}/model.weights.h5")
 
     def set_static_loss_scaling_factor(self, dataset):
         """Set the :code:`n_batches` attribute of the
@@ -735,11 +733,9 @@ class ModelBase:
             checkpoint = tf.train.Checkpoint(
                 model=model.model, optimizer=model.model.optimizer
             )
-            checkpoint.restore(
-                tf.train.latest_checkpoint(f"{dirname}/checkpoints")
-            ).expect_partial()
+            checkpoint.restore(tf.train.latest_checkpoint(f"{dirname}/checkpoints"))
         else:
-            model.load_weights(f"{dirname}/model.weights.h5").expect_partial()
+            model.load_weights(f"{dirname}/model.weights.h5")
 
         return model
 
