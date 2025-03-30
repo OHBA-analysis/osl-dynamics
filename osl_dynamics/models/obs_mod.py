@@ -520,12 +520,12 @@ def get_means_dev_mag_parameters(model):
     means_dev_mag_inf_beta_input_layer = model.get_layer("means_dev_mag_inf_beta_input")
     means_dev_mag_inf_beta_layer = model.get_layer("means_dev_mag_inf_beta")
 
-    means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(1)
+    means_dev_mag_inf_alpha_input = means_dev_mag_inf_alpha_input_layer(tf.constant(1))
     means_dev_mag_inf_alpha = means_dev_mag_inf_alpha_layer(
         means_dev_mag_inf_alpha_input
     )
 
-    means_dev_mag_inf_beta_input = means_dev_mag_inf_beta_input_layer(1)
+    means_dev_mag_inf_beta_input = means_dev_mag_inf_beta_input_layer(tf.constant(1))
     means_dev_mag_inf_beta = means_dev_mag_inf_beta_layer(means_dev_mag_inf_beta_input)
     return means_dev_mag_inf_alpha.numpy(), means_dev_mag_inf_beta.numpy()
 
@@ -552,10 +552,10 @@ def get_covs_dev_mag_parameters(model):
     covs_dev_mag_inf_beta_input_layer = model.get_layer("covs_dev_mag_inf_beta_input")
     covs_dev_mag_inf_beta_layer = model.get_layer("covs_dev_mag_inf_beta")
 
-    covs_dev_mag_inf_alpha_input = covs_dev_mag_inf_alpha_input_layer(1)
+    covs_dev_mag_inf_alpha_input = covs_dev_mag_inf_alpha_input_layer(tf.constant(1))
     covs_dev_mag_inf_alpha = covs_dev_mag_inf_alpha_layer(covs_dev_mag_inf_alpha_input)
 
-    covs_dev_mag_inf_beta_input = covs_dev_mag_inf_beta_input_layer(1)
+    covs_dev_mag_inf_beta_input = covs_dev_mag_inf_beta_input_layer(tf.constant(1))
     covs_dev_mag_inf_beta = covs_dev_mag_inf_beta_layer(covs_dev_mag_inf_beta_input)
     return covs_dev_mag_inf_alpha.numpy(), covs_dev_mag_inf_beta.numpy()
 
@@ -673,14 +673,14 @@ def get_session_dev(
         means_dev_map = get_dev_map(model, "means", session_labels)
         means_dev = means_dev_layer([means_dev_mag, means_dev_map])
     else:
-        means_dev = means_dev_layer(1)
+        means_dev = means_dev_layer(tf.constant(1))
 
     if learn_covariances:
         covs_dev_mag = get_dev_mag(model, "covs")
         covs_dev_map = get_dev_map(model, "covs", session_labels)
         covs_dev = covs_dev_layer([covs_dev_mag, covs_dev_map])
     else:
-        covs_dev = covs_dev_layer(1)
+        covs_dev = covs_dev_layer(tf.constant(1))
 
     return means_dev.numpy(), covs_dev.numpy()
 
@@ -748,7 +748,9 @@ def generate_covariances(model, session_labels):
 
     covs_dev_decoder_layer = model.get_layer("covs_dev_decoder")
     dev_mag_mod_layer = model.get_layer("covs_dev_mag_mod_beta")
-    dev_mag_mod = 1 / dev_mag_mod_layer(covs_dev_decoder_layer(concat_embeddings))
+    dev_mag_mod = tf.constant(1) / dev_mag_mod_layer(
+        covs_dev_decoder_layer(concat_embeddings)
+    )
 
     # Generate deviations
     dev_layer = model.get_layer("covs_dev")

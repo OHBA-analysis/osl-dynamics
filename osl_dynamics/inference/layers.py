@@ -313,15 +313,6 @@ class SampleGammaDistributionLayer(layers.Layer):
         alpha = tf.gather(alpha, session_id, axis=0)  # shape = (None, n_states, 1)
         beta = tf.gather(beta, session_id, axis=0)  # shape = (None, n_states, 1)
         output = alpha / beta
-        if training:
-            N = tfp.distributions.Gamma(
-                concentration=alpha,
-                rate=beta,
-                allow_nan_stats=False,
-            )
-            output = (
-                1 - self.annealing_factor
-            ) * output + self.annealing_factor * N.sample()
 
         return output
 
