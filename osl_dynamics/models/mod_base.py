@@ -318,8 +318,15 @@ class ModelBase:
         # with static quantities
         self.set_static_loss_scaling_factor(x)
 
+        # Fit model
         history = self.model.fit(*args, **kwargs)
-        return history.history
+
+        # Convert history from tensors to float
+        history = {
+            key: list(map(float, values)) for key, values in history.history.items()
+        }
+
+        return history
 
     def load_weights(self, filepath):
         """Load weights of the model from a file.
