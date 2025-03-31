@@ -12,27 +12,27 @@ from shutil import copyfile
 import numpy as np
 import nibabel as nib
 
-from osl import source_recon
+from osl_ephys import source_recon
 
 # Directories and files
-PREPROC_DIR = "data/preproc"
-FIXED_SMRI_DIR = "data/smri"
+preproc_dir = "data/preproc"
+fixed_smri_dir = "data/smri"
 
-SMRI_FILE = "data/raw/Nottingham/{0}/anat/{0}_T1w.nii.gz"
+smri_file = "data/raw/Nottingham/{0}/anat/{0}_T1w.nii.gz"
 
 # Look up which subjects we preprocessed to see what SMRI files we need to fix
 smri_files = []
-for path in sorted(glob(PREPROC_DIR + "/*/sub-*_preproc_raw.fif")):
+for path in sorted(glob(preproc_dir + "/*/sub-*_preproc-raw.fif")):
     subject = Path(path).stem.split("_")[0]
-    smri_file = SMRI_FILE.format(subject)
+    smri_file = smri_file.format(subject)
     if Path(smri_file).exists():
         smri_files.append(smri_file)
 
 # Make output directory if it doesn't exist
-makedirs(FIXED_SMRI_DIR, exist_ok=True)
+makedirs(fixed_smri_dir, exist_ok=True)
 
 for input_smri_file in smri_files:
-    output_smri_file = FIXED_SMRI_DIR + "/" + Path(input_smri_file).name
+    output_smri_file = fixed_smri_dir + "/" + Path(input_smri_file).name
     print("Saving output to:", output_smri_file)
 
     # Copy the original SMRI file to the output directory

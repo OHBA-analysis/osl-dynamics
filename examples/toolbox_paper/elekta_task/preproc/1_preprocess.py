@@ -4,11 +4,7 @@
 
 from dask.distributed import Client
 
-from osl import preprocessing, utils
-
-# Directories
-raw_dir = "data/ds117"
-preproc_dir = "data/preproc"
+from osl_ephys import preprocessing, utils
 
 if __name__ == "__main__":
     utils.logger.set_up(level="INFO")
@@ -31,18 +27,24 @@ if __name__ == "__main__":
         - interpolate_bads: {}
     """
 
+    # Directories
+    rawdir = "data/ds117"
+    outdir = "data/preproc"
+
     for sub in range(1, 20):
         # Get input files for preprocessing
         inputs = []
+        subjects = []
         for run in range(1, 7):
-            inputs.append(f"{raw_dir}/sub{sub:03d}/MEG/run_{run:02d}_sss.fif")
-        outdir = f"{preproc_dir}/sub{sub:03d}"
+            inputs.append(f"{rawdir}/sub{sub:03d}/MEG/run_{run:02d}_sss.fif")
+            subjects.append(f"{sub-{sub:02d}}_run-{run:02d}")
 
         # Run batch preprocessing
         preprocessing.run_proc_batch(
             config,
             inputs,
             outdir=outdir,
+            subjects=subjects,
             overwrite=True,
             dask_client=True,
         )
