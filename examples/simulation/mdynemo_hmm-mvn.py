@@ -26,7 +26,6 @@ config = Config(
     inference_normalization="layer",
     model_n_units=64,
     model_normalization="layer",
-    theta_normalization="layer",
     learn_means=True,
     learn_stds=True,
     learn_corrs=True,
