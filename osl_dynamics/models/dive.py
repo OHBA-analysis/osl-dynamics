@@ -96,9 +96,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_regularizer : str
         Regularizer.
 
-    theta_normalization : str
-        Type of normalization to apply to the posterior samples, :code:`theta`.
-        Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
     learn_alpha_temperature : bool
         Should we learn :code:`alpha_temperature`?
     initial_alpha_temperature : float
@@ -302,9 +299,9 @@ class Model(VariationalInferenceModelBase):
         class TemporalPriorLayer(tf.keras.layers.Layer):
             def __init__(self, config, **kwargs):
                 super().__init__(**kwargs)
-                self.theta_norm_drop_layer = tf.keras.layers.Dropout(
+                self.theta_drop_layer = tf.keras.layers.Dropout(
                     config.model_dropout,
-                    name="theta_norm_drop",
+                    name="theta_drop",
                 )
                 self.mod_rnn_layer = ModelRNNLayer(
                     config.model_rnn,
@@ -325,7 +322,7 @@ class Model(VariationalInferenceModelBase):
                 )
 
                 self.layers = [
-                    self.theta_norm_drop_layer,
+                    self.theta_drop_layer,
                     self.mod_rnn_layer,
                     self.mod_mu_layer,
                     self.mod_sigma_layer,
@@ -333,10 +330,10 @@ class Model(VariationalInferenceModelBase):
                 ]
 
             def call(self, inputs):
-                inf_mu, inf_sigma, theta_norm = inputs
+                inf_mu, inf_sigma, theta = inputs
 
-                theta_norm_drop = self.theta_norm_drop_layer(theta_norm)
-                mod_rnn = self.mod_rnn_layer(theta_norm_drop)
+                theta_drop = self.theta_drop_layer(theta)
+                mod_rnn = self.mod_rnn_layer(theta_drop)
                 mod_mu = self.mod_mu_layer(mod_rnn)
                 mod_sigma = self.mod_sigma_layer(mod_rnn)
                 kl_div = self.kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
@@ -368,10 +365,6 @@ class Model(VariationalInferenceModelBase):
                     config.theta_std_epsilon,
                     name="theta",
                 )
-                self.theta_norm_layer = NormalizationLayer(
-                    config.theta_normalization,
-                    name="theta_norm",
-                )
                 self.alpha_layer = SoftmaxLayer(
                     config.initial_alpha_temperature,
                     config.learn_alpha_temperature,
@@ -387,7 +380,6 @@ class Model(VariationalInferenceModelBase):
                     self.inf_mu_layer,
                     self.inf_sigma_layer,
                     self.theta_layer,
-                    self.theta_norm_layer,
                     self.alpha_layer,
                     self.temporal_prior_layer,
                 ]
@@ -398,11 +390,10 @@ class Model(VariationalInferenceModelBase):
                 inf_mu = self.inf_mu_layer(inf_rnn)
                 inf_sigma = self.inf_sigma_layer(inf_rnn)
                 theta = self.theta_layer([inf_mu, inf_sigma])
-                theta_norm = self.theta_norm_layer(theta)
-                alpha = self.alpha_layer(theta_norm)
-                kl_div = self.temporal_prior_layer([inf_mu, inf_sigma, theta_norm])
+                alpha = self.alpha_layer(theta)
+                kl_div = self.temporal_prior_layer([inf_mu, inf_sigma, theta])
 
-                return alpha, theta_norm, kl_div
+                return alpha, theta, kl_div
 
         class SessionEmbeddingsLayer(tf.keras.layers.Layer):
             def __init__(self, config, **kwargs):
@@ -497,7 +488,7 @@ class Model(VariationalInferenceModelBase):
         embeddings_layer = AddLayer(name="embeddings")
         embeddings = embeddings_layer(label_embeddings)
 
-        alpha, theta_norm, kl_div = encoder_layer(data)
+        alpha, theta, kl_div = encoder_layer(data)
 
         # -----------------
         # Observation model
@@ -836,10 +827,14 @@ class Model(VariationalInferenceModelBase):
             [kl_div, means_dev_mag_kl_loss, covs_dev_mag_kl_loss],
         )
 
+        # ---------- For output names ---------- #
+        theta_layer = tf.keras.layers.Identity(name="theta")
+        theta = theta_layer(theta)
+
         # ------------
         # Create model
         inputs = [data, session_id]
-        outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "theta": theta_norm}
+        outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "theta": theta}
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 

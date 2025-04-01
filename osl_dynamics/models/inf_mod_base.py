@@ -27,7 +27,6 @@ class VariationalInferenceModelConfig:
     """Settings needed for the inference model."""
 
     # Alpha parameters
-    theta_normalization: Literal[None, "batch", "layer"] = None
     learn_alpha_temperature: bool = None
     initial_alpha_temperature: float = None
     theta_std_epsilon: float = 1e-6

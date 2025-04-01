@@ -88,9 +88,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_regularizer : str
         Regularizer.
 
-    theta_normalization : str
-        Type of normalization to apply to the posterior samples, :code:`theta`.
-        Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
     learn_alpha_temperature : bool
         Should we learn :code:`alpha_temperature`?
     initial_alpha_temperature : float
@@ -220,9 +217,9 @@ class Model(VariationalInferenceModelBase):
         class TemporalPriorLayer(tf.keras.layers.Layer):
             def __init__(self, config, **kwargs):
                 super().__init__(**kwargs)
-                self.theta_norm_drop_layer = tf.keras.layers.Dropout(
+                self.theta_drop_layer = tf.keras.layers.Dropout(
                     config.model_dropout,
-                    name="theta_norm_drop",
+                    name="theta_drop",
                 )
                 self.mod_rnn_layer = ModelRNNLayer(
                     config.model_rnn,
@@ -243,7 +240,7 @@ class Model(VariationalInferenceModelBase):
                 )
 
                 self.layers = [
-                    self.theta_norm_drop_layer,
+                    self.theta_drop_layer,
                     self.mod_rnn_layer,
                     self.mod_mu_layer,
                     self.mod_sigma_layer,
@@ -251,10 +248,10 @@ class Model(VariationalInferenceModelBase):
                 ]
 
             def call(self, inputs):
-                inf_mu, inf_sigma, theta_norm = inputs
+                inf_mu, inf_sigma, theta = inputs
 
-                theta_norm_drop = self.theta_norm_drop_layer(theta_norm)
-                mod_rnn = self.mod_rnn_layer(theta_norm_drop)
+                theta_drop = self.theta_drop_layer(theta)
+                mod_rnn = self.mod_rnn_layer(theta_drop)
                 mod_mu = self.mod_mu_layer(mod_rnn)
                 mod_sigma = self.mod_sigma_layer(mod_rnn)
                 kl_div = self.kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
@@ -286,10 +283,6 @@ class Model(VariationalInferenceModelBase):
                     config.theta_std_epsilon,
                     name="theta",
                 )
-                self.theta_norm_layer = NormalizationLayer(
-                    config.theta_normalization,
-                    name="theta_norm",
-                )
                 self.alpha_layer = SoftmaxLayer(
                     config.initial_alpha_temperature,
                     config.learn_alpha_temperature,
@@ -305,7 +298,6 @@ class Model(VariationalInferenceModelBase):
                     self.inf_mu_layer,
                     self.inf_sigma_layer,
                     self.theta_layer,
-                    self.theta_norm_layer,
                     self.alpha_layer,
                     self.temporal_prior_layer,
                 ]
@@ -316,11 +308,10 @@ class Model(VariationalInferenceModelBase):
                 inf_mu = self.inf_mu_layer(inf_rnn)
                 inf_sigma = self.inf_sigma_layer(inf_rnn)
                 theta = self.theta_layer([inf_mu, inf_sigma])
-                theta_norm = self.theta_norm_layer(theta)
-                alpha = self.alpha_layer(theta_norm)
-                kl_div = self.temporal_prior_layer([inf_mu, inf_sigma, theta_norm])
+                alpha = self.alpha_layer(theta)
+                kl_div = self.temporal_prior_layer([inf_mu, inf_sigma, theta])
 
-                return alpha, theta_norm, kl_div
+                return alpha, theta, kl_div
 
         class DecoderLayer(tf.keras.layers.Layer):
             def __init__(self, config, **kwargs):
@@ -357,21 +348,25 @@ class Model(VariationalInferenceModelBase):
         kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
         ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
 
+        # ---------- For output names ---------- #
+        theta_layer = tf.keras.layers.Identity(name="theta")
+
         # ---------- Forward pass ---------- #
         data = tf.keras.layers.Input(
             shape=(config.sequence_length, config.n_channels), name="data"
         )
         static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-        alpha, theta_norm, kl_div = encoder_layer(data)
+        alpha, theta, kl_div = encoder_layer(data)
         mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         D = covs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         m, C = decoder_layer([mu, D, alpha])
         ll_loss = ll_loss_layer([data, m, C])
         kl_loss = kl_loss_layer(kl_div)
+        theta = theta_layer(theta)
 
         # ---------- Create model ---------- #
         inputs = {"data": data}
-        outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "theta": theta_norm}
+        outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "theta": theta}
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
@@ -506,14 +501,14 @@ class Model(VariationalInferenceModelBase):
                 self.config.diagonal_covariances,
             )
 
-    def sample_alpha(self, n_samples, theta_norm=None):
+    def sample_alpha(self, n_samples, theta=None):
         """Uses the model RNN to sample mode mixing factors, :code:`alpha`.
 
         Parameters
         ----------
         n_samples : int
             Number of samples to take.
-        theta_norm : np.ndarray, optional
+        theta : np.ndarray, optional
             Normalized logits to initialise the sampling with.
             Shape must be (sequence_length, n_modes).
 
@@ -526,7 +521,6 @@ class Model(VariationalInferenceModelBase):
         model_rnn_layer = self.model.get_layer("mod_rnn")
         mod_mu_layer = self.model.get_layer("mod_mu")
         mod_sigma_layer = self.model.get_layer("mod_sigma")
-        theta_norm_layer = self.model.get_layer("theta_norm")
         alpha_layer = self.model.get_layer("alpha")
 
         # Normally distributed random numbers used to sample the logits theta
@@ -534,24 +528,22 @@ class Model(VariationalInferenceModelBase):
             np.float32
         )
 
-        if theta_norm is None:
+        if theta is None:
             # Sequence of the underlying logits theta
-            theta_norm = np.zeros(
+            theta = np.zeros(
                 [self.config.sequence_length, self.config.n_modes],
                 dtype=np.float32,
             )
 
             # Randomly sample the first time step
-            theta_norm[-1] = np.random.normal(size=self.config.n_modes)
+            theta[-1] = np.random.normal(size=self.config.n_modes)
 
         # Sample the mode fixing factors
         alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
         for i in trange(n_samples, desc="Sampling mode time course"):
             # If there are leading zeros we trim theta so that we don't pass
             # the zeros
-            trimmed_theta = theta_norm[~np.all(theta_norm == 0, axis=1)][
-                np.newaxis, :, :
-            ]
+            trimmed_theta = theta[~np.all(theta == 0, axis=1)][np.newaxis, :, :]
 
             # Predict the probability distribution function for theta one time
             # step in the future, p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
@@ -560,11 +552,10 @@ class Model(VariationalInferenceModelBase):
             mod_sigma = mod_sigma_layer(model_rnn)[0, -1]
 
             # Shift theta one time step to the left
-            theta_norm = np.roll(theta_norm, -1, axis=0)
+            theta = np.roll(theta, -1, axis=0)
 
             # Sample from the probability distribution function
-            theta = mod_mu + mod_sigma * epsilon[i]
-            theta_norm[-1] = theta_norm_layer(theta[np.newaxis, np.newaxis, :])[0]
+            theta[-1] = mod_mu + mod_sigma * epsilon[i]
 
             # Calculate the mode mixing factors
             alpha[i] = alpha_layer(mod_mu[np.newaxis, np.newaxis, :])[0, 0]
@@ -640,16 +631,13 @@ class Model(VariationalInferenceModelBase):
         self.config.learning_rate = learning_rate or self.config.learning_rate
         self.config.do_kl_annealing = False
 
-        # Layers to fix (i.e. make non-trainable)
-        fixed_layers = ["mod_rnn", "mod_mu", "mod_sigma"]
-
         # Fine tune on sessions
         alpha = []
         means = []
         covariances = []
-        with self.set_trainable(fixed_layers, False), set_logging_level(
-            _logger, logging.WARNING
-        ):
+        with self.set_trainable(
+            self.get_layer("encoder").temporal_prior_layer, False
+        ), set_logging_level(_logger, logging.WARNING):
             for i in trange(training_data.n_sessions, desc="Fine tuning"):
                 # Train on this session
                 with training_data.set_keep(i):
@@ -722,22 +710,10 @@ class Model(VariationalInferenceModelBase):
         self.config.n_epochs = n_epochs or self.config.n_epochs
         self.config.learning_rate = learning_rate or self.config.learning_rate
 
-        # Layers to fix (i.e. make non-trainable)
-        fixed_layers = [
-            "mod_rnn",
-            "mod_mu",
-            "mod_sigma",
-            "inf_rnn",
-            "inf_mu",
-            "inf_sigma",
-            "theta_norm",
-            "alpha",
-        ]
-
         # Dual estimation on sessions
         means = []
         covariances = []
-        with self.set_trainable(fixed_layers, False):
+        with self.set_trainable("encoder", False):
             if isinstance(training_data, list):
                 n_sessions = len(training_data)
             else:

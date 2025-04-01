@@ -94,12 +94,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_regularizer : str
         Regularizer.
 
-    theta_normalization : str
-        Type of normalization to apply to the posterior samples, :code:`theta`.
-        Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
-        The same parameter is used for the :code:`gamma` time course.
-
-
     learn_means : bool
         Should we make the mean for each mode trainable?
     learn_stds : bool
@@ -255,10 +249,10 @@ class Model(VariationalInferenceModelBase):
         class TemporalPriorLayer(tf.keras.layers.Layer):
             def __init__(self, config, **kwargs):
                 super().__init__(**kwargs)
-                self.concatenate_layer = ConcatenateLayer(axis=2, name="theta_norm")
-                self.theta_norm_drop_layer = tf.keras.layers.Dropout(
+                self.concatenate_layer = ConcatenateLayer(axis=2, name="theta")
+                self.theta_drop_layer = tf.keras.layers.Dropout(
                     config.model_dropout,
-                    name="theta_norm_drop",
+                    name="theta_drop",
                 )
                 self.mod_rnn_layer = ModelRNNLayer(
                     config.model_rnn,
@@ -297,7 +291,7 @@ class Model(VariationalInferenceModelBase):
 
                 self.layers = [
                     self.concatenate_layer,
-                    self.theta_norm_drop_layer,
+                    self.theta_drop_layer,
                     self.mod_rnn_layer,
                     self.power_mod_mu_layer,
                     self.power_mod_sigma_layer,
@@ -311,15 +305,15 @@ class Model(VariationalInferenceModelBase):
                 (
                     power_inf_mu,
                     power_inf_sigma,
-                    power_theta_norm,
+                    power_theta,
                     fc_inf_mu,
                     fc_inf_sigma,
-                    fc_theta_norm,
+                    fc_theta,
                 ) = inputs
 
-                theta_norm = self.concatenate_layer([power_theta_norm, fc_theta_norm])
-                theta_norm_drop = self.theta_norm_drop_layer(theta_norm)
-                mod_rnn = self.mod_rnn_layer(theta_norm_drop)
+                theta = self.concatenate_layer([power_theta, fc_theta])
+                theta_drop = self.theta_drop_layer(theta)
+                mod_rnn = self.mod_rnn_layer(theta_drop)
 
                 power_mod_mu = self.power_mod_mu_layer(mod_rnn)
                 power_mod_sigma = self.power_mod_sigma_layer(mod_rnn)
@@ -360,9 +354,6 @@ class Model(VariationalInferenceModelBase):
                 self.power_theta_layer = SampleNormalDistributionLayer(
                     config.theta_std_epsilon, name="power_theta"
                 )
-                self.power_theta_norm_layer = NormalizationLayer(
-                    config.theta_normalization, name="power_theta_norm"
-                )
                 self.alpha_layer = SoftmaxLayer(
                     initial_temperature=1.0,
                     learn_temperature=False,
@@ -377,9 +368,6 @@ class Model(VariationalInferenceModelBase):
                 )
                 self.fc_theta_layer = SampleNormalDistributionLayer(
                     config.theta_std_epsilon, name="fc_theta"
-                )
-                self.fc_theta_norm_layer = NormalizationLayer(
-                    config.theta_normalization, name="fc_theta_norm"
                 )
                 self.beta_layer = SoftmaxLayer(
                     initial_temperature=1.0,
@@ -397,12 +385,10 @@ class Model(VariationalInferenceModelBase):
                     self.power_inf_mu_layer,
                     self.power_inf_sigma_layer,
                     self.power_theta_layer,
-                    self.power_theta_norm_layer,
                     self.alpha_layer,
                     self.fc_inf_mu_layer,
                     self.fc_inf_sigma_layer,
                     self.fc_theta_layer,
-                    self.fc_theta_norm_layer,
                     self.beta_layer,
                     self.temporal_prior_layer,
                 ]
@@ -414,31 +400,29 @@ class Model(VariationalInferenceModelBase):
                 power_inf_mu = self.power_inf_mu_layer(inf_rnn)
                 power_inf_sigma = self.power_inf_sigma_layer(inf_rnn)
                 power_theta = self.power_theta_layer([power_inf_mu, power_inf_sigma])
-                power_theta_norm = self.power_theta_norm_layer(power_theta)
-                alpha = self.alpha_layer(power_theta_norm)
+                alpha = self.alpha_layer(power_theta)
 
                 fc_inf_mu = self.fc_inf_mu_layer(inf_rnn)
                 fc_inf_sigma = self.fc_inf_sigma_layer(inf_rnn)
                 fc_theta = self.fc_theta_layer([fc_inf_mu, fc_inf_sigma])
-                fc_theta_norm = self.fc_theta_norm_layer(fc_theta)
-                beta = self.beta_layer(fc_theta_norm)
+                beta = self.beta_layer(fc_theta)
 
                 power_kl_div, fc_kl_div = self.temporal_prior_layer(
                     [
                         power_inf_mu,
                         power_inf_sigma,
-                        power_theta_norm,
+                        power_theta,
                         fc_inf_mu,
                         fc_inf_sigma,
-                        fc_theta_norm,
+                        fc_theta,
                     ]
                 )
 
                 return (
                     alpha,
                     beta,
-                    power_theta_norm,
-                    fc_theta_norm,
+                    power_theta,
+                    fc_theta,
                     power_kl_div,
                     fc_kl_div,
                 )
@@ -524,6 +508,10 @@ class Model(VariationalInferenceModelBase):
         kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
         ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
 
+        # ---------- For output names ---------- #
+        power_theta_layer = tf.keras.layers.Identity(name="power_theta")
+        fc_theta_layer = tf.keras.layers.Identity(name="fc_theta")
+
         # ---------- Forward pass ---------- #
         data = tf.keras.layers.Input(
             shape=(config.sequence_length, config.n_channels), name="data"
@@ -533,8 +521,8 @@ class Model(VariationalInferenceModelBase):
         (
             alpha,
             beta,
-            power_theta_norm,
-            fc_theta_norm,
+            power_theta,
+            fc_theta,
             power_kl_div,
             fc_kl_div,
         ) = encoder_layer(data)
@@ -544,14 +532,16 @@ class Model(VariationalInferenceModelBase):
         m, C = decoder_layer([mu, E, R, alpha, beta])
         ll_loss = ll_loss_layer([data, m, C])
         kl_loss = kl_loss_layer([power_kl_div, fc_kl_div])
+        power_theta = power_theta_layer(power_theta)
+        fc_theta = fc_theta_layer(fc_theta)
 
         # ---------- Create model ---------- #
         inputs = {"data": data}
         outputs = {
             "ll_loss": ll_loss,
             "kl_loss": kl_loss,
-            "power_theta": power_theta_norm,
-            "fc_theta": fc_theta_norm,
+            "power_theta": power_theta,
+            "fc_theta": fc_theta,
         }
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
@@ -734,13 +724,11 @@ class Model(VariationalInferenceModelBase):
         model_rnn_layer = self.model.get_layer("mod_rnn")
         power_mod_mu_layer = self.model.get_layer("power_mod_mu")
         power_mod_sigma_layer = self.model.get_layer("power_mod_sigma")
-        power_theta_norm_layer = self.model.get_layer("power_theta_norm")
         alpha_layer = self.model.get_layer("alpha")
         fc_mod_mu_layer = self.model.get_layer("fc_mod_mu")
         fc_mod_sigma_layer = self.model.get_layer("fc_mod_sigma")
-        fc_theta_norm_layer = self.model.get_layer("fc_theta_norm")
         beta_layer = self.model.get_layer("beta")
-        concatenate_layer = self.model.get_layer("theta_norm")
+        concatenate_layer = self.model.get_layer("theta")
 
         # Normally distributed random numbers used to sample the logits theta
         power_epsilon = np.random.normal(
@@ -751,16 +739,16 @@ class Model(VariationalInferenceModelBase):
         ).astype(np.float32)
 
         # Initialise sequence of underlying logits theta
-        power_theta_norm = np.zeros(
+        power_theta = np.zeros(
             [self.config.sequence_length, self.config.n_modes],
             dtype=np.float32,
         )
-        power_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
-        fc_theta_norm = np.zeros(
+        power_theta[-1] = np.random.normal(size=self.config.n_modes)
+        fc_theta = np.zeros(
             [self.config.sequence_length, self.config.n_corr_modes],
             dtype=np.float32,
         )
-        fc_theta_norm[-1] = np.random.normal(size=self.config.n_corr_modes)
+        fc_theta[-1] = np.random.normal(size=self.config.n_corr_modes)
 
         # Sample the mode time courses
         alpha = np.empty([n_samples, self.config.n_modes])
@@ -768,10 +756,10 @@ class Model(VariationalInferenceModelBase):
         for i in trange(n_samples, desc="Sampling mode time courses"):
             # If there are leading zeros we trim theta so that we don't pass
             # the zeros
-            trimmed_power_theta = power_theta_norm[
-                ~np.all(power_theta_norm == 0, axis=1)
-            ][np.newaxis, :, :]
-            trimmed_fc_theta = fc_theta_norm[~np.all(fc_theta_norm == 0, axis=1)][
+            trimmed_power_theta = power_theta[~np.all(power_theta == 0, axis=1)][
+                np.newaxis, :, :
+            ]
+            trimmed_fc_theta = fc_theta[~np.all(fc_theta == 0, axis=1)][
                 np.newaxis, :, :
             ]
             trimmed_theta = concatenate_layer([trimmed_power_theta, trimmed_fc_theta])
@@ -783,21 +771,15 @@ class Model(VariationalInferenceModelBase):
             fc_mod_sigma = fc_mod_sigma_layer(model_rnn)[0, -1]
 
             # Shift theta one time step to the left
-            power_theta_norm = np.roll(power_theta_norm, -1, axis=0)
-            fc_theta_norm = np.roll(fc_theta_norm, -1, axis=0)
+            power_theta = np.roll(power_theta, -1, axis=0)
+            fc_theta = np.roll(fc_theta, -1, axis=0)
 
             # Sample from the probability distribution function
-            power_theta = power_mod_mu + power_mod_sigma * power_epsilon[i]
-            power_theta_norm[-1] = power_theta_norm_layer(
-                power_theta[np.newaxis, np.newaxis, :]
-            )
-            fc_theta = fc_mod_mu + fc_mod_sigma * fc_epsilon[i]
-            fc_theta_norm[-1] = fc_theta_norm_layer(fc_theta[np.newaxis, np.newaxis, :])
+            power_theta[-1] = power_mod_mu + power_mod_sigma * power_epsilon[i]
+            fc_theta[-1] = fc_mod_mu + fc_mod_sigma * fc_epsilon[i]
 
-            alpha[i] = alpha_layer(power_theta_norm[-1][np.newaxis, np.newaxis, :])[
-                0, 0
-            ]
-            beta[i] = beta_layer(fc_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
+            alpha[i] = alpha_layer(power_theta[-1][np.newaxis, np.newaxis, :])[0, 0]
+            beta[i] = beta_layer(fc_theta[-1][np.newaxis, np.newaxis, :])[0, 0]
 
         return alpha, beta
 
