@@ -632,9 +632,9 @@ class ModelBase:
             Value to set the :code:`trainable` attribute of the layers to.
         """
         # Validation
-        if isinstance(layers, str):
+        if not isinstance(layers, list):
             layers = [layers]
-        if isinstance(values, bool):
+        if not isinstance(values, list):
             values = [values] * len(layers)
         if len(layers) != len(values):
             raise ValueError(
@@ -643,23 +643,31 @@ class ModelBase:
             )
 
         available_layers = [layer.name for layer in self.layers]
-        for layer in layers:
-            if layer not in available_layers:
+        for i, (layer, value) in enumerate(zip(layers, values)):
+            if isinstance(layer, str):
+                if layer not in available_layers:
+                    raise ValueError(
+                        f"Layer {layer} not found in model. Available layers: {available_layers}"
+                    )
+                layers[i] = self.get_layer(layer)
+            elif not isinstance(layer, tf.keras.layers.Layer):
                 raise ValueError(
-                    f"No such layer: {layer}. "
-                    + f"Available layers are: {available_layers}."
+                    f"Layer {layer} is not a string or a Keras layer. "
+                    + f"Available layers: {available_layers}"
                 )
+            if not isinstance(value, bool):
+                raise ValueError(f"Value {i} is not a boolean.")
 
-        original_values = [self.get_layer(layer).trainable for layer in layers]
+        original_values = [layer.trainable for layer in layers]
 
         try:
             for layer, trainable in zip(layers, values):
-                self.get_layer(layer).trainable = trainable
+                layer.trainable = trainable
             self.compile()
             yield
         finally:
             for layer, trainable in zip(layers, original_values):
-                self.get_layer(layer).trainable = trainable
+                layer.trainable = trainable
             self.compile()
 
     @staticmethod
