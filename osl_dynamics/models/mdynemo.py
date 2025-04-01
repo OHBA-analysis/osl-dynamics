@@ -782,30 +782,3 @@ class Model(VariationalInferenceModelBase):
             beta[i] = beta_layer(fc_theta[-1][np.newaxis, np.newaxis, :])[0, 0]
 
         return alpha, beta
-
-    def get_n_params_generative_model(self):
-        """Get the number of trainable parameters in the generative model.
-
-        This includes the model RNN weights and biases, mixing coefficients,
-        mode means, standard deviations and correlations.
-
-        Returns
-        -------
-        n_params : int
-            Number of parameters in the generative model.
-        """
-        n_params = 0
-
-        for var in self.trainable_weights:
-            var_name = var.name
-            if (
-                "mod_" in var_name
-                or "alpha" in var_name
-                or "beta" in var_name
-                or "means" in var_name
-                or "stds" in var_name
-                or "corrs" in var_name
-            ):
-                n_params += np.prod(var.shape)
-
-            return int(n_params)

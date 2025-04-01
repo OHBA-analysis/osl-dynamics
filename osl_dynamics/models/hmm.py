@@ -283,24 +283,6 @@ class Model(MarkovStateInferenceModelBase):
         """Wrapper for :code:`get_means_covariances`."""
         return self.get_means_covariances()
 
-    def get_n_params_generative_model(self):
-        """Get the number of trainable parameters in the generative model.
-
-        Returns
-        -------
-        n_params : int
-            Number of parameters in the generative model.
-        """
-        n_params = 0
-        for var in self.trainable_weights:
-            if "means" in var.name or "covs" in var.name:
-                n_params += np.prod(var.shape)
-            if "trans_prob" in var.name:
-                n_params += var.shape[0] * (var.shape[0] - 1)
-            if "initial_state_probs" in var.name:
-                n_params += var.shape[0] - 1
-        return int(n_params)
-
     def set_means(self, means, update_initializer=True):
         """Set the state means.
 
