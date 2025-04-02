@@ -82,8 +82,6 @@ training_data.add_session_labels(
 model = Model(config)
 model.summary()
 
-print("Before training: ", model.model.optimizer)
-
 # Set regularizers
 model.set_regularizers(training_data)
 

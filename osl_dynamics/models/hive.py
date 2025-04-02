@@ -282,7 +282,8 @@ class Model(MarkovStateInferenceModelBase):
 
         config = self.config
 
-        # Inputs
+        # -------- Inputs -------- #
+
         data = layers.Input(
             shape=(config.sequence_length, config.n_channels),
             dtype=tf.float32,
@@ -291,7 +292,6 @@ class Model(MarkovStateInferenceModelBase):
         batch_size_layer = BatchSizeLayer(name="batch_size")
         batch_size = batch_size_layer(data)
 
-        # Static loss scaling factor
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
             config.sequence_length,
             config.loss_calc,
@@ -338,7 +338,8 @@ class Model(MarkovStateInferenceModelBase):
         embeddings = embeddings_layer(label_embeddings)
         # embeddings.shape = (n_sessions, embeddings_dim)
 
-        # Group level observation model parameters
+        # -------- Group level observation model parameters -------- #
+
         group_means_layer = VectorsLayer(
             config.n_states,
             config.n_channels,
@@ -364,10 +365,8 @@ class Model(MarkovStateInferenceModelBase):
             data, static_loss_scaling_factor=static_loss_scaling_factor
         )
 
-        # ---------------
-        # Mean deviations
+        # -------- Mean deviations -------- #
 
-        # Layer definitions
         if config.learn_means:
             means_spatial_embeddings_layer = layers.Dense(
                 config.spatial_embeddings_dim,
@@ -424,8 +423,6 @@ class Model(MarkovStateInferenceModelBase):
 
             means_dev_layer = layers.Multiply(name="means_dev")
 
-            # Data flow to get mean deviations
-
             # Get the concatenated embeddings
             means_spatial_embeddings = means_spatial_embeddings_layer(group_mu)
             means_concat_embeddings = means_concat_embeddings_layer(
@@ -461,7 +458,7 @@ class Model(MarkovStateInferenceModelBase):
             )
             means_dev = means_dev_layer([means_dev_mag, norm_means_dev_map])
         else:
-            means_dev_layer = ZeroLayer(
+            means_dev_layer = TFZerosLayer(
                 shape=(config.n_states, config.n_channels),
                 name="means_dev",
             )
@@ -469,10 +466,8 @@ class Model(MarkovStateInferenceModelBase):
                 [means_dev_layer(data), batch_size]
             )
 
-        # ----------------------
-        # Covariances deviations
+        # --------- Covariances deviations -------- #
 
-        # Layer definitions
         if config.learn_covariances:
             covs_spatial_embeddings_layer = layers.Dense(
                 config.spatial_embeddings_dim,
@@ -529,8 +524,6 @@ class Model(MarkovStateInferenceModelBase):
             )
             covs_dev_layer = layers.Multiply(name="covs_dev")
 
-            # Data flow to get covariances deviations
-
             # Get the concatenated embeddings
             covs_spatial_embeddings = covs_spatial_embeddings_layer(
                 InverseCholeskyLayer(config.covariances_epsilon)(group_D)
@@ -570,7 +563,7 @@ class Model(MarkovStateInferenceModelBase):
             covs_dev = covs_dev_layer([covs_dev_mag, norm_covs_dev_map])
             # covs_dev.shape = (None, n_states, n_channels * (n_channels + 1) // 2)
         else:
-            covs_dev_layer = ZeroLayer(
+            covs_dev_layer = TFZerosLayer(
                 shape=(
                     config.n_states,
                     config.n_channels * (config.n_channels + 1) // 2,
@@ -586,8 +579,7 @@ class Model(MarkovStateInferenceModelBase):
                 ),
             )
 
-        # ----------------------------------------
-        # Add deviations to group level parameters
+        # -------- Add deviations to group level parameters -------- #
 
         session_means_layer = SessionParamLayer(
             "means", config.covariances_epsilon, name="session_means"
@@ -603,14 +595,14 @@ class Model(MarkovStateInferenceModelBase):
             [group_D, covs_dev]
         )  # shape = (None, n_states, n_channels, n_channels)
 
-        # -------
-        # LL loss
+        # -------- Log-likelihood losses -------- #
 
-        # Log-likelihood for each state
         ll_layer = SeparateLogLikelihoodLayer(config.n_states, name="ll")
         ll = ll_layer([data, mu, D])
 
-        # Hidden state inference
+        # -------- Hidden state inference -------- #
+
+        # Posterior
         hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
             config.n_states,
             config.sequence_length,
@@ -628,8 +620,7 @@ class Model(MarkovStateInferenceModelBase):
         ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
         ll_loss = ll_loss_layer([ll, gamma])
 
-        # ---------
-        # KL losses
+        # -------- KL losses -------- #
 
         # For the observation model (static KL loss)
         if config.learn_means:
@@ -652,7 +643,7 @@ class Model(MarkovStateInferenceModelBase):
                 static_loss_scaling_factor=static_loss_scaling_factor,
             )
         else:
-            means_dev_mag_kl_loss_layer = ZeroLayer(
+            means_dev_mag_kl_loss_layer = TFZerosLayer(
                 (),
                 name="means_dev_mag_kl_loss",
             )
@@ -680,15 +671,15 @@ class Model(MarkovStateInferenceModelBase):
                 static_loss_scaling_factor=static_loss_scaling_factor,
             )
         else:
-            covs_dev_mag_kl_loss_layer = ZeroLayer((), name="covs_dev_mag_kl_loss")
+            covs_dev_mag_kl_loss_layer = TFZerosLayer((), name="covs_dev_mag_kl_loss")
             covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(data)
 
         # Total KL loss
         kl_loss_layer = KLLossLayer(do_annealing=config.do_kl_annealing, name="kl_loss")
         kl_loss = kl_loss_layer([means_dev_mag_kl_loss, covs_dev_mag_kl_loss])
 
-        # ------------
-        # Create model
+        # -------- Create model -------- #
+
         inputs = [data, session_id]
         outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "gamma": gamma, "xi": xi}
         name = config.model_name
