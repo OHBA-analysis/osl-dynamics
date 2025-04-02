@@ -22,7 +22,7 @@ from osl_dynamics.inference.layers import (
     KLDivergenceLayer,
     KLLossLayer,
     LogLikelihoodLossLayer,
-    MatMulLayer,
+    TFMatMulLayer,
     MixMatricesLayer,
     MixVectorsLayer,
     ModelRNNLayer,
@@ -356,7 +356,7 @@ class Model(VariationalInferenceModelBase):
         mix_means_layer = MixVectorsLayer(name="mix_means")
         mix_stds_layer = MixMatricesLayer(name="mix_stds")
         mix_corrs_layer = MixMatricesLayer(name="mix_corrs")
-        matmul_layer = MatMulLayer(name="cov")
+        matmul_layer = TFMatMulLayer(name="cov")
         ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
         theta_layer = TFConcatLayer(axis=2, name="theta")
         theta_drop_layer = tf.keras.layers.Dropout(

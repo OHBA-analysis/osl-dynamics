@@ -44,6 +44,140 @@ def add_epsilon(A, epsilon, diag=False):
     return A + epsilon * I
 
 
+class TFConcatLayer(layers.Layer):
+    """Wrapper for `tf.concat \
+    <https://www.tensorflow.org/api_docs/python/tf/concat>`_.
+
+    Parameters
+    ----------
+    axis : int
+        Axis to concatenate along.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the base class.
+    """
+
+    def __init__(self, axis, **kwargs):
+        super().__init__(**kwargs)
+        self.axis = axis
+
+    def call(self, inputs, **kwargs):
+        return tf.concat(inputs, axis=self.axis)
+
+
+class TFMatMulLayer(layers.Layer):
+    """Wrapper for `tf.matmul \
+    <https://www.tensorflow.org/api_docs/python/tf/linalg/matmul>`_.
+    """
+
+    def call(self, inputs, **kwargs):
+        # If [A, B, C] is passed, we return matmul(A, matmul(B, C))
+        out = inputs[-1]
+        for tensor in inputs[len(inputs) - 2 :: -1]:
+            out = tf.matmul(tensor, out)
+        return out
+
+
+class TFRangeLayer(layers.Layer):
+    """Wrapper for `tf.range \
+    <https://www.tensorflow.org/api_docs/python/tf/range>`_.
+
+    Parameters
+    ----------
+    limit : int
+        Upper limit for range.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the base class.
+    """
+
+    def __init__(self, limit, **kwargs):
+        super().__init__(**kwargs)
+        self.limit = limit
+
+    def call(self, inputs):
+        return tf.range(self.limit)
+
+
+class TFZerosLayer(layers.Layer):
+    """Wrapper for `tf.zeros \
+    <https://www.tensorflow.org/api_docs/python/tf/zeros>`_.
+
+    Parameters
+    ----------
+    shape : tuple
+        Shape of the zeros tensor.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the base class.
+    """
+
+    def __init__(self, shape, **kwargs):
+        super().__init__(**kwargs)
+        self.shape = shape
+
+    def call(self, inputs):
+        """
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
+        return tf.zeros(self.shape)
+
+
+class TFBroadcastToLayer(layers.Layer):
+    """Wrapper for `tf.broadcast_to \
+        <https://www.tensorflow.org/api_docs/python/tf/broadcast_to>`_.
+    """
+
+    def __init__(self, n_modes, n_channels, **kwargs):
+        super().__init__(**kwargs)
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+
+    def call(self, inputs):
+        data, batch_size = inputs
+        return tf.broadcast_to(data, (batch_size, self.n_modes, self.n_channels))
+
+
+class TFGatherLayer(layers.Layer):
+    """Wrapper for `tf.gather \
+        <https://www.tensorflow.org/api_docs/python/tf/gather>`_.
+    """
+
+    def __init__(self, axis, batch_dims=0, **kwargs):
+        super().__init__(**kwargs)
+        self.axis = axis
+        self.batch_dims = batch_dims
+
+    def call(self, inputs, **kwargs):
+        return tf.gather(
+            inputs[0], inputs[1], axis=self.axis, batch_dims=self.batch_dims
+        )
+
+
+class TFAddLayer(layers.Layer):
+    """Wrapper for `tf.add \
+        <https://www.tensorflow.org/api_docs/python/tf/math/add>`_.
+    """
+
+    def call(self, inputs, **kwargs):
+        out = inputs[0]
+        for tensor in inputs[1:]:
+            out = tf.add(out, tensor)
+        return out
+
+
+class TFConstantLayer(layers.Layer):
+    """Wrapper for `tf.constant \
+        <https://www.tensorflow.org/api_docs/python/tf/constant>`_.
+    """
+
+    def __init__(self, values, **kwargs):
+        super().__init__(**kwargs)
+        self.values = values
+
+    def call(self, inputs, **kwargs):
+        return tf.constant(self.values)
+
+
 def NormalizationLayer(norm_type, *args, **kwargs):
     """Returns a normalization layer.
 
@@ -122,111 +256,6 @@ class AddRegularizationLossLayer(layers.Layer):
         reg_loss = self.reg(inputs)
         self.add_loss(self.strength * reg_loss)
         return inputs
-
-
-class TFConcatLayer(layers.Layer):
-    """Wrapper for `tf.concat \
-    <https://www.tensorflow.org/api_docs/python/tf/concat>`_.
-
-    Parameters
-    ----------
-    axis : int
-        Axis to concatenate along.
-    kwargs : keyword arguments, optional
-        Keyword arguments to pass to the base class.
-    """
-
-    def __init__(self, axis, **kwargs):
-        super().__init__(**kwargs)
-        self.axis = axis
-
-    def call(self, inputs, **kwargs):
-        return tf.concat(inputs, axis=self.axis)
-
-
-class SplitLayer(layers.Layer):
-    """Wrapper for `tf.split \
-    <https://www.tensorflow.org/api_docs/python/tf/split>`_.
-
-    Parameters
-    ----------
-    num_or_size_splits : int or list
-        Split to apply.
-    axis : int
-        Axis to split along.
-    kwargs : keyword arguments, optional
-        Keyword arguments to pass to the base class.
-    """
-
-    def __init__(self, num_or_size_splits, axis, **kwargs):
-        super().__init__(**kwargs)
-        self.num_or_size_splits = num_or_size_splits
-        self.axis = axis
-
-    def call(self, inputs, **kwargs):
-        return tf.split(
-            inputs,
-            num_or_size_splits=self.num_or_size_splits,
-            axis=self.axis,
-        )
-
-
-class MatMulLayer(layers.Layer):
-    """Wrapper for `tf.matmul \
-    <https://www.tensorflow.org/api_docs/python/tf/linalg/matmul>`_.
-    """
-
-    def call(self, inputs, **kwargs):
-        # If [A, B, C] is passed, we return matmul(A, matmul(B, C))
-        out = inputs[-1]
-        for tensor in inputs[len(inputs) - 2 :: -1]:
-            out = tf.matmul(tensor, out)
-        return out
-
-
-class TFRangeLayer(layers.Layer):
-    """Wrapper for `tf.range \
-    <https://www.tensorflow.org/api_docs/python/tf/range>`_.
-
-    Parameters
-    ----------
-    limit : int
-        Upper limit for range.
-    kwargs : keyword arguments, optional
-        Keyword arguments to pass to the base class.
-    """
-
-    def __init__(self, limit, **kwargs):
-        super().__init__(**kwargs)
-        self.limit = limit
-
-    def call(self, inputs):
-        return tf.range(self.limit)
-
-
-class ZeroLayer(layers.Layer):
-    """Wrapper for `tf.zeros \
-    <https://www.tensorflow.org/api_docs/python/tf/zeros>`_.
-
-    Parameters
-    ----------
-    shape : tuple
-        Shape of the zeros tensor.
-    kwargs : keyword arguments, optional
-        Keyword arguments to pass to the base class.
-    """
-
-    def __init__(self, shape, **kwargs):
-        super().__init__(**kwargs)
-        self.shape = shape
-
-    def call(self, inputs):
-        """
-        Note
-        ----
-        The :code:`inputs` passed to this method are not used.
-        """
-        return tf.zeros(self.shape)
 
 
 class InverseCholeskyLayer(layers.Layer):
@@ -2301,49 +2330,6 @@ class SumLogLikelihoodLossLayer(layers.Layer):
         return tf.expand_dims(nll_loss, axis=-1)
 
 
-class TFBroadcastToLayer(layers.Layer):
-    """Wrapper for `tf.broadcast_to \
-        <https://www.tensorflow.org/api_docs/python/tf/broadcast_to>`_.
-    """
-
-    def __init__(self, n_modes, n_channels, **kwargs):
-        super().__init__(**kwargs)
-        self.n_modes = n_modes
-        self.n_channels = n_channels
-
-    def call(self, inputs):
-        data, batch_size = inputs
-        return tf.broadcast_to(data, (batch_size, self.n_modes, self.n_channels))
-
-
-class TFGatherLayer(layers.Layer):
-    """Wrapper for `tf.gather \
-        <https://www.tensorflow.org/api_docs/python/tf/gather>`_.
-    """
-
-    def __init__(self, axis, batch_dims=0, **kwargs):
-        super().__init__(**kwargs)
-        self.axis = axis
-        self.batch_dims = batch_dims
-
-    def call(self, inputs, **kwargs):
-        return tf.gather(
-            inputs[0], inputs[1], axis=self.axis, batch_dims=self.batch_dims
-        )
-
-
-class AddLayer(layers.Layer):
-    """Wrapper for `tf.add \
-        <https://www.tensorflow.org/api_docs/python/tf/math/add>`_.
-    """
-
-    def call(self, inputs, **kwargs):
-        out = inputs[0]
-        for tensor in inputs[1:]:
-            out = tf.add(out, tensor)
-        return out
-
-
 class EmbeddingLayer(layers.Layer):
     """Layer for embeddings.
 
@@ -2410,19 +2396,6 @@ class ShiftForForecastingLayer(layers.Layer):
         A = A[:, : -self.clip]
         B = B[:, self.clip :]
         return A, B
-
-
-class TFConstantLayer(layers.Layer):
-    """Wrapper for `tf.constant \
-        <https://www.tensorflow.org/api_docs/python/tf/constant>`_.
-    """
-
-    def __init__(self, values, **kwargs):
-        super().__init__(**kwargs)
-        self.values = values
-
-    def call(self, inputs, **kwargs):
-        return tf.constant(self.values)
 
 
 class SequentialLayer(layers.Layer):

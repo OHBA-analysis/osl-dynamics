@@ -30,17 +30,17 @@ from osl_dynamics.inference.layers import (
     ConcatEmbeddingsLayer,
     SessionParamLayer,
     MixSessionSpecificParametersLayer,
-    ZeroLayer,
     InverseCholeskyLayer,
     GammaExponentialKLDivergenceLayer,
     MultiLayerPerceptronLayer,
     LearnableTensorLayer,
     StaticLossScalingFactorLayer,
     BatchSizeLayer,
-    AddLayer,
+    TFAddLayer,
     TFConstantLayer,
     TFGatherLayer,
     TFBroadcastToLayer,
+    TFZerosLayer,
     EmbeddingLayer,
 )
 from osl_dynamics.data import SessionLabels
@@ -485,7 +485,7 @@ class Model(VariationalInferenceModelBase):
                 )
             )
 
-        embeddings_layer = AddLayer(name="embeddings")
+        embeddings_layer = TFAddLayer(name="embeddings")
         embeddings = embeddings_layer(label_embeddings)
 
         alpha, theta, kl_div = encoder_layer(data)
@@ -614,7 +614,7 @@ class Model(VariationalInferenceModelBase):
             )
             means_dev = means_dev_layer([means_dev_mag, norm_means_dev_map])
         else:
-            means_dev_layer = ZeroLayer(
+            means_dev_layer = TFZerosLayer(
                 shape=(config.n_modes, config.n_channels),
                 name="means_dev",
             )
@@ -721,7 +721,7 @@ class Model(VariationalInferenceModelBase):
             covs_dev = covs_dev_layer([covs_dev_mag, norm_covs_dev_map])
             # covs_dev.shape = (None, n_modes, n_channels * (n_channels + 1) // 2)
         else:
-            covs_dev_layer = ZeroLayer(
+            covs_dev_layer = TFZerosLayer(
                 shape=(
                     config.n_modes,
                     config.n_channels * (config.n_channels + 1) // 2,
@@ -790,7 +790,7 @@ class Model(VariationalInferenceModelBase):
                 static_loss_scaling_factor=static_loss_scaling_factor,
             )
         else:
-            means_dev_mag_kl_loss_layer = ZeroLayer(
+            means_dev_mag_kl_loss_layer = TFZerosLayer(
                 (),
                 name="means_dev_mag_kl_loss",
             )
@@ -818,7 +818,7 @@ class Model(VariationalInferenceModelBase):
                 static_loss_scaling_factor=static_loss_scaling_factor,
             )
         else:
-            covs_dev_mag_kl_loss_layer = ZeroLayer((), name="covs_dev_mag_kl_loss")
+            covs_dev_mag_kl_loss_layer = TFZerosLayer((), name="covs_dev_mag_kl_loss")
             covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(data)
 
         # Total KL loss

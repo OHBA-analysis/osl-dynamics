@@ -13,7 +13,6 @@ from osl_dynamics.inference.layers import (
     CovarianceMatricesLayer,
     ConcatEmbeddingsLayer,
     SessionParamLayer,
-    ZeroLayer,
     InverseCholeskyLayer,
     SampleGammaDistributionLayer,
     GammaExponentialKLDivergenceLayer,
@@ -25,10 +24,11 @@ from osl_dynamics.inference.layers import (
     SumLogLikelihoodLossLayer,
     LearnableTensorLayer,
     BatchSizeLayer,
-    AddLayer,
+    TFAddLayer,
+    TFBroadcastToLayer,
     TFConstantLayer,
     TFGatherLayer,
-    TFBroadcastToLayer,
+    TFZerosLayer,
     EmbeddingLayer,
 )
 from osl_dynamics.models import obs_mod
@@ -334,7 +334,7 @@ class Model(MarkovStateInferenceModelBase):
                 )
             )
 
-        embeddings_layer = AddLayer(name="embeddings")
+        embeddings_layer = TFAddLayer(name="embeddings")
         embeddings = embeddings_layer(label_embeddings)
         # embeddings.shape = (n_sessions, embeddings_dim)
 
