@@ -12,18 +12,17 @@ from dataclasses import dataclass
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import layers
 from tqdm.auto import trange
 
 from osl_dynamics.inference.layers import (
-    ConcatenateLayer,
+    TFConcatLayer,
     CorrelationMatricesLayer,
     DiagonalMatricesLayer,
     InferenceRNNLayer,
     KLDivergenceLayer,
     KLLossLayer,
     LogLikelihoodLossLayer,
-    MatMulLayer,
+    TFMatMulLayer,
     MixMatricesLayer,
     MixVectorsLayer,
     ModelRNNLayer,
@@ -94,12 +93,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Dropout rate.
     model_regularizer : str
         Regularizer.
-
-    theta_normalization : str
-        Type of normalization to apply to the posterior samples, :code:`theta`.
-        Either :code:`'layer'`, :code:`'batch'` or :code:`None`.
-        The same parameter is used for the :code:`gamma` time course.
-
 
     learn_means : bool
         Should we make the mean for each mode trainable?
@@ -252,7 +245,209 @@ class Model(VariationalInferenceModelBase):
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = _model_structure(self.config)
+
+        config = self.config
+
+        # ---------- Define layers ---------- #
+        data_drop_layer = tf.keras.layers.Dropout(
+            config.inference_dropout, name="data_drop"
+        )
+        inf_rnn_layer = InferenceRNNLayer(
+            config.inference_rnn,
+            config.inference_normalization,
+            config.inference_activation,
+            config.inference_n_layers,
+            config.inference_n_units,
+            config.inference_dropout,
+            config.inference_regularizer,
+            name="inf_rnn",
+        )
+        power_inf_mu_layer = tf.keras.layers.Dense(config.n_modes, name="power_inf_mu")
+        power_inf_sigma_layer = tf.keras.layers.Dense(
+            config.n_modes, activation="softplus", name="power_inf_sigma"
+        )
+        power_theta_layer = SampleNormalDistributionLayer(
+            config.theta_std_epsilon, name="power_theta"
+        )
+        fc_inf_mu_layer = tf.keras.layers.Dense(config.n_corr_modes, name="fc_inf_mu")
+        fc_inf_sigma_layer = tf.keras.layers.Dense(
+            config.n_corr_modes, activation="softplus", name="fc_inf_sigma"
+        )
+        fc_theta_layer = SampleNormalDistributionLayer(
+            config.theta_std_epsilon, name="fc_theta"
+        )
+        alpha_layer = SoftmaxLayer(
+            initial_temperature=1.0,
+            learn_temperature=False,
+            name="alpha",
+        )
+        beta_layer = SoftmaxLayer(
+            initial_temperature=1.0,
+            learn_temperature=False,
+            name="beta",
+        )
+        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+            config.sequence_length,
+            config.loss_calc,
+            name="static_loss_scaling_factor",
+        )
+        means_layer = VectorsLayer(
+            config.n_modes,
+            config.n_channels,
+            config.learn_means,
+            config.initial_means,
+            config.means_regularizer,
+            name="means",
+        )
+        stds_layer = DiagonalMatricesLayer(
+            config.n_modes,
+            config.n_channels,
+            config.learn_stds,
+            config.initial_stds,
+            config.stds_epsilon,
+            config.stds_regularizer,
+            name="stds",
+        )
+        corrs_layer = CorrelationMatricesLayer(
+            config.n_corr_modes,
+            config.n_channels,
+            config.learn_corrs,
+            config.initial_corrs,
+            config.corrs_epsilon,
+            config.corrs_regularizer,
+            name="corrs",
+        )
+
+        class PCATransformLayer(tf.keras.layers.Layer):
+            def __init__(self, pca_components, **kwargs):
+                super(PCATransformLayer, self).__init__(**kwargs)
+                self.pca_components = tf.Variable(
+                    initial_value=tf.convert_to_tensor(
+                        pca_components, dtype=tf.float32
+                    ),
+                    trainable=False,
+                )
+
+            def call(self, inputs):
+                mu, E, R = inputs
+                pca_mu = tf.squeeze(
+                    tf.matmul(
+                        tf.expand_dims(tf.transpose(self.pca_components), 0),
+                        tf.expand_dims(mu, -1),
+                    )
+                )
+                pca_E = tf.matmul(
+                    tf.matmul(
+                        tf.expand_dims(tf.transpose(self.pca_components), 0),
+                        E,
+                    ),
+                    tf.expand_dims(self.pca_components, 0),
+                )
+                pca_R = tf.matmul(
+                    tf.matmul(
+                        tf.expand_dims(tf.transpose(self.pca_components), 0),
+                        R,
+                    ),
+                    tf.expand_dims(self.pca_components, 0),
+                )
+                return pca_mu, pca_E, pca_R
+
+        pca_layer = PCATransformLayer(config.pca_components, name="pca")
+        mix_means_layer = MixVectorsLayer(name="mix_means")
+        mix_stds_layer = MixMatricesLayer(name="mix_stds")
+        mix_corrs_layer = MixMatricesLayer(name="mix_corrs")
+        matmul_layer = TFMatMulLayer(name="cov")
+        ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
+        theta_layer = TFConcatLayer(axis=2, name="theta")
+        theta_drop_layer = tf.keras.layers.Dropout(
+            config.model_dropout,
+            name="theta_drop",
+        )
+        mod_rnn_layer = ModelRNNLayer(
+            config.model_rnn,
+            config.model_normalization,
+            config.model_activation,
+            config.model_n_layers,
+            config.model_n_units,
+            config.model_dropout,
+            config.model_regularizer,
+            name="mod_rnn",
+        )
+        power_mod_mu_layer = tf.keras.layers.Dense(config.n_modes, name="power_mod_mu")
+        power_mod_sigma_layer = tf.keras.layers.Dense(
+            config.n_modes, activation="softplus", name="power_mod_sigma"
+        )
+        fc_mod_mu_layer = tf.keras.layers.Dense(config.n_corr_modes, name="fc_mod_mu")
+        fc_mod_sigma_layer = tf.keras.layers.Dense(
+            config.n_corr_modes, activation="softplus", name="fc_mod_sigma"
+        )
+        fc_kl_div_layer = KLDivergenceLayer(
+            config.theta_std_epsilon,
+            config.loss_calc,
+            name="fc_kl_div",
+        )
+        kl_div_layer_power = KLDivergenceLayer(
+            config.theta_std_epsilon,
+            config.loss_calc,
+            name="power_kl_div",
+        )
+        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
+
+        # ---------- Forward pass ---------- #
+
+        # Encoder
+        data = tf.keras.layers.Input(
+            shape=(config.sequence_length, config.n_channels), name="data"
+        )
+        data_drop = data_drop_layer(data)
+        inf_rnn = inf_rnn_layer(data_drop)
+        power_inf_mu = power_inf_mu_layer(inf_rnn)
+        power_inf_sigma = power_inf_sigma_layer(inf_rnn)
+        power_theta = power_theta_layer([power_inf_mu, power_inf_sigma])
+        fc_inf_mu = fc_inf_mu_layer(inf_rnn)
+        fc_inf_sigma = fc_inf_sigma_layer(inf_rnn)
+        fc_theta = fc_theta_layer([fc_inf_mu, fc_inf_sigma])
+        alpha = alpha_layer(power_theta)
+        beta = beta_layer(fc_theta)
+
+        # Observation model
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+        mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
+        E = stds_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
+        R = corrs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
+        pca_mu, pca_E, pca_R = pca_layer([mu, E, R])
+        m = mix_means_layer([alpha, pca_mu])
+        G = mix_stds_layer([alpha, pca_E])
+        F = mix_corrs_layer([beta, pca_R])
+        C = matmul_layer([G, F, G])
+        ll_loss = ll_loss_layer([data, m, C])
+
+        # Decoder
+        theta = theta_layer([power_theta, fc_theta])
+        theta_drop = theta_drop_layer(theta)
+        mod_rnn = mod_rnn_layer(theta_drop)
+        power_mod_mu = power_mod_mu_layer(mod_rnn)
+        power_mod_sigma = power_mod_sigma_layer(mod_rnn)
+        fc_mod_mu = fc_mod_mu_layer(mod_rnn)
+        fc_mod_sigma = fc_mod_sigma_layer(mod_rnn)
+        power_kl_div = kl_div_layer_power(
+            [power_inf_mu, power_inf_sigma, power_mod_mu, power_mod_sigma]
+        )
+        fc_kl_div = fc_kl_div_layer(
+            [fc_inf_mu, fc_inf_sigma, fc_mod_mu, fc_mod_sigma],
+        )
+        kl_loss = kl_loss_layer([power_kl_div, fc_kl_div])
+
+        # ---------- Create model ---------- #
+        inputs = {"data": data}
+        outputs = {
+            "ll_loss": ll_loss,
+            "kl_loss": kl_loss,
+            "power_theta": power_theta,
+            "fc_theta": fc_theta,
+        }
+        name = config.model_name
+        self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
     def get_means(self):
         """Get the mode means.
@@ -432,13 +627,11 @@ class Model(VariationalInferenceModelBase):
         model_rnn_layer = self.model.get_layer("mod_rnn")
         power_mod_mu_layer = self.model.get_layer("power_mod_mu")
         power_mod_sigma_layer = self.model.get_layer("power_mod_sigma")
-        power_theta_norm_layer = self.model.get_layer("power_theta_norm")
         alpha_layer = self.model.get_layer("alpha")
         fc_mod_mu_layer = self.model.get_layer("fc_mod_mu")
         fc_mod_sigma_layer = self.model.get_layer("fc_mod_sigma")
-        fc_theta_norm_layer = self.model.get_layer("fc_theta_norm")
         beta_layer = self.model.get_layer("beta")
-        concatenate_layer = self.model.get_layer("theta_norm")
+        theta_layer = self.model.get_layer("theta")
 
         # Normally distributed random numbers used to sample the logits theta
         power_epsilon = np.random.normal(
@@ -449,16 +642,16 @@ class Model(VariationalInferenceModelBase):
         ).astype(np.float32)
 
         # Initialise sequence of underlying logits theta
-        power_theta_norm = np.zeros(
+        power_theta = np.zeros(
             [self.config.sequence_length, self.config.n_modes],
             dtype=np.float32,
         )
-        power_theta_norm[-1] = np.random.normal(size=self.config.n_modes)
-        fc_theta_norm = np.zeros(
+        power_theta[-1] = np.random.normal(size=self.config.n_modes)
+        fc_theta = np.zeros(
             [self.config.sequence_length, self.config.n_corr_modes],
             dtype=np.float32,
         )
-        fc_theta_norm[-1] = np.random.normal(size=self.config.n_corr_modes)
+        fc_theta[-1] = np.random.normal(size=self.config.n_corr_modes)
 
         # Sample the mode time courses
         alpha = np.empty([n_samples, self.config.n_modes])
@@ -466,13 +659,13 @@ class Model(VariationalInferenceModelBase):
         for i in trange(n_samples, desc="Sampling mode time courses"):
             # If there are leading zeros we trim theta so that we don't pass
             # the zeros
-            trimmed_power_theta = power_theta_norm[
-                ~np.all(power_theta_norm == 0, axis=1)
-            ][np.newaxis, :, :]
-            trimmed_fc_theta = fc_theta_norm[~np.all(fc_theta_norm == 0, axis=1)][
+            trimmed_power_theta = power_theta[~np.all(power_theta == 0, axis=1)][
                 np.newaxis, :, :
             ]
-            trimmed_theta = concatenate_layer([trimmed_power_theta, trimmed_fc_theta])
+            trimmed_fc_theta = fc_theta[~np.all(fc_theta == 0, axis=1)][
+                np.newaxis, :, :
+            ]
+            trimmed_theta = theta_layer([trimmed_power_theta, trimmed_fc_theta])
             # p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
             model_rnn = model_rnn_layer(trimmed_theta)
             power_mod_mu = power_mod_mu_layer(model_rnn)[0, -1]
@@ -481,303 +674,14 @@ class Model(VariationalInferenceModelBase):
             fc_mod_sigma = fc_mod_sigma_layer(model_rnn)[0, -1]
 
             # Shift theta one time step to the left
-            power_theta_norm = np.roll(power_theta_norm, -1, axis=0)
-            fc_theta_norm = np.roll(fc_theta_norm, -1, axis=0)
+            power_theta = np.roll(power_theta, -1, axis=0)
+            fc_theta = np.roll(fc_theta, -1, axis=0)
 
             # Sample from the probability distribution function
-            power_theta = power_mod_mu + power_mod_sigma * power_epsilon[i]
-            power_theta_norm[-1] = power_theta_norm_layer(
-                power_theta[np.newaxis, np.newaxis, :]
-            )
-            fc_theta = fc_mod_mu + fc_mod_sigma * fc_epsilon[i]
-            fc_theta_norm[-1] = fc_theta_norm_layer(fc_theta[np.newaxis, np.newaxis, :])
+            power_theta[-1] = power_mod_mu + power_mod_sigma * power_epsilon[i]
+            fc_theta[-1] = fc_mod_mu + fc_mod_sigma * fc_epsilon[i]
 
-            alpha[i] = alpha_layer(power_theta_norm[-1][np.newaxis, np.newaxis, :])[
-                0, 0
-            ]
-            beta[i] = beta_layer(fc_theta_norm[-1][np.newaxis, np.newaxis, :])[0, 0]
+            alpha[i] = alpha_layer(power_theta[-1][np.newaxis, np.newaxis, :])[0, 0]
+            beta[i] = beta_layer(fc_theta[-1][np.newaxis, np.newaxis, :])[0, 0]
 
         return alpha, beta
-
-    def get_n_params_generative_model(self):
-        """Get the number of trainable parameters in the generative model.
-
-        This includes the model RNN weights and biases, mixing coefficients,
-        mode means, standard deviations and correlations.
-
-        Returns
-        -------
-        n_params : int
-            Number of parameters in the generative model.
-        """
-        n_params = 0
-
-        for var in self.trainable_weights:
-            var_name = var.name
-            if (
-                "mod_" in var_name
-                or "alpha" in var_name
-                or "beta" in var_name
-                or "means" in var_name
-                or "stds" in var_name
-                or "corrs" in var_name
-            ):
-                n_params += np.prod(var.shape)
-
-            return int(n_params)
-
-
-def _model_structure(config):
-    # Layer for input
-    inputs = layers.Input(
-        shape=(config.sequence_length, config.n_channels), name="data"
-    )
-
-    # Static loss scaling factor
-    static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-        config.sequence_length,
-        config.loss_calc,
-        name="static_loss_scaling_factor",
-    )
-    static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
-
-    #
-    # Inference RNN
-    #
-
-    # Layers
-    data_drop_layer = layers.Dropout(config.inference_dropout, name="data_drop")
-    inf_rnn_layer = InferenceRNNLayer(
-        config.inference_rnn,
-        config.inference_normalization,
-        config.inference_activation,
-        config.inference_n_layers,
-        config.inference_n_units,
-        config.inference_dropout,
-        config.inference_regularizer,
-        name="inf_rnn",
-    )
-
-    # Data flow
-    data_drop = data_drop_layer(inputs)
-    inf_rnn = inf_rnn_layer(data_drop)
-
-    #
-    # Mode time course for Power
-    #
-
-    # Layers
-    power_inf_mu_layer = layers.Dense(config.n_modes, name="power_inf_mu")
-    power_inf_sigma_layer = layers.Dense(
-        config.n_modes, activation="softplus", name="power_inf_sigma"
-    )
-    power_theta_layer = SampleNormalDistributionLayer(
-        config.theta_std_epsilon, name="power_theta"
-    )
-    power_theta_norm_layer = NormalizationLayer(
-        config.theta_normalization, name="power_theta_norm"
-    )
-    alpha_layer = SoftmaxLayer(
-        initial_temperature=1.0,
-        learn_temperature=False,
-        name="alpha",
-    )
-
-    # Data flow
-    power_inf_mu = power_inf_mu_layer(inf_rnn)
-    power_inf_sigma = power_inf_sigma_layer(inf_rnn)
-    power_theta = power_theta_layer([power_inf_mu, power_inf_sigma])
-    power_theta_norm = power_theta_norm_layer(power_theta)
-    alpha = alpha_layer(power_theta_norm)
-
-    #
-    # Mode time course for the FCs
-    #
-
-    # Layers
-    fc_inf_mu_layer = layers.Dense(config.n_corr_modes, name="fc_inf_mu")
-    fc_inf_sigma_layer = layers.Dense(
-        config.n_corr_modes, activation="softplus", name="fc_inf_sigma"
-    )
-    fc_theta_layer = SampleNormalDistributionLayer(
-        config.theta_std_epsilon, name="fc_theta"
-    )
-    fc_theta_norm_layer = NormalizationLayer(
-        config.theta_normalization, name="fc_theta_norm"
-    )
-    beta_layer = SoftmaxLayer(
-        initial_temperature=1.0,
-        learn_temperature=False,
-        name="beta",
-    )
-
-    # Data flow
-    fc_inf_mu = fc_inf_mu_layer(inf_rnn)
-    fc_inf_sigma = fc_inf_sigma_layer(inf_rnn)
-    fc_theta = fc_theta_layer([fc_inf_mu, fc_inf_sigma])
-    fc_theta_norm = fc_theta_norm_layer(fc_theta)
-    beta = beta_layer(fc_theta_norm)
-
-    #
-    # Observation model
-    #
-
-    # Layers
-    means_layer = VectorsLayer(
-        config.n_modes,
-        config.n_channels,
-        config.learn_means,
-        config.initial_means,
-        config.means_regularizer,
-        name="means",
-    )
-    stds_layer = DiagonalMatricesLayer(
-        config.n_modes,
-        config.n_channels,
-        config.learn_stds,
-        config.initial_stds,
-        config.stds_epsilon,
-        config.stds_regularizer,
-        name="stds",
-    )
-    corrs_layer = CorrelationMatricesLayer(
-        config.n_corr_modes,
-        config.n_channels,
-        config.learn_corrs,
-        config.initial_corrs,
-        config.corrs_epsilon,
-        config.corrs_regularizer,
-        name="corrs",
-    )
-    mix_means_layer = MixVectorsLayer(name="mix_means")
-    mix_stds_layer = MixMatricesLayer(name="mix_stds")
-    mix_corrs_layer = MixMatricesLayer(name="mix_corrs")
-    matmul_layer = MatMulLayer(name="cov")
-    pca_means_layer = MatMulLayer(name="pca_means")
-    pca_stds_layer = MatMulLayer(name="pca_stds")
-    pca_corrs_layer = MatMulLayer(name="pca_corrs")
-    ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
-
-    # Data flow
-    mu = means_layer(
-        inputs, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # inputs not used
-    E = stds_layer(
-        inputs, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # inputs not used
-    R = corrs_layer(
-        inputs, static_loss_scaling_factor=static_loss_scaling_factor
-    )  # inputs not used
-
-    # multiply with pca components
-    pca_mu = tf.squeeze(
-        pca_means_layer(
-            [
-                tf.expand_dims(tf.transpose(config.pca_components), 0),
-                tf.expand_dims(mu, -1),
-            ]
-        )
-    )
-    pca_E = pca_stds_layer(
-        [
-            tf.expand_dims(tf.transpose(config.pca_components), 0),
-            E,
-            tf.expand_dims(config.pca_components, 0),
-        ]
-    )
-    pca_R = pca_corrs_layer(
-        [
-            tf.expand_dims(tf.transpose(config.pca_components), 0),
-            R,
-            tf.expand_dims(config.pca_components, 0),
-        ]
-    )
-
-    m = mix_means_layer([alpha, pca_mu])
-    G = mix_stds_layer([alpha, pca_E])
-    F = mix_corrs_layer([beta, pca_R])
-    C = matmul_layer([G, F, G])
-
-    ll_loss = ll_loss_layer([inputs, m, C])
-
-    #
-    # Model RNN
-    #
-
-    # Layers
-    concatenate_layer = ConcatenateLayer(axis=2, name="theta_norm")
-    theta_norm_drop_layer = layers.Dropout(
-        config.model_dropout,
-        name="theta_norm_drop",
-    )
-    mod_rnn_layer = ModelRNNLayer(
-        config.model_rnn,
-        config.model_normalization,
-        config.model_activation,
-        config.model_n_layers,
-        config.model_n_units,
-        config.model_dropout,
-        config.model_regularizer,
-        name="mod_rnn",
-    )
-
-    # Data flow
-    theta_norm = concatenate_layer([power_theta_norm, fc_theta_norm])
-    theta_norm_drop = theta_norm_drop_layer(theta_norm)
-    mod_rnn = mod_rnn_layer(theta_norm_drop)
-
-    #
-    # Mode time course for the mean
-    #
-
-    # Layers
-    power_mod_mu_layer = layers.Dense(config.n_modes, name="power_mod_mu")
-    power_mod_sigma_layer = layers.Dense(
-        config.n_modes, activation="softplus", name="power_mod_sigma"
-    )
-    kl_div_layer_power = KLDivergenceLayer(
-        config.theta_std_epsilon,
-        config.loss_calc,
-        name="power_kl_div",
-    )
-
-    # Data flow
-    power_mod_mu = power_mod_mu_layer(mod_rnn)
-    power_mod_sigma = power_mod_sigma_layer(mod_rnn)
-    power_kl_div = kl_div_layer_power(
-        [power_inf_mu, power_inf_sigma, power_mod_mu, power_mod_sigma]
-    )
-
-    #
-    # Mode time course for the functional connectivity
-    #
-
-    # Layers
-    fc_mod_mu_layer = layers.Dense(config.n_corr_modes, name="fc_mod_mu")
-    fc_mod_sigma_layer = layers.Dense(
-        config.n_corr_modes, activation="softplus", name="fc_mod_sigma"
-    )
-    fc_kl_div_layer = KLDivergenceLayer(
-        config.theta_std_epsilon,
-        config.loss_calc,
-        name="fc_kl_div",
-    )
-
-    # Data flow
-    fc_mod_mu = fc_mod_mu_layer(mod_rnn)
-    fc_mod_sigma = fc_mod_sigma_layer(mod_rnn)
-    fc_kl_div = fc_kl_div_layer(
-        [fc_inf_mu, fc_inf_sigma, fc_mod_mu, fc_mod_sigma],
-    )
-
-    #
-    # Total KL loss
-    #
-    kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
-    kl_loss = kl_loss_layer([power_kl_div, fc_kl_div])
-
-    return tf.keras.Model(
-        inputs=inputs,
-        outputs=[ll_loss, kl_loss, power_theta_norm, fc_theta_norm],
-        name="M-DyNeMo",
-    )

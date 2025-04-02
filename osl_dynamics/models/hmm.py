@@ -164,7 +164,86 @@ class Model(MarkovStateInferenceModelBase):
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = self._model_structure()
+
+        config = self.config
+
+        # Inputs
+        data = layers.Input(
+            shape=(config.sequence_length, config.n_channels),
+            name="data",
+        )
+
+        # Static loss scaling factor
+        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+            config.sequence_length,
+            config.loss_calc,
+            name="static_loss_scaling_factor",
+        )
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+
+        # Observation model
+        means_layer = VectorsLayer(
+            config.n_states,
+            config.n_channels,
+            config.learn_means,
+            config.initial_means,
+            config.means_regularizer,
+            name="means",
+        )
+        if config.diagonal_covariances:
+            covs_layer = DiagonalMatricesLayer(
+                config.n_states,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        else:
+            covs_layer = CovarianceMatricesLayer(
+                config.n_states,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        mu = means_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # data not used
+        D = covs_layer(
+            data, static_loss_scaling_factor=static_loss_scaling_factor
+        )  # data not used
+
+        # Log-likelihood
+        ll_layer = SeparateLogLikelihoodLayer(config.n_states, name="ll")
+        ll = ll_layer([data, mu, D])
+
+        # Hidden state inference
+        hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
+            config.n_states,
+            config.sequence_length,
+            config.initial_trans_prob,
+            config.initial_state_probs,
+            config.learn_trans_prob,
+            config.learn_initial_state_probs,
+            implementation=config.baum_welch_implementation,
+            dtype="float64",
+            name="hid_state_inf",
+        )
+        gamma, xi = hidden_state_inference_layer(ll)
+
+        # Loss
+        ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
+        ll_loss = ll_loss_layer([ll, gamma])
+
+        # Create model
+        inputs = {"data": data}
+        outputs = {"ll_loss": ll_loss, "gamma": gamma, "xi": xi}
+        name = config.model_name
+        self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
     def get_means(self):
         """Get the state means.
@@ -203,42 +282,6 @@ class Model(MarkovStateInferenceModelBase):
     def get_observation_model_parameters(self):
         """Wrapper for :code:`get_means_covariances`."""
         return self.get_means_covariances()
-
-    def get_n_params_generative_model(self):
-        """Get the number of trainable parameters in the generative model.
-
-        Returns
-        -------
-        n_params : int
-            Number of parameters in the generative model.
-        """
-        n_params = 0
-        for var in self.trainable_weights:
-            if "means" in var.name or "covs" in var.name:
-                n_params += np.prod(var.shape)
-            if "trans_prob" in var.name:
-                n_params += var.shape[0] * (var.shape[0] - 1)
-            if "initial_state_probs" in var.name:
-                n_params += var.shape[0] - 1
-        return int(n_params)
-
-    def get_log_likelihood(self, x):
-        """Get log-likelihood.
-
-        Parameters
-        ----------
-        data : np.ndarray
-            Data to calculate log-likelihood for.
-            Shape must be (batch_size, sequence_length, n_channels).
-
-        Returns
-        -------
-        log_likelihood : np.ndarray
-            Log-likelihood. Shape is (batch_size,).
-        """
-        means, covs = self.get_means_covariances()
-        ll_layer = self.model.get_layer("ll")
-        return ll_layer([x, [means], [covs]]).numpy()
 
     def set_means(self, means, update_initializer=True):
         """Set the state means.
@@ -434,7 +477,7 @@ class Model(MarkovStateInferenceModelBase):
         """
         # Save group-level model parameters
         os.makedirs(store_dir, exist_ok=True)
-        self.save_weights(f"{store_dir}/weights.h5")
+        self.save_weights(f"{store_dir}/model.weights.h5")
 
         # Temporarily change hyperparameters
         original_n_epochs = self.config.n_epochs
@@ -469,7 +512,7 @@ class Model(MarkovStateInferenceModelBase):
                 covariances.append(c)
 
                 # Reset back to group-level model parameters
-                self.load_weights(f"{store_dir}/weights.h5")
+                self.load_weights(f"{store_dir}/model.weights.h5")
                 self.compile()
 
         # Reset hyperparameters
@@ -477,81 +520,3 @@ class Model(MarkovStateInferenceModelBase):
         self.config.learning_rate = original_learning_rate
 
         return alpha, np.array(means), np.array(covariances)
-
-    def _model_structure(self):
-        """Build the model structure."""
-
-        config = self.config
-
-        # Inputs
-        data = layers.Input(
-            shape=(config.sequence_length, config.n_channels),
-            name="data",
-        )
-
-        # Static loss scaling factor
-        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            config.sequence_length,
-            config.loss_calc,
-            name="static_loss_scaling_factor",
-        )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-
-        # Observation model
-        means_layer = VectorsLayer(
-            config.n_states,
-            config.n_channels,
-            config.learn_means,
-            config.initial_means,
-            config.means_regularizer,
-            name="means",
-        )
-        if config.diagonal_covariances:
-            covs_layer = DiagonalMatricesLayer(
-                config.n_states,
-                config.n_channels,
-                config.learn_covariances,
-                config.initial_covariances,
-                config.covariances_epsilon,
-                config.covariances_regularizer,
-                name="covs",
-            )
-        else:
-            covs_layer = CovarianceMatricesLayer(
-                config.n_states,
-                config.n_channels,
-                config.learn_covariances,
-                config.initial_covariances,
-                config.covariances_epsilon,
-                config.covariances_regularizer,
-                name="covs",
-            )
-        mu = means_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
-        )  # data not used
-        D = covs_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
-        )  # data not used
-
-        # Log-likelihood
-        ll_layer = SeparateLogLikelihoodLayer(config.n_states, name="ll")
-        ll = ll_layer([data, [mu], [D]])
-
-        # Hidden state inference
-        hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
-            config.n_states,
-            config.initial_trans_prob,
-            config.initial_state_probs,
-            config.learn_trans_prob,
-            config.learn_initial_state_probs,
-            implementation=config.baum_welch_implementation,
-            dtype="float64",
-            name="hid_state_inf",
-        )
-        gamma, xi = hidden_state_inference_layer(ll)
-
-        # Loss
-        ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
-        ll_loss = ll_loss_layer([ll, gamma])
-
-        return tf.keras.Model(inputs=data, outputs=[ll_loss, gamma, xi], name="HMM")

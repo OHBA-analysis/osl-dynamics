@@ -1,70 +1,39 @@
 Installation
 ============
 
-Linux Instructions
-------------------
+Conda / Mamba
+-------------
 
-OSL Dynamics can be installed in three steps. Open a Terminal and execute the following commands:
+We recommend install osl-dynamics installed using `Miniforge <https://conda-forge.org/download/>`_ (or `Anaconda <https://www.anaconda.com/docs/getting-started/anaconda/install>`_/`Miniconda <https://www.anaconda.com/docs/getting-started/miniconda/install>`_) and `Mamba <https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html>`_.
 
-#. Create a virtual environment, we recommend using Anaconda: https://docs.anaconda.com/anaconda/install/index.html.
+Miniforge (:code:`conda`) can be installed with:
 
-    Once you have installed Anaconda (or Miniconda) execute:
+.. code::
 
-    ::
+    wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    bash Miniforge3-$(uname)-$(uname -m).sh
+    rm Miniforge3-$(uname)-$(uname -m).sh
 
-        conda create --name osld python=3.10.14
-        conda activate osld
+Mamba (:code:`mamba`) can be installed with:
 
-    Note, this environment must be activated every time you want to use osl-dynamics.
+.. code::
 
-#. Install the deep learning library TensorFlow: https://www.tensorflow.org/overview (and the addon tensorflow-probability).
+    conda install -n base -c conda-forge mamba
 
-    To install TensorFlow use:
+Linux / Mac Instructions
+------------------------
 
-    ::
+The following lines can be used to download a conda environment file and install osl-dynamics with its dependencies.
 
-        pip install tensorflow==2.11.0
+.. code::
 
-    If you have GPU resources you may need to install additional libraries (CUDA/cuDNN), see https://www.tensorflow.org/install/pip for detailed instructions.
+    wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/conda-envs/envs/osld-tf.yml
+    mamba env create -f osld-tf.yml
+    rm osld-tf.yml
 
-    If you are using an Apple Mac, you will need to use the following instead:
+If you have a GPU, then use the :code:`osld-tf-cuda.yml` environment file.
 
-    ::
-
-        pip install tensorflow-macos==2.11.0
-
-    You may also need to install the following package to get your GPUs working on a Mac:
-
-    ::
-
-        pip install tensorflow-metal==0.7.0
-
-    See https://developer.apple.com/metal/tensorflow-plugin/ for further details.
-
-    If pip can not find the package, then you can try installing TensorFlow with conda:
-
-    ::
-
-        conda install tensorflow=2.11.0
-
-    After you have installed TensorFlow, install the tensorflow-probability addon with:
-
-    ::
-
-        pip install tensorflow-probability==0.19.0
-
-#. Finally, install osl-dynamics:
-
-    ::
-
-        pip install osl-dynamics
-
-To remove osl-dynamics simply delete the conda environment:
-
-::
-
-    conda env remove -n osld
-    conda clean --all
+If you want to install osl-dynamics without TensorFlow, then use the :code:`osld.yml` environment file.
 
 Windows Instructions
 --------------------
@@ -74,7 +43,9 @@ If you are using a Windows computer, we recommend first installing linux (Ubuntu
 TensorFlow Versions
 -------------------
 
-osl-dynamics has been tested with the following versions:
+osl-dynamics v2.1+ requires tensorflow 2.19 and tensorflow-probability 0.25.
+
+osl-dynamics v2.0.0-2.0.2 has been tested with the following versions:
 
 .. list-table::
    :widths: 25 25
@@ -101,35 +72,30 @@ You can use the following to check if TensorFlow is using any GPUs you have avai
 ::
 
     conda activate osld
-    python
-    >> import tensorflow as tf
-    >> print(tf.test.is_gpu_available())
+    python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 
-This should print :code:`True` if you have GPUs available (and :code:`False` otherwise).
+This should print a list of the GPUs you have available (or an empty list :code:`[]` if there's none available).
 
-Training Speed
---------------
+Install the source code (optional)
+----------------------------------
 
-You can test if you've succesfully installed osl-dynamics by running the HMM and DyNeMo simulation example scripts:
+Once you have created the :code:`osld` conda environment you can install a local copy of the source code (`GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_) into it.
 
-- `HMM example <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/hmm_hmm-mvn.py>`_.
-- `DyNeMo example <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/dynemo_hmm-mvn.py>`_.
+.. code::
 
-A rough indication of the expected training speeds is given below. You could expect variations up to a factor of 2.
+    conda activate osld
+    git clone https://github.com/OHBA-analysis/osl-dynamics.git
+    cd osl-dynamics
+    pip install -e .
 
-.. list-table:: Training speed: **ms/step**
-   :widths: 25 25 25
-   :header-rows: 1
+Now you can run osl-dynamics with local changes to the code.
 
-   * - Computer
-     - HMM
-     - DyNeMo
-   * - M1/M2 Macbook
-     - 50
-     - 60
-   * - Linux with 1 GPU
-     - 100
-     - 20
-   * - Linux CPU
-     - 100
-     - 100
+Removing osl-dynamics
+---------------------
+
+To remove osl-dynamics simply delete the conda environment:
+
+::
+
+    conda env remove -n osld
+    conda clean --all

@@ -237,6 +237,8 @@ class KLAnnealingCallback(callbacks.Callback):
             covs_dev_mag_layer = self.model.get_layer("covs_dev_mag")
             covs_dev_mag_layer.annealing_factor.assign(new_value)
 
+        logs["kl_factor"] = new_value
+
 
 class EMADecayCallback(callbacks.Callback):
     """Callback to update the decay rate in an Exponential Moving Average optimizer.
@@ -276,7 +278,7 @@ class EMADecayCallback(callbacks.Callback):
         # Update the decay parameter in the optimizer
         # Here we are assuming a MarkovStateModelOptimizer is being used
         ema_optimizer = self.model.optimizer.ema_optimizer
-        ema_optimizer.decay = new_value
+        ema_optimizer.decay.assign(new_value)
 
 
 class SaveBestCallback(callbacks.ModelCheckpoint):

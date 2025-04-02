@@ -116,7 +116,52 @@ class Model(MarkovStateInferenceModelBase):
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = self._model_structure()
+
+        config = self.config
+
+        # Inputs
+        data = layers.Input(
+            shape=(config.sequence_length, config.n_channels),
+            name="data",
+        )
+
+        # Observation model
+        log_rates_layer = VectorsLayer(
+            config.n_states,
+            config.n_channels,
+            config.learn_log_rates,
+            config.initial_log_rates,
+            name="log_rates",
+        )
+        log_rates = log_rates_layer(data)  # data not used
+
+        # Log-likelihood
+        ll_layer = SeparatePoissonLogLikelihoodLayer(config.n_states, name="ll")
+        ll = ll_layer([data, log_rates])
+
+        # Hidden state inference
+        hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
+            config.n_states,
+            config.sequence_length,
+            config.initial_trans_prob,
+            config.initial_state_probs,
+            config.learn_trans_prob,
+            config.learn_initial_state_probs,
+            implementation=config.baum_welch_implementation,
+            dtype="float64",
+            name="hid_state_inf",
+        )
+        gamma, xi = hidden_state_inference_layer(ll)
+
+        # Loss
+        ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
+        ll_loss = ll_loss_layer([ll, gamma])
+
+        # Create model
+        inputs = {"data": data}
+        outputs = {"ll_loss": ll_loss, "gamma": gamma, "xi": xi}
+        name = config.model_name
+        self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
     def get_log_rates(self):
         """Get the state :code:`log_rates`.
@@ -141,24 +186,6 @@ class Model(MarkovStateInferenceModelBase):
     def get_observation_model_parameters(self):
         """Wrapper for :code:`get_log_rates`."""
         return self.get_log_rates()
-
-    def get_n_params_generative_model(self):
-        """Get the number of trainable parameters in the generative model.
-
-        Returns
-        -------
-        n_params : int
-            Number of parameters in the generative model.
-        """
-        n_params = 0
-        for var in self.trainable_weights:
-            if "log_rates" in var.name:
-                n_params += np.prod(var.shape)
-            if "trans_prob" in var.name:
-                n_params += var.shape[0] * (var.shape[0] - 1)
-            if "initial_state_probs" in var.name:
-                n_params += var.shape[0] - 1
-        return int(n_params)
 
     def get_log_likelihood(self, x):
         """Get log-likelihood.
@@ -262,49 +289,3 @@ class Model(MarkovStateInferenceModelBase):
         if self.config.learn_log_rates:
             # Set initial log_rates
             self.set_rates(rates, update_initializer=True)
-
-    def _model_structure(self):
-        """Build the model structure."""
-
-        config = self.config
-
-        # Inputs
-        data = layers.Input(
-            shape=(config.sequence_length, config.n_channels),
-            name="data",
-        )
-
-        # Observation model
-        log_rates_layer = VectorsLayer(
-            config.n_states,
-            config.n_channels,
-            config.learn_log_rates,
-            config.initial_log_rates,
-            name="log_rates",
-        )
-        log_rates = log_rates_layer(data)  # data not used
-
-        # Log-likelihood
-        ll_layer = SeparatePoissonLogLikelihoodLayer(config.n_states, name="ll")
-        ll = ll_layer([data, [log_rates]])
-
-        # Hidden state inference
-        hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
-            config.n_states,
-            config.initial_trans_prob,
-            config.initial_state_probs,
-            config.learn_trans_prob,
-            config.learn_initial_state_probs,
-            implementation=config.baum_welch_implementation,
-            dtype="float64",
-            name="hid_state_inf",
-        )
-        gamma, xi = hidden_state_inference_layer(ll)
-
-        # Loss
-        ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
-        ll_loss = ll_loss_layer([ll, gamma])
-
-        return tf.keras.Model(
-            inputs=data, outputs=[ll_loss, gamma, xi], name="HMM-Poisson"
-        )

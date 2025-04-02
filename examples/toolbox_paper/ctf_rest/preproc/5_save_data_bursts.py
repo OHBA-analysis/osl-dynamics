@@ -14,8 +14,8 @@ def get_downsampled_data(filename):
     return x.T
 
 # Source reconstructed data files
-src_dir = "data/src"
-files = sorted(glob(f"{src_dir}/*/sflip_parc-raw.fif"))
+outdir = "data/preproc"
+files = sorted(glob(f"{outdir}/*/*_sflip_parc-raw.fif"))
 
 # Get data
 time_series = [get_downsampled_data(file) for file in files]

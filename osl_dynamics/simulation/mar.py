@@ -4,7 +4,7 @@ import numpy as np
 
 
 class MAR:
-    """Class that generates data from a multivariate autoregressive (MAR) model.
+    r"""Class that generates data from a multivariate autoregressive (MAR) model.
 
     A :math:`p`-order MAR model can be written as
 
