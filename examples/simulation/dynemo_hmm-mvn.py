@@ -81,6 +81,7 @@ model.save(model_dir)
 
 # Calculate the free energy
 free_energy = model.free_energy(data)
+print("Free energy", free_energy)
 history["free_energy"] = free_energy
 
 # Save training history and free energy

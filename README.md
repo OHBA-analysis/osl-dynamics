@@ -10,78 +10,98 @@ If you find this toolbox useful, please cite:
 
 ## Installation
 
-### Conda
+We recommend using the conda environment files in `/envs`, which can be installed using [Miniforge](https://conda-forge.org/download/) (or [Anaconda](https://www.anaconda.com/docs/getting-started/anaconda/install)/[Miniconda](https://www.anaconda.com/docs/getting-started/miniconda/install)) and [Mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html).
 
-We recommend installing osl-dynamics within a virtual environment. You can do this with [Anaconda](https://docs.anaconda.com/free/anaconda/install/index.html) (or [miniconda](https://docs.conda.io/projects/miniconda/en/latest/miniconda-install.html).
+### Conda / Mamba
 
-Below we describe how to install osl-dynamics from source. We recommend using the conda environment files in `/envs`.
+Miniforge (`conda`) can be installed with:
+```
+wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+bash Miniforge3-$(uname)-$(uname -m).sh
+rm Miniforge3-$(uname)-$(uname -m).sh
+```
 
-### Linux
+Mamba (`mamba`) can be installed with:
+```
+conda install -n base -c conda-forge mamba
+```
 
+### Linux/Mac
+
+```
+wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/conda-envs/envs/osld-tf.yml
+mamba env create -f osld-tf.yml
+rm osld-tf.yml
+```
+If you have a GPU, then use the `osld-tf-cuda.yml` environment.
+
+### Windows
+
+If you are using a Windows computer, we recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions [here](https://ubuntu.com/wsl). Then follow the instructions above in the Ubuntu terminal.
+
+### Source code
+
+An editable local copy of the GitHub repo can be installed within the `osld` environment (created above):
+```
+conda activate osld
+git clone https://github.com/OHBA-analysis/osl-dynamics.git
+cd osl-dynamics
+pip install -e .
+```
+
+### hbaws (Oxford)
+
+On the OHBA workstation (hbaws), install Miniforge and Mamba using the instructions above and install osl-dynamics using:
 ```
 git clone https://github.com/OHBA-analysis/osl-dynamics.git
 cd osl-dynamics
-conda env create -f envs/linux.yml
+mamba env create -f envs/hbaws.yml
 conda activate osld
 pip install -e .
 ```
 
-### Mac
+### BMRC (Oxford)
 
-For a Mac, the installation of TensorFlow is slightly different to a Linux computer. We recommend using the lines above replacing the Linux environment file `envs/linux.yml` with the Mac environment file `envs/mac.yml`.
-
-Note, you may also need to do
+On the Biomedical Research Computing (BMRC) cluster, `mamba` is available as a software module:
 ```
-pip install tensorflow-metal==0.7.0
+module load Miniforge3
 ```
-to get your GPUs working. See [here](https://developer.apple.com/metal/tensorflow-plugin/) for further details.
-
-### Windows
-
-If you are using a Windows computer, we recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions [here](https://ubuntu.com/wsl). Then following the instructions above in the Ubuntu terminal.
+and osl-dynamics can be installed with:
+```
+git clone https://github.com/OHBA-analysis/osl-dynamics.git
+cd osl-dynamics
+mamba env create -f envs/bmrc.yml
+conda activate osld
+pip install -e .
+```
+The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
+```
+unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
+```
 
 ### Within an osl environment
 
-If you have already installed [OSL](https://github.com/OHBA-analysis/osl) you can install osl-dynamics in the `osl` environment with:
+If you have already installed [osl-ephys](https://github.com/OHBA-analysis/osl-ephys) you can install osl-dynamics in the `osl` environment with:
 ```
 conda activate osl
 cd osl-dynamics
-pip install tensorflow==2.11.0
-pip install tensorflow-probability==0.19.0
+pip install tensorflow==2.19
+pip install tensorflow-probability[tf]==0.25
 pip install -e .
 ```
-Note, if you're using a Mac computer you need to install TensorFlow with the following instead:
-```
-pip install tensorflow-macos==2.11.0
-```
-You may also need to install `tensorflow-metal` with
-```
-pip install tensorflow-metal==0.7.0
-```
-to use any GPUs that maybe available. See [here](https://developer.apple.com/metal/tensorflow-plugin/) for further details.
 
-### TensorFlow versions
-
-osl-dynamics has been tested with the following versions:
-
-| tensorflow  | tensorflow-probability |
-| ------------- | ------------- |
-| 2.11 | 0.19  |
-| 2.12 | 0.19  |
-| 2.13 | 0.20  |
-| 2.14 | 0.22  |
-| 2.15 | 0.22  |
+If you want GPU support, install TensorFlow with
+```
+pip install tensorflow[and-cuda]==2.19
+```
 
 ### Test GPUs are working
 
 You can use the following to check if TensorFlow is using any GPUs you have available:
 ```
-conda activate osld
-python
->> import tensorflow as tf
->> print(tf.test.is_gpu_available())
+python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
-This should print `True` if you have GPUs available (and `False` otherwise).
+This should return a list of GPUs.
 
 ### Removing osl-dynamics
 
@@ -95,7 +115,7 @@ rm -rf osl-dynamics
 
 The read the docs page should be automatically updated whenever there's a new commit on the `main` branch.
 
-The documentation is included as docstrings in the source code. Please write docstrings to any classes or functions you add following the [numpy style](https://numpydoc.readthedocs.io/en/latest/format.html). The API reference documentation will only be automatically generated if the docstrings are written correctly. The documentation directory `/doc` also contains `.rst` files that provide additional info regarding installation, development, the models, etc.
+The documentation is included as docstrings in the source code. The API reference documentation will only be automatically generated if the docstrings are written correctly. The documentation directory `/doc` also contains `.rst` files that provide additional info regarding installation, development, the models, etc.
 
 To compile the documentation locally you need to install the required packages (sphinx, etc.) in your conda environment:
 ```
@@ -133,14 +153,9 @@ python -m build
 ```
 This will create a new directory called `dist`.
 
-5. Test the build by installing in a test conda environment, e.g. with
+5. Test the build by installing with
 ```
-conda create --name test python=3.10.14
-conda activate test
-pip install tensorflow==2.11.0 tensorflow-probability==0.19.0
 pip install dist/<build>.whl
-python examples/simulation/hmm_hmm-mvn.py
-python examples/simulation/dynemo_hmm-mvn.py
 ```
 
 6. Upload the distribution to PyPI with

@@ -22,22 +22,21 @@ config = Config(
     n_modes=5,
     n_channels=20,
     sequence_length=100,
-    inference_n_units=128,
+    inference_n_units=64,
     inference_normalization="layer",
-    model_n_units=128,
+    model_n_units=64,
     model_normalization="layer",
-    theta_normalization="layer",
     learn_means=True,
     learn_stds=True,
     learn_corrs=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
+    n_kl_annealing_epochs=30,
     lr_decay=0.1,
-    batch_size=16,
+    batch_size=8,
     learning_rate=0.01,
-    n_epochs=200,
+    n_epochs=60,
 )
 
 # Simulate data
@@ -54,9 +53,7 @@ sim = simulation.MDyn_HMM_MVN(
 sim.standardize()
 training_data = data.Data(sim.time_series)
 
-training_data.prepare(
-    {"pca": {"n_pca_components": config.n_channels}, "standardize": {}}
-)
+training_data.prepare({"pca": {"n_pca_components": config.n_channels}})
 config.pca_components = training_data.pca_components
 
 # Build model

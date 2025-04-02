@@ -27,7 +27,6 @@ class VariationalInferenceModelConfig:
     """Settings needed for the inference model."""
 
     # Alpha parameters
-    theta_normalization: Literal[None, "batch", "layer"] = None
     learn_alpha_temperature: bool = None
     initial_alpha_temperature: float = None
     theta_std_epsilon: float = 1e-6
@@ -208,6 +207,7 @@ class VariationalInferenceModelBase(ModelBase):
             training_data,
             shuffle=True,
             concatenate=True,
+            drop_last_batch=True,
         )
 
         # Calculate the number of batches to use
@@ -217,7 +217,7 @@ class VariationalInferenceModelBase(ModelBase):
             _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
-        best_loss = np.Inf
+        best_loss = np.inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
@@ -247,7 +247,7 @@ class VariationalInferenceModelBase(ModelBase):
                 best_history = history
                 best_weights = self.get_weights()
 
-        if best_loss == np.Inf:
+        if best_loss == np.inf:
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
@@ -320,7 +320,7 @@ class VariationalInferenceModelBase(ModelBase):
         )
 
         # Train the model a few times and keep the best one
-        best_loss = np.Inf
+        best_loss = np.inf
         losses = []
         for subject in subjects_to_use:
             _logger.info(f"Using subject {subject}")
@@ -420,6 +420,7 @@ class VariationalInferenceModelBase(ModelBase):
             training_data,
             shuffle=True,
             concatenate=True,
+            drop_last_batch=True,
         )
 
         # Calculate the number of batches to use
@@ -429,7 +430,7 @@ class VariationalInferenceModelBase(ModelBase):
             _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
-        best_loss = np.Inf
+        best_loss = np.inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
@@ -456,7 +457,7 @@ class VariationalInferenceModelBase(ModelBase):
                 best_history = history
                 best_weights = self.get_weights()
 
-        if best_loss == np.Inf:
+        if best_loss == np.inf:
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
@@ -571,23 +572,6 @@ class VariationalInferenceModelBase(ModelBase):
         """
         super().reset_weights(keep=keep)
         self.reset_kl_annealing_factor()
-
-    def predict(self, *args, **kwargs):
-        """Wrapper for the standard keras predict method.
-
-        Returns
-        -------
-        predictions : dict
-            Dictionary with labels for each prediction.
-        """
-        predictions = self.model.predict(*args, **kwargs)
-        if not self.config.multiple_dynamics:
-            return_names = ["ll_loss", "kl_loss", "theta"]
-        else:
-            return_names = ["ll_loss", "kl_loss", "power_theta", "fc_theta"]
-        predictions_dict = dict(zip(return_names, predictions))
-
-        return predictions_dict
 
     def get_theta(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
@@ -1025,8 +1009,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         lr_callback = tf.keras.callbacks.LearningRateScheduler(lr_scheduler)
 
         # Callback for updating the the decay rate used in the
-        # EMA update of the transition probability matrix
-        trans_prob_decay_callback = callbacks.EMADecayCallback(
+        # EMA update of the HMM parameters
+        ema_prob_decay_callback = callbacks.EMADecayCallback(
             delay=self.config.trans_prob_update_delay,
             forget=self.config.trans_prob_update_forget,
             n_epochs=self.config.n_epochs,
@@ -1036,7 +1020,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         args, kwargs = replace_argument(
             self.model.fit,
             "callbacks",
-            [lr_callback, trans_prob_decay_callback],
+            [lr_callback, ema_prob_decay_callback],
             args,
             kwargs,
             append=True,
@@ -1053,11 +1037,14 @@ class MarkovStateInferenceModelBase(ModelBase):
             Optimizer to use when compiling.
         """
 
-        # Moving average optimizer for the transition probability matrix
+        # EMA optimizer for HMM state parameters
         decay = (
             1 + self.config.trans_prob_update_delay
         ) ** -self.config.trans_prob_update_forget
-        ema_optimizer = optimizers.ExponentialMovingAverage(decay)
+        ema_optimizer = optimizers.ExponentialMovingAverage(
+            self.config.learning_rate, decay
+        )
+        ema_variables = self.model.get_layer("hid_state_inf").trainable_variables
 
         # Optimizer for all other trainable parameters
         base_optimizer = tf.keras.optimizers.get(
@@ -1071,28 +1058,14 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # Combine into a single optimizer for the model
         optimizer = optimizers.MarkovStateModelOptimizer(
-            ema_optimizer,
             base_optimizer,
+            ema_optimizer,
+            ema_variables,
             learning_rate=self.config.learning_rate,
         )
 
         # Compile
-        self.model.compile(optimizer)
-
-    def predict(self, *args, **kwargs):
-        """Wrapper for the standard keras predict method.
-
-        Returns
-        -------
-        predictions : dict
-            Dictionary with labels for each prediction.
-        """
-        predictions = self.model.predict(*args, **kwargs)
-        if self.config.model_name == "HIVE":
-            names = ["ll_loss", "kl_loss", "gamma", "xi"]
-        else:
-            names = ["ll_loss", "gamma", "xi"]
-        return dict(zip(names, predictions))
+        super().compile(optimizer)
 
     def get_alpha(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
@@ -1322,6 +1295,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             training_data,
             shuffle=True,
             concatenate=True,
+            drop_last_batch=True,
         )
 
         # Calculate the number of batches to use
@@ -1331,7 +1305,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
-        best_loss = np.Inf
+        best_loss = np.inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
@@ -1358,7 +1332,7 @@ class MarkovStateInferenceModelBase(ModelBase):
                 best_history = history
                 best_weights = self.get_weights()
 
-        if best_loss == np.Inf:
+        if best_loss == np.inf:
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
@@ -1407,6 +1381,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             training_data,
             shuffle=True,
             concatenate=True,
+            drop_last_batch=True,
         )
 
         # Calculate the number of batches to use
@@ -1416,7 +1391,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
 
         # Pick the initialization with the lowest free energy
-        best_loss = np.Inf
+        best_loss = np.inf
         for n in range(n_init):
             _logger.info(f"Initialization {n}")
             self.reset()
@@ -1441,7 +1416,7 @@ class MarkovStateInferenceModelBase(ModelBase):
                 best_history = history
                 best_weights = self.get_weights()
 
-        if best_loss == np.Inf:
+        if best_loss == np.inf:
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_initialization}")
@@ -1536,8 +1511,162 @@ class MarkovStateInferenceModelBase(ModelBase):
         sim = HMM(trans_prob)
         return sim.generate_states(n_samples)
 
+    def get_log_likelihood(self, x):
+        """Log-likelihood.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Data. Shape is (batch_size, sequence_length, n_channels).
+
+        Returns
+        -------
+        log_likelihood : np.ndarray
+            Log-likelihood. Shape is (batch_size, sequence_length, n_states).
+        """
+        if not isinstance(x, np.ndarray) and not isinstance(x, tf.Tensor):
+            raise ValueError("A numpy array or Tensor should be passed for the x.")
+
+        if self.is_multi_gpu:
+            raise ValueError(
+                "MirroredStrategy is not supported for this method. "
+                + "Please load a new model with "
+                + "osl_dynamics.models.load(..., single_gpu=True)."
+            )
+
+        obs_mod_params = self.get_observation_model_parameters()
+        args = [x] + list(obs_mod_params)
+        ll_layer = self.model.get_layer("ll")
+        return ll_layer(args).numpy()
+
+    def get_posterior_entropy(self, gamma, xi):
+        r"""Posterior entropy.
+
+        Calculate the entropy of the posterior distribution:
+
+        .. math::
+            E &= \int q(s_{1:T}) \log q(s_{1:T}) ds_{1:T}
+
+              &= \displaystyle\sum_{t=1}^{T-1} \int q(s_t, s_{t+1}) \
+                 \log q(s_t, s_{t+1}) ds_t ds_{t+1} - \
+                 \displaystyle\sum_{t=2}^{T-1} \
+                 \int q(s_t) \log q(s_t) ds_t
+
+        Parameters
+        ----------
+        gamma : np.ndarray
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size, sequence_length, n_states).
+        xi : np.ndarray
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is
+            (batch_size, sequence_length-1, n_states, n_states).
+
+        Returns
+        -------
+        entropy : float
+            Posterior entropy.
+        """
+
+        # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1)
+        # log(q(s_t, s_t+1)) ds_t ds_t+1
+        first_term = xlogy(xi, xi)
+        first_term = np.sum(first_term, axis=(1, 2, 3))
+
+        # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
+        second_term = xlogy(gamma, gamma)[:, 1:-1, :]
+        second_term = np.sum(second_term, axis=(1, 2))
+
+        # Average over batches
+        entropy = np.mean(first_term - second_term)
+
+        if self.config.loss_calc == "mean":
+            # Correct sum over time into an average
+            entropy /= self.config.sequence_length
+
+        return entropy
+
+    def get_posterior_expected_log_likelihood(self, x, gamma):
+        r"""Posterior expected log-likelihood.
+
+        Calculates the expected log-likelihood with respect to the posterior
+        distribution of the states:
+
+        .. math::
+            LL &= \int q(s_{1:T}) \log \prod_{t=1}^T p(x_t | s_t) ds_{1:T}
+
+               &= \sum_{t=1}^T \int q(s_t) \log p(x_t | s_t) ds_t
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Data. Shape is (batch_size, sequence_length, n_channels).
+        gamma : np.ndarray
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size, sequence_length, n_states).
+
+        Returns
+        -------
+        log_likelihood : float
+            Posterior expected log-likelihood.
+        """
+        log_likelihood = self.get_log_likelihood(x)
+        expected_log_likelihood = np.sum(log_likelihood * gamma)
+        if self.config.loss_calc == "mean":
+            expected_log_likelihood /= self.config.sequence_length
+        return expected_log_likelihood
+
+    def get_posterior_expected_prior(self, gamma, xi):
+        r"""Posterior expected prior.
+
+        Calculates the expected prior probability of states with respect to the
+        posterior distribution of the states:
+
+        .. math::
+            P &= \int q(s_{1:T}) \log p(s_{1:T}) ds
+
+              &= \int q(s_1) \log p(s_1) ds_1 + \displaystyle\sum_{t=1}^{T-1} \
+                 \int q(s_t, s_{t+1}) \log p(s_{t+1} | s_t) ds_t ds_{t+1}
+
+        Parameters
+        ----------
+        gamma : np.ndarray
+            Marginal posterior distribution of hidden states given the data,
+            :math:`q(s_t)`. Shape is (batch_size, sequence_length, n_states).
+        xi : np.ndarray
+            Joint posterior distribution of hidden states at two consecutive
+            time points, :math:`q(s_t, s_{t+1})`. Shape is
+            (batch_size, sequence_length-1, n_states, n_states).
+
+        Returns
+        -------
+        prior : float
+            Posterior expected prior probability.
+            Shape is (batch_size, sequence_length).
+        """
+        initial_distribution = self.get_initial_state_probs()
+        trans_prob = self.get_trans_prob()
+
+        # first_term = int q(s_1) log p(s_1) ds_1
+        first_term = xlogy(gamma[:, 0, :], initial_distribution[None, ...])
+        first_term = np.sum(first_term, axis=1)
+
+        # remaining_terms =
+        # sum^{T-1}_t=1 int q(s_t, s_t+1) log p(s_t+1 | s_t}) ds_t ds_t+1
+        remaining_terms = xlogy(xi, trans_prob[None, None, ...])
+        remaining_terms = np.sum(remaining_terms, axis=(1, 2, 3))
+
+        # Average over batches
+        prior = np.mean(first_term + remaining_terms)
+
+        if self.config.loss_calc == "mean":
+            # Correct sum over time into an average
+            prior /= self.config.sequence_length
+
+        return prior
+
     def free_energy(self, dataset, **kwargs):
-        """Get the variational free energy of HMM-based models.
+        r"""Get the variational free energy of HMM-based models.
 
         This calculates:
 
@@ -1556,56 +1685,6 @@ class MarkovStateInferenceModelBase(ModelBase):
         free_energy : float
             Variational free energy.
         """
-
-        def _get_posterior_entropy(gamma, xi):
-            # E = int q(s_1:T) log q(s_1:T) ds_1:T
-            #   = sum_{t=1}^{T-1} int q(s_t,s_{t+1}) log q(s_t,s_{t+1}) ds_t ds_{t+1}
-            #     - sum_{t=2}^{T-1} int q(s_t) log q(s_t) ds_t
-
-            # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1)
-            # log(q(s_t, s_t+1)) ds_t ds_t+1
-            first_term = xlogy(xi, xi)
-            first_term = np.sum(first_term, axis=(1, 2, 3))
-
-            # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
-            second_term = xlogy(gamma, gamma)[:, 1:-1, :]
-            second_term = np.sum(second_term, axis=(1, 2))
-
-            # Average over batches
-            entropy = np.mean(first_term - second_term)
-
-            if self.config.loss_calc == "mean":
-                # Correct sum over time into an average
-                entropy /= self.config.sequence_length
-
-            return entropy
-
-        def _get_posterior_expected_prior(gamma, xi):
-            # P = int q(s_1:T) log p(s_1:T) ds
-            #   = int q(s_1) log p(s_1) ds_1
-            #     + sum_{t=1}^{T-1} int q(s_t,s_{t+1}) log p(s_{t+1}|s_t) ds_t ds_{t+1}
-
-            initial_distribution = self.get_initial_state_probs()
-            trans_prob = self.get_trans_prob()
-
-            # first_term = int q(s_1) log p(s_1) ds_1
-            first_term = xlogy(gamma[:, 0, :], initial_distribution[None, ...])
-            first_term = np.sum(first_term, axis=1)
-
-            # remaining_terms =
-            # sum^{T-1}_t=1 int q(s_t, s_t+1) log p(s_t+1 | s_t}) ds_t ds_t+1
-            remaining_terms = xlogy(xi, trans_prob[None, None, ...])
-            remaining_terms = np.sum(remaining_terms, axis=(1, 2, 3))
-
-            # Average over batches
-            prior = np.mean(first_term + remaining_terms)
-
-            if self.config.loss_calc == "mean":
-                # Correct sum over time into an average
-                prior /= self.config.sequence_length
-
-            return prior
-
         if self.is_multi_gpu:
             raise ValueError(
                 "MirroredStrategy is not supported for this method. "
@@ -1627,8 +1706,10 @@ class MarkovStateInferenceModelBase(ModelBase):
         for i in iterator:
             predictions = self.predict(dataset[i], **kwargs)
             nll = np.mean(predictions["ll_loss"])
-            entropy = _get_posterior_entropy(predictions["gamma"], predictions["xi"])
-            prior = _get_posterior_expected_prior(
+            entropy = self.get_posterior_entropy(
+                predictions["gamma"], predictions["xi"]
+            )
+            prior = self.get_posterior_expected_prior(
                 predictions["gamma"], predictions["xi"]
             )
             fe = nll + entropy - prior

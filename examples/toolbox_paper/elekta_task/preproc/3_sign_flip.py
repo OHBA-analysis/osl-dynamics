@@ -5,29 +5,28 @@
 from glob import glob
 from dask.distributed import Client
 
-from osl import source_recon, utils
+from osl_ephys import source_recon, utils
 
-# Directories
-raw_dir = "data/ds117"
-src_dir = "data/src"
+outdir = "data/preproc"
 
 if __name__ == "__main__":
     utils.logger.set_up(level="INFO")
 
     # Setup parallel workers
-    client = Client(n_workers=20, threads_per_worker=1)
+    client = Client(n_workers=16, threads_per_worker=1)
 
-    # Get subjects which we successfully source reconstructed
+    # Subjects to sign flip
     subjects = []
-    for path in sorted(glob(f"{src_dir}/*/rhino/parc-raw.fif")):
+    for path in sorted(glob(outdir + "/*/parc/parc-raw.fif")):
         subject = path.split("/")[-3]
         subjects.append(subject)
 
-    # Find a good template subject to match others to
+    # Find a good template subject to align other subjects to
     template = source_recon.find_template_subject(
-        src_dir, subjects, n_embeddings=15, standardize=True
+        outdir, subjects, n_embeddings=15, standardize=True
     )
 
+    # Settings
     config = f"""
         source_recon:
         - fix_sign_ambiguity:
@@ -40,4 +39,4 @@ if __name__ == "__main__":
     """
 
     # Run batch sign flipping
-    source_recon.run_src_batch(config, src_dir, subjects, dask_client=True)
+    source_recon.run_src_batch(config, outdir, subjects, dask_client=True)

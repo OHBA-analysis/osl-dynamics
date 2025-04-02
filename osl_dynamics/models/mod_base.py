@@ -20,12 +20,8 @@ from tqdm.keras import TqdmCallback
 
 if version.parse(tf.__version__) < version.parse("2.13"):
     from tensorflow.python.distribute.distribution_strategy_context import get_strategy
-elif version.parse(tf.__version__) < version.parse("2.16"):
-    from tensorflow.python.distribute.distribute_lib import get_strategy
 else:
-    raise ImportError(
-        f"Unsupported TensorFlow version: {tf.__version__}. Please use <= 2.15."
-    )
+    from tensorflow.python.distribute.distribute_lib import get_strategy
 
 import osl_dynamics
 from osl_dynamics import data
@@ -157,6 +153,8 @@ class ModelBase:
         optimizer : str or tf.keras.optimizers.Optimizer
             Optimizer to use when compiling.
         """
+
+        # Optimizer
         if optimizer is None:
             optimizer = optimizers.get(
                 {
@@ -167,7 +165,38 @@ class ModelBase:
                     },
                 }
             )
+
+        # Compile
         self.model.compile(optimizer)
+
+        # Add losses to metrics to print during training
+        self.add_metrics_for_loss()
+
+    def add_metrics_for_loss(self):
+        """Add a metric for each model output loss."""
+
+        # Create metric for each model output that is a loss
+        loss_metric = []
+        for name in self.output_names:
+            if "loss" in name:
+                metric = tf.keras.metrics.Mean(name=name)
+                loss_metric.append(metric)
+        self.model.loss_metric = loss_metric
+
+        # Get the original compute_metrics methods
+        old_compute_metrics = self.model.compute_metrics
+
+        # New method for calculating metrics
+        def compute_metrics(x, y, y_pred, sample_weight=None):
+            metrics = old_compute_metrics(x, y, y_pred, sample_weight)
+            for metric in self.loss_metric:
+                name = metric.name
+                metric.update_state(y_pred[name])
+                metrics[name] = metric.result()
+            return metrics
+
+        # Override the original Keras method
+        self.model.compute_metrics = compute_metrics
 
     def fit(
         self,
@@ -285,12 +314,19 @@ class ModelBase:
                 kwargs,
             )
 
-        # Set the scaling factor for losses that are associated with static
-        # quantities
+        # Set the scaling factor for losses that are associated
+        # with static quantities
         self.set_static_loss_scaling_factor(x)
 
+        # Fit model
         history = self.model.fit(*args, **kwargs)
-        return history.history
+
+        # Convert history from tensors to float
+        history = {
+            key: list(map(float, values)) for key, values in history.history.items()
+        }
+
+        return history
 
     def load_weights(self, filepath):
         """Load weights of the model from a file.
@@ -423,36 +459,6 @@ class ModelBase:
             concatenate=concatenate,
         )
 
-    def bayesian_information_criterion(self, dataset):
-        """Calculate the Bayesian Information Criterion (BIC) of the model
-        for a given dataset.
-
-        Note this method uses free energy as an approximate to the negative
-        log-likelihood.
-
-        Parameters
-        ----------
-        dataset : osl_dynamics.data.Data
-            Dataset to calculate the BIC for.
-
-        Returns
-        -------
-        bic : float
-            Bayesian Information Criterion for the model (for each sequence).
-        """
-        n_sequences = dtf.get_n_sequences(
-            dataset.time_series(concatenate=True), self.config.sequence_length
-        )
-        n = self.config.sequence_length * n_sequences
-        k = self.get_n_params_generative_model()
-
-        if self.config.loss_calc == "mean":
-            k /= self.config.sequence_length
-
-        nll = self.free_energy(dataset)
-
-        return k * np.log(n) + 2 * nll
-
     def summary_string(self):
         """Return a summary of the model as a string.
 
@@ -553,7 +559,7 @@ class ModelBase:
         """Saves config object and weights of the model.
 
         This is a wrapper for :code:`self.save_config` and
-        :code:`self.save_weights`.
+        :code:`self.model.save_weights`.
 
         Parameters
         ----------
@@ -562,9 +568,7 @@ class ModelBase:
             the model.
         """
         self.save_config(dirname)
-        self.save_weights(
-            f"{dirname}/weights"
-        )  # will use the keras method: self.model.save_weights()
+        self.model.save_weights(f"{dirname}/model.weights.h5")
 
     def set_static_loss_scaling_factor(self, dataset):
         """Set the :code:`n_batches` attribute of the
@@ -598,9 +602,9 @@ class ModelBase:
             Value to set the :code:`trainable` attribute of the layers to.
         """
         # Validation
-        if isinstance(layers, str):
+        if not isinstance(layers, list):
             layers = [layers]
-        if isinstance(values, bool):
+        if not isinstance(values, list):
             values = [values] * len(layers)
         if len(layers) != len(values):
             raise ValueError(
@@ -609,23 +613,31 @@ class ModelBase:
             )
 
         available_layers = [layer.name for layer in self.layers]
-        for layer in layers:
-            if layer not in available_layers:
+        for i, (layer, value) in enumerate(zip(layers, values)):
+            if isinstance(layer, str):
+                if layer not in available_layers:
+                    raise ValueError(
+                        f"Layer {layer} not found in model. Available layers: {available_layers}"
+                    )
+                layers[i] = self.get_layer(layer)
+            elif not isinstance(layer, tf.keras.layers.Layer):
                 raise ValueError(
-                    f"No such layer: {layer}. "
-                    + f"Available layers are: {available_layers}."
+                    f"Layer {layer} is not a string or a Keras layer. "
+                    + f"Available layers: {available_layers}"
                 )
+            if not isinstance(value, bool):
+                raise ValueError(f"Value {i} is not a boolean.")
 
-        original_values = [self.get_layer(layer).trainable for layer in layers]
+        original_values = [layer.trainable for layer in layers]
 
         try:
             for layer, trainable in zip(layers, values):
-                self.get_layer(layer).trainable = trainable
+                layer.trainable = trainable
             self.compile()
             yield
         finally:
             for layer, trainable in zip(layers, original_values):
-                self.get_layer(layer).trainable = trainable
+                layer.trainable = trainable
             self.compile()
 
     @staticmethod
@@ -706,11 +718,9 @@ class ModelBase:
             checkpoint = tf.train.Checkpoint(
                 model=model.model, optimizer=model.model.optimizer
             )
-            checkpoint.restore(
-                tf.train.latest_checkpoint(f"{dirname}/checkpoints")
-            ).expect_partial()
+            checkpoint.restore(tf.train.latest_checkpoint(f"{dirname}/checkpoints"))
         else:
-            model.load_weights(f"{dirname}/weights").expect_partial()
+            model.load_weights(f"{dirname}/model.weights.h5")
 
         return model
 

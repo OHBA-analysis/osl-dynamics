@@ -15,6 +15,8 @@ from osl_dynamics.models.hive import Config, Model
 from osl_dynamics.utils import plotting, set_random_seed
 
 
+set_random_seed(0)
+
 # Directory for plots
 os.makedirs("figures", exist_ok=True)
 
@@ -37,7 +39,7 @@ config = Config(
     dev_regularizer_factor=0.01,
     learn_means=False,
     learn_covariances=True,
-    batch_size=64,
+    batch_size=16,
     learning_rate=0.001,
     lr_decay=0.1,
     n_epochs=40,
@@ -46,7 +48,6 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=20,
-    unit_norm_embeddings=True,
 )
 
 # Simulate data
@@ -74,8 +75,6 @@ training_data = data.Data(sim.time_series)
 training_data.add_session_labels(
     "session_id", np.arange(config.n_sessions), "categorical"
 )
-training_data.add_session_labels("group_id", sim.assigned_groups, "categorical")
-config.session_labels = training_data.get_session_labels()
 
 # Build model
 model = Model(config)

@@ -5,10 +5,9 @@
 from glob import glob
 from dask.distributed import Client
 
-from osl import source_recon, utils
+from osl_ephys import source_recon, utils
 
-# Directories
-SRC_DIR = "data/src"
+outdir = "data/preproc"
 
 if __name__ == "__main__":
     utils.logger.set_up(level="INFO")
@@ -18,13 +17,13 @@ if __name__ == "__main__":
 
     # Subjects to sign flip
     subjects = []
-    for path in sorted(glob(SRC_DIR + "/*/rhino/parc-raw.fif")):
+    for path in sorted(glob(outdir + "/*/parc/parc-raw.fif")):
         subject = path.split("/")[-3]
         subjects.append(subject)
 
     # Find a good template subject to align other subjects to
     template = source_recon.find_template_subject(
-        SRC_DIR, subjects, n_embeddings=15, standardize=True
+        outdir, subjects, n_embeddings=15, standardize=True
     )
 
     # Settings
@@ -40,4 +39,4 @@ if __name__ == "__main__":
     """
 
     # Run batch sign flipping
-    source_recon.run_src_batch(config, SRC_DIR, subjects, dask_client=True)
+    source_recon.run_src_batch(config, outdir, subjects, dask_client=True)

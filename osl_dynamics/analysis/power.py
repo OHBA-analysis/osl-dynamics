@@ -294,7 +294,9 @@ def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
         )
 
     # Make sure the parcellation grid matches the mask file
-    parcellation = image.resample_to_img(parcellation, mask)
+    parcellation = image.resample_to_img(
+        parcellation, mask, force_resample=True, copy_header=True
+    )
     parcellation_grid = parcellation.get_fdata()
 
     # Make a 2D array of voxel weights for each parcel

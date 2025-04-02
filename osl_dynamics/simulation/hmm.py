@@ -135,7 +135,7 @@ class HMM:
 
 
 class HMM_MAR(Simulation):
-    """Simulate an HMM with a multivariate autoregressive (MAR) observation
+    r"""Simulate an HMM with a multivariate autoregressive (MAR) observation
     model.
 
     Parameters
