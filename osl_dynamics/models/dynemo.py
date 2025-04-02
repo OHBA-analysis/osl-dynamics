@@ -214,128 +214,40 @@ class Model(VariationalInferenceModelBase):
     def build_model(self):
         """Builds a keras model."""
 
-        class TemporalPriorLayer(tf.keras.layers.Layer):
-            def __init__(self, config, **kwargs):
-                super().__init__(**kwargs)
-                self.theta_drop_layer = tf.keras.layers.Dropout(
-                    config.model_dropout,
-                    name="theta_drop",
-                )
-                self.mod_rnn_layer = ModelRNNLayer(
-                    config.model_rnn,
-                    config.model_normalization,
-                    config.model_activation,
-                    config.model_n_layers,
-                    config.model_n_units,
-                    config.model_dropout,
-                    config.model_regularizer,
-                    name="mod_rnn",
-                )
-                self.mod_mu_layer = tf.keras.layers.Dense(config.n_modes, name="mod_mu")
-                self.mod_sigma_layer = tf.keras.layers.Dense(
-                    config.n_modes, activation="softplus", name="mod_sigma"
-                )
-                self.kl_div_layer = KLDivergenceLayer(
-                    config.theta_std_epsilon, config.loss_calc, name="kl_div"
-                )
-
-                self.layers = [
-                    self.theta_drop_layer,
-                    self.mod_rnn_layer,
-                    self.mod_mu_layer,
-                    self.mod_sigma_layer,
-                    self.kl_div_layer,
-                ]
-
-            def call(self, inputs):
-                inf_mu, inf_sigma, theta = inputs
-
-                theta_drop = self.theta_drop_layer(theta)
-                mod_rnn = self.mod_rnn_layer(theta_drop)
-                mod_mu = self.mod_mu_layer(mod_rnn)
-                mod_sigma = self.mod_sigma_layer(mod_rnn)
-                kl_div = self.kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
-
-                return kl_div
-
-        class EncoderLayer(tf.keras.layers.Layer):
-            def __init__(self, config, **kwargs):
-                super().__init__(**kwargs)
-                self.data_drop_layer = tf.keras.layers.Dropout(
-                    config.inference_dropout, name="data_drop"
-                )
-                self.inf_rnn_layer = InferenceRNNLayer(
-                    config.inference_rnn,
-                    config.inference_normalization,
-                    config.inference_activation,
-                    config.inference_n_layers,
-                    config.inference_n_units,
-                    config.inference_dropout,
-                    config.inference_regularizer,
-                    name="inf_rnn",
-                )
-
-                self.inf_mu_layer = tf.keras.layers.Dense(config.n_modes, name="inf_mu")
-                self.inf_sigma_layer = tf.keras.layers.Dense(
-                    config.n_modes, activation="softplus", name="inf_sigma"
-                )
-                self.theta_layer = SampleNormalDistributionLayer(
-                    config.theta_std_epsilon,
-                    name="theta",
-                )
-                self.alpha_layer = SoftmaxLayer(
-                    config.initial_alpha_temperature,
-                    config.learn_alpha_temperature,
-                    name="alpha",
-                )
-                self.temporal_prior_layer = TemporalPriorLayer(
-                    config, name="temporal_prior"
-                )
-
-                self.layers = [
-                    self.data_drop_layer,
-                    self.inf_rnn_layer,
-                    self.inf_mu_layer,
-                    self.inf_sigma_layer,
-                    self.theta_layer,
-                    self.alpha_layer,
-                    self.temporal_prior_layer,
-                ]
-
-            def call(self, inputs):
-                data_drop = self.data_drop_layer(inputs)
-                inf_rnn = self.inf_rnn_layer(data_drop)
-                inf_mu = self.inf_mu_layer(inf_rnn)
-                inf_sigma = self.inf_sigma_layer(inf_rnn)
-                theta = self.theta_layer([inf_mu, inf_sigma])
-                alpha = self.alpha_layer(theta)
-                kl_div = self.temporal_prior_layer([inf_mu, inf_sigma, theta])
-
-                return alpha, theta, kl_div
-
-        class DecoderLayer(tf.keras.layers.Layer):
-            def __init__(self, config, **kwargs):
-                super().__init__(**kwargs)
-                self.mix_means_layer = MixVectorsLayer(name="mix_means")
-                self.mix_covs_layer = MixMatricesLayer(name="mix_covs")
-
-            def call(self, inputs):
-                mu, D, alpha = inputs
-                m = self.mix_means_layer([alpha, mu])
-                C = self.mix_covs_layer([alpha, D])
-
-                return m, C
-
         config = self.config
 
         # ---------- Define layers ---------- #
+        data_drop_layer = tf.keras.layers.Dropout(
+            config.inference_dropout, name="data_drop"
+        )
+        inf_rnn_layer = InferenceRNNLayer(
+            config.inference_rnn,
+            config.inference_normalization,
+            config.inference_activation,
+            config.inference_n_layers,
+            config.inference_n_units,
+            config.inference_dropout,
+            config.inference_regularizer,
+            name="inf_rnn",
+        )
+        inf_mu_layer = tf.keras.layers.Dense(config.n_modes, name="inf_mu")
+        inf_sigma_layer = tf.keras.layers.Dense(
+            config.n_modes, activation="softplus", name="inf_sigma"
+        )
+        theta_layer = SampleNormalDistributionLayer(
+            config.theta_std_epsilon,
+            name="theta",
+        )
+        alpha_layer = SoftmaxLayer(
+            config.initial_alpha_temperature,
+            config.learn_alpha_temperature,
+            name="alpha",
+        )
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
             config.sequence_length,
             config.loss_calc,
             name="static_loss_scaling_factor",
         )
-        encoder_layer = EncoderLayer(config, name="encoder")
-        decoder_layer = DecoderLayer(config, name="decoder")
         means_layer = VectorsLayer(
             config.n_modes,
             config.n_channels,
@@ -344,25 +256,80 @@ class Model(VariationalInferenceModelBase):
             config.means_regularizer,
             name="means",
         )
-        covs_layer = self._select_covariance_layer()
-        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
+        if config.diagonal_covariances:
+            covs_layer = DiagonalMatricesLayer(
+                config.n_modes,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        else:
+            covs_layer = CovarianceMatricesLayer(
+                config.n_modes,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        mix_means_layer = MixVectorsLayer(name="mix_means")
+        mix_covs_layer = MixMatricesLayer(name="mix_covs")
         ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
-
-        # ---------- For output names ---------- #
-        theta_layer = tf.keras.layers.Identity(name="theta")
+        theta_drop_layer = tf.keras.layers.Dropout(
+            config.model_dropout,
+            name="theta_drop",
+        )
+        mod_rnn_layer = ModelRNNLayer(
+            config.model_rnn,
+            config.model_normalization,
+            config.model_activation,
+            config.model_n_layers,
+            config.model_n_units,
+            config.model_dropout,
+            config.model_regularizer,
+            name="mod_rnn",
+        )
+        mod_mu_layer = tf.keras.layers.Dense(config.n_modes, name="mod_mu")
+        mod_sigma_layer = tf.keras.layers.Dense(
+            config.n_modes, activation="softplus", name="mod_sigma"
+        )
+        kl_div_layer = KLDivergenceLayer(
+            config.theta_std_epsilon, config.loss_calc, name="kl_div"
+        )
+        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
         # ---------- Forward pass ---------- #
+
+        # Encoder
         data = tf.keras.layers.Input(
             shape=(config.sequence_length, config.n_channels), name="data"
         )
+        data_drop = data_drop_layer(data)
+        inf_rnn = inf_rnn_layer(data_drop)
+        inf_mu = inf_mu_layer(inf_rnn)
+        inf_sigma = inf_sigma_layer(inf_rnn)
+        theta = theta_layer([inf_mu, inf_sigma])
+        alpha = alpha_layer(theta)
+
+        # Observation model
         static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-        alpha, theta, kl_div = encoder_layer(data)
         mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         D = covs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
-        m, C = decoder_layer([mu, D, alpha])
+        m = mix_means_layer([alpha, mu])
+        C = mix_covs_layer([alpha, D])
         ll_loss = ll_loss_layer([data, m, C])
+
+        # Temporal prior
+        theta_drop = theta_drop_layer(theta)
+        mod_rnn = mod_rnn_layer(theta_drop)
+        mod_mu = mod_mu_layer(mod_rnn)
+        mod_sigma = mod_sigma_layer(mod_rnn)
+        kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
         kl_loss = kl_loss_layer(kl_div)
-        theta = theta_layer(theta)
 
         # ---------- Create model ---------- #
         inputs = {"data": data}
@@ -606,13 +573,16 @@ class Model(VariationalInferenceModelBase):
         self.config.learning_rate = learning_rate or self.config.learning_rate
         self.config.do_kl_annealing = False
 
+        # Layers to fix (i.e. make non-trainable)
+        fixed_layers = ["mod_rnn", "mod_mu", "mod_sigma"]
+
         # Fine tune on sessions
         alpha = []
         means = []
         covariances = []
-        with self.set_trainable(
-            self.get_layer("encoder").temporal_prior_layer, False
-        ), set_logging_level(_logger, logging.WARNING):
+        with self.set_trainable(fixed_layers, False), set_logging_level(
+            _logger, logging.WARNING
+        ):
             for i in trange(training_data.n_sessions, desc="Fine tuning"):
                 # Train on this session
                 with training_data.set_keep(i):
@@ -685,10 +655,22 @@ class Model(VariationalInferenceModelBase):
         self.config.n_epochs = n_epochs or self.config.n_epochs
         self.config.learning_rate = learning_rate or self.config.learning_rate
 
+        # Layers to fix (i.e. make non-trainable)
+        fixed_layers = [
+            "mod_rnn",
+            "mod_mu",
+            "mod_sigma",
+            "inf_rnn",
+            "inf_mu",
+            "inf_sigma",
+            "theta",
+            "alpha",
+        ]
+
         # Dual estimation on sessions
         means = []
         covariances = []
-        with self.set_trainable("encoder", False):
+        with self.set_trainable(fixed_layers, False):
             if isinstance(training_data, list):
                 n_sessions = len(training_data)
             else:
@@ -716,20 +698,3 @@ class Model(VariationalInferenceModelBase):
         self.config.learning_rate = original_learning_rate
 
         return np.array(means), np.array(covariances)
-
-    def _select_covariance_layer(self):
-        """Select the covariance layer based on the config."""
-        config = self.config
-        if config.diagonal_covariances:
-            CovsLayer = DiagonalMatricesLayer
-        else:
-            CovsLayer = CovarianceMatricesLayer
-        return CovsLayer(
-            config.n_modes or config.n_states,
-            config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
-        )

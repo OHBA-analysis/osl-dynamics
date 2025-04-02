@@ -15,7 +15,7 @@ import tensorflow as tf
 from tqdm.auto import trange
 
 from osl_dynamics.inference.layers import (
-    ConcatenateLayer,
+    TFConcatLayer,
     CorrelationMatricesLayer,
     DiagonalMatricesLayer,
     InferenceRNNLayer,
@@ -246,239 +246,51 @@ class Model(VariationalInferenceModelBase):
     def build_model(self):
         """Builds a keras model."""
 
-        class TemporalPriorLayer(tf.keras.layers.Layer):
-            def __init__(self, config, **kwargs):
-                super().__init__(**kwargs)
-                self.concatenate_layer = ConcatenateLayer(axis=2, name="theta")
-                self.theta_drop_layer = tf.keras.layers.Dropout(
-                    config.model_dropout,
-                    name="theta_drop",
-                )
-                self.mod_rnn_layer = ModelRNNLayer(
-                    config.model_rnn,
-                    config.model_normalization,
-                    config.model_activation,
-                    config.model_n_layers,
-                    config.model_n_units,
-                    config.model_dropout,
-                    config.model_regularizer,
-                    name="mod_rnn",
-                )
-
-                self.power_mod_mu_layer = tf.keras.layers.Dense(
-                    config.n_modes, name="power_mod_mu"
-                )
-                self.power_mod_sigma_layer = tf.keras.layers.Dense(
-                    config.n_modes, activation="softplus", name="power_mod_sigma"
-                )
-                self.kl_div_layer_power = KLDivergenceLayer(
-                    config.theta_std_epsilon,
-                    config.loss_calc,
-                    name="power_kl_div",
-                )
-
-                self.fc_mod_mu_layer = tf.keras.layers.Dense(
-                    config.n_corr_modes, name="fc_mod_mu"
-                )
-                self.fc_mod_sigma_layer = tf.keras.layers.Dense(
-                    config.n_corr_modes, activation="softplus", name="fc_mod_sigma"
-                )
-                self.fc_kl_div_layer = KLDivergenceLayer(
-                    config.theta_std_epsilon,
-                    config.loss_calc,
-                    name="fc_kl_div",
-                )
-
-                self.layers = [
-                    self.concatenate_layer,
-                    self.theta_drop_layer,
-                    self.mod_rnn_layer,
-                    self.power_mod_mu_layer,
-                    self.power_mod_sigma_layer,
-                    self.kl_div_layer_power,
-                    self.fc_mod_mu_layer,
-                    self.fc_mod_sigma_layer,
-                    self.fc_kl_div_layer,
-                ]
-
-            def call(self, inputs):
-                (
-                    power_inf_mu,
-                    power_inf_sigma,
-                    power_theta,
-                    fc_inf_mu,
-                    fc_inf_sigma,
-                    fc_theta,
-                ) = inputs
-
-                theta = self.concatenate_layer([power_theta, fc_theta])
-                theta_drop = self.theta_drop_layer(theta)
-                mod_rnn = self.mod_rnn_layer(theta_drop)
-
-                power_mod_mu = self.power_mod_mu_layer(mod_rnn)
-                power_mod_sigma = self.power_mod_sigma_layer(mod_rnn)
-                power_kl_div = self.kl_div_layer_power(
-                    [power_inf_mu, power_inf_sigma, power_mod_mu, power_mod_sigma]
-                )
-
-                fc_mod_mu = self.fc_mod_mu_layer(mod_rnn)
-                fc_mod_sigma = self.fc_mod_sigma_layer(mod_rnn)
-                fc_kl_div = self.fc_kl_div_layer(
-                    [fc_inf_mu, fc_inf_sigma, fc_mod_mu, fc_mod_sigma],
-                )
-                return power_kl_div, fc_kl_div
-
-        class EncoderLayer(tf.keras.layers.Layer):
-            def __init__(self, config, **kwargs):
-                super().__init__(**kwargs)
-                self.data_drop_layer = tf.keras.layers.Dropout(
-                    config.inference_dropout, name="data_drop"
-                )
-                self.inf_rnn_layer = InferenceRNNLayer(
-                    config.inference_rnn,
-                    config.inference_normalization,
-                    config.inference_activation,
-                    config.inference_n_layers,
-                    config.inference_n_units,
-                    config.inference_dropout,
-                    config.inference_regularizer,
-                    name="inf_rnn",
-                )
-
-                self.power_inf_mu_layer = tf.keras.layers.Dense(
-                    config.n_modes, name="power_inf_mu"
-                )
-                self.power_inf_sigma_layer = tf.keras.layers.Dense(
-                    config.n_modes, activation="softplus", name="power_inf_sigma"
-                )
-                self.power_theta_layer = SampleNormalDistributionLayer(
-                    config.theta_std_epsilon, name="power_theta"
-                )
-                self.alpha_layer = SoftmaxLayer(
-                    initial_temperature=1.0,
-                    learn_temperature=False,
-                    name="alpha",
-                )
-
-                self.fc_inf_mu_layer = tf.keras.layers.Dense(
-                    config.n_corr_modes, name="fc_inf_mu"
-                )
-                self.fc_inf_sigma_layer = tf.keras.layers.Dense(
-                    config.n_corr_modes, activation="softplus", name="fc_inf_sigma"
-                )
-                self.fc_theta_layer = SampleNormalDistributionLayer(
-                    config.theta_std_epsilon, name="fc_theta"
-                )
-                self.beta_layer = SoftmaxLayer(
-                    initial_temperature=1.0,
-                    learn_temperature=False,
-                    name="beta",
-                )
-
-                self.temporal_prior_layer = TemporalPriorLayer(
-                    config, name="temporal_prior"
-                )
-
-                self.layers = [
-                    self.data_drop_layer,
-                    self.inf_rnn_layer,
-                    self.power_inf_mu_layer,
-                    self.power_inf_sigma_layer,
-                    self.power_theta_layer,
-                    self.alpha_layer,
-                    self.fc_inf_mu_layer,
-                    self.fc_inf_sigma_layer,
-                    self.fc_theta_layer,
-                    self.beta_layer,
-                    self.temporal_prior_layer,
-                ]
-
-            def call(self, inputs):
-                data_drop = self.data_drop_layer(inputs)
-                inf_rnn = self.inf_rnn_layer(data_drop)
-
-                power_inf_mu = self.power_inf_mu_layer(inf_rnn)
-                power_inf_sigma = self.power_inf_sigma_layer(inf_rnn)
-                power_theta = self.power_theta_layer([power_inf_mu, power_inf_sigma])
-                alpha = self.alpha_layer(power_theta)
-
-                fc_inf_mu = self.fc_inf_mu_layer(inf_rnn)
-                fc_inf_sigma = self.fc_inf_sigma_layer(inf_rnn)
-                fc_theta = self.fc_theta_layer([fc_inf_mu, fc_inf_sigma])
-                beta = self.beta_layer(fc_theta)
-
-                power_kl_div, fc_kl_div = self.temporal_prior_layer(
-                    [
-                        power_inf_mu,
-                        power_inf_sigma,
-                        power_theta,
-                        fc_inf_mu,
-                        fc_inf_sigma,
-                        fc_theta,
-                    ]
-                )
-
-                return (
-                    alpha,
-                    beta,
-                    power_theta,
-                    fc_theta,
-                    power_kl_div,
-                    fc_kl_div,
-                )
-
-        class DecoderLayer(tf.keras.layers.Layer):
-            def __init__(self, config, **kwargs):
-                super().__init__(**kwargs)
-                self.pca_components = config.pca_components
-                self.mix_means_layer = MixVectorsLayer(name="mix_means")
-                self.mix_stds_layer = MixMatricesLayer(name="mix_stds")
-                self.mix_corrs_layer = MixMatricesLayer(name="mix_corrs")
-                self.matmul_layer = MatMulLayer(name="cov")
-
-            def call(self, inputs):
-                mu, E, R, alpha, beta = inputs
-
-                pca_mu = tf.squeeze(
-                    tf.matmul(
-                        tf.expand_dims(tf.transpose(self.pca_components), 0),
-                        tf.expand_dims(mu, -1),
-                    )
-                )
-                pca_E = tf.matmul(
-                    tf.matmul(
-                        tf.expand_dims(tf.transpose(self.pca_components), 0),
-                        E,
-                    ),
-                    tf.expand_dims(self.pca_components, 0),
-                )
-
-                pca_R = tf.matmul(
-                    tf.matmul(
-                        tf.expand_dims(tf.transpose(self.pca_components), 0),
-                        R,
-                    ),
-                    tf.expand_dims(self.pca_components, 0),
-                )
-
-                m = self.mix_means_layer([alpha, pca_mu])
-                G = self.mix_stds_layer([alpha, pca_E])
-                F = self.mix_corrs_layer([beta, pca_R])
-                C = self.matmul_layer([G, F, G])
-
-                return m, C
-
         config = self.config
 
         # ---------- Define layers ---------- #
+        data_drop_layer = tf.keras.layers.Dropout(
+            config.inference_dropout, name="data_drop"
+        )
+        inf_rnn_layer = InferenceRNNLayer(
+            config.inference_rnn,
+            config.inference_normalization,
+            config.inference_activation,
+            config.inference_n_layers,
+            config.inference_n_units,
+            config.inference_dropout,
+            config.inference_regularizer,
+            name="inf_rnn",
+        )
+        power_inf_mu_layer = tf.keras.layers.Dense(config.n_modes, name="power_inf_mu")
+        power_inf_sigma_layer = tf.keras.layers.Dense(
+            config.n_modes, activation="softplus", name="power_inf_sigma"
+        )
+        power_theta_layer = SampleNormalDistributionLayer(
+            config.theta_std_epsilon, name="power_theta"
+        )
+        fc_inf_mu_layer = tf.keras.layers.Dense(config.n_corr_modes, name="fc_inf_mu")
+        fc_inf_sigma_layer = tf.keras.layers.Dense(
+            config.n_corr_modes, activation="softplus", name="fc_inf_sigma"
+        )
+        fc_theta_layer = SampleNormalDistributionLayer(
+            config.theta_std_epsilon, name="fc_theta"
+        )
+        alpha_layer = SoftmaxLayer(
+            initial_temperature=1.0,
+            learn_temperature=False,
+            name="alpha",
+        )
+        beta_layer = SoftmaxLayer(
+            initial_temperature=1.0,
+            learn_temperature=False,
+            name="beta",
+        )
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
             config.sequence_length,
             config.loss_calc,
             name="static_loss_scaling_factor",
         )
-
-        encoder_layer = EncoderLayer(config, name="encoder")
-        decoder_layer = DecoderLayer(config, name="decoder")
         means_layer = VectorsLayer(
             config.n_modes,
             config.n_channels,
@@ -505,35 +317,126 @@ class Model(VariationalInferenceModelBase):
             config.corrs_regularizer,
             name="corrs",
         )
-        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
-        ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
 
-        # ---------- For output names ---------- #
-        power_theta_layer = tf.keras.layers.Identity(name="power_theta")
-        fc_theta_layer = tf.keras.layers.Identity(name="fc_theta")
+        class PCATransformLayer(tf.keras.layers.Layer):
+            def __init__(self, pca_components, **kwargs):
+                super(PCATransformLayer, self).__init__(**kwargs)
+                self.pca_components = tf.Variable(
+                    initial_value=tf.convert_to_tensor(
+                        pca_components, dtype=tf.float32
+                    ),
+                    trainable=False,
+                )
+
+            def call(self, inputs):
+                mu, E, R = inputs
+                pca_mu = tf.squeeze(
+                    tf.matmul(
+                        tf.expand_dims(tf.transpose(self.pca_components), 0),
+                        tf.expand_dims(mu, -1),
+                    )
+                )
+                pca_E = tf.matmul(
+                    tf.matmul(
+                        tf.expand_dims(tf.transpose(self.pca_components), 0),
+                        E,
+                    ),
+                    tf.expand_dims(self.pca_components, 0),
+                )
+                pca_R = tf.matmul(
+                    tf.matmul(
+                        tf.expand_dims(tf.transpose(self.pca_components), 0),
+                        R,
+                    ),
+                    tf.expand_dims(self.pca_components, 0),
+                )
+                return pca_mu, pca_E, pca_R
+
+        pca_layer = PCATransformLayer(config.pca_components, name="pca")
+        mix_means_layer = MixVectorsLayer(name="mix_means")
+        mix_stds_layer = MixMatricesLayer(name="mix_stds")
+        mix_corrs_layer = MixMatricesLayer(name="mix_corrs")
+        matmul_layer = MatMulLayer(name="cov")
+        ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
+        theta_layer = TFConcatLayer(axis=2, name="theta")
+        theta_drop_layer = tf.keras.layers.Dropout(
+            config.model_dropout,
+            name="theta_drop",
+        )
+        mod_rnn_layer = ModelRNNLayer(
+            config.model_rnn,
+            config.model_normalization,
+            config.model_activation,
+            config.model_n_layers,
+            config.model_n_units,
+            config.model_dropout,
+            config.model_regularizer,
+            name="mod_rnn",
+        )
+        power_mod_mu_layer = tf.keras.layers.Dense(config.n_modes, name="power_mod_mu")
+        power_mod_sigma_layer = tf.keras.layers.Dense(
+            config.n_modes, activation="softplus", name="power_mod_sigma"
+        )
+        fc_mod_mu_layer = tf.keras.layers.Dense(config.n_corr_modes, name="fc_mod_mu")
+        fc_mod_sigma_layer = tf.keras.layers.Dense(
+            config.n_corr_modes, activation="softplus", name="fc_mod_sigma"
+        )
+        fc_kl_div_layer = KLDivergenceLayer(
+            config.theta_std_epsilon,
+            config.loss_calc,
+            name="fc_kl_div",
+        )
+        kl_div_layer_power = KLDivergenceLayer(
+            config.theta_std_epsilon,
+            config.loss_calc,
+            name="power_kl_div",
+        )
+        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
         # ---------- Forward pass ---------- #
+
+        # Encoder
         data = tf.keras.layers.Input(
             shape=(config.sequence_length, config.n_channels), name="data"
         )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+        data_drop = data_drop_layer(data)
+        inf_rnn = inf_rnn_layer(data_drop)
+        power_inf_mu = power_inf_mu_layer(inf_rnn)
+        power_inf_sigma = power_inf_sigma_layer(inf_rnn)
+        power_theta = power_theta_layer([power_inf_mu, power_inf_sigma])
+        fc_inf_mu = fc_inf_mu_layer(inf_rnn)
+        fc_inf_sigma = fc_inf_sigma_layer(inf_rnn)
+        fc_theta = fc_theta_layer([fc_inf_mu, fc_inf_sigma])
+        alpha = alpha_layer(power_theta)
+        beta = beta_layer(fc_theta)
 
-        (
-            alpha,
-            beta,
-            power_theta,
-            fc_theta,
-            power_kl_div,
-            fc_kl_div,
-        ) = encoder_layer(data)
+        # Observation model
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
         mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         E = stds_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         R = corrs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
-        m, C = decoder_layer([mu, E, R, alpha, beta])
+        pca_mu, pca_E, pca_R = pca_layer([mu, E, R])
+        m = mix_means_layer([alpha, pca_mu])
+        G = mix_stds_layer([alpha, pca_E])
+        F = mix_corrs_layer([beta, pca_R])
+        C = matmul_layer([G, F, G])
         ll_loss = ll_loss_layer([data, m, C])
+
+        # Decoder
+        theta = theta_layer([power_theta, fc_theta])
+        theta_drop = theta_drop_layer(theta)
+        mod_rnn = mod_rnn_layer(theta_drop)
+        power_mod_mu = power_mod_mu_layer(mod_rnn)
+        power_mod_sigma = power_mod_sigma_layer(mod_rnn)
+        fc_mod_mu = fc_mod_mu_layer(mod_rnn)
+        fc_mod_sigma = fc_mod_sigma_layer(mod_rnn)
+        power_kl_div = kl_div_layer_power(
+            [power_inf_mu, power_inf_sigma, power_mod_mu, power_mod_sigma]
+        )
+        fc_kl_div = fc_kl_div_layer(
+            [fc_inf_mu, fc_inf_sigma, fc_mod_mu, fc_mod_sigma],
+        )
         kl_loss = kl_loss_layer([power_kl_div, fc_kl_div])
-        power_theta = power_theta_layer(power_theta)
-        fc_theta = fc_theta_layer(fc_theta)
 
         # ---------- Create model ---------- #
         inputs = {"data": data}
@@ -728,7 +631,7 @@ class Model(VariationalInferenceModelBase):
         fc_mod_mu_layer = self.model.get_layer("fc_mod_mu")
         fc_mod_sigma_layer = self.model.get_layer("fc_mod_sigma")
         beta_layer = self.model.get_layer("beta")
-        concatenate_layer = self.model.get_layer("theta")
+        theta_layer = self.model.get_layer("theta")
 
         # Normally distributed random numbers used to sample the logits theta
         power_epsilon = np.random.normal(
@@ -762,7 +665,7 @@ class Model(VariationalInferenceModelBase):
             trimmed_fc_theta = fc_theta[~np.all(fc_theta == 0, axis=1)][
                 np.newaxis, :, :
             ]
-            trimmed_theta = concatenate_layer([trimmed_power_theta, trimmed_fc_theta])
+            trimmed_theta = theta_layer([trimmed_power_theta, trimmed_fc_theta])
             # p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
             model_rnn = model_rnn_layer(trimmed_theta)
             power_mod_mu = power_mod_mu_layer(model_rnn)[0, -1]

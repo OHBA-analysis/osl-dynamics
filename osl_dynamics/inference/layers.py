@@ -124,7 +124,7 @@ class AddRegularizationLossLayer(layers.Layer):
         return inputs
 
 
-class ConcatenateLayer(layers.Layer):
+class TFConcatLayer(layers.Layer):
     """Wrapper for `tf.concat \
     <https://www.tensorflow.org/api_docs/python/tf/concat>`_.
 

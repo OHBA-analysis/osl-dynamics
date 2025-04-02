@@ -773,7 +773,7 @@ class VariationalInferenceModelBase(ModelBase):
             step_size = None
 
         dataset = self.make_dataset(dataset, step_size=step_size)
-        alpha_layer = self.model.get_layer("encoder").alpha_layer
+        alpha_layer = self.model.get_layer("alpha")
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
@@ -846,9 +846,8 @@ class VariationalInferenceModelBase(ModelBase):
             step_size = None
 
         dataset = self.make_dataset(dataset, step_size=step_size)
-        encoder_layer = self.model.get_layer("encoder")
-        alpha_layer = encoder_layer.alpha_layer
-        beta_layer = encoder_layer.beta_layer
+        alpha_layer = self.model.get_layer("alpha")
+        beta_layer = self.model.get_layer("beta")
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
