@@ -33,7 +33,7 @@ config = Config(
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=False,
-    learn_covariances=True,
+    learn_covariances=False,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
@@ -79,7 +79,7 @@ print("Training model")
 history = model.fit(
     training_data,
     save_best_after=config.n_kl_annealing_epochs,
-    save_filepath="tmp/weights",
+    save_filepath=f"{save_dir}/tmp/weights",
 )
 
 # Free energy = Log Likelihood - KL Divergence
@@ -106,14 +106,14 @@ plotting.plot_alpha(
     n_samples=2000,
     title="Ground Truth",
     y_labels=r"$\alpha_{jt}$",
-    filename="figures/sim_alp.png",
+    filename=f"{save_dir}/sim_alp.png",
 )
 plotting.plot_alpha(
     inf_alp,
     n_samples=2000,
     title="DyNeMo",
     y_labels=r"$\alpha_{jt}$",
-    filename="figures/inf_alp.png",
+    filename=f"{save_dir}/inf_alp.png",
 )
 
 # Correlation between mode time courses
@@ -146,7 +146,7 @@ plotting.plot_line(
     x_label="Sample",
     y_label="$d$",
     fig_kwargs={"figsize": (15, 1.5)},
-    filename="figures/rd.png",
+    filename=f"{save_dir}/rd.png",
 )
 
 # Delete temporary directory
