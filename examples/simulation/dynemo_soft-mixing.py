@@ -4,7 +4,7 @@
 
 print("Setting up")
 import os
-
+import sys
 import numpy as np
 from tqdm.auto import trange
 
@@ -14,7 +14,9 @@ from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.utils import plotting
 
 # Create directory to hold plots
-os.makedirs("figures_init", exist_ok=True)
+save_dir = sys.argv[1]
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir, exist_ok=True)
 
 # GPU settings
 tf_ops.gpu_growth()
@@ -59,9 +61,13 @@ sim = simulation.MixedSine_MVN(
 sim_alp = sim.mode_time_course
 training_data = data.Data(sim.time_series)
 
+np.save(f'{save_dir}/mode_time_course.npy',sim_alp)
+np.save(f'{save_dir}/time_series.npy',sim.time_series)
+np.save(f'{save_dir}/ground_truth_covs.npy',sim.covariances)
+
 # Plot ground truth logits
 plotting.plot_separate_time_series(
-    sim.logits, n_samples=2000, filename="figures/sim_logits.png"
+    sim.logits, n_samples=2000, filename=f"{save_dir}/sim_logits.png"
 )
 
 # Build model
@@ -79,10 +85,19 @@ history = model.fit(
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)
 print(f"Free energy: {free_energy}")
+model.save(f'{save_dir}/model/')
+with open(f"{save_dir}/free_energy.txt", "w") as f:
+    f.write(f"{free_energy:.6f}")
+
 
 # Inferred alpha and mode time course
 inf_alp = model.get_alpha(training_data)
 orders = modes.match_modes(sim_alp, inf_alp, return_order=True)
+
+np.save(f'{save_dir}/alp.npy',inf_alp)
+np.save(f'{save_dir}/covs.npy',model.get_covariances())
+
+
 inf_alp = inf_alp[:, orders[1]]
 
 # Compare the inferred mode time course to the ground truth
