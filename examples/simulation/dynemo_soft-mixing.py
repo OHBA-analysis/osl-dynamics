@@ -26,9 +26,9 @@ config = Config(
     n_modes=6,
     n_channels=80,
     sequence_length=200,
-    inference_n_units=64,
+    inference_n_units=8,
     inference_normalization="layer",
-    model_n_units=64,
+    model_n_units=8,
     model_normalization="layer",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
@@ -73,11 +73,13 @@ plotting.plot_separate_time_series(
 # Build model
 model = Model(config)
 model.summary()
-#model.set_covariances(sim.covariances)
+model.set_covariances(sim.covariances)
 
 print("Training model")
-init_kwargs = {"n_init": 10, "n_epochs": 2, "take": 1}
-model.random_subset_initialization(training_data, **init_kwargs)
+#init_kwargs = {"n_init": 10, "n_epochs": 2, "take": 1}
+#model.random_subset_initialization(training_data, **init_kwargs)
+
+
 history = model.fit(
     training_data,
     save_best_after=config.n_kl_annealing_epochs,
