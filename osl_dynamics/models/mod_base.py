@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import warnings
 from abc import abstractmethod
 from dataclasses import dataclass
 from io import StringIO
@@ -337,7 +338,11 @@ class ModelBase:
             Path to file containing model weights.
         """
         with self.config.strategy.scope():
-            return self.model.load_weights(filepath)
+            with warnings.catch_warnings():
+                warnings.filterwarnings(  # suppress optimizer warning
+                    "ignore", message="Skipping variable loading for optimizer"
+                )
+                self.model.load_weights(filepath)
 
     def reset_weights(self, keep=None):
         """Resets trainable variables in the model to their initial value."""
@@ -720,7 +725,7 @@ class ModelBase:
             )
             checkpoint.restore(tf.train.latest_checkpoint(f"{dirname}/checkpoints"))
         else:
-            model.load_weights(f"{dirname}/model.weights.h5")
+            cls.load_weights(model, f"{dirname}/model.weights.h5")
 
         return model
 
