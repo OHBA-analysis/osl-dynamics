@@ -4,7 +4,7 @@ Installation
 Conda / Mamba
 -------------
 
-We recommend install osl-dynamics installed using `Miniforge <https://conda-forge.org/download/>`_ (or `Anaconda <https://www.anaconda.com/docs/getting-started/anaconda/install>`_/`Miniconda <https://www.anaconda.com/docs/getting-started/miniconda/install>`_) and `Mamba <https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html>`_.
+We recommend installing osl-dynamics using `Miniforge <https://conda-forge.org/download/>`_ (or `Anaconda <https://www.anaconda.com/docs/getting-started/anaconda/install>`_/`Miniconda <https://www.anaconda.com/docs/getting-started/miniconda/install>`_) and `Mamba <https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html>`_.
 
 Miniforge (:code:`conda`) can be installed with:
 
