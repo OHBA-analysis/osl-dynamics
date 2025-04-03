@@ -76,6 +76,8 @@ model.summary()
 #model.set_covariances(sim.covariances)
 
 print("Training model")
+init_kwargs = {"n_init": 10, "n_epochs": 2, "take": 1}
+model.random_subset_initialization(training_data, **init_kwargs)
 history = model.fit(
     training_data,
     save_best_after=config.n_kl_annealing_epochs,
