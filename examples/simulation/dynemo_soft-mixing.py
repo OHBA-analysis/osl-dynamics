@@ -73,7 +73,7 @@ plotting.plot_separate_time_series(
 # Build model
 model = Model(config)
 model.summary()
-model.set_covariances(sim.covariances)
+#model.set_covariances(sim.covariances)
 
 print("Training model")
 history = model.fit(
