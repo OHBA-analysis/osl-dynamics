@@ -45,10 +45,10 @@ data.prepare(methods)
 config = Config(
     n_states=n_states,
     n_channels=data.n_channels,
-    sequence_length=2000,
+    sequence_length=200,
     learn_means=False,
     learn_covariances=True,
-    batch_size=32,
+    batch_size=256,
     learning_rate=0.01,
     n_epochs=20,
 )
