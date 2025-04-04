@@ -39,7 +39,7 @@ config = Config(
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=10,
     batch_size=16,
-    learning_rate=0.001,
+    learning_rate=0.01,
     n_epochs=20,
 )
 
@@ -79,23 +79,12 @@ print("Training model")
 #init_kwargs = {"n_init": 10, "n_epochs": 2, "take": 1}
 #model.random_subset_initialization(training_data, **init_kwargs)
 
-
-for i in range(10):
-    history = model.fit(
-    training_data,
-    save_best_after=config.n_kl_annealing_epochs,
-    save_filepath=f"{save_dir}/tmp/weights",
-    )
-    inf_alp = model.get_alpha(training_data)
-    orders = modes.match_modes(sim_alp, inf_alp, return_order=True)
-
-    plotting.plot_alpha(
-        inf_alp,
-        n_samples=2000,
-        title="DyNeMo",
-        y_labels=r"$\alpha_{jt}$",
-        filename=f"{save_dir}/inf_alp_epoch{i+1}.png",
-    )
+history = model.fit(
+training_data,
+      checkpoint_freq=2,
+      save_best_after=config.n_kl_annealing_epochs,
+      save_filepath=f"{save_dir}/tmp/weights",
+)
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)
