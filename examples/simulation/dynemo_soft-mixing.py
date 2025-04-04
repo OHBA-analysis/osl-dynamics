@@ -26,9 +26,9 @@ config = Config(
     n_modes=6,
     n_channels=80,
     sequence_length=200,
-    inference_n_units=8,
+    inference_n_units=64,
     inference_normalization="layer",
-    model_n_units=8,
+    model_n_units=64,
     model_normalization="layer",
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
@@ -40,7 +40,7 @@ config = Config(
     n_kl_annealing_epochs=100,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=200,
+    n_epochs=2,
 )
 
 print("Simulating data")
@@ -48,12 +48,12 @@ sim = simulation.MixedSine_MVN(
     n_samples=25600,
     n_modes=config.n_modes,
     n_channels=config.n_channels,
-    #relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
-    #amplitudes=[6, 5, 4, 3, 2, 1],
-    #frequencies=[1, 2, 3, 4, 6, 8],
-    relative_activation=[1, 1, 1, 1, 1, 1],
-    amplitudes=[1, 1, 1, 1, 1, 1],
-    frequencies=[1.2, 2.2, 3.2, 4.2, 6.2, 8.2],
+    relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
+    amplitudes=[6, 5, 4, 3, 2, 1],
+    frequencies=[1, 2, 3, 4, 6, 8],
+    #relative_activation=[1, 1, 1, 1, 1, 1],
+    #amplitudes=[1, 1, 1, 1, 1, 1],
+    #frequencies=[1.2, 2.2, 3.2, 4.2, 6.2, 8.2],
     sampling_frequency=250,
     means="zero",
     covariances="random",
@@ -73,18 +73,29 @@ plotting.plot_separate_time_series(
 # Build model
 model = Model(config)
 model.summary()
-model.set_covariances(sim.covariances)
+#model.set_covariances(sim.covariances)
 
 print("Training model")
 #init_kwargs = {"n_init": 10, "n_epochs": 2, "take": 1}
 #model.random_subset_initialization(training_data, **init_kwargs)
 
 
-history = model.fit(
+for i in range(100):
+    history = model.fit(
     training_data,
     save_best_after=config.n_kl_annealing_epochs,
     save_filepath=f"{save_dir}/tmp/weights",
-)
+    )
+    inf_alp = model.get_alpha(training_data)
+    orders = modes.match_modes(sim_alp, inf_alp, return_order=True)
+
+    plotting.plot_alpha(
+        inf_alp,
+        n_samples=2000,
+        title="DyNeMo",
+        y_labels=r"$\alpha_{jt}$",
+        filename=f"{save_dir}/inf_alp_epoch{i+1}.png",
+    )
 
 # Free energy = Log Likelihood - KL Divergence
 free_energy = model.free_energy(training_data)
