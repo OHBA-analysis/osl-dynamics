@@ -80,7 +80,7 @@ print("Training model")
 #model.random_subset_initialization(training_data, **init_kwargs)
 
 
-for i in range(100):
+for i in range(10):
     history = model.fit(
     training_data,
     save_best_after=config.n_kl_annealing_epochs,
