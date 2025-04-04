@@ -33,7 +33,7 @@ config = Config(
     learn_alpha_temperature=True,
     initial_alpha_temperature=1.0,
     learn_means=False,
-    learn_covariances=False,
+    learn_covariances=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
@@ -83,7 +83,7 @@ history = model.fit(
 training_data,
       checkpoint_freq=2,
       save_best_after=config.n_kl_annealing_epochs,
-      save_filepath=f"{save_dir}/tmp/weights",
+      save_filepath=f"{save_dir}/weights",
 )
 
 # Free energy = Log Likelihood - KL Divergence
