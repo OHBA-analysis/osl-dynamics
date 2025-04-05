@@ -27,7 +27,7 @@ The following lines can be used to download a conda environment file and install
 
 .. code::
 
-    wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/conda-envs/envs/osld-tf.yml
+    wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
     mamba env create -f osld-tf.yml
     rm osld-tf.yml
 
