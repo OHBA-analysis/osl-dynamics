@@ -29,7 +29,7 @@ conda install -n base -c conda-forge mamba
 ### Linux/Mac
 
 ```
-wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/conda-envs/envs/osld-tf.yml
+wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
 mamba env create -f osld-tf.yml
 rm osld-tf.yml
 ```
