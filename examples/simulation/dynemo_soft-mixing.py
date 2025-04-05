@@ -40,10 +40,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
+    n_kl_annealing_epochs=10,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=10,
+    n_epochs=20,
 )
 
 print("Simulating data")
