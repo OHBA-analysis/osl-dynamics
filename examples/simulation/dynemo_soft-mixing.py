@@ -51,12 +51,12 @@ sim = simulation.MixedSine_MVN(
     n_samples=n_samples,
     n_modes=config.n_modes,
     n_channels=config.n_channels,
-    #relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
-    #amplitudes=[6, 5, 4, 3, 2, 1],
-    #frequencies=[1, 2, 3, 4, 6, 8],
-    relative_activation=[1, 1, 1, 1, 1, 1],
-    amplitudes=[1, 1, 1, 1, 1, 1],
-    frequencies=[1.2, 2.2, 3.2, 4.2, 6.2, 8.2],
+    relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
+    amplitudes=[6, 5, 4, 3, 2, 1],
+    frequencies=[1, 2, 3, 4, 6, 8],
+    #relative_activation=[1, 1, 1, 1, 1, 1],
+    #amplitudes=[1, 1, 1, 1, 1, 1],
+    #frequencies=[1.2, 2.2, 3.2, 4.2, 6.2, 8.2],
     sampling_frequency=250,
     means="zero",
     covariances="random",
@@ -148,7 +148,7 @@ np.save(f'{save_dir}/alp_test.npy',inf_alp_test)
 #np.save(f'{save_dir}/covs.npy',model.get_covariances())
 
 
-inf_alp_training = inf_alp_test[:, orders[1]]
+inf_alp_test = inf_alp_test[:, orders[1]]
 
 # Compare the inferred mode time course to the ground truth
 plotting.plot_alpha(
