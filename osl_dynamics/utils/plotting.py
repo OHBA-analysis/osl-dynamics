@@ -1648,7 +1648,7 @@ def plot_brain_surface(
 def plot_alpha(
     *alpha,
     n_samples=None,
-    cmap="Set3",
+    cmap="tab10",
     sampling_frequency=None,
     y_labels=None,
     title=None,

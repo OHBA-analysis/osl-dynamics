@@ -748,7 +748,7 @@ def generate_covariances(model, session_labels):
 
     covs_dev_decoder_layer = model.get_layer("covs_dev_decoder")
     dev_mag_mod_layer = model.get_layer("covs_dev_mag_mod_beta")
-    dev_mag_mod = tf.constant(1) / dev_mag_mod_layer(
+    dev_mag_mod = tf.constant(1, dtype=tf.float32) / dev_mag_mod_layer(
         covs_dev_decoder_layer(concat_embeddings)
     )
 

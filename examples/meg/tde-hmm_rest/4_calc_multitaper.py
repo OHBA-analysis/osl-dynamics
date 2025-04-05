@@ -46,7 +46,7 @@ data = Data(
 #   data.
 # - sequence_length must be the same as used in the Config to create
 #   the model.
-data_ = data.trim_time_series(n_embeddings=15, sequence_length=2000)
+data_ = data.trim_time_series(n_embeddings=15, sequence_length=200)
 
 # State probabilities
 alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))

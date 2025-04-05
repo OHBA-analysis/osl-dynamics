@@ -26,9 +26,7 @@ def wavelet(
 ):
     """Calculate a wavelet transform.
 
-    This function uses a `scipy.signal.morlet2 <https://docs.scipy.org/doc\
-    /scipy/reference/generated/scipy.signal.morlet2.html>`_ window to calculate
-    the wavelet transform.
+    This function uses a Morlet2 window to calculate a wavelet transform.
 
     Parameters
     ----------
@@ -37,9 +35,7 @@ def wavelet(
     sampling_frequency : float
         Sampling frequency in Hz.
     w : float, optional
-        :code:`w` parameter to pass to `scipy.signal.morlet2
-        <https://docs.scipy.org/doc/scipy/reference/generated\
-        /scipy.signal.morlet2.html>`_.
+        Number of oscillations in the Gaussian envelope.
     standardize : bool, optional
         Should we standardize the data before calculating the wavelet?
     time_range : list, optional
@@ -88,7 +84,8 @@ def wavelet(
     data = data[start_index:end_index]
 
     # Time axis (s)
-    t = np.arange(time_range[0], time_range[1], 1 / sampling_frequency)
+    dt = 1 / sampling_frequency
+    t = np.arange(time_range[0], time_range[1], dt)
 
     # Frequency axis (Hz)
     f = np.arange(frequency_range[0], frequency_range[1], df)
@@ -96,8 +93,24 @@ def wavelet(
     # Calculate the width for each Morlet window based on the frequency
     widths = w * sampling_frequency / (2 * f * np.pi)
 
+    def _morlet2(M, s):
+        x = np.arange(0, M) - (M - 1.0) / 2
+        x = x / s
+        sinusoidal = np.exp(1j * w * x)
+        gaussian = np.exp(-0.5 * x**2)
+        normalization = np.pi ** (-0.25) * np.sqrt(1 / s)
+        return sinusoidal * gaussian * normalization
+
+    def _cwt(data, widths):
+        output = np.empty((len(widths), len(data)), dtype=np.complex64)
+        for i, width in enumerate(widths):
+            M = np.min([10 * width, len(data)])
+            wavelet_data = np.conj(_morlet2(M, width)[::-1])
+            output[i] = np.convolve(data, wavelet_data, mode="same")
+        return output
+
     # Calculate wavelet transform
-    wt = signal.cwt(data=data, wavelet=signal.morlet2, widths=widths, w=w)
+    wt = _cwt(data, widths)
     wt = abs(wt)
 
     return t, f, wt
