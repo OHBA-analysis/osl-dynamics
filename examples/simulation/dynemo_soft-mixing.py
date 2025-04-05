@@ -21,7 +21,7 @@ if not os.path.exists(save_dir):
 # GPU settings
 tf_ops.gpu_growth()
 
-n_samples = 25600
+n_samples = 32000
 training_size=0.8
 
 # Settings
