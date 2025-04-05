@@ -21,7 +21,7 @@ if not os.path.exists(save_dir):
 # GPU settings
 tf_ops.gpu_growth()
 
-n_samples = 500000
+n_samples = 25600
 training_size=0.8
 
 # Settings
@@ -40,10 +40,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=10,
+    n_kl_annealing_epochs=100,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=20,
+    n_epochs=200,
 )
 
 print("Simulating data")
