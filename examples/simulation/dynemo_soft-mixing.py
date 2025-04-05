@@ -21,6 +21,9 @@ if not os.path.exists(save_dir):
 # GPU settings
 tf_ops.gpu_growth()
 
+n_samples = 500000
+training_size=0.8
+
 # Settings
 config = Config(
     n_modes=6,
@@ -40,12 +43,12 @@ config = Config(
     n_kl_annealing_epochs=100,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=200,
+    n_epochs=10,
 )
 
 print("Simulating data")
 sim = simulation.MixedSine_MVN(
-    n_samples=25600,
+    n_samples=n_samples,
     n_modes=config.n_modes,
     n_channels=config.n_channels,
     relative_activation=[1, 0.5, 0.5, 0.25, 0.25, 0.1],
@@ -59,16 +62,21 @@ sim = simulation.MixedSine_MVN(
     covariances="random",
 )
 sim_alp = sim.mode_time_course
-training_data = data.Data(sim.time_series)
+training_data = data.Data(sim.time_series[:int(n_samples*training_size)])
+test_data = data.Data(sim.time_series[int(n_samples*training_size):])
 
-np.save(f'{save_dir}/mode_time_course.npy',sim_alp)
-np.save(f'{save_dir}/time_series.npy',sim.time_series)
+np.save(f'{save_dir}/training_mode_time_course.npy',sim_alp[:int(n_samples*training_size)])
+np.save(f'{save_dir}/test_mode_time_course.npy',sim_alp[int(n_samples*training_size):])
+np.save(f'{save_dir}/training_time_series.npy',sim.time_series[:int(n_samples*training_size)])
+np.save(f'{save_dir}/test_time_series.npy',sim.time_series[int(n_samples*training_size):])
 np.save(f'{save_dir}/ground_truth_covs.npy',sim.covariances)
 
+'''
 # Plot ground truth logits
 plotting.plot_separate_time_series(
     sim.logits, n_samples=2000, filename=f"{save_dir}/sim_logits.png"
 )
+'''
 
 # Build model
 model = Model(config)
@@ -81,49 +89,88 @@ print("Training model")
 
 history = model.fit(
 training_data,
-      checkpoint_freq=2,
+      #checkpoint_freq=2,
       save_best_after=config.n_kl_annealing_epochs,
       save_filepath=f"{save_dir}/weights",
 )
 
 # Free energy = Log Likelihood - KL Divergence
-free_energy = model.free_energy(training_data)
-print(f"Free energy: {free_energy}")
+training_free_energy = model.free_energy(training_data)
+print(f"Training Free energy: {training_free_energy}")
 model.save(f'{save_dir}/model/')
 with open(f"{save_dir}/free_energy.txt", "w") as f:
-    f.write(f"{free_energy:.6f}")
+    f.write(f"{training_free_energy:.6f}")
 
+test_free_energy = model.free_energy(test_data)
+print(f"Test Free energy: {test_free_energy}")
+with open(f"{save_dir}/test_free_energy.txt", "w") as f:
+    f.write(f"{test_free_energy:.6f}")
 
+###################################################################33
+### Look at the training data
 # Inferred alpha and mode time course
-inf_alp = model.get_alpha(training_data)
-orders = modes.match_modes(sim_alp, inf_alp, return_order=True)
+inf_alp_training = model.get_alpha(training_data)
+orders = modes.match_modes(sim_alp[:int(n_samples*training_size)], inf_alp_training, return_order=True)
 
-np.save(f'{save_dir}/alp.npy',inf_alp)
+np.save(f'{save_dir}/alp_training.npy',inf_alp_training)
 np.save(f'{save_dir}/covs.npy',model.get_covariances())
 
 
-inf_alp = inf_alp[:, orders[1]]
+inf_alp_training = inf_alp_training[:, orders[1]]
 
 # Compare the inferred mode time course to the ground truth
 plotting.plot_alpha(
-    sim_alp,
+    sim_alp[:int(n_samples*training_size)],
     n_samples=2000,
     title="Ground Truth",
     y_labels=r"$\alpha_{jt}$",
-    filename=f"{save_dir}/sim_alp.png",
+    filename=f"{save_dir}/sim_alp_training.png",
 )
 plotting.plot_alpha(
-    inf_alp,
+    inf_alp_training,
     n_samples=2000,
     title="DyNeMo",
     y_labels=r"$\alpha_{jt}$",
-    filename=f"{save_dir}/inf_alp.png",
+    filename=f"{save_dir}/inf_alp_training.png",
 )
 
 # Correlation between mode time courses
-corr = metrics.alpha_correlation(inf_alp, sim_alp)
-print("Correlation (DyNeMo vs Simulation):", corr)
+corr = metrics.alpha_correlation(inf_alp_training, sim_alp[:int(n_samples*training_size)])
+print("TrainingCorrelation (DyNeMo vs Simulation):", corr)
 
+#############################################################################################
+### Look at the test data
+# Inferred alpha and mode time course
+inf_alp_test = model.get_alpha(test_data)
+orders = modes.match_modes(sim_alp[int(n_samples*training_size):], inf_alp_test, return_order=True)
+
+np.save(f'{save_dir}/alp_test.npy',inf_alp_test)
+#np.save(f'{save_dir}/covs.npy',model.get_covariances())
+
+
+inf_alp_training = inf_alp_test[:, orders[1]]
+
+# Compare the inferred mode time course to the ground truth
+plotting.plot_alpha(
+    sim_alp[int(n_samples*training_size):],
+    n_samples=2000,
+    title="Ground Truth",
+    y_labels=r"$\alpha_{jt}$",
+    filename=f"{save_dir}/sim_alp_test.png",
+)
+plotting.plot_alpha(
+    inf_alp_test,
+    n_samples=2000,
+    title="DyNeMo",
+    y_labels=r"$\alpha_{jt}$",
+    filename=f"{save_dir}/inf_alp_test.png",
+)
+
+# Correlation between mode time courses
+corr = metrics.alpha_correlation(inf_alp_test, sim_alp[int(n_samples*training_size):])
+print("Test Correlation (DyNeMo vs Simulation):", corr)
+##########################################################################################
+'''
 # Reconstruction of the time-varying covariance
 sim_cov = sim.covariances
 inf_cov = model.get_covariances()[orders[1]]
@@ -152,6 +199,8 @@ plotting.plot_line(
     fig_kwargs={"figsize": (15, 1.5)},
     filename=f"{save_dir}/rd.png",
 )
+'''
+
 
 # Delete temporary directory
 training_data.delete_dir()
