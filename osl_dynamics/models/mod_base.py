@@ -471,9 +471,7 @@ class ModelBase:
         which makes the output easier to parse.
         """
         stringio = StringIO()
-        self.model.summary(
-            print_fn=lambda s: stringio.write(s + "\n"), line_length=1000
-        )
+        self.model.summary(print_fn=lambda s: stringio.write(s + "\n"))
         return stringio.getvalue()
 
     def summary_table(self, renderer):
@@ -490,34 +488,28 @@ class ModelBase:
             Summary of the model as a table.
         """
 
+        # Get model.summary() as a string
         summary = self.summary_string()
 
         renderers = {"html": HTMLTable, "latex": LatexTable}
 
-        # Extract information
-        headers = [h for h in re.split(r"\s{2,}", summary.splitlines()[2]) if h != ""]
-        columns = [summary.splitlines()[2].find(title) for title in headers] + [-1]
+        # Extract headers
+        header_line = summary.splitlines()[2]  # Row with the column headers
+        headers = [h.strip() for h in re.split(r"┃", header_line) if h.strip() != ""]
 
         # Create HTML table
         table = renderers.get(renderer, HTMLTable)(headers)
-        for line in summary.splitlines()[4:]:
-            if (
-                line.startswith("_")
-                or line.startswith("=")
-                or line.startswith('Model: "')
-            ):
-                continue
-            elements = [
-                line[start:stop].strip() for start, stop in zip(columns, columns[1:])
-            ]
-            if "params:" in elements[0]:
-                parts = re.search(r"(.*? params): (.*?)$", elements[0]).groups()
-                parts = [*parts, "", ""]
-                table += parts
-            elif elements[:3] == ["", "", ""]:
-                table.append_last(elements[3])
+        for line in summary.splitlines():
+            elements = [e.strip() for e in line.split("│")]
+            if len(elements) == 1:
+                if "params" in elements[0]:
+                    elements = re.search(r"(.*? params): (.*?)$", elements[0]).groups()
+                    elements = [*elements, "", ""]
+                else:
+                    continue
             else:
-                table += elements
+                elements = elements[1:-1]
+            table += elements
 
         return table.output()
 
