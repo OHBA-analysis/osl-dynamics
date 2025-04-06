@@ -107,6 +107,7 @@ This should return a list of GPUs.
 Simply delete the conda environment:
 ```
 conda env remove -n osld
+conda clean --all
 ```
 And remove the GitHub repository if you have cloned it:
 ```
