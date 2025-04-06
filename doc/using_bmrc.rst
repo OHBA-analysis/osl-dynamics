@@ -92,28 +92,35 @@ Further info:
 Modules
 -------
 
-The BMRC server uses software modules for popular packages. We install osl-dynamics within an Anaconda environment. We can load Anaconda with:
+The BMRC server uses software modules for popular packages. We install osl-dynamics within an conda environment. We can load conda with:
 
 .. code-block:: shell
 
-    module load Anaconda3/2022.05
+    module load Miniforge3
 
-We also need CUDA to use the GPUs on BMRC. We load CUDA with:
+Conda can be used on the login nodes (``clusterX.bmrc.ox.ac.uk``). However, to use conda on ``compg017`` you need to set the following:
 
 .. code-block:: shell
 
-    module load cuDNN
+    unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
 
 Similarly we can load other useful software packages, e.g.
 
 .. code-block:: shell
 
     module load git
-    module load matlab/2019a
+    module load matlab
 
-All of the above lines can be added to ``/users/woolrich/<username>/.bashrc`` which will load the modules automatically when you log in.
+The above lines can be added to ``/users/woolrich/<username>/.bashrc`` which will load the modules automatically when you log in.
 
-Using OSL Dynamics on BMRC
+Incase you need a particular version of CUDA/cuDNN to use a GPU you can check which are available and load the module with:
+
+.. code-block:: shell
+
+    module avail cuDNN
+    module load cuDNN
+
+Using osl-dynamics on BMRC
 --------------------------
 
 osl-dynamics can be used in a standalone python script, e.g. the scripts in ``/osl-dynamics/examples``. It is imported like any other python package:
@@ -127,7 +134,7 @@ The script is executed via the command line on a GPU node with ``python <script>
 
 Before you can run the script you need to activate the virtual environment in which osl-dynamics was installed with ``conda activate <env>``.
 
-Editing OSL Dynamics on BMRC
+Editing osl-dynamics on BMRC
 ----------------------------
 
 A text editor is required for making changes to the source code. There are multiple options for this:
