@@ -46,9 +46,9 @@ If you are using a Windows computer, we recommend first installing Linux (Ubuntu
 
 On the OHBA workstation (hbaws), install Miniforge and Mamba using the instructions above and install osl-dynamics using:
 ```
-wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/hbaws.yml > osld-tf.yml
-mamba env create -f osld-tf.yml
-rm osld-tf.yml
+wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/hbaws.yml
+mamba env create -f hbaws.yml
+rm hbaws.yml
 ```
 
 #### BMRC (Oxford)
@@ -59,9 +59,9 @@ module load Miniforge3
 ```
 and osl-dynamics can be installed with:
 ```
-wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/bmrc.yml > osld-tf-cuda.yml
-mamba env create -f osld-tf-cuda.yml
-rm osld-tf-cuda.yml
+wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/bmrc.yml
+mamba env create -f bmrc.yml
+rm bmrc.yml
 ```
 The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
 ```
