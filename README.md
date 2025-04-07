@@ -28,6 +28,8 @@ conda install -n base -c conda-forge mamba
 
 ### osl-dynamics installation
 
+Different computers have their own environment files. For more information see the envs [readme](https://github.com/OHBA-analysis/osl-dynamics/tree/main/envs#readme).
+
 #### Linux/Mac
 ```
 wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
