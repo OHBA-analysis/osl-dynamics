@@ -18,7 +18,7 @@ Available parcellations:
 If you use the Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz parcellation, please cite:
 
     Kohl, O., Woolrich, M., Nobre, A. C., & Quinn, A. (2023). Glasser52: A parcellation for MEG-Analysis [Data set].
-    Zenodo. https://doi.org/10.5281/zenodo.10401793
+    Zenodo. https://zenodo.org/records/11099418
 
 See the link for further info regarding the parcel name/locations.
 

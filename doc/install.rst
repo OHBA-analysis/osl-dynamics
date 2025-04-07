@@ -1,10 +1,10 @@
 Installation
 ============
 
-Conda / Mamba
--------------
+We recommend installing osl-dynamics using `Miniforge <https://conda-forge.org/download/>`_ (or `Anaconda <https://www.anaconda.com/docs/getting-started/anaconda/install>`_/`Miniconda <https://www.anaconda.com/docs/getting-started/miniconda/install>`_) and `Mamba <https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html>`_.
 
-We recommend install osl-dynamics installed using `Miniforge <https://conda-forge.org/download/>`_ (or `Anaconda <https://www.anaconda.com/docs/getting-started/anaconda/install>`_/`Miniconda <https://www.anaconda.com/docs/getting-started/miniconda/install>`_) and `Mamba <https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html>`_.
+Conda / Mamba Installation
+--------------------------
 
 Miniforge (:code:`conda`) can be installed with:
 
@@ -69,26 +69,38 @@ Test your GPUs are working
 
 You can use the following to check if TensorFlow is using any GPUs you have available:
 
-::
+.. code::
 
     conda activate osld
     python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 
 This should print a list of the GPUs you have available (or an empty list :code:`[]` if there's none available).
 
-Install the source code (optional)
-----------------------------------
+Install the latest development code (optional)
+----------------------------------------------
 
-Once you have created the :code:`osld` conda environment you can install a local copy of the source code (`GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_) into it.
+You should only need to do this if you need a feature or fix that has not been released on pip yet.
+
+Once you have created the :code:`osld` conda environment (see instructions above) you can install the latest development version on the `GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_ with:
 
 .. code::
 
     conda activate osld
+    pip install git+https://github.com/OHBA-analysis/osl-dynamics.git
+
+Install the source code (optional)
+----------------------------------
+
+Once you have created the :code:`osld` conda environment (see instructions above) you can install a local copy of the source code (`GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_) into it.
+
+.. code::
+
     git clone https://github.com/OHBA-analysis/osl-dynamics.git
+    conda activate osld
     cd osl-dynamics
     pip install -e .
 
-Now you can run osl-dynamics with local changes to the code.
+Now you can run osl-dynamics with your own local changes to the code.
 
 Removing osl-dynamics
 ---------------------
