@@ -4,7 +4,7 @@ This script will download source reconstructed resting-state (eyes open)
 MEG data.
 
 This data is part of the MRC MEGUK dataset. It is CTF data from the
-Nottingham site. 65 subjects are part of this dataset.
+Nottingham site. 51 subjects are part of this dataset.
 """
 
 import os

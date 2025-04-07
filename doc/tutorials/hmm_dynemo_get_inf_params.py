@@ -44,7 +44,7 @@ def get_model(name, rename=None):
     os.remove(f"{name}.zip")
     return f"Model downloaded to: {rename}"
 
-get_model("hmm_notts_mrc_meguk_glasser", rename="results/model")
+get_model("tde_hmm_notts_mrc_meguk_glasser", rename="results/model")
 
 #%%
 # Load Trained Model

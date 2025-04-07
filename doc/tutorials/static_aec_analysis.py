@@ -76,9 +76,9 @@ data.set_sampling_frequency(250)
 
 # Calculate amplitude envelope data for the alpha band (7-13 Hz)
 methods = {
+    "standardize": {},
     "filter": {"low_freq": 7, "high_freq": 13},
     "amplitude_envelope": {},
-    "standardize": {},
 }
 data.prepare(methods)
 

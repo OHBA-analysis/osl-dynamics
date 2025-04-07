@@ -4,6 +4,14 @@
 - MNI152_T1_2mm_brain.nii.gz
 - MNI152_T1_8mm_brain.nii.gz
 - ft_8mm_brain_mask.nii.gz
+
+Mask files can be resampled in FSL, e.g. to resample the 1x1x1 mm grid MNI mask file to a 5x5x5 mm grid:
+
+.. code::
+
+    flirt -in $FSLDIR/data/standard/MNI152_T1_1mm_brain.nii.gz -ref $FSLDIR/data/standard/MNI152_T1_1mm_brain.nii.gz -out MNI152_T1_5mm_brain.nii.gz -applyisoxfm 5
+
+When plotting brain maps the resolution of the mask file must match the resolution of the parcellation file. Parcellation files can also be resampled using the code above.
 """
 
 from pathlib import Path
