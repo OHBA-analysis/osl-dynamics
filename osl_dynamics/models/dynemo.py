@@ -772,6 +772,7 @@ class DyNeMoKerasModel(tf.keras.Model):
         self.current_epoch = 0  # will be updated via a callback
 
     def train_step(self, data):
+        print(f'current epoch is:{self.current_epoch}')
         x = data  # Unsupervised data (no labels)
 
         with tf.GradientTape() as tape:
