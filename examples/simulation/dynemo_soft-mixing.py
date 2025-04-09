@@ -14,7 +14,7 @@ from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.utils import plotting
 
 # Create directory to hold plots
-save_dir = './debug/'#sys.argv[1]
+save_dir = sys.argv[1]
 if not os.path.exists(save_dir):
     os.makedirs(save_dir, exist_ok=True)
 
@@ -23,7 +23,7 @@ tf_ops.gpu_growth()
 
 n_samples = 32000
 training_size=0.8
-
+'''
 from tensorflow.keras.callbacks import Callback
 class EpochTrackerCallback(Callback):
     def __init__(self, model):
@@ -32,7 +32,7 @@ class EpochTrackerCallback(Callback):
     def on_epoch_begin(self, epoch, logs=None):
         print(f"[EpochTrackerCallback] Setting current_epoch to {epoch}")
         self.model.current_epoch = epoch  # ← this updates self.current_epoch inside the model
-
+'''
 
 # Settings
 config = Config(
@@ -91,16 +91,14 @@ plotting.plot_separate_time_series(
 # Build model
 model = Model(config)
 model.summary()
-model.set_covariances(sim.covariances)
+#model.set_covariances(sim.covariances)
 
 print("Training model")
-init_kwargs = {"n_init": 1, "n_epochs": 2, "take": 1}
-#model.random_subset_initialization(training_data, **init_kwargs)
-print("Using train_step from:", model.model.train_step)
-model.model.run_eagerly = True
+init_kwargs = {"n_init": 10, "n_epochs": 2, "take": 1}
+model.random_subset_initialization(training_data, **init_kwargs)
 history = model.fit(
 training_data,
-      callbacks=[EpochTrackerCallback(model.model)],
+      #callbacks=[EpochTrackerCallback(model.model)],
       #checkpoint_freq=2,
       save_best_after=config.n_kl_annealing_epochs,
       save_filepath=f"{save_dir}/weights",
