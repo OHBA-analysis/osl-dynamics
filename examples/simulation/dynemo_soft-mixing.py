@@ -92,7 +92,7 @@ model.compile()
 for epoch in range(config.n_epochs):
     if epoch % 10 == 0:
         model.get_layer('covs').trainable = True
-        model.complie()
+        model.compile()
     history.append(model.fit(
     training_data,
           epochs=1
@@ -102,7 +102,7 @@ for epoch in range(config.n_epochs):
     ))
     if epoch % 10 == 0:
         model.get_layer('covs').trainable = False
-        model.complie()
+        model.compile()
 
 # Free energy = Log Likelihood - KL Divergence
 training_free_energy = model.free_energy(training_data)
