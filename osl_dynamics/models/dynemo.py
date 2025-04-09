@@ -757,14 +757,14 @@ class Model(VariationalInferenceModelBase):
         kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
         kl_loss = kl_loss_layer(kl_div)
 
-        #return tf.keras.Model(
-        #    inputs=inputs,
-        #    outputs=[ll_loss, kl_loss, theta_norm],
-        #    name=config.model_name,
-        #)
-        return DyNeMoKerasModel(inputs=inputs,
-                                outputs=[ll_loss, kl_loss, theta_norm],
-                                name=config.model_name)
+        return tf.keras.Model(
+            inputs=inputs,
+            outputs=[ll_loss, kl_loss, theta_norm],
+            name=config.model_name,
+        )
+        #return DyNeMoKerasModel(inputs=inputs,
+        #                        outputs=[ll_loss, kl_loss, theta_norm],
+        #                        name=config.model_name)
 
 class DyNeMoKerasModel(tf.keras.Model):
     def __init__(self, inputs, outputs,name):
