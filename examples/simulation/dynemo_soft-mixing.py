@@ -24,6 +24,15 @@ tf_ops.gpu_growth()
 n_samples = 32000
 training_size=0.8
 
+from tensorflow.keras.callbacks import Callback
+class EpochTrackerCallback(Callback):
+    def __init__(self, model):
+        self.model = model
+
+    def on_epoch_begin(self, epoch, logs=None):
+        self.model.current_epoch = epoch  # ← this updates self.current_epoch inside the model
+
+
 # Settings
 config = Config(
     n_modes=6,
@@ -89,9 +98,10 @@ model.random_subset_initialization(training_data, **init_kwargs)
 for epoch in range(config.n_epochs):
     history = model.fit(
     training_data,
-    #checkpoint_freq=2,
-    save_best_after=config.n_kl_annealing_epochs,
-    save_filepath=f"{save_dir}/weights",
+          callbacks=[EpochTrackerCallback(model.model)],
+          #checkpoint_freq=2,
+          save_best_after=config.n_kl_annealing_epochs,
+          save_filepath=f"{save_dir}/weights",
     )
 
 # Free energy = Log Likelihood - KL Divergence

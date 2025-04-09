@@ -757,8 +757,38 @@ class Model(VariationalInferenceModelBase):
         kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
         kl_loss = kl_loss_layer(kl_div)
 
-        return tf.keras.Model(
-            inputs=inputs,
-            outputs=[ll_loss, kl_loss, theta_norm],
-            name=config.model_name,
-        )
+        #return tf.keras.Model(
+        #    inputs=inputs,
+        #    outputs=[ll_loss, kl_loss, theta_norm],
+        #    name=config.model_name,
+        #)
+        return DyNeMoKerasModel(inputs=inputs,
+                                outputs=[ll_loss, kl_loss, theta_norm],
+                                name=config.model_name)
+
+class DyNeMoKerasModel(tf.keras.Model):
+    def __init__(self, inputs, outputs):
+        super().__init__(inputs=inputs, outputs=outputs)
+        self.current_epoch = 0  # will be updated via a callback
+
+    def train_step(self, data):
+        x = data  # Unsupervised data (no labels)
+
+        with tf.GradientTape() as tape:
+            ll_loss, kl_loss, _ = self(x, training=True)
+            loss = tf.add_n(self.losses)  # combines ll_loss and kl_loss
+
+        # Compute gradients of total loss wrt all trainable weights
+        grads = tape.gradient(loss, self.trainable_variables)
+
+        # Only update "covs" every 10 epochs (i.e., epoch % 10 == 0)
+        if self.current_epoch % 10 != 0:
+            for i, var in enumerate(self.trainable_variables):
+                if "covs" in var.name:
+                    print(f'Current epoch={self.current_epoch}, we are freezing covs update')
+                    grads[i] = tf.zeros_like(grads[i])  # freeze update for "covs"
+
+        # Apply gradients (skipping "covs" if frozen)
+        self.optimizer.apply_gradients(zip(grads, self.trainable_variables))
+
+        return {"loss": loss}
