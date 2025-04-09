@@ -783,7 +783,7 @@ class DyNeMoKerasModel(tf.keras.Model):
         grads = tape.gradient(loss, self.trainable_variables)
 
         # Only update "covs" every 10 epochs (i.e., epoch % 10 == 0)
-        if self.current_epoch % 10 != 0:
+        if self.current_epoch % 5 != 0:
             for i, var in enumerate(self.trainable_variables):
                 if "covs" in var.name:
                     print(f'Current epoch={self.current_epoch}, we are freezing covs update')
