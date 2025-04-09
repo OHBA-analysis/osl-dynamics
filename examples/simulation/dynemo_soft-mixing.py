@@ -30,6 +30,7 @@ class EpochTrackerCallback(Callback):
         self.model = model
 
     def on_epoch_begin(self, epoch, logs=None):
+        print(f"[EpochTrackerCallback] Setting current_epoch to {epoch}")
         self.model.current_epoch = epoch  # ← this updates self.current_epoch inside the model
 
 
