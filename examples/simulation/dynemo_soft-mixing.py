@@ -96,6 +96,9 @@ model.summary()
 print("Training model")
 init_kwargs = {"n_init": 1, "n_epochs": 2, "take": 1}
 model.random_subset_initialization(training_data, **init_kwargs)
+
+print(f"Inner model type: {type(model.model)}")
+print('#############################')
 for epoch in range(config.n_epochs):
     history = model.fit(
     training_data,
