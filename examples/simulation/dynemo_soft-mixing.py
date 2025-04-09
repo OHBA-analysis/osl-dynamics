@@ -21,8 +21,8 @@ if not os.path.exists(save_dir):
 # GPU settings
 tf_ops.gpu_growth()
 
-n_samples = 2000000
-training_size=0.9
+n_samples = 32000
+training_size=0.8
 
 # Settings
 config = Config(
@@ -40,10 +40,10 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=10,
+    n_kl_annealing_epochs=100,
     batch_size=16,
     learning_rate=0.01,
-    n_epochs=20,
+    n_epochs=200,
 )
 
 print("Simulating data")
@@ -86,13 +86,23 @@ model.summary()
 print("Training model")
 init_kwargs = {"n_init": 10, "n_epochs": 2, "take": 1}
 model.random_subset_initialization(training_data, **init_kwargs)
-
-history = model.fit(
-training_data,
-      #checkpoint_freq=2,
-      save_best_after=config.n_kl_annealing_epochs,
-      save_filepath=f"{save_dir}/weights",
-)
+history = []
+model.get_layer('covs').trainable = False
+model.compile()
+for epoch in range(config.n_epochs):
+    if epoch % 10 == 0:
+        model.get_layer('covs').trainable = True
+        model.complie()
+    history.append(model.fit(
+    training_data,
+          epochs=1
+              #checkpoint_freq=2,
+              #save_best_after=config.n_kl_annealing_epochs,
+              #save_filepath=f"{save_dir}/weights",
+    ))
+    if epoch % 10 == 0:
+        model.get_layer('covs').trainable = False
+        model.complie()
 
 # Free energy = Log Likelihood - KL Divergence
 training_free_energy = model.free_energy(training_data)
