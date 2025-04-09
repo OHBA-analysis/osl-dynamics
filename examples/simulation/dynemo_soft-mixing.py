@@ -14,7 +14,7 @@ from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.utils import plotting
 
 # Create directory to hold plots
-save_dir = sys.argv[1]
+save_dir = './debug/'#sys.argv[1]
 if not os.path.exists(save_dir):
     os.makedirs(save_dir, exist_ok=True)
 
@@ -50,7 +50,7 @@ config = Config(
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
+    n_kl_annealing_epochs=200,
     batch_size=16,
     learning_rate=0.01,
     n_epochs=200,
@@ -95,17 +95,15 @@ model.summary()
 
 print("Training model")
 init_kwargs = {"n_init": 1, "n_epochs": 2, "take": 1}
-model.random_subset_initialization(training_data, **init_kwargs)
-
-print(f"Inner model type: {type(model.model)}")
-print('#############################')
-for epoch in range(config.n_epochs):
-    history = model.fit(
-    training_data,
-          callbacks=[EpochTrackerCallback(model.model)],
-          #checkpoint_freq=2,
-          save_best_after=config.n_kl_annealing_epochs,
-          save_filepath=f"{save_dir}/weights",
+#model.random_subset_initialization(training_data, **init_kwargs)
+print("Using train_step from:", model.model.train_step)
+model.model.run_eagerly = True
+history = model.fit(
+training_data,
+      callbacks=[EpochTrackerCallback(model.model)],
+      #checkpoint_freq=2,
+      save_best_after=config.n_kl_annealing_epochs,
+      save_filepath=f"{save_dir}/weights",
     )
 
 # Free energy = Log Likelihood - KL Divergence
