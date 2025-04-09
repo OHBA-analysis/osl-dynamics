@@ -91,7 +91,7 @@ plotting.plot_separate_time_series(
 # Build model
 model = Model(config)
 model.summary()
-#model.set_covariances(sim.covariances)
+model.set_covariances(sim.covariances)
 
 print("Training model")
 init_kwargs = {"n_init": 1, "n_epochs": 2, "take": 1}
