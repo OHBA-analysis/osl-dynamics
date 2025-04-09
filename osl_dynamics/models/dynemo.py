@@ -767,8 +767,8 @@ class Model(VariationalInferenceModelBase):
                                 name=config.model_name)
 
 class DyNeMoKerasModel(tf.keras.Model):
-    def __init__(self, inputs, outputs):
-        super().__init__(inputs=inputs, outputs=outputs)
+    def __init__(self, inputs, outputs,name):
+        super().__init__(inputs=inputs, outputs=outputs,name=name)
         self.current_epoch = 0  # will be updated via a callback
 
     def train_step(self, data):
