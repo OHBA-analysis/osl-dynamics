@@ -55,7 +55,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     inference_n_units : int
         Number of units.
     inference_normalization : str
-        Type of normalization to use. Either :code:`None`, :code:`'batch'`or
+        Type of normalization to use. Either :code:`None`, :code:`'batch'` or
         :code:`'layer'`.
     inference_activation : str
         Type of activation to use after normalization and before dropout.
@@ -72,8 +72,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either :code:`None`, :code:`'batch'`
-        or :code:`'layer'`.
+        Type of normalization to use. Either :code:`None`, :code:`'batch'` or
+        :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
         E.g. :code:`'relu'`, :code:`'elu'`, etc.
@@ -93,7 +93,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         If :code:`diagonal_covariances=True` and full matrices are passed,
         the diagonal is extracted.
     covariances_epsilon : float
-        Error added to standard deviations for numerical stability.
+        Error added to state covariances for numerical stability.
     diagonal_covariances : bool
         Should we learn diagonal state covariances?
     means_regularizer : tf.keras.regularizers.Regularizer
@@ -201,39 +201,162 @@ class Model(VariationalInferenceModelBase):
 
     def build_model(self):
         """Builds a keras model."""
-        self.model = self._model_structure()
+
+        config = self.config
+
+        # ---------- Define layers ---------- #
+
+        # Inference RNN:
+        # - Learns q(state_t) = softmax(inf_theta_t), where
+        #     - inf_theta_t ~ affine(RNN(inputs_<=t)) is a set of logits
+
+        inf_rnn_layer = InferenceRNNLayer(
+            config.inference_rnn,
+            config.inference_normalization,
+            config.inference_activation,
+            config.inference_n_layers,
+            config.inference_n_units,
+            config.inference_dropout,
+            config.inference_regularizer,
+            name="inf_rnn",
+        )
+        inf_theta_layer = layers.Dense(config.n_states, name="inf_theta")
+        alpha_layer = SoftmaxLayer(
+            initial_temperature=1.0,
+            learn_temperature=False,
+            name="alpha",
+        )
+        states_layer = SampleGumbelSoftmaxDistributionLayer(
+            temperature=1.0, name="states"
+        )  # NOTE: NEED EDIT; temperature as a configurable parameter
+
+        # Observation model:
+        # - We use a multivariate normal with a mean vector and covariance matrix
+        #   for each state as the observation model.
+        # - We calculate the likelihood of generating the training data with alpha
+        #   and the observation model.
+        # - p(x_t | theta_tk) = N(mu_k, D_k), where mu_k and D_k are state(k)-dependent
+        #   means/covariances.
+
+        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
+            config.sequence_length,
+            config.loss_calc,
+            name="static_loss_scaling_factor",
+        )
+        means_layer = VectorsLayer(
+            config.n_states,
+            config.n_channels,
+            config.learn_means,
+            config.initial_means,
+            config.means_regularizer,
+            name="means",
+        )
+        if config.diagonal_covariances:
+            covs_layer = DiagonalMatricesLayer(
+                config.n_states,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        else:
+            covs_layer = CovarianceMatricesLayer(
+                config.n_states,
+                config.n_channels,
+                config.learn_covariances,
+                config.initial_covariances,
+                config.covariances_epsilon,
+                config.covariances_regularizer,
+                name="covs",
+            )
+        ll_loss_layer = CategoricalLogLikelihoodLossLayer(
+            config.n_states,
+            config.loss_calc,
+            name="ll_loss",
+        )
+
+        # Model RNN:
+        # - Learns p(state_t | state_<t) ~ Cat(mod_theta_t), where
+        #     - mod_theta_t ~ affine(RNN(states_<t)) is a set of logits
+        # - Here, the model RNN predicts logits for the next state based
+        #   on a history of states.
+
+        mod_rnn_layer = ModelRNNLayer(
+            config.model_rnn,
+            config.model_normalization,
+            config.model_activation,
+            config.model_n_layers,
+            config.model_n_units,
+            config.model_dropout,
+            config.model_regularizer,
+            name="mod_rnn",
+        )
+        mod_theta_layer = layers.Dense(config.n_states, name="mod_theta")
+        kl_div_layer = CategoricalKLDivergenceLayer(config.loss_calc, name="kl_div")
+        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
+
+        # ---------- Forward pass ---------- #
+
+        # Encoder
+        data = layers.Input(
+            shape=(config.sequence_length, config.n_channels), name="data"
+        )
+        inf_rnn = inf_rnn_layer(data)
+        inf_theta = inf_theta_layer(inf_rnn)
+        alpha = alpha_layer(inf_theta)
+        states = states_layer(inf_theta)
+
+        # Observation model
+        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
+        mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
+        D = covs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
+        ll_loss = ll_loss_layer([data, mu, D, alpha])
+
+        # Temporal prior
+        mod_rnn = mod_rnn_layer(states)
+        mod_theta = mod_theta_layer(mod_rnn)
+        kl_div = kl_div_layer([inf_theta, mod_theta])
+        kl_loss = kl_loss_layer(kl_div)
+
+        # ---------- Create model ---------- #
+        inputs = {"data": data}
+        outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "theta": inf_theta}
+        name = config.model_name
+        self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
     def get_means(self):
-        """Get the mode means.
+        """Get the state means.
 
         Returns
         -------
         means : np.ndarary
-            Mode means.
+            State means.
         """
         return obs_mod.get_observation_model_parameter(self.model, "means")
 
     def get_covariances(self):
-        """Get the mode covariances.
+        """Get the state covariances.
 
         Returns
         -------
         covariances : np.ndarary
-            Mode covariances.
+            State covariances.
         """
         return obs_mod.get_observation_model_parameter(self.model, "covs")
 
     def get_means_covariances(self):
-        """Get the mode means and covariances.
+        """Get the state means and covariances.
 
         This is a wrapper for :code:`get_means` and :code:`get_covariances`.
 
         Returns
         -------
         means : np.ndarary
-            Mode means.
+            State means.
         covariances : np.ndarray
-            Mode covariances.
+            State covariances.
         """
         return self.get_means(), self.get_covariances()
 
@@ -242,12 +365,12 @@ class Model(VariationalInferenceModelBase):
         return self.get_means_covariances()
 
     def set_means(self, means, update_initializer=True):
-        """Set the mode means.
+        """Set the state means.
 
         Parameters
         ----------
         means : np.ndarray
-            Mode means. Shape is (n_modes, n_channels).
+            State means. Shape is (n_states, n_channels).
         update_initializer : bool
             Do we want to use the passed means when we re-initialize
             the model?
@@ -260,12 +383,12 @@ class Model(VariationalInferenceModelBase):
         )
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Set the mode covariances.
+        """Set the state covariances.
 
         Parameters
         ----------
         covariances : np.ndarray
-            Mode covariances. Shape is (n_modes, n_channels, n_channels).
+            State covariances. Shape is (n_states, n_channels, n_channels).
         update_initializer : bool, optional
             Do we want to use the passed covariances when we re-initialize
             the model?
@@ -394,141 +517,11 @@ class Model(VariationalInferenceModelBase):
             states = np.roll(states, -1, axis=0)
 
             # Sample from the probability distribution function
-            states[-1] = tf.nn.softmax((mod_theta + gumbel_noise[i]) / final_temperature, axis=-1)
+            states[-1] = tf.nn.softmax(
+                (mod_theta + gumbel_noise[i]) / final_temperature, axis=-1
+            )
 
             # Calculate the state probability time courses
             alpha[i] = alpha_layer(mod_theta[np.newaxis, np.newaxis, :])[0, 0]
 
         return alpha
-    
-    def _select_covariance_layer(self):
-        """Select the covariance layer based on the config."""
-        config = self.config
-        if config.diagonal_covariances:
-            CovsLayer = DiagonalMatricesLayer
-        else:
-            CovsLayer = CovarianceMatricesLayer
-        return CovsLayer(
-            config.n_states,
-            config.n_channels,
-            config.learn_covariances,
-            config.initial_covariances,
-            config.covariances_epsilon,
-            config.covariances_regularizer,
-            name="covs",
-        )
-
-    def _model_structure(self):
-        """Build the model structure."""
-
-        config = self.config
-
-        # Inputs
-        inputs = layers.Input(
-            shape=(config.sequence_length, config.n_channels), name="data"
-        )
-
-        # Static loss scaling factor
-        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            config.sequence_length,
-            config.loss_calc,
-            name="static_loss_scaling_factor",
-        )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(inputs)
-
-        # Inference RNN:
-        # - Learns q(state_t) = softmax(inf_theta_t), where 
-        #     - inf_theta_t ~ affine(RNN(inputs_<=t)) is a set of logits
-
-        # Definition of layers
-        inf_rnn_layer = InferenceRNNLayer(
-            config.inference_rnn,
-            config.inference_normalization,
-            config.inference_activation,
-            config.inference_n_layers,
-            config.inference_n_units,
-            config.inference_dropout,
-            config.inference_regularizer,
-            name="inf_rnn",
-        )
-        inf_theta_layer = layers.Dense(config.n_states, name="inf_theta")
-        alpha_layer = SoftmaxLayer(
-            initial_temperature=1.0,
-            learn_temperature=False,
-            name="alpha",
-        )
-        states_layer = SampleGumbelSoftmaxDistributionLayer(
-            temperature=1.0, name="states"
-        ) # NOTE: NEED EDIT; temperature as a configurable parameter
-
-        # Data flow
-        inf_rnn = inf_rnn_layer(inputs)
-        inf_theta = inf_theta_layer(inf_rnn)
-        alpha = alpha_layer(inf_theta)
-        states = states_layer(inf_theta)
-
-        # Observation model:
-        # - We use a multivariate normal with a mean vector and covariance matrix
-        #   for each state as the observation model.
-        # - We calculate the likelihood of generating the training data with alpha
-        #   and the observation model.
-        # - p(x_t | theta_tk) = N(mu_k, D_k), where mu_k and D_k are state(k)-dependent
-        #   means/covariances.
-
-        # Definition of layers
-        means_layer = VectorsLayer(
-            config.n_states,
-            config.n_channels,
-            config.learn_means,
-            config.initial_means,
-            config.means_regularizer,
-            name="means",
-        )
-        covs_layer = self._select_covariance_layer()
-        ll_loss_layer = CategoricalLogLikelihoodLossLayer(
-            config.n_states,
-            config.loss_calc,
-            name="ll_loss",
-        )
-
-        # Data flow
-        mu = means_layer(
-            inputs, static_loss_scaling_factor=static_loss_scaling_factor
-        )  # inputs not used
-        D = covs_layer(
-            inputs, static_loss_scaling_factor=static_loss_scaling_factor
-        )  # inputs not used
-        ll_loss = ll_loss_layer([inputs, mu, D, alpha, None])
-
-        # Model RNN:
-        # - Learns p(state_t | state_<t) ~ Cat(mod_theta_t), where
-        #     - mod_theta_t ~ affine(RNN(states_<t)) is a set of logits
-        # - Here, the model RNN predicts logits for the next state based
-        #   on a history of states.
-
-        # Definition of layers
-        mod_rnn_layer = ModelRNNLayer(
-            config.model_rnn,
-            config.model_normalization,
-            config.model_activation,
-            config.model_n_layers,
-            config.model_n_units,
-            config.model_dropout,
-            config.model_regularizer,
-            name="mod_rnn",
-        )
-        mod_theta_layer = layers.Dense(config.n_states, name="mod_theta")
-        kl_div_layer = CategoricalKLDivergenceLayer(config.loss_calc, name="kl_div")
-        kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
-
-        # Data flow
-        mod_rnn = mod_rnn_layer(states)
-        mod_theta = mod_theta_layer(mod_rnn)
-        kl_div = kl_div_layer([inf_theta, mod_theta])
-        kl_loss = kl_loss_layer(kl_div)
-
-        return tf.keras.Model(
-            inputs=inputs,
-            outputs=[ll_loss, kl_loss, inf_theta],
-            name=config.model_name,
-        )
