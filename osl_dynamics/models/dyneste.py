@@ -357,7 +357,7 @@ class Model(VariationalInferenceModelBase):
         states_layer = self.model.get_layer("states")
 
         # Get the final temperature of Gumbel-Softmax distribution
-        final_temperature = states_layer.temperature.numpy()
+        final_temperature = tf.cast(states_layer.temperature, tf.float32)
 
         # Preallocate Gumbel noise
         gumbel_noise = tfp.distributions.Gumbel(loc=0, scale=1).sample(
@@ -373,7 +373,8 @@ class Model(VariationalInferenceModelBase):
 
             # Randomly sample the first time step
             init_gs = tfp.distributions.RelaxedOneHotCategorical(
-                temperature=final_temperature, logits=np.zeros((self.config.n_states,)),
+                temperature=final_temperature,
+                logits=tf.zeros([self.config.n_states], dtype=tf.float32),
             )
             states[-1] = init_gs.sample()
 
