@@ -65,6 +65,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     inference_regularizer : str
         Regularizer.
 
+    initial_gs_temperature : float
+        Initial temperature for the Gumbel-Softmax distribution.
+
     model_rnn : str
         RNN to use, either :code:`'gru'` or :code:`'lstm'`.
     model_n_layers : int
@@ -144,6 +147,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     inference_activation: str = None
     inference_dropout: float = 0.0
     inference_regularizer: str = None
+    initial_gs_temperature: float = 1.0
 
     # Model network parameters
     model_rnn: str = "lstm"
@@ -227,8 +231,8 @@ class Model(VariationalInferenceModelBase):
             name="alpha",
         )
         states_layer = SampleGumbelSoftmaxDistributionLayer(
-            temperature=1.0, name="states"
-        )  # NOTE: NEED EDIT; temperature as a configurable parameter
+            temperature=config.initial_gs_temperature, name="states"
+        )
 
         # Observation model:
         # - We use a multivariate normal with a mean vector and covariance matrix
