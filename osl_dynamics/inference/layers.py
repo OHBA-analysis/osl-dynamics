@@ -1358,9 +1358,13 @@ class KLLossLayer(layers.Layer):
     def __init__(self, do_annealing, **kwargs):
         super().__init__(**kwargs)
         if do_annealing:
-            self.annealing_factor = tf.keras.Variable(0.0, trainable=False, name="kl_factor")
+            self.annealing_factor = tf.keras.Variable(
+                0.0, trainable=False, name="kl_factor"
+            )
         else:
-            self.annealing_factor = tf.keras.Variable(1.0, trainable=False, name="kl_factor")
+            self.annealing_factor = tf.keras.Variable(
+                1.0, trainable=False, name="kl_factor"
+            )
 
     def call(self, inputs, training=False, **kwargs):
         kl_loss = inputs
