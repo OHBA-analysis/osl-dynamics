@@ -1514,7 +1514,7 @@ def topoplot(
     title=None,
     colorbar=True,
     axis=None,
-    cmap="plasma",
+    cmap="cold_hot",
     n_contours=10,
     filename=None,
 ):
