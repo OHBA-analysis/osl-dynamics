@@ -121,7 +121,7 @@ class GumbelSoftmaxAnnealingCallback(tf.keras.callbacks.Callback):
         layer_name,
         n_epochs,
         start_temperature=1.0,
-        end_temperature=0.0,
+        end_temperature=0.01,
         slope=0.014,
     ):
         self.curve = curve
