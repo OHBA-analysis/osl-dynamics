@@ -1606,11 +1606,11 @@ def plot_brain_surface(
     Parameters
     ----------
     values : np.ndarray
-        Data to plot. Must be of shape (n_channels,).
+        Data to plot. Must be of shape (n_parcels,).
     mask_file : str
-        Mask file for the brain.
+        Mask file for the brain. See osl_dynamics.files.mask.
     parcellation_file : str
-        Parcellation file.
+        Parcellation file. See osl_dynamics.files.parcellation.
     title : str, optional
         Title for the plot.
     cmap : str, optional
@@ -1634,8 +1634,10 @@ def plot_brain_surface(
         :code:`['left', 'right']` or :code:`['left']` or :code:`['right']`.
         Defaults to :code:`['left', 'right']`.
     views : list, optional
-        :code:`['lateral', 'medial']` or :code:`['lateral']`.
-        Defaults to :code:`['lateral']`.
+        The list can contain :code:`'lateral'` or :code:`'medial'`.
+        Defaults to :code:`['lateral']`, which will show one row with
+        lateral views. :code:`['lateral', 'medial']` will show two
+        rows with the lateral view ontop and medial view below.
     bg_on_data : bool, optional
         If True, the sulcal depth is jointly visible with surface data.
         Otherwise, the background image will only be visible where there
@@ -1645,8 +1647,8 @@ def plot_brain_surface(
         Threshold values to display. Defaults to no thresholding.
     filename : str, optional
         Output filename. Extension can be :code:`png/svg/pdf`.
-        If :code:`None` is passed then the image is shown on
-        screen and the Matplotlib objects are returned.
+        If None is passed then the image is shown on screen and the
+        Matplotlib objects are returned.
     show_plot : bool, optional
         Should we show the plot? If :code:`filename` is True, defaults
         to False, otherwise False.
@@ -1671,7 +1673,7 @@ def plot_brain_surface(
         views = ["lateral"]
 
     if filename is not None:
-        allowed_extensions = [".nii", ".nii.gz", ".png", ".svg", ".pdf"]
+        allowed_extensions = [".png", ".svg", ".pdf"]
         if not any([ext in filename for ext in allowed_extensions]):
             raise ValueError(
                 "filename must have one of following extensions: "
