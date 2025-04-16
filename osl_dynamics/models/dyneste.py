@@ -1,29 +1,25 @@
-"""Dynamic Network Modes (DyNeMo).
+"""Dynamic Network States (DyNeStE)."""
 
-See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
-/dynemo.html>`_ for a description of this model.
-"""
-
-import os
 import logging
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import tensorflow as tf
+import tensorflow_probability as tfp
+from tensorflow.keras import layers
 from tqdm.auto import trange
 
+from osl_dynamics.inference import callbacks
 from osl_dynamics.inference.layers import (
+    CategoricalKLDivergenceLayer,
+    CategoricalLogLikelihoodLossLayer,
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
     InferenceRNNLayer,
-    KLDivergenceLayer,
     KLLossLayer,
-    LogLikelihoodLossLayer,
-    MixMatricesLayer,
-    MixVectorsLayer,
     ModelRNNLayer,
-    NormalizationLayer,
-    SampleNormalDistributionLayer,
+    SampleGumbelSoftmaxDistributionLayer,
     SoftmaxLayer,
     VectorsLayer,
     StaticLossScalingFactorLayer,
@@ -34,21 +30,21 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.utils.misc import set_logging_level
+from osl_dynamics.utils.misc import set_logging_level, replace_argument
 
 _logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
 class Config(BaseModelConfig, VariationalInferenceModelConfig):
-    """Settings for DyNeMo.
+    """Settings for DyNeStE.
 
     Parameters
     ----------
     model_name : str
         Model name.
-    n_modes : int
-        Number of modes.
+    n_states : int
+        Number of states.
     n_channels : int
         Number of channels.
     sequence_length : int
@@ -78,7 +74,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_n_units : int
         Number of units.
     model_normalization : str
-        Type of normalization to use. Either None, :code:`'batch'` or
+        Type of normalization to use. Either :code:`None`, :code:`'batch'` or
         :code:`'layer'`.
     model_activation : str
         Type of activation to use after normalization and before dropout.
@@ -88,25 +84,20 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_regularizer : str
         Regularizer.
 
-    learn_alpha_temperature : bool
-        Should we learn :code:`alpha_temperature`?
-    initial_alpha_temperature : float
-        Initial value for :code:`alpha_temperature`.
-
     learn_means : bool
-        Should we make the mean vectors for each mode trainable?
+        Should we make the mean vectors for each state trainable?
     learn_covariances : bool
-        Should we make the covariance matrix for each mode trainable?
+        Should we make the covariance matrix for each state trainable?
     initial_means : np.ndarray
         Initialisation for mean vectors.
     initial_covariances : np.ndarray
-        Initialisation for mode covariances.
+        Initialisation for state covariances.
         If :code:`diagonal_covariances=True` and full matrices are passed,
         the diagonal is extracted.
     covariances_epsilon : float
-        Error added to mode covariances for numerical stability.
+        Error added to state covariances for numerical stability.
     diagonal_covariances : bool
-        Should we learn diagonal mode covariances?
+        Should we learn diagonal state covariances?
     means_regularizer : tf.keras.regularizers.Regularizer
         Regularizer for mean vectors.
     covariances_regularizer : tf.keras.regularizers.Regularizer
@@ -121,6 +112,22 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         :code:`kl_annealing_curve='tanh'`.
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
+
+    do_gs_annealing : bool
+        Should we use temperature annealing for the Gumbel-Softmax distribution
+        during training?
+    gs_annealing_curve : str
+        Type of Gumbel-Softmax temperature annealing curve. Either :code:`'linear'`
+        or :code:`'exp'`.
+    initial_gs_temperature : float
+        Initial temperature for the Gumbel-Softmax distribution.
+    final_gs_temperature : float
+        Final temperature for the Gumbel-Softmax distribution after annealing.
+    gs_annealing_slope : float
+        Slope of the Gumbel-Softmax temperature annealing curve. Only used when
+        :code:`gs_annealing_curve='exp'`.
+    n_gs_annealing_epochs : int
+        Number of epochs to perform Gumbel-Softmax temperature annealing.
 
     batch_size : int
         Mini-batch size.
@@ -145,7 +152,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Strategy for distributed learning.
     """
 
-    model_name: str = "DyNeMo"
+    model_name: str = "DyNeStE"
 
     # Inference network parameters
     inference_rnn: str = "lstm"
@@ -165,6 +172,14 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_dropout: float = 0.0
     model_regularizer: str = None
 
+    # GS annealing parameters
+    do_gs_annealing: bool = False
+    gs_annealing_curve: Literal["linear", "exp"] = None
+    initial_gs_temperature: float = 1.0
+    final_gs_temperature: float = 0.01
+    gs_annealing_slope: float = None
+    n_gs_annealing_epochs: int = None
+
     # Observation model parameters
     learn_means: bool = None
     learn_covariances: bool = None
@@ -178,8 +193,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     def __post_init__(self):
         self.validate_rnn_parameters()
         self.validate_observation_model_parameters()
-        self.validate_alpha_parameters()
         self.validate_kl_annealing_parameters()
+        self.validate_gs_annealing_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 
@@ -200,13 +215,45 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             else:
                 self.covariances_epsilon = 0.0
 
+    def validate_gs_annealing_parameters(self):
+        if self.do_gs_annealing:
+            if self.gs_annealing_curve is None:
+                raise ValueError(
+                    "If we are performing Gumbel-Softmax annealing, "
+                    "gs_annealing_curve must be passed."
+                )
+
+            if self.gs_annealing_curve not in ["linear", "exp"]:
+                raise ValueError("GS annealing curve must be 'linear' or 'exp'.")
+
+            if self.gs_annealing_curve == "exp":
+                if self.gs_annealing_slope is None:
+                    raise ValueError(
+                        "gs_annealing_slope must be passed if "
+                        "gs_annealing_curve='exp'."
+                    )
+
+                if self.gs_annealing_slope <= 0:
+                    raise ValueError("gs_annealing_slope must be positive.")
+
+            if self.n_gs_annealing_epochs is None:
+                raise ValueError(
+                    "If we are performing GS annealing, "
+                    "n_gs_annealing_epochs must be passed."
+                )
+
+            if self.n_gs_annealing_epochs < 1:
+                raise ValueError(
+                    "Number of GS annealing epochs must be greater than zero."
+                )
+
 
 class Model(VariationalInferenceModelBase):
-    """DyNeMo model class.
+    """DyNeStE model class.
 
     Parameters
     ----------
-    config : osl_dynamics.models.dynemo.Config
+    config : osl_dynamics.models.dyneste.Config
     """
 
     config_type = Config
@@ -217,9 +264,11 @@ class Model(VariationalInferenceModelBase):
         config = self.config
 
         # ---------- Define layers ---------- #
-        data_drop_layer = tf.keras.layers.Dropout(
-            config.inference_dropout, name="data_drop"
-        )
+
+        # Inference RNN:
+        # - Learns q(state_t) = softmax(inf_theta_t), where
+        #     - inf_theta_t ~ affine(RNN(inputs_<=t)) is a set of logits
+
         inf_rnn_layer = InferenceRNNLayer(
             config.inference_rnn,
             config.inference_normalization,
@@ -230,26 +279,31 @@ class Model(VariationalInferenceModelBase):
             config.inference_regularizer,
             name="inf_rnn",
         )
-        inf_mu_layer = tf.keras.layers.Dense(config.n_modes, name="inf_mu")
-        inf_sigma_layer = tf.keras.layers.Dense(
-            config.n_modes, activation="softplus", name="inf_sigma"
-        )
-        theta_layer = SampleNormalDistributionLayer(
-            config.theta_std_epsilon,
-            name="theta",
-        )
+        inf_theta_layer = layers.Dense(config.n_states, name="inf_theta")
         alpha_layer = SoftmaxLayer(
-            config.initial_alpha_temperature,
-            config.learn_alpha_temperature,
+            initial_temperature=1.0,
+            learn_temperature=False,
             name="alpha",
         )
+        states_layer = SampleGumbelSoftmaxDistributionLayer(
+            temperature=config.initial_gs_temperature, name="states"
+        )
+
+        # Observation model:
+        # - We use a multivariate normal with a mean vector and covariance matrix
+        #   for each state as the observation model.
+        # - We calculate the likelihood of generating the training data with alpha
+        #   and the observation model.
+        # - p(x_t | theta_tk) = N(mu_k, D_k), where mu_k and D_k are state(k)-dependent
+        #   means/covariances.
+
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
             config.sequence_length,
             config.loss_calc,
             name="static_loss_scaling_factor",
         )
         means_layer = VectorsLayer(
-            config.n_modes,
+            config.n_states,
             config.n_channels,
             config.learn_means,
             config.initial_means,
@@ -258,7 +312,7 @@ class Model(VariationalInferenceModelBase):
         )
         if config.diagonal_covariances:
             covs_layer = DiagonalMatricesLayer(
-                config.n_modes,
+                config.n_states,
                 config.n_channels,
                 config.learn_covariances,
                 config.initial_covariances,
@@ -268,7 +322,7 @@ class Model(VariationalInferenceModelBase):
             )
         else:
             covs_layer = CovarianceMatricesLayer(
-                config.n_modes,
+                config.n_states,
                 config.n_channels,
                 config.learn_covariances,
                 config.initial_covariances,
@@ -276,13 +330,18 @@ class Model(VariationalInferenceModelBase):
                 config.covariances_regularizer,
                 name="covs",
             )
-        mix_means_layer = MixVectorsLayer(name="mix_means")
-        mix_covs_layer = MixMatricesLayer(name="mix_covs")
-        ll_loss_layer = LogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
-        theta_drop_layer = tf.keras.layers.Dropout(
-            config.model_dropout,
-            name="theta_drop",
+        ll_loss_layer = CategoricalLogLikelihoodLossLayer(
+            config.n_states,
+            config.loss_calc,
+            name="ll_loss",
         )
+
+        # Model RNN:
+        # - Learns p(state_t | state_<t) ~ Cat(mod_theta_t), where
+        #     - mod_theta_t ~ affine(RNN(states_<t)) is a set of logits
+        # - Here, the model RNN predicts logits for the next state based
+        #   on a history of states.
+
         mod_rnn_layer = ModelRNNLayer(
             config.model_rnn,
             config.model_normalization,
@@ -293,81 +352,119 @@ class Model(VariationalInferenceModelBase):
             config.model_regularizer,
             name="mod_rnn",
         )
-        mod_mu_layer = tf.keras.layers.Dense(config.n_modes, name="mod_mu")
-        mod_sigma_layer = tf.keras.layers.Dense(
-            config.n_modes, activation="softplus", name="mod_sigma"
-        )
-        kl_div_layer = KLDivergenceLayer(
-            config.theta_std_epsilon, config.loss_calc, name="kl_div"
-        )
+        mod_theta_layer = layers.Dense(config.n_states, name="mod_theta")
+        kl_div_layer = CategoricalKLDivergenceLayer(config.loss_calc, name="kl_div")
         kl_loss_layer = KLLossLayer(config.do_kl_annealing, name="kl_loss")
 
         # ---------- Forward pass ---------- #
 
         # Encoder
-        data = tf.keras.layers.Input(
+        data = layers.Input(
             shape=(config.sequence_length, config.n_channels), name="data"
         )
-        data_drop = data_drop_layer(data)
-        inf_rnn = inf_rnn_layer(data_drop)
-        inf_mu = inf_mu_layer(inf_rnn)
-        inf_sigma = inf_sigma_layer(inf_rnn)
-        theta = theta_layer([inf_mu, inf_sigma])
-        alpha = alpha_layer(theta)
+        inf_rnn = inf_rnn_layer(data)
+        inf_theta = inf_theta_layer(inf_rnn)
+        alpha = alpha_layer(inf_theta)
+        states = states_layer(inf_theta)
 
         # Observation model
         static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
         mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
         D = covs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
-        m = mix_means_layer([alpha, mu])
-        C = mix_covs_layer([alpha, D])
-        ll_loss = ll_loss_layer([data, m, C])
+        ll_loss = ll_loss_layer([data, mu, D, alpha])
 
         # Temporal prior
-        theta_drop = theta_drop_layer(theta)
-        mod_rnn = mod_rnn_layer(theta_drop)
-        mod_mu = mod_mu_layer(mod_rnn)
-        mod_sigma = mod_sigma_layer(mod_rnn)
-        kl_div = kl_div_layer([inf_mu, inf_sigma, mod_mu, mod_sigma])
+        mod_rnn = mod_rnn_layer(states)
+        mod_theta = mod_theta_layer(mod_rnn)
+        kl_div = kl_div_layer([inf_theta, mod_theta])
         kl_loss = kl_loss_layer(kl_div)
 
         # ---------- Create model ---------- #
         inputs = {"data": data}
-        outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "theta": theta}
+        outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "theta": inf_theta}
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
+    def fit(self, *args, gs_annealing_callback=None, **kwargs):
+        """Wrapper for the standard keras fit method.
+
+        This function inherits :code:`fit()` functions in :code:`ModelBase` and
+        :code:`VariationalInferenceModelBase`.
+
+        Parameters
+        ----------
+        *args : arguments
+            Arguments for :code:`ModelBase.fit()` or
+            :code:`VariationalInferenceModelBase.fit()`.
+        gs_annealing_callback : bool, optional
+            Should we anneal the Gumbel-Softmax temperature during training?
+        **kwargs : keyword arguments, optional
+            Keyword arguments for :code:`ModelBase.fit()` or
+            :code:`VariationalInferenceModelBase.fit()`.
+
+        Returns
+        -------
+        history : history
+            The training history.
+        """
+        # Validation
+        if gs_annealing_callback is None:
+            gs_annealing_callback = self.config.do_gs_annealing
+
+        # Gumbel-Softmax distribution temperature annealing
+        if gs_annealing_callback:
+            gs_annealing_callback = callbacks.GumbelSoftmaxAnnealingCallback(
+                curve=self.config.gs_annealing_curve,
+                layer_name="states",
+                n_epochs=self.config.n_gs_annealing_epochs,
+                start_temperature=self.config.initial_gs_temperature,
+                end_temperature=self.config.final_gs_temperature,
+                slope=self.config.gs_annealing_slope,
+            )
+
+            # Update arguments to pass to the fit method
+            args, kwargs = replace_argument(
+                self.model.fit,
+                "callbacks",
+                [gs_annealing_callback],
+                args,
+                kwargs,
+                append=True,
+            )
+
+        return super().fit(*args, **kwargs)
+
     def get_means(self):
-        """Get the mode means.
+        """Get the state means.
 
         Returns
         -------
         means : np.ndarary
-            Mode means.
+            State means.
         """
         return obs_mod.get_observation_model_parameter(self.model, "means")
 
     def get_covariances(self):
-        """Get the mode covariances.
+        """Get the state covariances.
 
         Returns
         -------
         covariances : np.ndarary
-            Mode covariances.
+            State covariances.
         """
         return obs_mod.get_observation_model_parameter(self.model, "covs")
 
     def get_means_covariances(self):
-        """Get the mode means and covariances.
+        """Get the state means and covariances.
 
         This is a wrapper for :code:`get_means` and :code:`get_covariances`.
 
         Returns
         -------
         means : np.ndarary
-            Mode means.
+            State means.
         covariances : np.ndarray
-            Mode covariances.
+            State covariances.
         """
         return self.get_means(), self.get_covariances()
 
@@ -376,12 +473,12 @@ class Model(VariationalInferenceModelBase):
         return self.get_means_covariances()
 
     def set_means(self, means, update_initializer=True):
-        """Set the mode means.
+        """Set the state means.
 
         Parameters
         ----------
         means : np.ndarray
-            Mode means. Shape is (n_modes, n_channels).
+            State means. Shape is (n_states, n_channels).
         update_initializer : bool
             Do we want to use the passed means when we re-initialize
             the model?
@@ -394,12 +491,12 @@ class Model(VariationalInferenceModelBase):
         )
 
     def set_covariances(self, covariances, update_initializer=True):
-        """Set the mode covariances.
+        """Set the state covariances.
 
         Parameters
         ----------
         covariances : np.ndarray
-            Mode covariances. Shape is (n_modes, n_channels, n_channels).
+            State covariances. Shape is (n_states, n_channels, n_channels).
         update_initializer : bool, optional
             Do we want to use the passed covariances when we re-initialize
             the model?
@@ -468,16 +565,16 @@ class Model(VariationalInferenceModelBase):
                 self.config.diagonal_covariances,
             )
 
-    def sample_alpha(self, n_samples, theta=None):
-        """Uses the model RNN to sample mode mixing factors, :code:`alpha`.
+    def sample_alpha(self, n_samples, states=None):
+        """Uses the model RNN to sample a state probability time course, :code:`alpha`.
 
         Parameters
         ----------
         n_samples : int
             Number of samples to take.
-        theta : np.ndarray, optional
-            Normalized logits to initialise the sampling with.
-            Shape must be (sequence_length, n_modes).
+        states : np.ndarray, optional
+            One-hot state vectors to initialize the sampling with.
+            Shape must be (sequence_length, n_states).
 
         Returns
         -------
@@ -485,216 +582,54 @@ class Model(VariationalInferenceModelBase):
             Sampled alpha.
         """
         # Get layers
-        model_rnn_layer = self.model.get_layer("mod_rnn")
-        mod_mu_layer = self.model.get_layer("mod_mu")
-        mod_sigma_layer = self.model.get_layer("mod_sigma")
+        mod_rnn_layer = self.model.get_layer("mod_rnn")
+        mod_theta_layer = self.model.get_layer("mod_theta")
         alpha_layer = self.model.get_layer("alpha")
+        states_layer = self.model.get_layer("states")
 
-        # Normally distributed random numbers used to sample the logits theta
-        epsilon = np.random.normal(0, 1, [n_samples + 1, self.config.n_modes]).astype(
-            np.float32
+        # Get the final temperature of Gumbel-Softmax distribution
+        final_temperature = tf.cast(states_layer.temperature, tf.float32)
+
+        # Preallocate Gumbel noise
+        gumbel_noise = tfp.distributions.Gumbel(loc=0, scale=1).sample(
+            [n_samples, self.config.n_states]
         )
 
-        if theta is None:
-            # Sequence of the underlying logits theta
-            theta = np.zeros(
-                [self.config.sequence_length, self.config.n_modes],
+        if states is None:
+            # Sequence of the underlying state time course
+            states = np.zeros(
+                [self.config.sequence_length, self.config.n_states],
                 dtype=np.float32,
             )
 
             # Randomly sample the first time step
-            theta[-1] = np.random.normal(size=self.config.n_modes)
+            init_gs = tfp.distributions.RelaxedOneHotCategorical(
+                temperature=final_temperature,
+                logits=tf.zeros([self.config.n_states], dtype=tf.float32),
+            )
+            states[-1] = init_gs.sample()
 
-        # Sample the mode fixing factors
-        alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
-        for i in trange(n_samples, desc="Sampling mode time course"):
-            # If there are leading zeros we trim theta so that we don't pass
-            # the zeros
-            trimmed_theta = theta[~np.all(theta == 0, axis=1)][np.newaxis, :, :]
+        # Sample the state probability time course
+        alpha = np.empty([n_samples, self.config.n_states], dtype=np.float32)
+        for i in trange(n_samples, desc="Sampling state probability time course"):
+            # If there are leading zeros we trim the state time course so that
+            # we don't pass the zeros
+            trimmed_states = states[~np.all(states == 0, axis=1)][np.newaxis, :, :]
 
             # Predict the probability distribution function for theta one time
-            # step in the future, p(theta|theta_<t) ~ N(mod_mu, sigma_theta_jt)
-            model_rnn = model_rnn_layer(trimmed_theta)
-            mod_mu = mod_mu_layer(model_rnn)[0, -1]
-            mod_sigma = mod_sigma_layer(model_rnn)[0, -1]
+            # step in the future, p(state_t|state_<t) ~ Cat(mod_theta)
+            mod_rnn = mod_rnn_layer(trimmed_states)
+            mod_theta = mod_theta_layer(mod_rnn)[0, -1]
 
-            # Shift theta one time step to the left
-            theta = np.roll(theta, -1, axis=0)
+            # Shift the state time course one time step to the left
+            states = np.roll(states, -1, axis=0)
 
             # Sample from the probability distribution function
-            theta[-1] = mod_mu + mod_sigma * epsilon[i]
+            states[-1] = tf.nn.softmax(
+                (mod_theta + gumbel_noise[i]) / final_temperature, axis=-1
+            )
 
-            # Calculate the mode mixing factors
-            alpha[i] = alpha_layer(mod_mu[np.newaxis, np.newaxis, :])[0, 0]
+            # Calculate the state probability time courses
+            alpha[i] = alpha_layer(mod_theta[np.newaxis, np.newaxis, :])[0, 0]
 
         return alpha
-
-    def fine_tuning(
-        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
-    ):
-        """Fine tuning the model for each session.
-
-        Here, we train the inference RNN and observation model with the model
-        RNN fixed held fixed at the group-level.
-
-        Parameters
-        ----------
-        training_data : osl_dynamics.data.Data
-            Training dataset.
-        n_epochs : int, optional
-            Number of epochs to train for. Defaults to the value in the
-            :code:`config` used to create the model.
-        learning_rate : float, optional
-            Learning rate. Defaults to the value in the :code:`config` used
-            to create the model.
-        store_dir : str, optional
-            Directory to temporarily store the model in.
-
-        Returns
-        -------
-        alpha : list of np.ndarray
-            Session-specific mixing coefficients.
-            Each element has shape (n_samples, n_modes).
-        means : np.ndarray
-            Session-specific means. Shape is (n_sessions, n_modes, n_channels).
-        covariances : np.ndarray
-            Session-specific covariances.
-            Shape is (n_sessions, n_modes, n_channels, n_channels).
-        """
-        # Save the group level model
-        os.makedirs(store_dir, exist_ok=True)
-        self.save_weights(f"{store_dir}/model.weights.h5")
-
-        # Save original training hyperparameters
-        original_n_epochs = self.config.n_epochs
-        original_learning_rate = self.config.learning_rate
-        original_do_kl_annealing = self.config.do_kl_annealing
-        self.config.n_epochs = n_epochs or self.config.n_epochs
-        self.config.learning_rate = learning_rate or self.config.learning_rate
-        self.config.do_kl_annealing = False
-
-        # Layers to fix (i.e. make non-trainable)
-        fixed_layers = ["mod_rnn", "mod_mu", "mod_sigma"]
-
-        # Fine tune on sessions
-        alpha = []
-        means = []
-        covariances = []
-        with self.set_trainable(fixed_layers, False), set_logging_level(
-            _logger, logging.WARNING
-        ):
-            for i in trange(training_data.n_sessions, desc="Fine tuning"):
-                # Train on this session
-                with training_data.set_keep(i):
-                    self.fit(training_data, verbose=0)
-                    a = self.get_alpha(
-                        training_data,
-                        concatenate=True,
-                        verbose=0,
-                    )
-
-                # Get inferred parameters
-                m, c = self.get_means_covariances()
-                alpha.append(a)
-                means.append(m)
-                covariances.append(c)
-
-                # Reset back to group-level model parameters
-                self.load_weights(f"{store_dir}/model.weights.h5")
-                self.compile()
-
-        # Reset hyperparameters
-        self.config.n_epochs = original_n_epochs
-        self.config.learning_rate = original_learning_rate
-        self.config.do_kl_annealing = original_do_kl_annealing
-
-        return alpha, np.array(means), np.array(covariances)
-
-    def dual_estimation(
-        self,
-        training_data,
-        n_epochs=None,
-        learning_rate=None,
-        store_dir="tmp",
-    ):
-        """Dual estimation to get the session-specific observation model
-        parameters.
-
-        Here, we train the observation model parameters (mode means and
-        covariances) with the inference RNN and model RNN held fixed at
-        the group-level.
-
-        Parameters
-        ----------
-        training_data : osl_dynamics.data.Data or list of tf.data.Dataset
-            Training dataset.
-        n_epochs : int, optional
-            Number of epochs to train for. Defaults to the value in the
-            :code:`config` used to create the model.
-        learning_rate : float, optional
-            Learning rate. Defaults to the value in the :code:`config` used
-            to create the model.
-        store_dir : str, optional
-            Directory to temporarily store the model in.
-
-        Returns
-        -------
-        means : np.ndarray
-            Session-specific means. Shape is (n_sessions, n_modes, n_channels).
-        covariances : np.ndarray
-            Session-specific covariances.
-            Shape is (n_sessions, n_modes, n_channels, n_channels).
-        """
-        # Save the group level model
-        os.makedirs(store_dir, exist_ok=True)
-        self.save_weights(f"{store_dir}/model_weights.weights.h5")
-
-        # Save original training hyperparameters
-        original_n_epochs = self.config.n_epochs
-        original_learning_rate = self.config.learning_rate
-        self.config.n_epochs = n_epochs or self.config.n_epochs
-        self.config.learning_rate = learning_rate or self.config.learning_rate
-
-        # Layers to fix (i.e. make non-trainable)
-        fixed_layers = [
-            "mod_rnn",
-            "mod_mu",
-            "mod_sigma",
-            "inf_rnn",
-            "inf_mu",
-            "inf_sigma",
-            "theta",
-            "alpha",
-        ]
-
-        # Dual estimation on sessions
-        means = []
-        covariances = []
-        with self.set_trainable(fixed_layers, False):
-            if isinstance(training_data, list):
-                n_sessions = len(training_data)
-            else:
-                n_sessions = training_data.n_sessions
-
-            for i in trange(n_sessions, desc="Dual estimation"):
-                # Train on this session
-                if isinstance(training_data, list):
-                    self.fit(training_data[i], verbose=0)
-                else:
-                    with training_data.set_keep(i):
-                        self.fit(training_data, verbose=0)
-
-                # Get inferred parameters
-                m, c = self.get_means_covariances()
-                means.append(m)
-                covariances.append(c)
-
-                # Reset back to group-level model parameters
-                self.load_weights(f"{store_dir}/model_weights.weights.h5")
-                self.compile()
-
-        # Reset hyperparameters
-        self.config.n_epochs = original_n_epochs
-        self.config.learning_rate = original_learning_rate
-
-        return np.array(means), np.array(covariances)

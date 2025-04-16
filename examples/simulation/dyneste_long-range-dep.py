@@ -1,4 +1,4 @@
-"""Example script for demonstrating DyNeMo's ability to learn long-range dependependcies.
+"""Example script for demonstrating DyNeStE's ability to learn long-range dependependcies.
 
 - An HSMM is simulated.
 - The output of this script will vary slightly due to random sampling.
@@ -7,11 +7,12 @@
 print("Setting up")
 import os
 from osl_dynamics import data, simulation
-from osl_dynamics.inference import tf_ops, modes, metrics, callbacks
-from osl_dynamics.models.dynemo import Config, Model
+from osl_dynamics.inference import tf_ops, modes, metrics
+from osl_dynamics.models.dyneste import Config, Model
 from osl_dynamics.utils import plotting
 
-# Make directory to hold plots
+# Make directory for results and plots
+os.makedirs("results", exist_ok=True)
 os.makedirs("figures", exist_ok=True)
 
 # GPU settings
@@ -19,24 +20,29 @@ tf_ops.gpu_growth()
 
 # Settings
 config = Config(
-    n_modes=3,
+    n_states=3,
     n_channels=11,
     sequence_length=200,
-    inference_n_units=64,
+    inference_n_units=128,
     inference_normalization="layer",
-    model_n_units=64,
+    model_n_units=128,
     model_normalization="layer",
-    learn_alpha_temperature=True,
-    initial_alpha_temperature=1.0,
     learn_means=False,
     learn_covariances=True,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=100,
+    n_kl_annealing_epochs=50,
+    do_gs_annealing=True,
+    gs_annealing_curve="exp",
+    initial_gs_temperature=1.0,
+    final_gs_temperature=0.06,
+    gs_annealing_slope=0.04,
+    n_gs_annealing_epochs=120,
     batch_size=16,
-    learning_rate=0.01,
-    n_epochs=200,
+    learning_rate=5e-3,
+    lr_decay=0.01,
+    n_epochs=120,
 )
 
 # Simulate data
@@ -44,7 +50,7 @@ print("Simulating data")
 sim = simulation.HSMM_MVN(
     n_samples=25600,
     n_channels=config.n_channels,
-    n_modes=config.n_modes,
+    n_states=config.n_states,
     means="zero",
     covariances="random",
     observation_error=0.0,
@@ -54,7 +60,7 @@ sim = simulation.HSMM_MVN(
 sim.standardize()
 training_data = data.Data(sim.time_series)
 
-# Plot the transition probability matrix for mode switching in the HSMM
+# Plot the transition probability matrix for state switching in the HSMM
 plotting.plot_matrices(
     sim.off_diagonal_trans_prob, filename="figures/sim_trans_prob.png"
 )
@@ -71,32 +77,25 @@ prediction_dataset = training_data.dataset(
 model = Model(config)
 model.summary()
 
-# Callbacks
-dice_callback = callbacks.DiceCoefficientCallback(
-    prediction_dataset, sim.mode_time_course
-)
-
 print("Training model")
-history = model.fit(
-    training_dataset,
-    epochs=config.n_epochs,
-    save_best_after=config.n_kl_annealing_epochs,
-    save_filepath="model/weights",
-    callbacks=[dice_callback],
-)
+history = model.fit(training_dataset)
 
-# Free energy = Log Likelihood + KL Divergence
+# Save model
+model_dir = "results/model"
+model.save(model_dir)
+
+# Free energy = Negative Log Likelihood + KL Divergence
 free_energy = model.free_energy(prediction_dataset)
 print(f"Free energy: {free_energy}")
 
-# DyNeMo inferred alpha
+# Inferred state probabilities
 inf_alp = model.get_alpha(prediction_dataset)
 
-# Mode time courses
+# State time courses
 sim_stc = sim.mode_time_course
 inf_stc = modes.argmax_time_courses(inf_alp)
 
-# Calculate the dice coefficient between mode time courses
+# Calculate the dice coefficient between state time courses
 orders = modes.match_modes(sim_stc, inf_stc, return_order=True)
 inf_stc = inf_stc[:, orders[1]]
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
@@ -104,7 +103,7 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 plotting.plot_alpha(
     sim_stc,
     inf_stc,
-    y_labels=["Ground Truth", "DyNeMo"],
+    y_labels=["Ground Truth", "DyNeStE"],
     filename="figures/compare.png",
 )
 
