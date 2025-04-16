@@ -1,11 +1,14 @@
 """Parcellation related classes and functions."""
 
-import nibabel as nib
+import logging
 import numpy as np
+import nibabel as nib
 from pathlib import Path
-from nilearn.plotting import plot_markers
+from nilearn import image, plotting
 
 from osl_dynamics import files
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 class Parcellation:
@@ -97,10 +100,94 @@ def plot_parcellation(parcellation, **kwargs):
         .plot_markers.html#nilearn.plotting.plot_markers>`_.
     """
     parcellation = Parcellation(parcellation)
-    return plot_markers(
+    return plotting.plot_markers(
         np.zeros(parcellation.n_parcels),
         parcellation.roi_centers(),
         colorbar=False,
         node_cmap="binary_r",
         **kwargs,
     )
+
+
+def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
+    """Takes a vector of parcel values and return a 3D voxel grid.
+
+    Parameters
+    ----------
+    mask_file : str
+        Mask file for the voxel grid. Must be a NIFTI file.
+    parcellation_file : str
+        Parcellation file. Must be a NIFTI file.
+    vector : np.ndarray
+        Value at each parcel. Shape must be (n_parcels,).
+
+    Returns
+    -------
+    voxel_grid : np.ndarray
+        Value at each voxel. Shape is (x, y, z), where :code:`x`,
+        :code:`y` and :code:`z` correspond to 3D voxel locations.
+    """
+    # Suppress INFO messages from nibabel
+    logging.getLogger("nibabel.global").setLevel(logging.ERROR)
+
+    # Validation
+    mask_file = files.check_exists(mask_file, files.mask.directory)
+    parcellation_file = files.check_exists(
+        parcellation_file, files.parcellation.directory
+    )
+
+    # Load the mask
+    mask = nib.load(mask_file)
+    mask_grid = mask.get_fdata()
+    mask_grid = mask_grid.ravel(order="F")
+
+    # Get indices of non-zero elements, i.e. those which contain the brain
+    non_zero_voxels = mask_grid != 0
+
+    # Load the parcellation
+    parcellation = nib.load(parcellation_file)
+
+    # Make sure parcellation is 4D and contains 1 for voxel assignment
+    # to a parcel and 0 otherwise
+    parcellation_grid = parcellation.get_fdata()
+    if parcellation_grid.ndim == 3:
+        unique_values = np.unique(parcellation_grid)[1:]
+        parcellation_grid = np.array(
+            [(parcellation_grid == value).astype(int) for value in unique_values]
+        )
+        parcellation_grid = np.rollaxis(parcellation_grid, 0, 4)
+        parcellation = nib.Nifti1Image(
+            parcellation_grid, parcellation.affine, parcellation.header
+        )
+
+    # Make sure the parcellation grid matches the mask file
+    parcellation = image.resample_to_img(
+        parcellation, mask, force_resample=True, copy_header=True
+    )
+    parcellation_grid = parcellation.get_fdata()
+
+    # Make a 2D array of voxel weights for each parcel
+    n_parcels = parcellation.shape[-1]
+
+    # Check parcellation is compatible
+    if vector.shape[0] != n_parcels:
+        _logger.error(
+            "parcellation_file has a different number of parcels to the vector"
+        )
+
+    voxel_weights = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_voxels]
+
+    # Normalise the voxels weights
+    voxel_weights /= voxel_weights.max(axis=0, keepdims=True)
+
+    # Generate a vector containing value at each voxel
+    voxel_values = voxel_weights @ vector
+
+    # Final 3D voxel grid
+    voxel_grid = np.zeros(mask_grid.shape[0])
+    voxel_grid[non_zero_voxels] = voxel_values
+    voxel_grid = voxel_grid.reshape(
+        mask.shape[0], mask.shape[1], mask.shape[2], order="F"
+    )
+
+    return voxel_grid
