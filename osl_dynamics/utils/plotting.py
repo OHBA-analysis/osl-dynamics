@@ -6,13 +6,16 @@ from itertools import zip_longest
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import nibabel as nib
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import patches
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
-from nilearn.plotting import plot_markers
+from nilearn.plotting import plot_markers, plot_img_on_surf
 
+from osl_dynamics import files
+from osl_dynamics.analysis import power
 from osl_dynamics.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
@@ -1585,64 +1588,156 @@ def plot_brain_surface(
     mask_file,
     parcellation_file,
     filename=None,
-    subtract_mean=False,
-    mean_weights=None,
-    **plot_kwargs,
+    title=None,
+    cmap="cold_hot",
+    colorbar=True,
+    symmetric_cbar=True,
+    cbar_label=None,
+    vmin=None,
+    vmax=None,
+    hemispheres=None,
+    views=None,
+    bg_on_data=False,
+    threshold=None,
+    show_plot=True,
 ):
     """Plot a 2D heat map on the surface of the brain.
 
     Parameters
     ----------
     values : np.ndarray
-        Data to plot. Can be of shape: (n_maps, n_channels) or (n_channels,).
-        A (..., n_channels, n_channels) array can also be passed. Warning: this
-        function cannot be used if :code:`n_maps=n_channels`.
+        Data to plot. Must be of shape (n_channels,).
     mask_file : str
-        Mask file used to preprocess the training data.
+        Mask file for the brain.
     parcellation_file : str
-        Parcellation file used to parcellate the training data.
+        Parcellation file.
     filename : str, optional
-        Output filename. If extension is :code:`.nii.gz` the power map is saved
-        as a NIFTI file. Or if the extension is :code:`png/svg/pdf`, it is saved
-        as images. If :code:`None` is passed then the image is shown on
+        Output filename. Extension can be :code:`png/svg/pdf`.
+        If :code:`None` is passed then the image is shown on
         screen and the Matplotlib objects are returned.
-    subtract_mean : bool, optional
-        Should we subtract the mean power across modes?
-    mean_weights: np.ndarray, optional
-        Numpy array with weightings for each mode to use to calculate the mean.
-        Default is equal weighting.
-    plot_kwargs : dict, optional
-        Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
-        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
-        .plot_img_on_surf.html>`_. By default we use::
-
-            {
-                "views": ["lateral", "medial"],
-                "hemispheres": ["left", "right"],
-                "colorbar": True,
-                "output_file": filename,
-            }
-
-        Any keyword arguments passed here will override these.
+    title : str, optional
+        Title for the plot.
+    cmap : str, optional
+        Matplotlib colormap.
+    colorbar : bool, optional
+        Should we plot a colorbar?
+    symmetric_cbar : bool, optional
+        Should we have a symmetric color bar?
+    cbar_label : str, optional
+        Label for the color bar.
+    vmin : float, optional
+        Minimum value for the color bar.
+        May be overriden if :code:`symmetric_cbar=True`.
+    vmax : float, optional
+        Maximum value for the color bar.
+        May be overriden if :code:`symmetric_cbar=True`.
+    hemispheres : list, optional.
+        :code:`['left', 'right']` or :code:`['left']` or :code:`['right']`.
+        Defaults to :code:`['left', 'right']`.
+    views : list, optional
+        :code:`['lateral', 'medial']` or :code:`['lateral']`.
+        Defaults to :code:`['lateral']`.
+    bg_on_data : bool, optional
+        If True, the sulcal depth is jointly visible with surface data.
+        Otherwise, the background image will only be visible where there
+        is no surface data (either because the surface data contains nans
+        or because is was thresholded).
+    threshold : float, optional
+        Threshold values to display. Defaults to no thresholding.
+    show_plot : bool, optional
+        Should we show the plot?
 
     Returns
     -------
-    fig : list of plt.figure
-        Matplotlib figure object. Only returned if :code:`filename=None`.
-    ax : list of plt.axes
-        Matplotlib axis object(s). Only returned if :code:`filename=None`.
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`filename` is None.
+    ax : plt.axes
+        Matplotlib axis object. Only returned if :code:`filename` is None.
     """
-    from osl_dynamics.analysis import power
+    if vmin is None:
+        vmin = np.min(values)
+    if vmax is None:
+        vmax = np.max(values)
+    if symmetric_cbar:
+        vmax = np.max([vmax, -vmin])
+        vmin = -vmax
+    if hemispheres is None:
+        hemispheres = ["left", "right"]
+    if views is None:
+        views = ["lateral"]
 
-    return power.save(
-        power_map=values,
-        filename=filename,
-        mask_file=mask_file,
-        parcellation_file=parcellation_file,
-        subtract_mean=subtract_mean,
-        mean_weights=mean_weights,
-        **plot_kwargs,
+    # Find files
+    mask_file = files.check_exists(mask_file, files.mask.directory)
+    parcellation_file = files.check_exists(
+        parcellation_file, files.parcellation.directory
     )
+
+    # Convert from parcel values to voxel values
+    values = power.parcel_vector_to_voxel_grid(mask_file, parcellation_file, values)
+
+    # Create image to plot
+    mask = nib.load(mask_file)
+    nii = nib.Nifti1Image(values, mask.affine, mask.header)
+
+    # Plot
+    fig, ax = plot_img_on_surf(
+        nii,
+        output_file=None,
+        colorbar=False,
+        cmap=cmap,
+        symmetric_cbar=symmetric_cbar,
+        vmin=vmin,
+        vmax=vmax,
+        hemispheres=hemispheres,
+        views=views,
+        bg_on_data=bg_on_data,
+        threshold=threshold,
+    )
+
+    if views == ["lateral"]:
+        # Plotting 2 views
+
+        # Title
+        fig.suptitle(title, fontsize=26, y=0.97)
+
+        if colorbar:
+            # Positioning and size of the colour bar
+            # [left, bottom, width, height]
+            cbar_ax = fig.add_axes([0.25, 0.2, 0.5, 0.05])
+
+            # Colour bar
+            sm = plt.cm.ScalarMappable(
+                cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax)
+            )
+            cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
+            cbar.ax.tick_params(labelsize=24)
+            cbar.set_label(cbar_label, fontsize=24)
+    else:
+        # Plotting 4 views
+
+        # Title
+        fig.suptitle(title, fontsize=18, y=0.98)
+
+        if colorbar:
+            # Positioning and size of the colour bar
+            # [left, bottom, width, height]
+            cbar_ax = fig.add_axes([0.3, 0.1, 0.4, 0.04])
+
+            # Colour bar
+            sm = plt.cm.ScalarMappable(
+                cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax)
+            )
+            cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
+            cbar.ax.tick_params(labelsize=16)
+            cbar.set_label(cbar_label, fontsize=16)
+
+    # Save or return
+    if filename is not None:
+        fig.savefig(filename)
+        if not show_plot:
+            plt.close(fig)
+    else:
+        return fig, ax
 
 
 def plot_alpha(
