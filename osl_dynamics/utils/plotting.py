@@ -1590,6 +1590,7 @@ def plot_brain_surface(
     cmap="cold_hot",
     colorbar=True,
     symmetric_cbar=True,
+    cbar_tick_format="%.2g",
     cbar_label=None,
     vmin=None,
     vmax=None,
@@ -1618,6 +1619,9 @@ def plot_brain_surface(
         Should we plot a colorbar?
     symmetric_cbar : bool, optional
         Should we have a symmetric color bar?
+    cbar_tick_format : str, optional
+        Formatting for the color bar tick labels.
+        Example use: :code:`cbar_tick_format='%.2f'`.
     cbar_label : str, optional
         Label for the color bar.
     vmin : float, optional
@@ -1722,7 +1726,12 @@ def plot_brain_surface(
             sm = plt.cm.ScalarMappable(
                 cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax)
             )
-            cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
+            cbar = fig.colorbar(
+                sm,
+                cax=cbar_ax,
+                orientation="horizontal",
+                format=cbar_tick_format,
+            )
             cbar.ax.tick_params(labelsize=24)
             cbar.set_label(cbar_label, fontsize=24)
     else:
@@ -1740,7 +1749,12 @@ def plot_brain_surface(
             sm = plt.cm.ScalarMappable(
                 cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax)
             )
-            cbar = fig.colorbar(sm, cax=cbar_ax, orientation="horizontal")
+            cbar = fig.colorbar(
+                sm,
+                cax=cbar_ax,
+                orientation="horizontal",
+                format=cbar_tick_format,
+            )
             cbar.ax.tick_params(labelsize=16)
             cbar.set_label(cbar_label, fontsize=16)
 
