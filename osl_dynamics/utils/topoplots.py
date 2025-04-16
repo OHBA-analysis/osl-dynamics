@@ -127,7 +127,7 @@ class Topology:
             self.outline = [
                 np.array(
                     [line.split("\t") for line in outline.splitlines() if line != ""]
-                ).astype(np.float)
+                ).astype(float)
                 for outline in f.read().split("-" * 10)
             ]
 

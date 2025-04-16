@@ -6,13 +6,13 @@ from pathlib import Path
 
 import numpy as np
 import nibabel as nib
-from nilearn import image, plotting
 from tqdm.auto import trange
 from pqdm.threads import pqdm
 import matplotlib.pyplot as plt
 
 from osl_dynamics import array_ops, files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
+from osl_dynamics.utils import parcellation, plotting
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -242,90 +242,6 @@ def variance_from_spectra(
     return np.squeeze(var)
 
 
-def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
-    """Takes a vector of parcel values and return a 3D voxel grid.
-
-    Parameters
-    ----------
-    mask_file : str
-        Mask file for the voxel grid. Must be a NIFTI file.
-    parcellation_file : str
-        Parcellation file. Must be a NIFTI file.
-    vector : np.ndarray
-        Value at each parcel. Shape must be (n_parcels,).
-
-    Returns
-    -------
-    voxel_grid : np.ndarray
-        Value at each voxel. Shape is (x, y, z), where :code:`x`,
-        :code:`y` and :code:`z` correspond to 3D voxel locations.
-    """
-    # Suppress INFO messages from nibabel
-    logging.getLogger("nibabel.global").setLevel(logging.ERROR)
-
-    # Validation
-    mask_file = files.check_exists(mask_file, files.mask.directory)
-    parcellation_file = files.check_exists(
-        parcellation_file, files.parcellation.directory
-    )
-
-    # Load the mask
-    mask = nib.load(mask_file)
-    mask_grid = mask.get_fdata()
-    mask_grid = mask_grid.ravel(order="F")
-
-    # Get indices of non-zero elements, i.e. those which contain the brain
-    non_zero_voxels = mask_grid != 0
-
-    # Load the parcellation
-    parcellation = nib.load(parcellation_file)
-
-    # Make sure parcellation is 4D and contains 1 for voxel assignment
-    # to a parcel and 0 otherwise
-    parcellation_grid = parcellation.get_fdata()
-    if parcellation_grid.ndim == 3:
-        unique_values = np.unique(parcellation_grid)[1:]
-        parcellation_grid = np.array(
-            [(parcellation_grid == value).astype(int) for value in unique_values]
-        )
-        parcellation_grid = np.rollaxis(parcellation_grid, 0, 4)
-        parcellation = nib.Nifti1Image(
-            parcellation_grid, parcellation.affine, parcellation.header
-        )
-
-    # Make sure the parcellation grid matches the mask file
-    parcellation = image.resample_to_img(
-        parcellation, mask, force_resample=True, copy_header=True
-    )
-    parcellation_grid = parcellation.get_fdata()
-
-    # Make a 2D array of voxel weights for each parcel
-    n_parcels = parcellation.shape[-1]
-
-    # Check parcellation is compatible
-    if vector.shape[0] != n_parcels:
-        _logger.error(
-            "parcellation_file has a different number of parcels to the vector"
-        )
-
-    voxel_weights = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_voxels]
-
-    # Normalise the voxels weights
-    voxel_weights /= voxel_weights.max(axis=0, keepdims=True)
-
-    # Generate a vector containing value at each voxel
-    voxel_values = voxel_weights @ vector
-
-    # Final 3D voxel grid
-    voxel_grid = np.zeros(mask_grid.shape[0])
-    voxel_grid[non_zero_voxels] = voxel_values
-    voxel_grid = voxel_grid.reshape(
-        mask.shape[0], mask.shape[1], mask.shape[2], order="F"
-    )
-
-    return voxel_grid
-
-
 def save(
     power_map,
     mask_file,
@@ -335,16 +251,11 @@ def save(
     subtract_mean=False,
     mean_weights=None,
     plot_kwargs=None,
-    show_plots=True,
     combined=False,
     titles=None,
     n_rows=1,
 ):
     """Saves power maps.
-
-    This function is a wrapper for `nilearn.plotting.plot_img_on_surf
-    <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
-    .plot_img_on_surf.html>`_.
 
     Parameters
     ----------
@@ -370,17 +281,16 @@ def save(
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     plot_kwargs : dict, optional
-        Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
-        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
-        .plot_img_on_surf.html>`_.
-    show_plots : bool, optional
-        Should the individual plots be shown on screen (for Juptyer notebooks)?
+        Keyword arguments to pass to `osl_dynamics.utils.plotting\
+        .plot_brain_surface <https://osl-dynamics.readthedocs.io/en/latest/\
+        autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils\
+        .plotting.plot_brain_surface>`_.
     combined : bool, optional
         Should the individual plots be combined into a single image?
         The combined image is always shown on screen (for Juptyer notebooks).
         Note if :code:`True` is passed, the individual images will be deleted.
     titles : list, optional
-        List of titles for each power plot. Only used if :code:`combined=True`.
+        List of titles for each power plot.
     n_rows : int, optional
         Number of rows in the combined image. Only used if :code:`combined=True`.
 
@@ -392,23 +302,9 @@ def save(
     axes : list of plt.axis
         List of Matplotlib axis object(s). Only returned if
         :code:`filename=None`.
-
-    Examples
-    --------
-    Plot power maps with customise display::
-
-        power.save(
-            ...,
-            plot_kwargs={
-                "cmap": "RdBu_r",
-                "bg_on_data": 1,
-                "darkness": 0.4,
-                "alpha": 1,
-            },
-        )
     """
-    # Create a copy of the power map so we don't modify it
-    power_map = np.copy(power_map)
+    if plot_kwargs is None:
+        plot_kwargs = {}
 
     # Validation
     if filename is not None:
@@ -423,9 +319,10 @@ def save(
         parcellation_file, files.parcellation.directory
     )
 
-    if plot_kwargs is None:
-        plot_kwargs = {}
+    # Create a copy of the power map so we don't modify it
+    power_map = np.copy(power_map)
 
+    # Reshape the power maps
     power_map = np.squeeze(power_map)
     if power_map.ndim > 1:
         if power_map.shape[-1] == power_map.shape[-2]:
@@ -457,32 +354,44 @@ def save(
     # Select the component to plot
     power_map = power_map[component]
 
-    # Calculate power map grid for each mode
-    power_map = [
-        parcel_vector_to_voxel_grid(mask_file, parcellation_file, p) for p in power_map
-    ]
-
-    # Make sure n_modes is the last dimension for compatibility with nii files
-    # (n_modes, x, y, z) -> (x, y, z, n_modes)
-    power_map = np.moveaxis(power_map, 0, -1)
-
-    # Load the mask
-    mask = nib.load(mask_file)
+    if titles is None:
+        titles = [None] * n_modes
+    else:
+        if len(titles) != n_modes:
+            raise ValueError(
+                f"Number of titles ({len(titles)}) does not match the number "
+                f"of power maps ({n_modes})."
+            )
 
     # Just display the power map
     if filename is None:
         figures, axes = [], []
         for i in trange(n_modes, desc="Saving images"):
-            nii = nib.Nifti1Image(power_map[:, :, :, i], mask.affine, mask.header)
-            fig, ax = plotting.plot_img_on_surf(nii, output_file=None, **plot_kwargs)
+            fig, ax = plotting.plot_brain_surface(
+                power_map[i],
+                mask_file=mask_file,
+                parcellation_file=parcellation_file,
+                title=titles[i],
+                **plot_kwargs,
+            )
             figures.append(fig)
             axes.append(ax)
         return figures, axes
 
     else:
-        # Save as nii file
         if ".nii" in filename:
+            # Convert parcel values to voxel values
+            power_map = [
+                parcellation.parcel_vector_to_voxel_grid(
+                    mask_file, parcellation_file, p
+                )
+                for p in power_map
+            ]
+            power_map = np.moveaxis(power_map, 0, -1)
+
+            # Save as nii file
             _logger.info(f"Saving {filename}")
+            mask = nib.load(mask_file)
             nii = nib.Nifti1Image(power_map, mask.affine, mask.header)
             nib.save(nii, filename)
 
@@ -490,27 +399,22 @@ def save(
             # Save each map as an image
             output_files = []
             for i in trange(n_modes, desc="Saving images"):
-                nii = nib.Nifti1Image(
-                    power_map[:, :, :, i],
-                    mask.affine,
-                    mask.header,
-                )
-                fig, ax = plotting.plot_img_on_surf(
-                    nii, output_file=None, **plot_kwargs
-                )
                 output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
                     fn=Path(filename), i=i, w=len(str(n_modes))
                 )
+                plotting.plot_brain_surface(
+                    power_map[i],
+                    mask_file=mask_file,
+                    parcellation_file=parcellation_file,
+                    title=titles[i],
+                    filename=output_file,
+                    **plot_kwargs,
+                )
                 output_files.append(output_file)
-                fig.savefig(output_file)
-
-                if not show_plots:
-                    plt.close(fig)
 
             if combined:
                 n_columns = -(n_modes // -n_rows)
 
-                titles = titles or [None] * n_modes
                 # Combine images into a single image
                 fig, axes = plt.subplots(
                     n_rows, n_columns, figsize=(n_columns * 5, n_rows * 5)
@@ -519,7 +423,6 @@ def save(
                     ax.axis("off")
                     if i < n_modes:
                         ax.imshow(plt.imread(output_files[i]))
-                        ax.set_title(titles[i], fontsize=20)
                 fig.tight_layout()
                 fig.savefig(filename)
 
@@ -577,9 +480,10 @@ def multi_save(
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     plot_kwargs : dict, optional
-        Keyword arguments to pass to `nilearn.plotting.plot_img_on_surf
-        <https://nilearn.github.io/stable/modules/generated/nilearn.plotting\
-        .plot_img_on_surf.html>`_.
+        Keyword arguments to pass to `osl_dynamics.utils.plotting\
+        .plot_brain_surface <https://osl-dynamics.readthedocs.io/en/latest/\
+        autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils\
+        .plotting.plot_brain_surface>`_.
     """
     # Create a copy of the power maps so we don't modify them
     group_power_map = np.copy(group_power_map)

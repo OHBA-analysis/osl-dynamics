@@ -37,7 +37,7 @@ plotting.topoplot(
     show_names=False,
     title="Example Plot",
     colorbar=True,
-    cmap="plasma",
+    cmap="cold_hot",
     n_contours=25,
     filename="ctf275.png",
 )
