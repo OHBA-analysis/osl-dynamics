@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 import tensorflow as tf
@@ -9,6 +10,7 @@ import tensorflow_probability as tfp
 from tensorflow.keras import layers
 from tqdm.auto import trange
 
+from osl_dynamics.inference import callbacks
 from osl_dynamics.inference.layers import (
     CategoricalKLDivergenceLayer,
     CategoricalLogLikelihoodLossLayer,
@@ -28,7 +30,7 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.utils.misc import set_logging_level
+from osl_dynamics.utils.misc import set_logging_level, replace_argument
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -64,9 +66,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Dropout rate.
     inference_regularizer : str
         Regularizer.
-
-    initial_gs_temperature : float
-        Initial temperature for the Gumbel-Softmax distribution.
 
     model_rnn : str
         RNN to use, either :code:`'gru'` or :code:`'lstm'`.
@@ -114,6 +113,22 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
+    do_gs_annealing : bool
+        Should we use temperature annealing for the Gumbel-Softmax distribution
+        during training?
+    gs_annealing_curve : str
+        Type of Gumbel-Softmax temperature annealing curve. Either :code:`'linear'`
+        or :code:`'exp'`.
+    initial_gs_temperature : float
+        Initial temperature for the Gumbel-Softmax distribution.
+    final_gs_temperature : float
+        Final temperature for the Gumbel-Softmax distribution after annealing.
+    gs_annealing_slope : float
+        Slope of the Gumbel-Softmax temperature annealing curve. Only used when
+        :code:`gs_annealing_curve='exp'`.
+    n_gs_annealing_epochs : int
+        Number of epochs to perform Gumbel-Softmax temperature annealing.
+
     batch_size : int
         Mini-batch size.
     learning_rate : float
@@ -147,7 +162,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     inference_activation: str = None
     inference_dropout: float = 0.0
     inference_regularizer: str = None
-    initial_gs_temperature: float = 1.0
 
     # Model network parameters
     model_rnn: str = "lstm"
@@ -157,6 +171,14 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     model_activation: str = None
     model_dropout: float = 0.0
     model_regularizer: str = None
+
+    # GS annealing parameters
+    do_gs_annealing: bool = False
+    gs_annealing_curve: Literal["linear", "exp"] = None
+    initial_gs_temperature: float = 1.0
+    final_gs_temperature: float = 0.01
+    gs_annealing_slope: float = None
+    n_gs_annealing_epochs: int = None
 
     # Observation model parameters
     learn_means: bool = None
@@ -172,6 +194,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         self.validate_rnn_parameters()
         self.validate_observation_model_parameters()
         self.validate_kl_annealing_parameters()
+        self.validate_gs_annealing_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 
@@ -192,6 +215,38 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             else:
                 self.covariances_epsilon = 0.0
 
+    def validate_gs_annealing_parameters(self):
+        if self.do_gs_annealing:
+            if self.gs_annealing_curve is None:
+                raise ValueError(
+                    "If we are performing Gumbel-Softmax annealing, "
+                    "gs_annealing_curve must be passed."
+                )
+
+            if self.gs_annealing_curve not in ["linear", "exp"]:
+                raise ValueError("GS annealing curve must be 'linear' or 'exp'.")
+
+            if self.gs_annealing_curve == "exp":
+                if self.gs_annealing_slope is None:
+                    raise ValueError(
+                        "gs_annealing_slope must be passed if "
+                        "gs_annealing_curve='exp'."
+                    )
+
+                if self.gs_annealing_slope <= 0:
+                    raise ValueError("gs_annealing_slope must be positive.")
+
+            if self.n_gs_annealing_epochs is None:
+                raise ValueError(
+                    "If we are performing GS annealing, "
+                    "n_gs_annealing_epochs must be passed."
+                )
+
+            if self.n_gs_annealing_epochs < 1:
+                raise ValueError(
+                    "Number of GS annealing epochs must be greater than zero."
+                )
+
 
 class Model(VariationalInferenceModelBase):
     """DyNeStE model class.
@@ -202,6 +257,55 @@ class Model(VariationalInferenceModelBase):
     """
 
     config_type = Config
+
+    def fit(self, *args, gs_annealing_callback=None, **kwargs):
+        """Wrapper for the standard keras fit method.
+
+        This function inherits :code:`fit()` functions in :code:`ModelBase` and
+        :code:`VariationalInferenceModelBase`.
+
+        Parameters
+        ----------
+        *args : arguments
+            Arguments for :code:`ModelBase.fit()` or
+            :code:`VariationalInferenceModelBase.fit()`.
+        gs_annealing_callback : bool, optional
+            Should we anneal the Gumbel-Softmax temperature during training?
+        **kwargs : keyword arguments, optional
+            Keyword arguments for :code:`ModelBase.fit()` or
+            :code:`VariationalInferenceModelBase.fit()`.
+
+        Returns
+        -------
+        history : history
+            The training history.
+        """
+        # Validation
+        if gs_annealing_callback is None:
+            gs_annealing_callback = self.config.do_gs_annealing
+
+        # Gumbel-Softmax distribution temperature annealing
+        if gs_annealing_callback:
+            gs_annealing_callback = callbacks.GumbelSoftmaxAnnealingCallback(
+                curve=self.config.gs_annealing_curve,
+                layer_name="states",
+                n_epochs=self.config.n_gs_annealing_epochs,
+                start_temperature=self.config.initial_gs_temperature,
+                end_temperature=self.config.final_gs_temperature,
+                slope=self.config.gs_annealing_slope,
+            )
+
+            # Update arguments to pass to the fit method
+            args, kwargs = replace_argument(
+                self.model.fit,
+                "callbacks",
+                [gs_annealing_callback],
+                args,
+                kwargs,
+                append=True,
+            )
+
+        return super().fit(*args, **kwargs)
 
     def build_model(self):
         """Builds a keras model."""

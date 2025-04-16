@@ -8,7 +8,6 @@ print("Setting up")
 import os
 from osl_dynamics import data, simulation
 from osl_dynamics.inference import tf_ops, modes, metrics
-from osl_dynamics.inference.callbacks import GumbelSoftmaxAnnealingCallback
 from osl_dynamics.models.dyneste import Config, Model
 from osl_dynamics.utils import plotting
 
@@ -30,11 +29,16 @@ config = Config(
     model_normalization="layer",
     learn_means=False,
     learn_covariances=True,
-    initial_gs_temperature=1.0,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=50,
+    do_gs_annealing=True,
+    gs_annealing_curve="exp",
+    initial_gs_temperature=1.0,
+    final_gs_temperature=0.06,
+    gs_annealing_slope=0.04,
+    n_gs_annealing_epochs=120,
     batch_size=16,
     learning_rate=5e-3,
     lr_decay=0.01,
@@ -74,19 +78,7 @@ model = Model(config)
 model.summary()
 
 print("Training model")
-history = model.fit(
-    training_dataset,
-    callbacks=[
-        GumbelSoftmaxAnnealingCallback(
-            curve="exp",
-            layer_name="states",
-            n_epochs=config.n_epochs,
-            start_temperature=config.initial_gs_temperature,
-            end_temperature=0.06,
-            slope=0.04,
-        ),
-    ],
-)
+history = model.fit(training_dataset)
 
 # Save model
 model_dir = "results/model"

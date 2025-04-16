@@ -14,13 +14,12 @@ from osl_dynamics.simulation import HMM_MVN
 from osl_dynamics.data import Data
 from osl_dynamics.models.dyneste import Config, Model
 from osl_dynamics.inference import modes, metrics
-from osl_dynamics.inference.callbacks import GumbelSoftmaxAnnealingCallback
 
 # Create directory for results
 results_dir = "results"
 os.makedirs(results_dir, exist_ok=True)
 
-#%% Simulate data
+# %% Simulate data
 
 print("Simulating data")
 sim = HMM_MVN(
@@ -39,7 +38,7 @@ data = Data(sim.time_series)
 # Prepare data
 data.standardize()
 
-#%% Build model
+# %% Build model
 
 config = Config(
     n_states=5,
@@ -51,11 +50,16 @@ config = Config(
     model_normalization="layer",
     learn_means=False,
     learn_covariances=True,
-    initial_gs_temperature=1.0,
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
     n_kl_annealing_epochs=50,
+    do_gs_annealing=True,
+    gs_annealing_curve="exp",
+    initial_gs_temperature=1.0,
+    final_gs_temperature=0.06,
+    gs_annealing_slope=0.04,
+    n_gs_annealing_epochs=120,
     batch_size=16,
     learning_rate=5e-3,
     lr_decay=0.01,
@@ -68,25 +72,13 @@ model.summary()
 # Add regularization for the observation model
 model.set_regularizers(data)
 
-#%% Train model
+# %% Train model
 
 # Initialization
 init_history = model.random_subset_initialization(data, n_init=5, n_epochs=1, take=1)
 
 # Full training
-history = model.fit(
-    data,
-    callbacks=[
-        GumbelSoftmaxAnnealingCallback(
-            curve="exp",
-            layer_name="states",
-            n_epochs=config.n_epochs,
-            start_temperature=config.initial_gs_temperature,
-            end_temperature=0.06,
-            slope=0.04,
-        ),
-    ],
-)
+history = model.fit(data)
 
 # Save model
 model_dir = f"{results_dir}/model"
@@ -101,7 +93,7 @@ history["free_energy"] = free_energy
 pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
 pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
 
-#%% Get inferred parameters
+# %% Get inferred parameters
 
 # Inferred state probabilities
 alp = model.get_alpha(data)
@@ -117,7 +109,7 @@ pickle.dump(alp, open(f"{inf_params_dir}/alp.pkl", "wb"))
 np.save(f"{inf_params_dir}/means.npy", means)
 np.save(f"{inf_params_dir}/covs.npy", covs)
 
-#%% Calculate summary statistics
+# %% Calculate summary statistics
 
 # State time courses
 stc = modes.argmax_time_courses(alp)
@@ -137,7 +129,7 @@ np.save(f"{summary_stats_dir}/lt.npy", lt)
 np.save(f"{summary_stats_dir}/intv.npy", intv)
 np.save(f"{summary_stats_dir}/sr.npy", sr)
 
-#%% Compare inferred parameters to ground truth simulation
+# %% Compare inferred parameters to ground truth simulation
 
 # Re-order simulated state time course to match inferred
 inf_stc, sim_stc = modes.match_modes(stc, sim.state_time_course)
@@ -147,6 +139,6 @@ dice = metrics.dice_coefficient(inf_stc, sim_stc)
 
 print("Dice coefficient:", dice)
 
-#%% Delete temporary directory
+# %% Delete temporary directory
 
 data.delete_dir()
