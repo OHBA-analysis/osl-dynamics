@@ -1587,7 +1587,6 @@ def plot_brain_surface(
     values,
     mask_file,
     parcellation_file,
-    filename=None,
     title=None,
     cmap="cold_hot",
     colorbar=True,
@@ -1599,7 +1598,8 @@ def plot_brain_surface(
     views=None,
     bg_on_data=False,
     threshold=None,
-    show_plot=True,
+    filename=None,
+    show_plot=None,
 ):
     """Plot a 2D heat map on the surface of the brain.
 
@@ -1611,10 +1611,6 @@ def plot_brain_surface(
         Mask file for the brain.
     parcellation_file : str
         Parcellation file.
-    filename : str, optional
-        Output filename. Extension can be :code:`png/svg/pdf`.
-        If :code:`None` is passed then the image is shown on
-        screen and the Matplotlib objects are returned.
     title : str, optional
         Title for the plot.
     cmap : str, optional
@@ -1644,8 +1640,13 @@ def plot_brain_surface(
         or because is was thresholded).
     threshold : float, optional
         Threshold values to display. Defaults to no thresholding.
+    filename : str, optional
+        Output filename. Extension can be :code:`png/svg/pdf`.
+        If :code:`None` is passed then the image is shown on
+        screen and the Matplotlib objects are returned.
     show_plot : bool, optional
-        Should we show the plot?
+        Should we show the plot? If :code:`filename` is True, defaults
+        to False, otherwise False.
 
     Returns
     -------
@@ -1665,6 +1666,19 @@ def plot_brain_surface(
         hemispheres = ["left", "right"]
     if views is None:
         views = ["lateral"]
+
+    if filename is not None:
+        allowed_extensions = [".nii", ".nii.gz", ".png", ".svg", ".pdf"]
+        if not any([ext in filename for ext in allowed_extensions]):
+            raise ValueError(
+                "filename must have one of following extensions: "
+                + f"{' '.join(allowed_extensions)}."
+            )
+
+    if filename is None:
+        show_plot = True
+    else:
+        show_plot = False
 
     # Find files
     mask_file = files.check_exists(mask_file, files.mask.directory)
