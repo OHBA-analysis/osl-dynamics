@@ -258,55 +258,6 @@ class Model(VariationalInferenceModelBase):
 
     config_type = Config
 
-    def fit(self, *args, gs_annealing_callback=None, **kwargs):
-        """Wrapper for the standard keras fit method.
-
-        This function inherits :code:`fit()` functions in :code:`ModelBase` and
-        :code:`VariationalInferenceModelBase`.
-
-        Parameters
-        ----------
-        *args : arguments
-            Arguments for :code:`ModelBase.fit()` or
-            :code:`VariationalInferenceModelBase.fit()`.
-        gs_annealing_callback : bool, optional
-            Should we anneal the Gumbel-Softmax temperature during training?
-        **kwargs : keyword arguments, optional
-            Keyword arguments for :code:`ModelBase.fit()` or
-            :code:`VariationalInferenceModelBase.fit()`.
-
-        Returns
-        -------
-        history : history
-            The training history.
-        """
-        # Validation
-        if gs_annealing_callback is None:
-            gs_annealing_callback = self.config.do_gs_annealing
-
-        # Gumbel-Softmax distribution temperature annealing
-        if gs_annealing_callback:
-            gs_annealing_callback = callbacks.GumbelSoftmaxAnnealingCallback(
-                curve=self.config.gs_annealing_curve,
-                layer_name="states",
-                n_epochs=self.config.n_gs_annealing_epochs,
-                start_temperature=self.config.initial_gs_temperature,
-                end_temperature=self.config.final_gs_temperature,
-                slope=self.config.gs_annealing_slope,
-            )
-
-            # Update arguments to pass to the fit method
-            args, kwargs = replace_argument(
-                self.model.fit,
-                "callbacks",
-                [gs_annealing_callback],
-                args,
-                kwargs,
-                append=True,
-            )
-
-        return super().fit(*args, **kwargs)
-
     def build_model(self):
         """Builds a keras model."""
 
@@ -433,6 +384,55 @@ class Model(VariationalInferenceModelBase):
         outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "theta": inf_theta}
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
+
+    def fit(self, *args, gs_annealing_callback=None, **kwargs):
+        """Wrapper for the standard keras fit method.
+
+        This function inherits :code:`fit()` functions in :code:`ModelBase` and
+        :code:`VariationalInferenceModelBase`.
+
+        Parameters
+        ----------
+        *args : arguments
+            Arguments for :code:`ModelBase.fit()` or
+            :code:`VariationalInferenceModelBase.fit()`.
+        gs_annealing_callback : bool, optional
+            Should we anneal the Gumbel-Softmax temperature during training?
+        **kwargs : keyword arguments, optional
+            Keyword arguments for :code:`ModelBase.fit()` or
+            :code:`VariationalInferenceModelBase.fit()`.
+
+        Returns
+        -------
+        history : history
+            The training history.
+        """
+        # Validation
+        if gs_annealing_callback is None:
+            gs_annealing_callback = self.config.do_gs_annealing
+
+        # Gumbel-Softmax distribution temperature annealing
+        if gs_annealing_callback:
+            gs_annealing_callback = callbacks.GumbelSoftmaxAnnealingCallback(
+                curve=self.config.gs_annealing_curve,
+                layer_name="states",
+                n_epochs=self.config.n_gs_annealing_epochs,
+                start_temperature=self.config.initial_gs_temperature,
+                end_temperature=self.config.final_gs_temperature,
+                slope=self.config.gs_annealing_slope,
+            )
+
+            # Update arguments to pass to the fit method
+            args, kwargs = replace_argument(
+                self.model.fit,
+                "callbacks",
+                [gs_annealing_callback],
+                args,
+                kwargs,
+                append=True,
+            )
+
+        return super().fit(*args, **kwargs)
 
     def get_means(self):
         """Get the state means.
