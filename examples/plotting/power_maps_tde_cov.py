@@ -7,7 +7,6 @@ import os
 import numpy as np
 
 from osl_dynamics.analysis import power, modes
-from osl_dynamics.data import rw
 
 def get_data(name, output_dir):
     if os.path.exists(output_dir):
@@ -30,7 +29,7 @@ covs = np.load("notts_tde_hmm/covs.npy")
 
 # This is the number of embeddings and PCA components used to prepare the training data
 n_embeddings = 15
-pca_components = rw.loadmat("notts_tde_hmm/pca_components.mat")
+pca_components = np.load("notts_tde_hmm/pca_components.npy")
 
 # Convert from the time-delay embedded/PCA space to the original source space
 power_map = modes.raw_covariances(
