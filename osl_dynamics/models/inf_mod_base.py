@@ -10,6 +10,7 @@ import tensorflow as tf
 from tensorflow.keras import utils
 from scipy.special import xlogy, logsumexp
 from tqdm.auto import trange
+from tqdm import tqdm
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics import array_ops
@@ -1577,7 +1578,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         second_term = xlogy(gamma, gamma)[:, 1:-1, :]
         second_term = np.sum(second_term, axis=(1, 2))
 
-        # Average over batches
+        # Average over sequences in a batch
         entropy = np.mean(first_term - second_term)
 
         if self.config.loss_calc == "mean":
@@ -1611,9 +1612,18 @@ class MarkovStateInferenceModelBase(ModelBase):
             Posterior expected log-likelihood.
         """
         log_likelihood = self.get_log_likelihood(x)
-        expected_log_likelihood = np.sum(log_likelihood * gamma)
+        expected_log_likelihood = log_likelihood * gamma
+
+        # Sum over time points and states
+        expected_log_likelihood = np.sum(expected_log_likelihood, axis=(1, 2))
+
+        # Average over sequences in a batch
+        expected_log_likelihood = np.mean(expected_log_likelihood, axis=0)
+
         if self.config.loss_calc == "mean":
+            # Correct sum over time into an average
             expected_log_likelihood /= self.config.sequence_length
+
         return expected_log_likelihood
 
     def get_posterior_expected_prior(self, gamma, xi):
@@ -1642,7 +1652,6 @@ class MarkovStateInferenceModelBase(ModelBase):
         -------
         prior : float
             Posterior expected prior probability.
-            Shape is (batch_size, sequence_length).
         """
         initial_distribution = self.get_initial_state_probs()
         trans_prob = self.get_trans_prob()
@@ -1656,7 +1665,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         remaining_terms = xlogy(xi, trans_prob[None, None, ...])
         remaining_terms = np.sum(remaining_terms, axis=(1, 2, 3))
 
-        # Average over batches
+        # Average over sequences in a batch
         prior = np.mean(first_term + remaining_terms)
 
         if self.config.loss_calc == "mean":
@@ -1665,14 +1674,14 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return prior
 
-    def free_energy(self, dataset, **kwargs):
+    def free_energy(self, dataset):
         r"""Get the variational free energy of HMM-based models.
 
         This calculates:
 
         .. math::
             \mathcal{F} = \int q(s_{1:T}) \log \left[ \
-                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] \
+                          \frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \right] \
                           ds_{1:T}
 
         Parameters
@@ -1692,20 +1701,13 @@ class MarkovStateInferenceModelBase(ModelBase):
                 + "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
-        dataset = self.make_dataset(dataset, concatenate=False)
-
-        n_datasets = len(dataset)
-        if len(dataset) > 1:
-            iterator = trange(n_datasets, desc="Getting free energy")
-            kwargs["verbose"] = 0
-        else:
-            iterator = range(n_datasets)
-            _logger.info("Getting free energy")
+        dataset = self.make_dataset(dataset, concatenate=True)
+        n_batches = dtf.get_n_batches(dataset)
 
         free_energy = []
-        for i in iterator:
-            predictions = self.predict(dataset[i], **kwargs)
-            nll = np.mean(predictions["ll_loss"])
+        for batch in tqdm(dataset, desc="Getting free energy", total=n_batches):
+            predictions = self.predict(batch, verbose=0)
+            nll = predictions["ll_loss"][0]
             entropy = self.get_posterior_entropy(
                 predictions["gamma"], predictions["xi"]
             )
@@ -1714,7 +1716,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             )
             fe = nll + entropy - prior
             if self.config.model_name == "HIVE":
-                kl_loss = np.mean(predictions["kl_loss"])
+                kl_loss = predictions["kl_loss"][0]
                 fe += kl_loss
             free_energy.append(fe)
 
@@ -1731,7 +1733,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         Returns
         -------
         evidence : float
-            Model evidence.
+            Model evidence (averaged over sequences and batches).
         """
 
         def _evidence_predict_step(log_smoothing_distribution=None):
