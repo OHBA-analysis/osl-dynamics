@@ -7,7 +7,7 @@ from typing import Literal
 
 import numpy as np
 import tensorflow as tf
-from scipy.special import xlogy, logsumexp
+from scipy.special import logsumexp
 from tqdm.auto import tqdm, trange
 
 import osl_dynamics.data.tf as dtf
@@ -1207,27 +1207,45 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return viterbi_path
 
-    def get_trans_prob(self):
+    def get_trans_prob(self, tensor=False):
         """Get the transition probability matrix.
 
+        Parameters
+        ----------
+        tensor : bool, optional
+            Should we return the transition probability matrix as a
+            Tensor rather than a numpy array?
+
         Returns
         -------
-        trans_prob : np.ndarray
+        trans_prob : np.ndarray or tf.Tensor
             Transition probability matrix. Shape is (n_states, n_states).
         """
-        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.get_trans_prob().numpy()
+        layer = self.model.get_layer("hid_state_inf")
+        trans_prob = layer.get_trans_prob()
+        if not tensor:
+            trans_prob = trans_prob.numpy()
+        return trans_prob
 
-    def get_initial_state_probs(self):
+    def get_initial_state_probs(self, tensor=False):
         """Get the initial state probability distribution.
+
+        Parameters
+        ----------
+        tensor : bool, optional
+            Should we return the initial state probabilities as a
+            Tensor rather than a numpy array?
 
         Returns
         -------
-        initial_distribution : np.ndarray
+        initial_distribution : np.ndarray or tf.Tensor
             Initial distribution. Shape is (n_states,).
         """
-        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.get_initial_state_probs().numpy()
+        layer = self.model.get_layer("hid_state_inf")
+        initial_state_probs = layer.get_initial_state_probs()
+        if not tensor:
+            initial_state_probs = initial_state_probs.numpy()
+        return initial_state_probs
 
     def set_trans_prob(self, trans_prob, update_initializer=True):
         """Set the transition probability matrix.
@@ -1538,6 +1556,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         ll_layer = self.model.get_layer("ll")
         return ll_layer(args).numpy()
 
+    @tf.function
     def get_posterior_entropy(self, gamma, xi):
         r"""Posterior entropy.
 
@@ -1569,22 +1588,23 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # first_term = sum^{T-1}_t=1 int q(s_t, s_t+1)
         # log(q(s_t, s_t+1)) ds_t ds_t+1
-        first_term = xlogy(xi, xi)
-        first_term = np.sum(first_term, axis=(1, 2, 3))
+        first_term = tf.math.xlogy(xi, xi)
+        first_term = tf.reduce_sum(first_term, axis=(1, 2, 3))
 
         # second_term = sum^{T-1}_t=2 int q(s_t) log q(s_t) ds_t
-        second_term = xlogy(gamma, gamma)[:, 1:-1, :]
-        second_term = np.sum(second_term, axis=(1, 2))
+        second_term = tf.math.xlogy(gamma, gamma)[:, 1:-1, :]
+        second_term = tf.reduce_sum(second_term, axis=(1, 2))
 
         # Average over sequences in a batch
-        entropy = np.mean(first_term - second_term)
+        entropy = tf.reduce_mean(first_term - second_term)
 
         if self.config.loss_calc == "mean":
             # Correct sum over time into an average
-            entropy /= self.config.sequence_length
+            entropy /= tf.cast(self.config.sequence_length, tf.float64)
 
         return entropy
 
+    @tf.function
     def get_posterior_expected_log_likelihood(self, x, gamma):
         r"""Posterior expected log-likelihood.
 
@@ -1613,17 +1633,18 @@ class MarkovStateInferenceModelBase(ModelBase):
         expected_log_likelihood = log_likelihood * gamma
 
         # Sum over time points and states
-        expected_log_likelihood = np.sum(expected_log_likelihood, axis=(1, 2))
+        expected_log_likelihood = tf.reduce_sum(expected_log_likelihood, axis=(1, 2))
 
         # Average over sequences in a batch
-        expected_log_likelihood = np.mean(expected_log_likelihood, axis=0)
+        expected_log_likelihood = tf.reduce_mean(expected_log_likelihood, axis=0)
 
         if self.config.loss_calc == "mean":
             # Correct sum over time into an average
-            expected_log_likelihood /= self.config.sequence_length
+            expected_log_likelihood /= tf.cast(self.config.sequence_length, tf.float64)
 
         return expected_log_likelihood
 
+    @tf.function
     def get_posterior_expected_prior(self, gamma, xi):
         r"""Posterior expected prior.
 
@@ -1651,24 +1672,26 @@ class MarkovStateInferenceModelBase(ModelBase):
         prior : float
             Posterior expected prior probability.
         """
-        initial_distribution = self.get_initial_state_probs()
-        trans_prob = self.get_trans_prob()
+        initial_distribution = self.get_initial_state_probs(tensor=True)
+        initial_distribution = tf.cast(initial_distribution, tf.float64)
+        trans_prob = self.get_trans_prob(tensor=True)
+        trans_prob = tf.cast(trans_prob, tf.float64)
 
         # first_term = int q(s_1) log p(s_1) ds_1
-        first_term = xlogy(gamma[:, 0, :], initial_distribution[None, ...])
-        first_term = np.sum(first_term, axis=1)
+        first_term = tf.math.xlogy(gamma[:, 0, :], initial_distribution[None, ...])
+        first_term = tf.reduce_sum(first_term, axis=1)
 
         # remaining_terms =
         # sum^{T-1}_t=1 int q(s_t, s_t+1) log p(s_t+1 | s_t}) ds_t ds_t+1
-        remaining_terms = xlogy(xi, trans_prob[None, None, ...])
-        remaining_terms = np.sum(remaining_terms, axis=(1, 2, 3))
+        remaining_terms = tf.math.xlogy(xi, trans_prob[None, None, ...])
+        remaining_terms = tf.reduce_sum(remaining_terms, axis=(1, 2, 3))
 
         # Average over sequences in a batch
-        prior = np.mean(first_term + remaining_terms)
+        prior = tf.reduce_mean(first_term + remaining_terms)
 
         if self.config.loss_calc == "mean":
             # Correct sum over time into an average
-            prior /= self.config.sequence_length
+            prior /= tf.cast(self.config.sequence_length, tf.float64)
 
         return prior
 
