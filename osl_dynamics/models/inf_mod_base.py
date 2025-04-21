@@ -1700,10 +1700,9 @@ class MarkovStateInferenceModelBase(ModelBase):
             )
 
         dataset = self.make_dataset(dataset, concatenate=True)
-        n_batches = dtf.get_n_batches(dataset)
 
-        free_energy = 0
-        for batch in tqdm(dataset, desc="Getting free energy", total=n_batches):
+        free_energy = []
+        for batch in tqdm(dataset, desc="Getting free energy"):
             predictions = self.predict(batch, verbose=0)
             nll = predictions["ll_loss"][0]
             entropy = self.get_posterior_entropy(
@@ -1712,12 +1711,13 @@ class MarkovStateInferenceModelBase(ModelBase):
             prior = self.get_posterior_expected_prior(
                 predictions["gamma"], predictions["xi"]
             )
-            free_energy += nll + entropy - prior
+            fe = nll + entropy - prior
             if self.config.model_name == "HIVE":
                 kl_loss = predictions["kl_loss"][0]
-                free_energy += kl_loss
+                fe += kl_loss
+            free_energy.append(fe)
 
-        return free_energy / n_batches
+        return np.mean(free_energy)
 
     def evidence(self, dataset):
         """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
@@ -1774,10 +1774,9 @@ class MarkovStateInferenceModelBase(ModelBase):
             return log_smoothing_distribution, predictive_log_likelihood
 
         dataset = self.make_dataset(dataset, concatenate=True)
-        n_batches = dtf.get_n_batches(dataset)
 
-        evidence = 0
-        for batch in tqdm(dataset, desc="Getting evidence", total=n_batches):
+        evidence = []
+        for batch in tqdm(dataset, desc="Getting evidence"):
             data = batch["data"]
             batch_size = tf.shape(data)[0]
             batch_evidence = np.zeros(batch_size, dtype=np.float32)
@@ -1791,9 +1790,10 @@ class MarkovStateInferenceModelBase(ModelBase):
                     predictive_log_likelihood,
                 ) = _evidence_update_step(data[:, t, :], log_prediction_distribution)
                 batch_evidence += predictive_log_likelihood
-            evidence += np.mean(batch_evidence)
+            evidence.append(np.mean(batch_evidence))
+        evidence = np.mean(evidence)
 
         if self.config.loss_calc == "mean":
             evidence /= self.config.sequence_length
 
-        return evidence / n_batches
+        return evidence
