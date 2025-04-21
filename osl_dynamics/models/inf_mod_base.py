@@ -7,10 +7,8 @@ from typing import Literal
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import utils
 from scipy.special import xlogy, logsumexp
-from tqdm.auto import trange
-from tqdm import tqdm
+from tqdm.auto import tqdm, trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics import array_ops
@@ -1704,7 +1702,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         dataset = self.make_dataset(dataset, concatenate=True)
         n_batches = dtf.get_n_batches(dataset)
 
-        free_energy = []
+        free_energy = 0
         for batch in tqdm(dataset, desc="Getting free energy", total=n_batches):
             predictions = self.predict(batch, verbose=0)
             nll = predictions["ll_loss"][0]
@@ -1714,13 +1712,12 @@ class MarkovStateInferenceModelBase(ModelBase):
             prior = self.get_posterior_expected_prior(
                 predictions["gamma"], predictions["xi"]
             )
-            fe = nll + entropy - prior
+            free_energy += nll + entropy - prior
             if self.config.model_name == "HIVE":
                 kl_loss = predictions["kl_loss"][0]
-                fe += kl_loss
-            free_energy.append(fe)
+                free_energy += kl_loss
 
-        return np.mean(free_energy)
+        return free_energy / n_batches
 
     def evidence(self, dataset):
         """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
@@ -1733,7 +1730,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         Returns
         -------
         evidence : float
-            Model evidence (averaged over sequences and batches).
+            Model evidence.
         """
 
         def _evidence_predict_step(log_smoothing_distribution=None):
@@ -1776,33 +1773,24 @@ class MarkovStateInferenceModelBase(ModelBase):
 
             return log_smoothing_distribution, predictive_log_likelihood
 
-        _logger.info("Getting model evidence")
         dataset = self.make_dataset(dataset, concatenate=True)
         n_batches = dtf.get_n_batches(dataset)
 
         evidence = 0
-        for n, data in enumerate(dataset):
-            x = data["data"]
-            print("Batch {}/{}".format(n + 1, n_batches))
-            pb_i = utils.Progbar(self.config.sequence_length)
-            batch_size = tf.shape(x)[0]
+        for batch in tqdm(dataset, desc="Getting evidence", total=n_batches):
+            data = batch["data"]
+            batch_size = tf.shape(data)[0]
             batch_evidence = np.zeros(batch_size, dtype=np.float32)
             log_smoothing_distribution = None
             for t in range(self.config.sequence_length):
-                # Prediction step
                 log_prediction_distribution = _evidence_predict_step(
                     log_smoothing_distribution
                 )
-
-                # Update step
                 (
                     log_smoothing_distribution,
                     predictive_log_likelihood,
-                ) = _evidence_update_step(x[:, t, :], log_prediction_distribution)
-
-                # Update the batch evidence
+                ) = _evidence_update_step(data[:, t, :], log_prediction_distribution)
                 batch_evidence += predictive_log_likelihood
-                pb_i.add(1)
             evidence += np.mean(batch_evidence)
 
         if self.config.loss_calc == "mean":
