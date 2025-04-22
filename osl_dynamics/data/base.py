@@ -1992,6 +1992,8 @@ class Data:
             "arrays",
             "keep",
             "use_tfrecord",
+            "session_labels",
+            "extra_channels",
         ]
         for item in dont_keep:
             if item in attributes:
