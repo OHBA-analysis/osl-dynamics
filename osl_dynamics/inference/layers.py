@@ -228,36 +228,6 @@ class DummyLayer(layers.Layer):
         return inputs
 
 
-class AddRegularizationLossLayer(layers.Layer):
-    """Adds a regularization loss.
-
-    Can be used as a wrapper for a keras regularizer. Inputs are used to
-    calculate the regularization loss and returned without modification.
-
-    Parameters
-    ----------
-    reg : str
-        Type of regularization. Passed to `tf.keras.regularizers.get
-        <https://www.tensorflow.org/api_docs/python/tf/keras/regularizers\
-        /get>`_.
-    strength : float
-        Strength of regularization. The regularization is multiplied
-        by the strength before being added to the loss.
-    kwargs : keyword arguments, optional
-        Keyword arguments to pass to the base class.
-    """
-
-    def __init__(self, reg, strength, **kwargs):
-        super().__init__(**kwargs)
-        self.reg = regularizers.get(reg)
-        self.strength = strength
-
-    def call(self, inputs, **kwargs):
-        reg_loss = self.reg(inputs)
-        self.add_loss(self.strength * reg_loss)
-        return inputs
-
-
 class InverseCholeskyLayer(layers.Layer):
     """Layer for getting Cholesky vectors from postive definite symmetric matrices.
 
