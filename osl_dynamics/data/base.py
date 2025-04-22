@@ -2040,14 +2040,6 @@ class Data:
             Should we save data as fif files? If we are saving fif files
             the :code:`Data.sampling_frequency` attribute must be set.
         """
-        if as_fif and self.sampling_frequency is None:
-            raise ValueError(
-                "Data.sampling_frequency must be set if we are saving fif "
-                "files. Use Data.set_sampling_frequency() or pass "
-                "Data(..., sampling_frequency=...) when creating the Data "
-                "object."
-            )
-
         # Create output directory
         output_dir = pathlib.Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -2058,20 +2050,29 @@ class Data:
                 padded_index = misc.leading_zeros(i, self.n_sessions)
                 filename = f"{output_dir}/array{padded_index}_raw.fif"
                 if hasattr(self, "bad_samples"):
-                    rw.save_fif(
-                        self.arrays[i],
-                        self.sampling_frequency,
-                        filename,
-                        bad_samples=self.bad_samples[i],
-                        verbose=False,
-                    )
+                    bad_samples = self.bad_samples[i]
                 else:
-                    rw.save_fif(
-                        self.arrays[i],
-                        self.sampling_frequency,
-                        filename,
-                        verbose=False,
+                    bad_samples = None
+                if rw.file_ext(self.inputs[i]) == ".fif":
+                    original_fif = self.inputs[i]
+                else:
+                    original_fif = None
+                if self.sampling_frequency is None and original_fif is None:
+                    raise ValueError(
+                        "Data.sampling_frequency must be set if we are saving fif "
+                        "files. Use Data.set_sampling_frequency() or pass "
+                        "Data(..., sampling_frequency=...) when creating the Data "
+                        "object. Alternatively, pass the fif files when creating "
+                        "the Data object."
                     )
+                rw.save_fif(
+                    self.arrays[i],
+                    filename,
+                    sampling_frequency=self.sampling_frequency,
+                    bad_samples=bad_samples,
+                    original_fif=original_fif,
+                    verbose=False,
+                )
 
         else:
             # Function to save a single array

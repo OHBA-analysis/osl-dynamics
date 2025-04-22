@@ -254,23 +254,46 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
     return data
 
 
-def save_fif(data, sampling_frequency, filename, bad_samples=None, verbose=True):
+def save_fif(
+    data,
+    filename,
+    sampling_frequency=None,
+    bad_samples=None,
+    original_fif=None,
+    verbose=True,
+):
     """Save a fif file.
 
     Parameters
     ----------
     data : np.ndarray
         Data to save. Shape must be (n_good_samples, n_channels).
-    sampling_frequency : float
-        Sampling frequency in Hz.
-    filename : str
+    filename : str, optional
         Output filename. Recommended to end with 'raw.fif'.
+    sampling_frequency : float
+        Sampling frequency in Hz. If None, the sampling frequency
+        is taken from :code:`original_fif`.
     bad_samples : np.ndarray, optional
         Boolean numpy array of shape (n_samples,) which indicates
         if a time point is good (False) or bad (True).
+    original_fif : str, optional
+        Path to original fif file containing the data.
+        We take the timing info from this file if passed.
     verbose : bool, optional
         Should we print the messages?
     """
+    if sampling_frequency is None and original_fif is None:
+        raise ValueError("Either sampling_frequency or original_fif must be passed.")
+
+    if original_fif is not None:
+        # Load original fif file and get sampling frequency
+        original_raw = mne.io.read_raw_fif(original_fif, verbose=verbose)
+        if sampling_frequency is not None:
+            if sampling_frequency != original_raw.info["sfreq"]:
+                raise ValueError(
+                    "sampling_frequency does not match original_fif.info['sfreq']."
+                )
+        sampling_frequency = original_raw.info["sfreq"]
 
     # Create Info object
     n_channels = data.shape[1]
@@ -287,6 +310,13 @@ def save_fif(data, sampling_frequency, filename, bad_samples=None, verbose=True)
 
         # Create the Raw object
         raw = mne.io.RawArray(x.T, info, verbose=verbose)
+
+        if original_fif is not None:
+            # Set timing info
+            raw.set_meas_date(original_raw.info["meas_date"])
+            raw.__dict__["_first_samps"] = original_raw.__dict__["_first_samps"]
+            raw.__dict__["_last_samps"] = original_raw.__dict__["_last_samps"]
+            raw.__dict__["_cropped_samp"] = original_raw.__dict__["_cropped_samp"]
 
         # Annotate bad segments
         _, times = raw.get_data(return_times=True)
