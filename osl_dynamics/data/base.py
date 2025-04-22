@@ -2,7 +2,6 @@
 
 import os
 import re
-import mne
 import logging
 import pathlib
 import pickle
@@ -1234,19 +1233,22 @@ class Data:
             else:
                 window_length = 2 * self.sampling_frequency
 
+        if hasattr(self, "bad_samples"):
+            raise ValueError("remove_bad_segments can only be called once.")
+
         # Function to remove bad segments to a single array
         def _apply(array, prepared_data_file):
-            array = processing.remove_bad_segments(
+            array, bad = processing.remove_bad_segments(
                 array, window_length, significance_level, maximum_fraction
             )
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
-            return array
+            return array, bad
 
         # Run in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
         args = zip(arrays, self.prepared_data_filenames)
-        self.arrays = pqdm(
+        results = pqdm(
             args,
             function=_apply,
             desc="Bad segment removal",
@@ -1254,12 +1256,18 @@ class Data:
             argument_type="args",
             total=self.n_sessions,
         )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
+        if any([isinstance(e, Exception) for e in results]):
+            for i, e in enumerate(results):
                 if isinstance(e, Exception):
                     e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
+
+        # Unpack results
+        self.bad_samples = []
+        for i, (a, b) in enumerate(results):
+            self.arrays[i] = a
+            self.bad_samples.append(b)
 
         return self
 
@@ -2046,31 +2054,38 @@ class Data:
 
         if as_fif:
             # Function to save a fif file
-            def _save(i, arr):
-                info = mne.create_info(
-                    ch_names=[f"ch_{n}" for n in range(self.n_channels)],
-                    sfreq=self.sampling_frequency,
-                    ch_types=["misc"] * self.n_channels,
-                )
-                raw = mne.io.RawArray(arr.T, info, verbose=False)
+            def _save(i):
                 padded_index = misc.leading_zeros(i, self.n_sessions)
                 filename = f"{output_dir}/array{padded_index}_raw.fif"
-                raw.save(filename, overwrite=True, verbose=False)
+                if hasattr(self, "bad_samples"):
+                    rw.save_fif(
+                        self.arrays[i],
+                        self.sampling_frequency,
+                        filename,
+                        bad_samples=self.bad_samples[i],
+                        verbose=False,
+                    )
+                else:
+                    rw.save_fif(
+                        self.arrays[i],
+                        self.sampling_frequency,
+                        filename,
+                        verbose=False,
+                    )
 
         else:
             # Function to save a single array
-            def _save(i, arr):
+            def _save(i):
                 padded_index = misc.leading_zeros(i, self.n_sessions)
                 filename = f"{output_dir}/array{padded_index}.npy"
-                np.save(filename, arr)
+                np.save(filename, self.arrays[i])
 
         # Save arrays in parallel
         pqdm(
-            enumerate(self.arrays),
+            range(self.n_sessions),
             _save,
             desc="Saving data",
             n_jobs=self.n_jobs,
-            argument_type="args",
             total=self.n_sessions,
         )
 

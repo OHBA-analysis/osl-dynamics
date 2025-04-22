@@ -6,6 +6,7 @@ import logging
 import mne
 import numpy as np
 import scipy.io
+from scipy import ndimage
 
 
 _logger = logging.getLogger("osl-dynamics")
@@ -251,6 +252,62 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
     else:
         raise ValueError("a fif file must end with 'raw.fif' or 'epo.fif'.")
     return data
+
+
+def save_fif(data, sampling_frequency, filename, bad_samples=None, verbose=True):
+    """Save a fif file.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data to save. Shape must be (n_good_samples, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    filename : str
+        Output filename. Recommended to end with 'raw.fif'.
+    bad_samples : np.ndarray, optional
+        Boolean numpy array of shape (n_samples,) which indicates
+        if a time point is good (False) or bad (True).
+    verbose : bool, optional
+        Should we print the messages?
+    """
+
+    # Create Info object
+    n_channels = data.shape[1]
+    info = mne.create_info(
+        ch_names=[f"ch_{i}" for i in range(n_channels)],
+        sfreq=sampling_frequency,
+        ch_types=["misc"] * n_channels,
+    )
+
+    if bad_samples is not None:
+        # Create the full time series with nans during bad segments
+        x = np.full([bad_samples.shape[0], data.shape[1]], np.nan)
+        x[~bad_samples] = data
+
+        # Create the Raw object
+        raw = mne.io.RawArray(x.T, info, verbose=verbose)
+
+        # Annotate bad segments
+        _, times = raw.get_data(return_times=True)
+        labels, n_bad_segments = ndimage.label(bad_samples)
+        annotations = []
+        for i in range(1, n_bad_segments + 1):
+            indices = np.where(labels == i)[0]
+            onset = times[indices[0]]
+            duration = times[indices[-1]] - onset + raw.times[1] - raw.times[0]
+            annotations.append(
+                mne.Annotations(onset=onset, duration=duration, description="bad")
+            )
+        if annotations:
+            raw.set_annotations(sum(annotations[1:], annotations[0]))
+
+    else:
+        # Create Raw object (all time points are good)
+        raw = mne.io.RawArray(data.T, info, verbose=verbose)
+
+    # Save
+    raw.save(filename, overwrite=True, verbose=verbose)
 
 
 def load_matlab(filename, field):

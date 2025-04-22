@@ -214,6 +214,11 @@ def remove_bad_segments(
     -------
     x : np.ndarray
         Time series with bad segments removed.
+        Shape is (n_samples - n_bad_samples, n_channels).
+    bad : np.ndarray
+        Times of True (bad) or False (good) to indices whether
+        a time point is good or bad. This is the full length of
+        the original time series. Shape is (n_samples,).
     """
 
     def _gesd(X, alpha=significance_level, p_out=maximum_fraction, outlier_side=0):
@@ -288,5 +293,5 @@ def remove_bad_segments(
     # Look up what indices in the original data are bad
     bad = np.isin(indices, bad_metrics_indices)
 
-    # Return good data
-    return x[~bad]
+    # Return good data and bad indices
+    return x[~bad], bad
