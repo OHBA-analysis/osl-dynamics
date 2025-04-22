@@ -2017,7 +2017,9 @@ class Data:
                     break
 
     def save(self, output_dir=".", as_fif=False):
-        """Saves (prepared) data to numpy files.
+        """Saves (prepared) data.
+
+        The ordering of the saved files matches the order of the input files.
 
         Parameters
         ----------
@@ -2040,35 +2042,30 @@ class Data:
         output_dir = pathlib.Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 
-        # Function to save a single array
-        def _save_numpy(i, arr):
-            padded_index = misc.leading_zeros(i, self.n_sessions)
-            np.save(f"{output_dir}/array{padded_index}.npy", arr)
-
-        # Function to save a fif file
-        def _save_fif(i, arr):
-            info = mne.create_info(
-                ch_names=[f"ch_{n}" for n in range(self.n_channels)],
-                sfreq=self.sampling_frequency,
-                ch_types=["misc"] * self.n_channels,
-            )
-            raw = mne.io.RawArray(arr.T, info, verbose=False)
-            padded_index = misc.leading_zeros(i, self.n_sessions)
-            raw.save(
-                f"{output_dir}/array{padded_index}_raw.fif",
-                overwrite=True,
-                verbose=False,
-            )
-
         if as_fif:
-            save_function = _save_fif
+            # Function to save a fif file
+            def _save(i, arr):
+                info = mne.create_info(
+                    ch_names=[f"ch_{n}" for n in range(self.n_channels)],
+                    sfreq=self.sampling_frequency,
+                    ch_types=["misc"] * self.n_channels,
+                )
+                raw = mne.io.RawArray(arr.T, info, verbose=False)
+                padded_index = misc.leading_zeros(i, self.n_sessions)
+                filename = f"{output_dir}/array{padded_index}_raw.fif"
+                raw.save(filename, overwrite=True, verbose=False)
+
         else:
-            save_function = _save_numpy
+            # Function to save a single array
+            def _save(i, arr):
+                padded_index = misc.leading_zeros(i, self.n_sessions)
+                filename = f"{output_dir}/array{padded_index}.npy"
+                np.save(filename, arr)
 
         # Save arrays in parallel
         pqdm(
             enumerate(self.arrays),
-            save_function,
+            _save,
             desc="Saving data",
             n_jobs=self.n_jobs,
             argument_type="args",
