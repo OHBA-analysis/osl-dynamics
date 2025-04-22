@@ -9,4 +9,3 @@ outdir = "data/preproc"
 files = sorted(glob(f"{outdir}/*/sflip_parc-raw.fif"))
 data = Data(files, picks="misc", reject_by_annotation="omit")
 data.save("training_data/networks")
-data.delete_dir()

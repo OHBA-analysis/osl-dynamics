@@ -118,7 +118,3 @@ inf_stc, sim_stc = modes.match_modes(stc, sim.state_time_course)
 dice = metrics.dice_coefficient(inf_stc, sim_stc)
 
 print("Dice coefficient:", dice)
-
-#%% Delete temporary directory
-
-data.delete_dir()

@@ -162,5 +162,3 @@ plotting.plot_matrices(
 plotting.plot_matrices(
     inf_corrs, main_title="Inferred", filename="figures/inf_corrs.png"
 )
-
-training_data.delete_dir()

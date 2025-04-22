@@ -116,7 +116,3 @@ np.save(f"{summary_stats_dir}/fo.npy", fo)
 np.save(f"{summary_stats_dir}/lt.npy", lt)
 np.save(f"{summary_stats_dir}/intv.npy", intv)
 np.save(f"{summary_stats_dir}/sr.npy", sr)
-
-#%% Delete temporary directory
-
-data.delete_dir()

@@ -83,7 +83,3 @@ history["free_energy"] = free_energy
 # Save training history and free energy
 pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
 pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
-
-#%% Delete temporary directory
-
-data.delete_dir()

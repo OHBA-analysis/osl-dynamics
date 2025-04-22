@@ -88,5 +88,3 @@ for train_index, validation_index in kf.split(range(sim.n_sessions)):
 
 print("Mean score:", np.mean(scores))
 print("Score std:", np.std(scores))
-
-training_data.delete_dir()

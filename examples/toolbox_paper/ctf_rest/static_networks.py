@@ -175,6 +175,3 @@ connectivity.save(
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     filename=f"{output_dir}/aec_diff_.png",
 )
-
-# Delete tmp directory
-data.delete_dir()

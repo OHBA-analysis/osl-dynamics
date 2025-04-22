@@ -133,6 +133,3 @@ plotting.plot_state_lifetimes(
     y_label="Occurrence",
     filename="figures/sam_lt.png",
 )
-
-# Delete temporary directory
-training_data.delete_dir()

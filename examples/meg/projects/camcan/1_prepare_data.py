@@ -23,6 +23,3 @@ data.prepare(
 
 # Save a TFRecord dataset
 data.save_tfrecord_dataset("training_dataset", sequence_length=400)
-
-# Delete temporary directory
-data.delete_dir()
