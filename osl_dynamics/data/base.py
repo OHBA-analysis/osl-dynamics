@@ -1,8 +1,9 @@
 """Base class for handling data."""
 
-import re
-import logging
 import os
+import re
+import mne
+import logging
 import pathlib
 import pickle
 import random
@@ -2015,7 +2016,7 @@ class Data:
                         setattr(self, attr, value)
                     break
 
-    def save(self, output_dir="."):
+    def save(self, output_dir=".", as_fif=False):
         """Saves (prepared) data to numpy files.
 
         Parameters
@@ -2023,20 +2024,51 @@ class Data:
         output_dir : str
             Path to save data files to. Default is the current working
             directory.
+        as_fif : bool, optional
+            Should we save data as fif files? If we are saving fif files
+            the :code:`Data.sampling_frequency` attribute must be set.
         """
+        if as_fif and self.sampling_frequency is None:
+            raise ValueError(
+                "Data.sampling_frequency must be set if we are saving fif "
+                "files. Use Data.set_sampling_frequency() or pass "
+                "Data(..., sampling_frequency=...) when creating the Data "
+                "object."
+            )
+
         # Create output directory
         output_dir = pathlib.Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # Function to save a single array
-        def _save(i, arr):
-            padded_number = misc.leading_zeros(i, self.n_sessions)
-            np.save(f"{output_dir}/array{padded_number}.npy", arr)
+        def _save_numpy(i, arr):
+            padded_index = misc.leading_zeros(i, self.n_sessions)
+            np.save(f"{output_dir}/array{padded_index}.npy", arr)
+
+        # Function to save a fif file
+        def _save_fif(i, arr):
+            info = mne.create_info(
+                ch_names=[f"ch_{n}" for n in range(self.n_channels)],
+                sfreq=self.sampling_frequency,
+                ch_types=["misc"] * self.n_channels,
+            )
+            raw = mne.io.RawArray(arr.T, info, verbose=False)
+            padded_index = misc.leading_zeros(i, self.n_sessions)
+            raw.save(
+                f"{output_dir}/array{padded_index}_raw.fif",
+                overwrite=True,
+                verbose=False,
+            )
+
+        if as_fif:
+            save_function = _save_fif
+        else:
+            save_function = _save_numpy
 
         # Save arrays in parallel
         pqdm(
             enumerate(self.arrays),
-            _save,
+            save_function,
             desc="Saving data",
             n_jobs=self.n_jobs,
             argument_type="args",
