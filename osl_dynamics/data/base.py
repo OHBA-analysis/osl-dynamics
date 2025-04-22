@@ -135,8 +135,8 @@ class Data:
             raise ValueError("No valid inputs were passed.")
 
         # Directory to store memory maps created by this class
+        # (created when rw.load_data is called)
         self.store_dir = pathlib.Path(store_dir)
-        self.store_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
 
         # Load and validate the raw data
         self.raw_data_arrays, self.raw_data_filenames = self.load_raw_data()

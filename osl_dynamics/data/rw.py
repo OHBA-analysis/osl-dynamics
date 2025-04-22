@@ -149,6 +149,10 @@ def load_data(
         if mmap_location is None:
             return data
         else:
+            # Create Data.store_dir
+            store_dir = path.dirname(mmap_location)
+            os.makedirs(store_dir, exist_ok=True)
+
             # Save to a file so we can load data as a memory map
             np.save(mmap_location, data)
             data = mmap_location
