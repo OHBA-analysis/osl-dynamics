@@ -7,9 +7,8 @@ from typing import Literal
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.keras import utils
 from scipy.special import xlogy, logsumexp
-from tqdm.auto import trange
+from tqdm.auto import tqdm, trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics import array_ops
@@ -1216,8 +1215,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         trans_prob : np.ndarray
             Transition probability matrix. Shape is (n_states, n_states).
         """
-        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.get_trans_prob().numpy()
+        layer = self.model.get_layer("hid_state_inf")
+        return layer.get_trans_prob().numpy()
 
     def get_initial_state_probs(self):
         """Get the initial state probability distribution.
@@ -1227,8 +1226,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         initial_distribution : np.ndarray
             Initial distribution. Shape is (n_states,).
         """
-        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.get_initial_state_probs().numpy()
+        layer = self.model.get_layer("hid_state_inf")
+        return layer.get_initial_state_probs().numpy()
 
     def set_trans_prob(self, trans_prob, update_initializer=True):
         """Set the transition probability matrix.
@@ -1577,7 +1576,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         second_term = xlogy(gamma, gamma)[:, 1:-1, :]
         second_term = np.sum(second_term, axis=(1, 2))
 
-        # Average over batches
+        # Average over sequences in a batch
         entropy = np.mean(first_term - second_term)
 
         if self.config.loss_calc == "mean":
@@ -1611,9 +1610,18 @@ class MarkovStateInferenceModelBase(ModelBase):
             Posterior expected log-likelihood.
         """
         log_likelihood = self.get_log_likelihood(x)
-        expected_log_likelihood = np.sum(log_likelihood * gamma)
+        expected_log_likelihood = log_likelihood * gamma
+
+        # Sum over time points and states
+        expected_log_likelihood = np.sum(expected_log_likelihood, axis=(1, 2))
+
+        # Average over sequences in a batch
+        expected_log_likelihood = np.mean(expected_log_likelihood, axis=0)
+
         if self.config.loss_calc == "mean":
+            # Correct sum over time into an average
             expected_log_likelihood /= self.config.sequence_length
+
         return expected_log_likelihood
 
     def get_posterior_expected_prior(self, gamma, xi):
@@ -1642,7 +1650,6 @@ class MarkovStateInferenceModelBase(ModelBase):
         -------
         prior : float
             Posterior expected prior probability.
-            Shape is (batch_size, sequence_length).
         """
         initial_distribution = self.get_initial_state_probs()
         trans_prob = self.get_trans_prob()
@@ -1656,7 +1663,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         remaining_terms = xlogy(xi, trans_prob[None, None, ...])
         remaining_terms = np.sum(remaining_terms, axis=(1, 2, 3))
 
-        # Average over batches
+        # Average over sequences in a batch
         prior = np.mean(first_term + remaining_terms)
 
         if self.config.loss_calc == "mean":
@@ -1665,14 +1672,14 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return prior
 
-    def free_energy(self, dataset, **kwargs):
+    def free_energy(self, dataset):
         r"""Get the variational free energy of HMM-based models.
 
         This calculates:
 
         .. math::
             \mathcal{F} = \int q(s_{1:T}) \log \left[ \
-                          \\frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \\right] \
+                          \frac{q(s_{1:T})}{p(x_{1:T}, s_{1:T})} \right] \
                           ds_{1:T}
 
         Parameters
@@ -1692,20 +1699,12 @@ class MarkovStateInferenceModelBase(ModelBase):
                 + "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
-        dataset = self.make_dataset(dataset, concatenate=False)
-
-        n_datasets = len(dataset)
-        if len(dataset) > 1:
-            iterator = trange(n_datasets, desc="Getting free energy")
-            kwargs["verbose"] = 0
-        else:
-            iterator = range(n_datasets)
-            _logger.info("Getting free energy")
+        dataset = self.make_dataset(dataset, concatenate=True)
 
         free_energy = []
-        for i in iterator:
-            predictions = self.predict(dataset[i], **kwargs)
-            nll = np.mean(predictions["ll_loss"])
+        for batch in tqdm(dataset, desc="Getting free energy"):
+            predictions = self.predict(batch, verbose=0)
+            nll = predictions["ll_loss"][0]
             entropy = self.get_posterior_entropy(
                 predictions["gamma"], predictions["xi"]
             )
@@ -1714,7 +1713,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             )
             fe = nll + entropy - prior
             if self.config.model_name == "HIVE":
-                kl_loss = np.mean(predictions["kl_loss"])
+                kl_loss = predictions["kl_loss"][0]
                 fe += kl_loss
             free_energy.append(fe)
 
@@ -1774,36 +1773,27 @@ class MarkovStateInferenceModelBase(ModelBase):
 
             return log_smoothing_distribution, predictive_log_likelihood
 
-        _logger.info("Getting model evidence")
         dataset = self.make_dataset(dataset, concatenate=True)
-        n_batches = dtf.get_n_batches(dataset)
 
-        evidence = 0
-        for n, data in enumerate(dataset):
-            x = data["data"]
-            print("Batch {}/{}".format(n + 1, n_batches))
-            pb_i = utils.Progbar(self.config.sequence_length)
-            batch_size = tf.shape(x)[0]
+        evidence = []
+        for batch in tqdm(dataset, desc="Getting evidence"):
+            data = batch["data"]
+            batch_size = tf.shape(data)[0]
             batch_evidence = np.zeros(batch_size, dtype=np.float32)
             log_smoothing_distribution = None
             for t in range(self.config.sequence_length):
-                # Prediction step
                 log_prediction_distribution = _evidence_predict_step(
                     log_smoothing_distribution
                 )
-
-                # Update step
                 (
                     log_smoothing_distribution,
                     predictive_log_likelihood,
-                ) = _evidence_update_step(x[:, t, :], log_prediction_distribution)
-
-                # Update the batch evidence
+                ) = _evidence_update_step(data[:, t, :], log_prediction_distribution)
                 batch_evidence += predictive_log_likelihood
-                pb_i.add(1)
-            evidence += np.mean(batch_evidence)
+            evidence.append(np.mean(batch_evidence))
+        evidence = np.mean(evidence)
 
         if self.config.loss_calc == "mean":
             evidence /= self.config.sequence_length
 
-        return evidence / n_batches
+        return evidence
