@@ -1,11 +1,12 @@
 """Functions for reading and writing data."""
 
+import os
 import logging
-from os import listdir, path
 
 import mne
 import numpy as np
 import scipy.io
+from scipy import ndimage
 
 
 _logger = logging.getLogger("osl-dynamics")
@@ -26,7 +27,7 @@ def validate_inputs(inputs):
         Validated inputs.
     """
     if isinstance(inputs, str):
-        if path.isdir(inputs):
+        if os.path.isdir(inputs):
             validated_inputs = list_dir(inputs, keep_ext=_allowed_ext)
         else:
             validated_inputs = [inputs]
@@ -45,9 +46,9 @@ def validate_inputs(inputs):
         elif isinstance(inputs[0], str):
             validated_inputs = []
             for inp in inputs:
-                if path.isdir(inp):
+                if os.path.isdir(inp):
                     validated_inputs += list_dir(inp, keep_ext=_allowed_ext)
-                elif path.exists(inp):
+                elif os.path.exists(inp):
                     validated_inputs.append(inp)
                 else:
                     _logger.warn(f"{inp} not found")
@@ -70,7 +71,7 @@ def file_ext(filename):
     """
     if not isinstance(filename, str):
         return None
-    _, ext = path.splitext(filename)
+    _, ext = os.path.splitext(filename)
     return ext
 
 
@@ -92,12 +93,12 @@ def list_dir(path, keep_ext=None):
     """
     files = []
     if keep_ext is None:
-        for file in sorted(listdir(path)):
+        for file in sorted(os.listdir(path)):
             files.append(path + "/" + file)
     else:
         if isinstance(keep_ext, str):
             keep_ext = [keep_ext]
-        for file in sorted(listdir(path)):
+        for file in sorted(os.listdir(path)):
             if file_ext(file) in keep_ext:
                 files.append(path + "/" + file)
     return files
@@ -149,13 +150,17 @@ def load_data(
         if mmap_location is None:
             return data
         else:
+            # Create Data.store_dir
+            store_dir = os.path.dirname(mmap_location)
+            os.makedirs(store_dir, exist_ok=True, mode=0o700)
+
             # Save to a file so we can load data as a memory map
             np.save(mmap_location, data)
             data = mmap_location
 
     if isinstance(data, str):
         # Check if file/folder exists
-        if not path.exists(data):
+        if not os.path.exists(data):
             raise FileNotFoundError(data)
 
         # Check extension
@@ -247,6 +252,92 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
     else:
         raise ValueError("a fif file must end with 'raw.fif' or 'epo.fif'.")
     return data
+
+
+def save_fif(
+    data,
+    filename,
+    sampling_frequency=None,
+    bad_samples=None,
+    original_fif=None,
+    verbose=True,
+):
+    """Save a fif file.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data to save. Shape must be (n_good_samples, n_channels).
+    filename : str, optional
+        Output filename. Recommended to end with 'raw.fif'.
+    sampling_frequency : float
+        Sampling frequency in Hz. If None, the sampling frequency
+        is taken from :code:`original_fif`.
+    bad_samples : np.ndarray, optional
+        Boolean numpy array of shape (n_samples,) which indicates
+        if a time point is good (False) or bad (True).
+    original_fif : str, optional
+        Path to original fif file containing the data.
+        We take the timing info from this file if passed.
+    verbose : bool, optional
+        Should we print the messages?
+    """
+    if sampling_frequency is None and original_fif is None:
+        raise ValueError("Either sampling_frequency or original_fif must be passed.")
+
+    if original_fif is not None:
+        # Load original fif file and get sampling frequency
+        original_raw = mne.io.read_raw_fif(original_fif, verbose=verbose)
+        if sampling_frequency is not None:
+            if sampling_frequency != original_raw.info["sfreq"]:
+                raise ValueError(
+                    "sampling_frequency does not match original_fif.info['sfreq']."
+                )
+        sampling_frequency = original_raw.info["sfreq"]
+
+    # Create Info object
+    n_channels = data.shape[1]
+    info = mne.create_info(
+        ch_names=[f"ch_{i}" for i in range(n_channels)],
+        sfreq=sampling_frequency,
+        ch_types=["misc"] * n_channels,
+    )
+
+    if bad_samples is not None:
+        # Create the full time series with nans during bad segments
+        x = np.full([bad_samples.shape[0], data.shape[1]], np.nan)
+        x[~bad_samples] = data
+
+        # Create the Raw object
+        raw = mne.io.RawArray(x.T, info, verbose=verbose)
+
+        if original_fif is not None:
+            # Set timing info
+            raw.set_meas_date(original_raw.info["meas_date"])
+            raw.__dict__["_first_samps"] = original_raw.__dict__["_first_samps"]
+            raw.__dict__["_last_samps"] = original_raw.__dict__["_last_samps"]
+            raw.__dict__["_cropped_samp"] = original_raw.__dict__["_cropped_samp"]
+
+        # Annotate bad segments
+        _, times = raw.get_data(return_times=True)
+        labels, n_bad_segments = ndimage.label(bad_samples)
+        annotations = []
+        for i in range(1, n_bad_segments + 1):
+            indices = np.where(labels == i)[0]
+            onset = times[indices[0]]
+            duration = times[indices[-1]] - onset + raw.times[1] - raw.times[0]
+            annotations.append(
+                mne.Annotations(onset=onset, duration=duration, description="bad")
+            )
+        if annotations:
+            raw.set_annotations(sum(annotations[1:], annotations[0]))
+
+    else:
+        # Create Raw object (all time points are good)
+        raw = mne.io.RawArray(data.T, info, verbose=verbose)
+
+    # Save
+    raw.save(filename, overwrite=True, verbose=verbose)
 
 
 def load_matlab(filename, field):

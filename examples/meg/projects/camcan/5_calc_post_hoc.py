@@ -62,6 +62,3 @@ np.save(f"{output_dir}/fo.npy", fo)
 np.save(f"{output_dir}/lt.npy", lt)
 np.save(f"{output_dir}/intv.npy", intv)
 np.save(f"{output_dir}/sr.npy", sr)
-
-# Delete temporary directory
-data.delete_dir()

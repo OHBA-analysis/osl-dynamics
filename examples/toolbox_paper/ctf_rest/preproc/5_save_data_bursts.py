@@ -23,4 +23,3 @@ time_series = [get_downsampled_data(file) for file in files]
 # Save as normal numpy files
 data = Data(time_series)
 data.save("training_data/bursts")
-data.delete_dir()

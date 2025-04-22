@@ -1,8 +1,8 @@
 """Base class for handling data."""
 
+import os
 import re
 import logging
-import os
 import pathlib
 import pickle
 import random
@@ -89,7 +89,7 @@ class Data:
         Extra session labels.
     extra_channels : dict, optional
         Extra channels to add to the data. The keys are the channel names and
-        the values are the channel data. 
+        the values are the channel data.
     n_jobs : int, optional
         Number of processes to load the data in parallel.
         Default is 1, which loads data in serial.
@@ -134,8 +134,8 @@ class Data:
             raise ValueError("No valid inputs were passed.")
 
         # Directory to store memory maps created by this class
+        # (created when rw.load_data is called)
         self.store_dir = pathlib.Path(store_dir)
-        self.store_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
 
         # Load and validate the raw data
         self.raw_data_arrays, self.raw_data_filenames = self.load_raw_data()
@@ -1233,19 +1233,22 @@ class Data:
             else:
                 window_length = 2 * self.sampling_frequency
 
+        if hasattr(self, "bad_samples"):
+            raise ValueError("remove_bad_segments can only be called once.")
+
         # Function to remove bad segments to a single array
         def _apply(array, prepared_data_file):
-            array = processing.remove_bad_segments(
+            array, bad = processing.remove_bad_segments(
                 array, window_length, significance_level, maximum_fraction
             )
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
-            return array
+            return array, bad
 
         # Run in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
         args = zip(arrays, self.prepared_data_filenames)
-        self.arrays = pqdm(
+        results = pqdm(
             args,
             function=_apply,
             desc="Bad segment removal",
@@ -1253,12 +1256,18 @@ class Data:
             argument_type="args",
             total=self.n_sessions,
         )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
+        if any([isinstance(e, Exception) for e in results]):
+            for i, e in enumerate(results):
                 if isinstance(e, Exception):
                     e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
+
+        # Unpack results
+        self.bad_samples = []
+        for i, (a, b) in enumerate(results):
+            self.arrays[i] = a
+            self.bad_samples.append(b)
 
         return self
 
@@ -1692,7 +1701,7 @@ class Data:
         overwrite : bool, optional
             Should we overwrite the existing TFRecord datasets if there is a need?
         """
-        os.makedirs(tfrecord_dir, mode=0o700, exist_ok=True)
+        os.makedirs(tfrecord_dir, exist_ok=True, mode=0o700)
 
         self.sequence_length = sequence_length
         self.step_size = step_size or sequence_length
@@ -1757,7 +1766,7 @@ class Data:
         tfrecord_path = (
             f"{tfrecord_dir}"
             "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}"
-            f".{self._identifier}.tfrecord"
+            f"_{self._identifier}.tfrecord"
         )
 
         # TFRecords we need to save
@@ -1991,6 +2000,8 @@ class Data:
             "arrays",
             "keep",
             "use_tfrecord",
+            "session_labels",
+            "extra_channels",
         ]
         for item in dont_keep:
             if item in attributes:
@@ -2015,31 +2026,67 @@ class Data:
                         setattr(self, attr, value)
                     break
 
-    def save(self, output_dir="."):
-        """Saves (prepared) data to numpy files.
+    def save(self, output_dir=".", as_fif=False):
+        """Saves (prepared) data.
+
+        The ordering of the saved files matches the order of the input files.
 
         Parameters
         ----------
         output_dir : str
             Path to save data files to. Default is the current working
             directory.
+        as_fif : bool, optional
+            Should we save data as fif files? If we are saving fif files
+            the :code:`Data.sampling_frequency` attribute must be set.
         """
         # Create output directory
         output_dir = pathlib.Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 
-        # Function to save a single array
-        def _save(i, arr):
-            padded_number = misc.leading_zeros(i, self.n_sessions)
-            np.save(f"{output_dir}/array{padded_number}.npy", arr)
+        if as_fif:
+            # Function to save a fif file
+            def _save(i):
+                padded_index = misc.leading_zeros(i, self.n_sessions)
+                filename = f"{output_dir}/array{padded_index}_raw.fif"
+                if hasattr(self, "bad_samples"):
+                    bad_samples = self.bad_samples[i]
+                else:
+                    bad_samples = None
+                if rw.file_ext(self.inputs[i]) == ".fif":
+                    original_fif = self.inputs[i]
+                else:
+                    original_fif = None
+                if self.sampling_frequency is None and original_fif is None:
+                    raise ValueError(
+                        "Data.sampling_frequency must be set if we are saving fif "
+                        "files. Use Data.set_sampling_frequency() or pass "
+                        "Data(..., sampling_frequency=...) when creating the Data "
+                        "object. Alternatively, pass the fif files when creating "
+                        "the Data object."
+                    )
+                rw.save_fif(
+                    self.arrays[i],
+                    filename,
+                    sampling_frequency=self.sampling_frequency,
+                    bad_samples=bad_samples,
+                    original_fif=original_fif,
+                    verbose=False,
+                )
+
+        else:
+            # Function to save a single array
+            def _save(i):
+                padded_index = misc.leading_zeros(i, self.n_sessions)
+                filename = f"{output_dir}/array{padded_index}.npy"
+                np.save(filename, self.arrays[i])
 
         # Save arrays in parallel
         pqdm(
-            enumerate(self.arrays),
+            range(self.n_sessions),
             _save,
             desc="Saving data",
             n_jobs=self.n_jobs,
-            argument_type="args",
             total=self.n_sessions,
         )
 

@@ -61,7 +61,3 @@ means, covs = model.dual_estimation(data, alpha)
 # Save
 np.save(f"{dual_estimates_dir}/means.npy", means)
 np.save(f"{dual_estimates_dir}/covs.npy", covs)
-
-#%% Delete temporary directory
-
-data.delete_dir()

@@ -295,7 +295,7 @@ def load_tfrecord_dataset(
     tfrecord_path = (
         f"{tfrecord_dir}"
         "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}"
-        f".{identifier}.tfrecord"
+        f"_{identifier}.tfrecord"
     )
 
     if validation_split is None:

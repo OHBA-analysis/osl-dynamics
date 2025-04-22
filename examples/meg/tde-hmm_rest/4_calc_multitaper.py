@@ -79,7 +79,3 @@ np.save(f"{spectra_dir}/w.npy", w)
 wb_comp = spectral.decompose_spectra(coh, n_components=2)
 
 np.save(f"{spectra_dir}/nnmf_2.npy", wb_comp)
-
-#%% Delete temporary directory
-
-data.delete_dir()

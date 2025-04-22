@@ -62,8 +62,3 @@ means, covs = model.get_means_covariances()
 
 np.save(f"{inf_params_dir}/means.npy", means)
 np.save(f"{inf_params_dir}/covs.npy", covs)
-
-#%% Delete temporary directory
-
-data.delete_dir()
-

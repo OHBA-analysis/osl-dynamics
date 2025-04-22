@@ -147,6 +147,3 @@ plotting.plot_scatter(
 axes[0].set_title("Simulation")
 axes[1].set_title("Inferred")
 plotting.save(fig, filename="figures/embeddings.png")
-
-# Delete temporary directory
-training_data.delete_dir()

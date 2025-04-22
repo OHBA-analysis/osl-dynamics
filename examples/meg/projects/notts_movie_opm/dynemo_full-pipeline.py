@@ -280,7 +280,3 @@ analysis.connectivity.save(
     filename=f"{maps_dir}/coh_.png",
     parcellation_file=parcellation_file,
 )
-
-#%% Clean up
-
-training_data.delete_dir()
