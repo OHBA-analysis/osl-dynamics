@@ -1758,7 +1758,7 @@ class Data:
         tfrecord_path = (
             f"{tfrecord_dir}"
             "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}"
-            f".{self._identifier}.tfrecord"
+            f"_{self._identifier}.tfrecord"
         )
 
         # TFRecords we need to save
