@@ -1215,8 +1215,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         trans_prob : np.ndarray
             Transition probability matrix. Shape is (n_states, n_states).
         """
-        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.get_trans_prob().numpy()
+        layer = self.model.get_layer("hid_state_inf")
+        return layer.get_trans_prob().numpy()
 
     def get_initial_state_probs(self):
         """Get the initial state probability distribution.
@@ -1226,8 +1226,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         initial_distribution : np.ndarray
             Initial distribution. Shape is (n_states,).
         """
-        hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        return hidden_state_inference_layer.get_initial_state_probs().numpy()
+        layer = self.model.get_layer("hid_state_inf")
+        return layer.get_initial_state_probs().numpy()
 
     def set_trans_prob(self, trans_prob, update_initializer=True):
         """Set the transition probability matrix.
