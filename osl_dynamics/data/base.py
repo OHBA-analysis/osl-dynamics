@@ -90,7 +90,7 @@ class Data:
         Extra session labels.
     extra_channels : dict, optional
         Extra channels to add to the data. The keys are the channel names and
-        the values are the channel data. 
+        the values are the channel data.
     n_jobs : int, optional
         Number of processes to load the data in parallel.
         Default is 1, which loads data in serial.
