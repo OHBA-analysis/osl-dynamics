@@ -1,7 +1,7 @@
 """Functions for reading and writing data."""
 
+import os
 import logging
-from os import listdir, path
 
 import mne
 import numpy as np
@@ -26,7 +26,7 @@ def validate_inputs(inputs):
         Validated inputs.
     """
     if isinstance(inputs, str):
-        if path.isdir(inputs):
+        if os.path.isdir(inputs):
             validated_inputs = list_dir(inputs, keep_ext=_allowed_ext)
         else:
             validated_inputs = [inputs]
@@ -45,9 +45,9 @@ def validate_inputs(inputs):
         elif isinstance(inputs[0], str):
             validated_inputs = []
             for inp in inputs:
-                if path.isdir(inp):
+                if os.path.isdir(inp):
                     validated_inputs += list_dir(inp, keep_ext=_allowed_ext)
-                elif path.exists(inp):
+                elif os.path.exists(inp):
                     validated_inputs.append(inp)
                 else:
                     _logger.warn(f"{inp} not found")
@@ -70,7 +70,7 @@ def file_ext(filename):
     """
     if not isinstance(filename, str):
         return None
-    _, ext = path.splitext(filename)
+    _, ext = os.path.splitext(filename)
     return ext
 
 
@@ -92,12 +92,12 @@ def list_dir(path, keep_ext=None):
     """
     files = []
     if keep_ext is None:
-        for file in sorted(listdir(path)):
+        for file in sorted(os.listdir(path)):
             files.append(path + "/" + file)
     else:
         if isinstance(keep_ext, str):
             keep_ext = [keep_ext]
-        for file in sorted(listdir(path)):
+        for file in sorted(os.listdir(path)):
             if file_ext(file) in keep_ext:
                 files.append(path + "/" + file)
     return files
@@ -150,7 +150,7 @@ def load_data(
             return data
         else:
             # Create Data.store_dir
-            store_dir = path.dirname(mmap_location)
+            store_dir = os.path.dirname(mmap_location)
             os.makedirs(store_dir, exist_ok=True, mode=0o700)
 
             # Save to a file so we can load data as a memory map
@@ -159,7 +159,7 @@ def load_data(
 
     if isinstance(data, str):
         # Check if file/folder exists
-        if not path.exists(data):
+        if not os.path.exists(data):
             raise FileNotFoundError(data)
 
         # Check extension
