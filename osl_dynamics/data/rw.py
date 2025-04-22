@@ -151,7 +151,7 @@ def load_data(
         else:
             # Create Data.store_dir
             store_dir = path.dirname(mmap_location)
-            os.makedirs(store_dir, exist_ok=True)
+            os.makedirs(store_dir, exist_ok=True, mode=0o700)
 
             # Save to a file so we can load data as a memory map
             np.save(mmap_location, data)

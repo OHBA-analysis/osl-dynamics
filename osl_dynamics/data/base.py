@@ -1693,7 +1693,7 @@ class Data:
         overwrite : bool, optional
             Should we overwrite the existing TFRecord datasets if there is a need?
         """
-        os.makedirs(tfrecord_dir, mode=0o700, exist_ok=True)
+        os.makedirs(tfrecord_dir, exist_ok=True, mode=0o700)
 
         self.sequence_length = sequence_length
         self.step_size = step_size or sequence_length
@@ -2038,7 +2038,7 @@ class Data:
 
         # Create output directory
         output_dir = pathlib.Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 
         # Function to save a single array
         def _save_numpy(i, arr):
