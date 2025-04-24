@@ -19,6 +19,7 @@ import logging
 from pathlib import Path
 
 import numpy as np
+import matplotlib.pyplot as plt
 
 from osl_dynamics import array_ops
 from osl_dynamics.utils.misc import load, override_dict_defaults, save
@@ -1196,8 +1197,7 @@ def plot_group_ae_networks(
 
             {'filename': '<output_dir>/networks/mean_.png',
              'mask_file': data.mask_file,
-             'parcellation_file': data.parcellation_file,
-             'plot_kwargs': {'symmetric_cbar': True}}
+             'parcellation_file': data.parcellation_file}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -1206,7 +1206,8 @@ def plot_group_ae_networks(
 
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/aec_.png',
-             'threshold': 0.97}
+             'threshold': 0.97,
+             'plot_kwargs': {'display_mode': 'xz', 'annotate': False}}
     """
     power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
@@ -1247,7 +1248,6 @@ def plot_group_ae_networks(
         "filename": f"{networks_dir}/mean_.png",
         "mask_file": mask_file,
         "parcellation_file": parcellation_file,
-        "plot_kwargs": {"symmetric_cbar": True},
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
@@ -1267,6 +1267,7 @@ def plot_group_ae_networks(
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/aec_.png",
         "threshold": 0.97,
+        "plot_kwargs": {"display_mode": "xz", "annotate": False},
     }
     conn_save_kwargs = override_dict_defaults(
         default_conn_save_kwargs, conn_save_kwargs
@@ -1328,8 +1329,7 @@ def plot_group_tde_hmm_networks(
             {'mask_file': mask_file,
              'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True,
-             'plot_kwargs': {'symmetric_cbar': True}}
+             'subtract_mean': True}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -1338,7 +1338,7 @@ def plot_group_tde_hmm_networks(
 
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/coh_.png',
-             'plot_kwargs': {'edge_cmap': 'Reds'}}
+             'plot_kwargs': {'display_mode': "xz", 'annotate': False}}
     """
     power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
@@ -1373,37 +1373,33 @@ def plot_group_tde_hmm_networks(
         w = load(f"{spectra_dir}/w.npy")
     else:
         w = None
+    if frequency_range is None:
+        frequency_range = [f[0], f[-1]]
 
     # Calculate group average
     gpsd = np.average(psd, axis=0, weights=w)
     gcoh = np.average(coh, axis=0, weights=w)
 
-    # Calculate average PSD across channels and the standard error
-    p = np.mean(gpsd, axis=-2)
-    e = np.std(gpsd, axis=-2) / np.sqrt(gpsd.shape[-2])
+    # Calculate group PSD averaged over channels for each state
+    mgpsd = np.mean(gpsd, axis=0)
+    p = np.mean(gpsd, axis=1)
+    mp = np.mean(mgpsd, axis=0)
 
     # Plot PSDs
     from osl_dynamics.utils import plotting
 
-    n_states = gpsd.shape[0]
-    for i in range(n_states):
+    cmap = plt.get_cmap("tab10")
+    for i in range(p.shape[0]):
         fig, ax = plotting.plot_line(
             [f],
-            [p[i]],
-            errors=[[p[i] - e[i]], [p[i] + e[i]]],
-            labels=[f"State {i + 1}"],
-            x_range=[f[0], f[-1]],
-            y_range=[p.min() - 0.1 * p.max(), 1.2 * p.max()],
+            [mp],
             x_label="Frequency (Hz)",
             y_label="PSD (a.u.)",
+            x_range=frequency_range,
+            y_range=[0, np.max(p) * 1.1],
+            plot_kwargs={"color": "black", "linestyle": "--"},
         )
-        if frequency_range is not None:
-            ax.axvspan(
-                frequency_range[0],
-                frequency_range[1],
-                alpha=0.25,
-                color="gray",
-            )
+        ax.plot(f, p[i], color=cmap(i))
         plotting.save(fig, filename=f"{networks_dir}/psd_{i}.png")
 
     # Calculate power maps from the group-level PSDs
@@ -1417,7 +1413,6 @@ def plot_group_tde_hmm_networks(
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
-        "plot_kwargs": {"symmetric_cbar": True},
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
@@ -1433,18 +1428,20 @@ def plot_group_tde_hmm_networks(
     # Calculate coherence networks from group-level spectra
     from osl_dynamics.analysis import connectivity
 
+    # Calculate group coherence relative to the average across states
     gc = connectivity.mean_coherence_from_spectra(
         f, gcoh, frequency_range=frequency_range
     )
+    gc -= np.mean(gc, axis=0, keepdims=True)
 
     # Threshold
-    gc = connectivity.threshold(gc, percentile=percentile, subtract_mean=True)
+    gc = connectivity.threshold(gc, percentile=percentile, absolute_value=True)
 
     # Save coherence networks
     default_conn_save_kwargs = {
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/coh_.png",
-        "plot_kwargs": {"edge_cmap": "Reds"},
+        "plot_kwargs": {"display_mode": "xz", "annotate": False},
     }
     conn_save_kwargs = override_dict_defaults(
         default_conn_save_kwargs, conn_save_kwargs
@@ -1514,8 +1511,7 @@ def plot_group_nnmf_tde_hmm_networks(
              'parcellation_file': parcellation_file,
              'component': component,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True,
-             'plot_kwargs': {'symmetric_cbar': True}}
+             'subtract_mean': True}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to `analysis.connectivity.save
         <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
@@ -1525,7 +1521,7 @@ def plot_group_nnmf_tde_hmm_networks(
             {'parcellation_file': parcellation_file,
              'component': component,
              'filename': '<output_dir>/networks/coh_.png',
-             'plot_kwargs': {'edge_cmap': 'Reds'}}
+             'plot_kwargs': {'display_mode': "xz", 'annotate': False}}
     """
     power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
@@ -1585,23 +1581,26 @@ def plot_group_nnmf_tde_hmm_networks(
     gpsd = np.average(psd, axis=0, weights=w)
     gcoh = np.average(coh, axis=0, weights=w)
 
-    # Calculate average PSD across channels and the standard error
-    p = np.mean(gpsd, axis=-2)
-    e = np.std(gpsd, axis=-2) / np.sqrt(gpsd.shape[-2])
+    # Calculate group PSD averaged over channels for each state
+    mgpsd = np.mean(gpsd, axis=0)
+    p = np.mean(gpsd, axis=1)
+    mp = np.mean(mgpsd, axis=0)
 
     # Plot PSDs
-    n_states = gpsd.shape[0]
-    for i in range(n_states):
+    from osl_dynamics.utils import plotting
+
+    cmap = plt.get_cmap("tab10")
+    for i in range(p.shape[0]):
         fig, ax = plotting.plot_line(
             [f],
-            [p[i]],
-            errors=[[p[i] - e[i]], [p[i] + e[i]]],
-            labels=[f"State {i + 1}"],
-            x_range=[f[0], f[-1]],
-            y_range=[p.min() - 0.1 * p.max(), 1.2 * p.max()],
+            [mp],
             x_label="Frequency (Hz)",
             y_label="PSD (a.u.)",
+            x_range=[f[0], f[-1]],
+            y_range=[0, np.max(p) * 1.1],
+            plot_kwargs={"color": "black", "linestyle": "--"},
         )
+        ax.plot(f, p[i], color=cmap(i))
         plotting.save(fig, filename=f"{networks_dir}/psd_{i}.png")
 
     # Calculate power maps from the group-level PSDs
@@ -1616,7 +1615,6 @@ def plot_group_nnmf_tde_hmm_networks(
         "component": component,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
-        "plot_kwargs": {"symmetric_cbar": True},
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
@@ -1632,17 +1630,22 @@ def plot_group_nnmf_tde_hmm_networks(
     # Calculate coherence networks from group-level spectra
     from osl_dynamics.analysis import connectivity
 
+    # Calculate coherence networks from group-level spectra
+    from osl_dynamics.analysis import connectivity
+
+    # Calculate group coherence relative to the average across states
     gc = connectivity.mean_coherence_from_spectra(f, gcoh, nnmf)
+    gc -= np.mean(gc, axis=0, keepdims=True)
 
     # Threshold
-    gc = connectivity.threshold(gc, percentile=percentile, subtract_mean=True)
+    gc = connectivity.threshold(gc, percentile=percentile, absolute_value=True)
 
     # Save coherence networks
     default_conn_save_kwargs = {
         "parcellation_file": parcellation_file,
         "component": component,
         "filename": f"{networks_dir}/coh_.png",
-        "plot_kwargs": {"edge_cmap": "Reds"},
+        "plot_kwargs": {"display_mode": "xz", "annotate": False},
     }
     conn_save_kwargs = override_dict_defaults(
         default_conn_save_kwargs, conn_save_kwargs
