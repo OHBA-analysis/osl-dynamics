@@ -82,7 +82,7 @@ def find_function(name, extra_funcs=None):
     return func
 
 
-def run_pipeline(config, output_dir, data=None, extra_funcs=None):
+def run_pipeline(config, output_dir, restrict=None, data=None, extra_funcs=None):
     """Run a full pipeline.
 
     Parameters
@@ -92,11 +92,18 @@ def run_pipeline(config, output_dir, data=None, extra_funcs=None):
         or :code:`dict` containing the config.
     output_dir : str
         Path to output directory.
+    restrict : int or str, optional
+        GPU to use. If a str is passed it will be cast to an int.
     data : osl_dynamics.data.Data, optional
         Data object.
     extra_funcs : list of functions, optional
         User-defined functions referenced in the config.
     """
+    if restrict is not None:
+        from osl_dynamics.inference import tf_ops
+
+        tf_ops.select_gpu(int(restrict))
+        tf_ops.gpu_growth()
 
     # Load config
     config = load_config(config)
@@ -152,6 +159,7 @@ def run_pipeline_from_file(config_file, output_directory, restrict=None):
 
         tf_ops.select_gpu(int(restrict))
         tf_ops.gpu_growth()
+
     config_path = Path(config_file)
     config = config_path.read_text()
 
