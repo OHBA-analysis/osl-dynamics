@@ -1070,8 +1070,6 @@ class Data:
                 self.data_field,
                 self.picks,
                 self.reject_by_annotation,
-                memmap_location=None,
-                mmap_mode="r",
             )
             if not self.time_axis_first:
                 template_data = template_data.T
