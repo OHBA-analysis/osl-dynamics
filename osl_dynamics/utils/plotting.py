@@ -2142,7 +2142,7 @@ def plot_hmm_summary_stats(
     lt,
     intv,
     sr,
-    filename,
+    filename=None,
     cmap="tab10",
     fig_kwargs=None,
     sns_kwargs=None,
@@ -2159,7 +2159,7 @@ def plot_hmm_summary_stats(
         Mean intervals in seconds. Shape must be (n_subjects, n_states).
     sr : np.ndarray
         Switching rates in Hz. Shape must be (n_subjects, n_states).
-    filename : str
+    filename : str, optional
         Output filename.
     cmap : str, optional
         Matplotlib colormap.
@@ -2167,6 +2167,15 @@ def plot_hmm_summary_stats(
         Arguments to pass to :code:`plt.subplots()`.
     sns_kwargs : dict, optional
         Arguments to pass to :code:`sns.violinplot()`.
+
+    Returns
+    -------
+    fig : plt.figure
+        Matplotlib figure object. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    ax : plt.axes
+        Matplotlib axis object(s). Only returned if :code:`ax=None` and
+        :code:`filename=None`.
     """
     if fig_kwargs is None:
         fig_kwargs = {}
@@ -2218,6 +2227,9 @@ def plot_hmm_summary_stats(
         ax=ax[3],
         sns_kwargs=sns_kwargs,
     )
+    if filename is None:
+        fig.tight_layout()
+        return fig, ax
     save(fig, filename=filename, tight_layout=True)
 
 

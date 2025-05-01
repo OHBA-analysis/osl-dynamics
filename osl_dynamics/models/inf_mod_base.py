@@ -1155,12 +1155,12 @@ class MarkovStateInferenceModelBase(ModelBase):
         log_Pi_0 = np.log(Pi_0 + eps)
         log_P = np.log(P + eps)
 
-        batch_size = self.config.batch_size
         sequence_length = self.config.sequence_length
         n_states = self.config.n_states
 
         def _viterbi_path(x):
             log_B = self.get_log_likelihood(x)
+            batch_size = log_B.shape[0]
             log_prob = np.empty([batch_size, sequence_length, n_states], dtype=float)
             prev = np.empty([batch_size, sequence_length, n_states], dtype=int)
 

@@ -30,13 +30,20 @@ conda install -n base -c conda-forge mamba
 
 Different computers have their own environment files. For more information see the envs [readme](https://github.com/OHBA-analysis/osl-dynamics/tree/main/envs#readme).
 
-#### Linux/Mac
+#### Linux/Mac (M1/M2 chip)
 ```
 wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
 mamba env create -f osld-tf.yml
 rm osld-tf.yml
 ```
 If you have a GPU, then use the `osld-tf-cuda.yml` environment.
+
+#### Mac (Intel chip)
+```
+wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-macos.yml
+mamba env create -f osld-tf-macos.yml
+rm osld-tf-macos.yml
+```
 
 #### Windows
 
