@@ -30,15 +30,30 @@ conda install -n base -c conda-forge mamba
 
 Different computers have their own environment files. For more information see the envs [readme](https://github.com/OHBA-analysis/osl-dynamics/tree/main/envs#readme).
 
-#### Linux/Mac (M1/M2 chip)
+#### Linux
 ```
 wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
 mamba env create -f osld-tf.yml
 rm osld-tf.yml
 ```
-If you have a GPU, then use the `osld-tf-cuda.yml` environment.
 
-#### Mac (Intel chip)
+If you have a GPU, then use the `osld-tf-cuda.yml` environment instead:
+```
+wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-cuda.yml
+mamba env create -f osld-tf-cuda.yml
+rm osld-tf-cuda.yml
+```
+
+#### Mac
+
+If you have an M-series (M1, M2, M3) chip use:
+```
+wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
+mamba env create -f osld-tf.yml
+rm osld-tf.yml
+```
+
+Otherwise, if you have an Intel chip use:
 ```
 wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-macos.yml
 mamba env create -f osld-tf-macos.yml
@@ -47,7 +62,7 @@ rm osld-tf-macos.yml
 
 #### Windows
 
-If you are using a Windows computer, we recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions [here](https://ubuntu.com/wsl). Then follow the instructions above in the Ubuntu terminal.
+If you are using a Windows computer, we recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions [here](https://ubuntu.com/wsl). Then follow the instructions for Linux above in the Ubuntu terminal.
 
 #### hbaws (Oxford)
 
