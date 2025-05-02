@@ -294,6 +294,7 @@ class Model(MarkovStateInferenceModelBase):
 
         static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
             config.sequence_length,
+            config.batch_size,
             config.loss_calc,
             name="static_loss_scaling_factor",
         )

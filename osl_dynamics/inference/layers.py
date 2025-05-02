@@ -1810,24 +1810,25 @@ class StaticLossScalingFactorLayer(layers.Layer):
     ----------
     sequence_length : int
         Length of the sequence.
+    batch_size : int
+        Batch size.
     calculation : str
         Operation for reducing the time dimension. Either 'mean' or 'sum'.
         If 'mean', scaling factor is divided by the sequence length.
     """
 
-    def __init__(self, sequence_length, calculation, **kwargs):
+    def __init__(self, sequence_length, batch_size, calculation, **kwargs):
         super().__init__(**kwargs)
         self.n_batches = 1
         self.sequence_length = sequence_length
+        self.batch_size = batch_size
         self.calculation = calculation
 
     def call(self, inputs, **kwargs):
-        # Note that inputs.shape[0] must be the batch size
-        batch_size = tf.cast(tf.shape(inputs)[0], tf.float32)
-        static_loss_scaling_factor = 1 / (batch_size * self.n_batches)
+        scaling_factor = 1 / (self.batch_size * self.n_batches)
         if self.calculation == "mean":
-            static_loss_scaling_factor /= self.sequence_length
-        return static_loss_scaling_factor
+            scaling_factor /= self.sequence_length
+        return tf.cast(scaling_factor, tf.float32)
 
 
 class HiddenMarkovStateInferenceLayer(layers.Layer):

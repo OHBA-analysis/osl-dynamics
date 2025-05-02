@@ -8,6 +8,10 @@ The latest conda environment files are:
 - `osld-tf.yml` - install the latest osl-dynamics and TensorFlow 2.19.
 - `osld-tf-cuda.yml` - install the latest osl-dynamics and TensorFlow 2.19 with CUDA.
 
+Older Macs with an Intel chip:
+
+- `osld-tf-macos.yml` - install osl-dynamics and tensorflow-macos 2.16.1.
+
 Oxford-specific computers:
 
 - `bmrc.yml`
