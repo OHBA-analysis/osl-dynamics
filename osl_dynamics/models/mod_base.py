@@ -584,7 +584,8 @@ class ModelBase:
         """
         if "static_loss_scaling_factor" in [layer.name for layer in self.model.layers]:
             n_batches = dtf.get_n_batches(dataset)
-            self.model.get_layer("static_loss_scaling_factor").n_batches = n_batches
+            layer = self.model.get_layer("static_loss_scaling_factor")
+            layer.n_batches = n_batches
 
     @contextmanager
     def set_trainable(self, layers, values):
