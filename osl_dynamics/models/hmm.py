@@ -25,7 +25,6 @@ from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
-    StaticLossScalingFactorLayer,
     VectorsLayer,
     CovarianceMatricesLayer,
     DiagonalMatricesLayer,
@@ -173,15 +172,6 @@ class Model(MarkovStateInferenceModelBase):
             name="data",
         )
 
-        # Static loss scaling factor
-        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            config.sequence_length,
-            config.batch_size,
-            config.loss_calc,
-            name="static_loss_scaling_factor",
-        )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-
         # Observation model
         means_layer = VectorsLayer(
             config.n_states,
@@ -211,12 +201,8 @@ class Model(MarkovStateInferenceModelBase):
                 config.covariances_regularizer,
                 name="covs",
             )
-        mu = means_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
-        )  # data not used
-        D = covs_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
-        )  # data not used
+        mu = means_layer(data)  # data not used
+        D = covs_layer(data)  # data not used
 
         # Log-likelihood
         ll_layer = SeparateLogLikelihoodLayer(config.n_states, name="ll")
@@ -359,14 +345,17 @@ class Model(MarkovStateInferenceModelBase):
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
 
+        scale_factor = self.get_static_loss_scaling_factor(training_dataset)
+
         if self.config.learn_means:
-            obs_mod.set_means_regularizer(self.model, training_dataset)
+            obs_mod.set_means_regularizer(self.model, training_dataset, scale_factor)
 
         if self.config.learn_covariances:
             obs_mod.set_covariances_regularizer(
                 self.model,
                 training_dataset,
                 self.config.covariances_epsilon,
+                scale_factor,
                 self.config.diagonal_covariances,
             )
 

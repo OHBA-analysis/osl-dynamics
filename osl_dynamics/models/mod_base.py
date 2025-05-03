@@ -460,6 +460,31 @@ class ModelBase:
             concatenate=concatenate,
         )
 
+    def get_static_loss_scaling_factor(self, training_dataset):
+        """Get scaling factor for static losses.
+
+        When calculating loss, we want to approximate the effect of the
+        regularization across the entire training dataset. To do this
+        We divide the regularization by the total number of sequences.
+
+        Parameters
+        ----------
+        training_dataset : tf.data.Dataset
+            TensorFlow dataset containing training data.
+
+        Returns
+        -------
+        scale_factor : float
+            Scale factor for 'static' losses, i.e. those which are not
+            time varying.
+        """
+        n_batches = dtf.get_n_batches(training_dataset)
+        n_sequences = self.config.batch_size * n_batches
+        scale_factor = 1.0 / n_sequences
+        if self.config.loss_calc == "mean":
+            scale_factor /= self.config.sequence_length
+        return scale_factor
+
     def summary_string(self):
         """Return a summary of the model as a string.
 

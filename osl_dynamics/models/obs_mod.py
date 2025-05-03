@@ -194,7 +194,7 @@ def set_embeddings_initializer(model, initial_embeddings):
         _set_embeddings_initializer(f"{k}_embeddings", v)
 
 
-def set_means_regularizer(model, training_dataset, layer_name="means"):
+def set_means_regularizer(model, training_dataset, scale_factor, layer_name="means"):
     """Set the means regularizer based on training data.
 
     A multivariate normal prior is applied to the mean vectors with
@@ -206,18 +206,14 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
         The model.
     training_dataset : osl_dynamics.data.Data
         The training dataset.
+    scale_factor : float
+        Scale factor for regularization.
     layer_name : str, optional
         Layer name of the means. Can be :code:`"means"` or
         :code:`"group_means"`.
     """
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
-    n_batches = dtf.get_n_batches(training_dataset)
-
-    n_sequences = model.config.batch_size * n_batches
-    scale_factor = 1.0 / n_sequences
-    if model.config.loss_calc == "mean":
-        scale_factor /= model.config.sequence_length
 
     mu = np.zeros(n_channels, dtype=np.float32)
     sigma = np.diag((range_ / 2) ** 2)
@@ -233,6 +229,7 @@ def set_covariances_regularizer(
     model,
     training_dataset,
     epsilon,
+    scale_factor,
     diagonal=False,
     layer_name="covs",
 ):
@@ -252,6 +249,8 @@ def set_covariances_regularizer(
         The training dataset.
     epsilon : float
         Error added to the covariance matrices.
+    scale_factor : float
+        Scale factor for regularization.
     diagonal : bool, optional
         Whether the covariances are diagonal.
     layer_name : str, optional
@@ -260,12 +259,6 @@ def set_covariances_regularizer(
     """
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
-    n_batches = dtf.get_n_batches(training_dataset)
-
-    n_sequences = model.config.batch_size * n_batches
-    scale_factor = 1.0 / n_sequences
-    if model.config.loss_calc == "mean":
-        scale_factor /= model.config.sequence_length
 
     covs_layer = model.get_layer(layer_name)
     if diagonal:
@@ -285,7 +278,7 @@ def set_covariances_regularizer(
         )
 
 
-def set_stds_regularizer(model, training_dataset, epsilon):
+def set_stds_regularizer(model, training_dataset, epsilon, scale_factor):
     """Set the standard deviations regularizer based on training data.
 
     A log-normal prior is applied to the standard deviations with :code:`mu=0`,
@@ -299,15 +292,11 @@ def set_stds_regularizer(model, training_dataset, epsilon):
         The training dataset.
     epsilon : float
         Error added to the standard deviations.
+    scale_factor : float
+        Scale factor for regularization.
     """
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
-    n_batches = dtf.get_n_batches(training_dataset)
-
-    n_sequences = model.config.batch_size * n_batches
-    scale_factor = 1.0 / n_sequences
-    if model.config.loss_calc == "mean":
-        scale_factor /= model.config.sequence_length
 
     mu = np.zeros([n_channels], dtype=np.float32)
     sigma = np.sqrt(np.log(2 * range_))
@@ -319,7 +308,7 @@ def set_stds_regularizer(model, training_dataset, epsilon):
     )
 
 
-def set_corrs_regularizer(model, training_dataset, epsilon):
+def set_corrs_regularizer(model, training_dataset, epsilon, scale_factor):
     """Set the correlations regularizer based on training data.
 
     A marginal inverse Wishart prior is applied to the correlations
@@ -333,14 +322,10 @@ def set_corrs_regularizer(model, training_dataset, epsilon):
         The training dataset.
     epsilon : float
         Error added to the correlations.
+    scale_factor : float
+        Scale factor for regularization.
     """
     n_channels = dtf.get_n_channels(training_dataset)
-    n_batches = dtf.get_n_batches(training_dataset)
-
-    n_sequences = model.config.batch_size * n_batches
-    scale_factor = 1.0 / n_sequences
-    if model.config.loss_calc == "mean":
-        scale_factor /= model.config.sequence_length
 
     nu = n_channels - 1 + 0.1
 

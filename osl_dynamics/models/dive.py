@@ -34,7 +34,6 @@ from osl_dynamics.inference.layers import (
     GammaExponentialKLDivergenceLayer,
     MultiLayerPerceptronLayer,
     LearnableTensorLayer,
-    StaticLossScalingFactorLayer,
     BatchSizeLayer,
     TFAddLayer,
     TFConstantLayer,

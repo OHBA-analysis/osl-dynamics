@@ -26,7 +26,6 @@ from osl_dynamics.inference.layers import (
     SampleNormalDistributionLayer,
     SoftmaxLayer,
     VectorsLayer,
-    StaticLossScalingFactorLayer,
 )
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.inf_mod_base import (
@@ -243,12 +242,6 @@ class Model(VariationalInferenceModelBase):
             config.learn_alpha_temperature,
             name="alpha",
         )
-        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            config.sequence_length,
-            config.batch_size,
-            config.loss_calc,
-            name="static_loss_scaling_factor",
-        )
         means_layer = VectorsLayer(
             config.n_modes,
             config.n_channels,
@@ -317,9 +310,8 @@ class Model(VariationalInferenceModelBase):
         alpha = alpha_layer(theta)
 
         # Observation model
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-        mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
-        D = covs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
+        mu = means_layer(data)
+        D = covs_layer(data)
         m = mix_means_layer([alpha, mu])
         C = mix_covs_layer([alpha, D])
         ll_loss = ll_loss_layer([data, m, C])
@@ -458,14 +450,17 @@ class Model(VariationalInferenceModelBase):
         """
         training_dataset = self.make_dataset(training_dataset, concatenate=True)
 
+        scale_factor = self.get_static_loss_scaling_factor(training_dataset)
+
         if self.config.learn_means:
-            obs_mod.set_means_regularizer(self.model, training_dataset)
+            obs_mod.set_means_regularizer(self.model, training_dataset, scale_factor)
 
         if self.config.learn_covariances:
             obs_mod.set_covariances_regularizer(
                 self.model,
                 training_dataset,
                 self.config.covariances_epsilon,
+                scale_factor,
                 self.config.diagonal_covariances,
             )
 

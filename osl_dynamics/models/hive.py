@@ -18,7 +18,6 @@ from osl_dynamics.inference.layers import (
     GammaExponentialKLDivergenceLayer,
     KLLossLayer,
     MultiLayerPerceptronLayer,
-    StaticLossScalingFactorLayer,
     HiddenMarkovStateInferenceLayer,
     SeparateLogLikelihoodLayer,
     SumLogLikelihoodLossLayer,
