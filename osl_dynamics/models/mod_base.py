@@ -315,10 +315,6 @@ class ModelBase:
                 kwargs,
             )
 
-        # Set the scaling factor for losses that are associated
-        # with static quantities
-        self.set_static_loss_scaling_factor(x)
-
         # Fit model
         history = self.model.fit(*args, **kwargs)
 
@@ -566,26 +562,6 @@ class ModelBase:
         """
         self.save_config(dirname)
         self.model.save_weights(f"{dirname}/model.weights.h5")
-
-    def set_static_loss_scaling_factor(self, dataset):
-        """Set the :code:`n_batches` attribute of the
-        :code:`"static_loss_scaling_factor"` layer.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset
-            TensorFlow dataset.
-
-        Note
-        ----
-        This assumes every model has a layer called
-        :code:`"static_loss_scaling_factor"`, with an attribure called
-        :code:`"n_batches"`.
-        """
-        if "static_loss_scaling_factor" in [layer.name for layer in self.model.layers]:
-            n_batches = dtf.get_n_batches(dataset)
-            layer = self.model.get_layer("static_loss_scaling_factor")
-            layer.n_batches = n_batches
 
     @contextmanager
     def set_trainable(self, layers, values):

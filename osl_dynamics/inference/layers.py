@@ -1794,43 +1794,6 @@ class MultiLayerPerceptronLayer(layers.Layer):
         return inputs
 
 
-class StaticLossScalingFactorLayer(layers.Layer):
-    r"""Layer for calculating the scaling factor for static losses.
-
-    When calculating loss, we sum over the sequence length (time dimension)
-    and average over the sequences. If we add a static quantity to each
-    time point we need to rescale it to account for the summation over time.
-    The scaling factor is given by
-
-    .. math::
-        \text{static_loss_scaling_factor} = \frac{1}{\text{batch_size} \times
-        \text{n_batches}}
-
-    Parameters
-    ----------
-    sequence_length : int
-        Length of the sequence.
-    batch_size : int
-        Batch size.
-    calculation : str
-        Operation for reducing the time dimension. Either 'mean' or 'sum'.
-        If 'mean', scaling factor is divided by the sequence length.
-    """
-
-    def __init__(self, sequence_length, batch_size, calculation, **kwargs):
-        super().__init__(**kwargs)
-        self.n_batches = 1
-        self.sequence_length = sequence_length
-        self.batch_size = batch_size
-        self.calculation = calculation
-
-    def call(self, inputs, **kwargs):
-        scaling_factor = 1 / (self.batch_size * self.n_batches)
-        if self.calculation == "mean":
-            scaling_factor /= self.sequence_length
-        return tf.cast(scaling_factor, tf.float32)
-
-
 class HiddenMarkovStateInferenceLayer(layers.Layer):
     """Hidden Markov state inference layer.
 

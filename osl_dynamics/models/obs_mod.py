@@ -212,6 +212,12 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
     """
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
+    n_batches = dtf.get_n_batches(training_dataset)
+
+    n_sequences = model.config.batch_size * n_batches
+    scale_factor = 1.0 / n_sequences
+    if model.config.loss_calc == "mean":
+        scale_factor /= model.config.sequence_length
 
     mu = np.zeros(n_channels, dtype=np.float32)
     sigma = np.diag((range_ / 2) ** 2)
@@ -219,8 +225,7 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
     means_layer = model.get_layer(layer_name)
     learnable_tensor_layer = means_layer.layers[0]
     learnable_tensor_layer.regularizer = regularizers.MultivariateNormal(
-        mu,
-        sigma,
+        mu, sigma, scale_factor
     )
 
 
@@ -255,6 +260,12 @@ def set_covariances_regularizer(
     """
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
+    n_batches = dtf.get_n_batches(training_dataset)
+
+    n_sequences = model.config.batch_size * n_batches
+    scale_factor = 1.0 / n_sequences
+    if model.config.loss_calc == "mean":
+        scale_factor /= model.config.sequence_length
 
     covs_layer = model.get_layer(layer_name)
     if diagonal:
@@ -262,9 +273,7 @@ def set_covariances_regularizer(
         sigma = np.sqrt(np.log(2 * range_))
         learnable_tensor_layer = covs_layer.layers[0]
         learnable_tensor_layer.regularizer = regularizers.LogNormal(
-            mu,
-            sigma,
-            epsilon,
+            mu, sigma, epsilon, scale_factor
         )
 
     else:
@@ -272,7 +281,7 @@ def set_covariances_regularizer(
         psi = np.diag(range_)
         learnable_tensor_layer = covs_layer.layers[0]
         learnable_tensor_layer.regularizer = regularizers.InverseWishart(
-            nu, psi, epsilon
+            nu, psi, epsilon, scale_factor
         )
 
 
@@ -293,6 +302,12 @@ def set_stds_regularizer(model, training_dataset, epsilon):
     """
     n_channels = dtf.get_n_channels(training_dataset)
     range_ = dtf.get_range(training_dataset)
+    n_batches = dtf.get_n_batches(training_dataset)
+
+    n_sequences = model.config.batch_size * n_batches
+    scale_factor = 1.0 / n_sequences
+    if model.config.loss_calc == "mean":
+        scale_factor /= model.config.sequence_length
 
     mu = np.zeros([n_channels], dtype=np.float32)
     sigma = np.sqrt(np.log(2 * range_))
@@ -300,9 +315,7 @@ def set_stds_regularizer(model, training_dataset, epsilon):
     stds_layer = model.get_layer("stds")
     learnable_tensor_layer = stds_layer.layers[0]
     learnable_tensor_layer.regularizer = regularizers.LogNormal(
-        mu,
-        sigma,
-        epsilon,
+        mu, sigma, epsilon, scale_factor
     )
 
 
@@ -322,15 +335,19 @@ def set_corrs_regularizer(model, training_dataset, epsilon):
         Error added to the correlations.
     """
     n_channels = dtf.get_n_channels(training_dataset)
+    n_batches = dtf.get_n_batches(training_dataset)
+
+    n_sequences = model.config.batch_size * n_batches
+    scale_factor = 1.0 / n_sequences
+    if model.config.loss_calc == "mean":
+        scale_factor /= model.config.sequence_length
 
     nu = n_channels - 1 + 0.1
 
     corrs_layer = model.get_layer("corrs")
     learnable_tensor_layer = corrs_layer.layers[0]
     learnable_tensor_layer.regularizer = regularizers.MarginalInverseWishart(
-        nu,
-        epsilon,
-        n_channels,
+        nu, epsilon, n_channels, scale_factor
     )
 
 

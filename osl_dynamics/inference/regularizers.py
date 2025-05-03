@@ -37,7 +37,6 @@ class InverseWishart(regularizers.Regularizer):
         )
         self.strength = strength
 
-        # Validation
         if not self.nu > self.n_channels - 1:
             raise ValueError("nu must be greater than (n_channels - 1).")
 
@@ -87,7 +86,6 @@ class MultivariateNormal(regularizers.Regularizer):
         self.sigma = sigma
         self.strength = strength
 
-        # Validation
         if self.mu.ndim != 1:
             raise ValueError("mu must be a 1D array.")
 
@@ -153,7 +151,6 @@ class MarginalInverseWishart(regularizers.Regularizer):
         )
         self.strength = strength
 
-        # Validation
         if not self.nu > self.n_channels - 1:
             raise ValueError("nu must be greater than (n_channels - 1).")
 
@@ -193,7 +190,6 @@ class LogNormal(regularizers.Regularizer):
         self.bijector = tfb.Softplus()
         self.strength = strength
 
-        # Validation
         if self.mu.ndim != 1:
             raise ValueError("mu must be a 1D array.")
 
