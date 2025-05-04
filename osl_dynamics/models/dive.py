@@ -170,7 +170,6 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Regularizer for the MLP for deviations.
     dev_regularizer_factor : float
         Regularizer factor for the MLP for deviations.
-        This will be scaled by the amount of data.
     initial_dev : dict
         Initialisation for dev posterior parameters.
 
@@ -307,14 +306,6 @@ class Model(VariationalInferenceModelBase):
         batch_size_layer = BatchSizeLayer(name="batch_size")
         batch_size = batch_size_layer(data)
 
-        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            config.sequence_length,
-            config.batch_size,
-            config.loss_calc,
-            name="static_loss_scaling_factor",
-        )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-
         session_id = layers.Input(
             shape=(config.sequence_length,),
             dtype=tf.int32,
@@ -437,9 +428,7 @@ class Model(VariationalInferenceModelBase):
             config.means_regularizer,
             name="group_means",
         )
-        group_mu = group_means_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
-        )
+        group_mu = group_means_layer(data)
 
         group_covs_layer = CovarianceMatricesLayer(
             config.n_modes,
@@ -450,9 +439,7 @@ class Model(VariationalInferenceModelBase):
             config.covariances_regularizer,
             name="group_covs",
         )
-        group_D = group_covs_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
-        )
+        group_D = group_covs_layer(data)
 
         # -------- Mean deviations -------- #
 
@@ -517,10 +504,7 @@ class Model(VariationalInferenceModelBase):
             )  # shape = (n_sessions, n_modes, embeddings_dim + spatial_embeddings_dim)
 
             # Get the mean deviation maps (no global magnitude information)
-            means_dev_decoder = means_dev_decoder_layer(
-                means_concat_embeddings,
-                static_loss_scaling_factor=static_loss_scaling_factor,
-            )
+            means_dev_decoder = means_dev_decoder_layer(means_concat_embeddings)
             means_dev_map = means_dev_map_layer(means_dev_decoder)
             norm_means_dev_map = TFGatherLayer(axis=0)(
                 [norm_means_dev_map_layer(means_dev_map), session_id[:, 0]]
@@ -618,10 +602,7 @@ class Model(VariationalInferenceModelBase):
             )
 
             # Get the covariance deviation maps (no global magnitude information)
-            covs_dev_decoder = covs_dev_decoder_layer(
-                covs_concat_embeddings,
-                static_loss_scaling_factor=static_loss_scaling_factor,
-            )
+            covs_dev_decoder = covs_dev_decoder_layer(covs_concat_embeddings)
             covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
             norm_covs_dev_map = TFGatherLayer(axis=0)(
                 [norm_covs_dev_map_layer(covs_dev_map), session_id[:, 0]]
@@ -701,7 +682,8 @@ class Model(VariationalInferenceModelBase):
             means_dev_mag_mod_beta = means_dev_mag_mod_beta_layer(means_dev_decoder)
 
             means_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
-                config.covariances_epsilon, name="means_dev_mag_kl_loss"
+                config.covariances_epsilon,
+                name="means_dev_mag_kl_loss",
             )
             means_dev_mag_kl_loss = means_dev_mag_kl_loss_layer(
                 [
@@ -709,7 +691,6 @@ class Model(VariationalInferenceModelBase):
                     means_dev_mag_inf_beta,
                     means_dev_mag_mod_beta,
                 ],
-                static_loss_scaling_factor=static_loss_scaling_factor,
             )
         else:
             means_dev_mag_kl_loss_layer = TFZerosLayer(
@@ -729,7 +710,8 @@ class Model(VariationalInferenceModelBase):
             )
 
             covs_dev_mag_kl_loss_layer = GammaExponentialKLDivergenceLayer(
-                config.covariances_epsilon, name="covs_dev_mag_kl_loss"
+                config.covariances_epsilon,
+                name="covs_dev_mag_kl_loss",
             )
             covs_dev_mag_kl_loss = covs_dev_mag_kl_loss_layer(
                 [
@@ -737,7 +719,6 @@ class Model(VariationalInferenceModelBase):
                     covs_dev_mag_inf_beta,
                     covs_dev_mag_mod_beta,
                 ],
-                static_loss_scaling_factor=static_loss_scaling_factor,
             )
         else:
             covs_dev_mag_kl_loss_layer = TFZerosLayer((), name="covs_dev_mag_kl_loss")

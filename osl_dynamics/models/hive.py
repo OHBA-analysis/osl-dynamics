@@ -96,7 +96,6 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Regularizer for the MLP for deviations.
     dev_regularizer_factor : float
         Regularizer factor for the MLP for deviations.
-        This will be scaled by the amount of data.
     initial_dev : dict
         Initialisation for dev posterior parameters.
 
@@ -291,14 +290,6 @@ class Model(MarkovStateInferenceModelBase):
         batch_size_layer = BatchSizeLayer(name="batch_size")
         batch_size = batch_size_layer(data)
 
-        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            config.sequence_length,
-            config.batch_size,
-            config.loss_calc,
-            name="static_loss_scaling_factor",
-        )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-
         session_id = layers.Input(
             shape=(config.sequence_length,),
             dtype=tf.int32,
@@ -348,9 +339,7 @@ class Model(MarkovStateInferenceModelBase):
             config.means_regularizer,
             name="group_means",
         )
-        group_mu = group_means_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
-        )
+        group_mu = group_means_layer(data)
 
         group_covs_layer = CovarianceMatricesLayer(
             config.n_states,
@@ -361,9 +350,7 @@ class Model(MarkovStateInferenceModelBase):
             config.covariances_regularizer,
             name="group_covs",
         )
-        group_D = group_covs_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
-        )
+        group_D = group_covs_layer(data)
 
         # -------- Mean deviations -------- #
 
@@ -430,10 +417,7 @@ class Model(MarkovStateInferenceModelBase):
             )  # shape = (n_sessions, n_states, embeddings_dim + spatial_embeddings_dim)
 
             # Get the mean deviation maps (no global magnitude information)
-            means_dev_decoder = means_dev_decoder_layer(
-                means_concat_embeddings,
-                static_loss_scaling_factor=static_loss_scaling_factor,
-            )
+            means_dev_decoder = means_dev_decoder_layer(means_concat_embeddings)
             means_dev_map = means_dev_map_layer(means_dev_decoder)
             norm_means_dev_map = TFGatherLayer(axis=0)(
                 [norm_means_dev_map_layer(means_dev_map), session_id[:, 0]]
@@ -533,10 +517,7 @@ class Model(MarkovStateInferenceModelBase):
             )
 
             # Get the covariance deviation maps (no global magnitude information)
-            covs_dev_decoder = covs_dev_decoder_layer(
-                covs_concat_embeddings,
-                static_loss_scaling_factor=static_loss_scaling_factor,
-            )
+            covs_dev_decoder = covs_dev_decoder_layer(covs_concat_embeddings)
             covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
             norm_covs_dev_map = TFGatherLayer(axis=0)(
                 [norm_covs_dev_map_layer(covs_dev_map), session_id[:, 0]]
@@ -640,7 +621,6 @@ class Model(MarkovStateInferenceModelBase):
                     means_dev_mag_inf_beta,
                     means_dev_mag_mod_beta,
                 ],
-                static_loss_scaling_factor=static_loss_scaling_factor,
             )
         else:
             means_dev_mag_kl_loss_layer = TFZerosLayer(
@@ -668,7 +648,6 @@ class Model(MarkovStateInferenceModelBase):
                     covs_dev_mag_inf_beta,
                     covs_dev_mag_mod_beta,
                 ],
-                static_loss_scaling_factor=static_loss_scaling_factor,
             )
         else:
             covs_dev_mag_kl_loss_layer = TFZerosLayer((), name="covs_dev_mag_kl_loss")
