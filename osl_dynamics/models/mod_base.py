@@ -460,7 +460,7 @@ class ModelBase:
             concatenate=concatenate,
         )
 
-    def get_static_loss_scaling_factor(self, training_dataset):
+    def get_static_loss_scaling_factor(self, n_batches):
         """Get scaling factor for static losses.
 
         When calculating loss, we want to approximate the effect of the
@@ -469,8 +469,8 @@ class ModelBase:
 
         Parameters
         ----------
-        training_dataset : tf.data.Dataset
-            TensorFlow dataset containing training data.
+        n_batches : int
+            Total number of batches in the training dataset.
 
         Returns
         -------
@@ -478,7 +478,6 @@ class ModelBase:
             Scale factor for 'static' losses, i.e. those which are not
             time varying.
         """
-        n_batches = dtf.get_n_batches(training_dataset)
         n_sequences = self.config.batch_size * n_batches
         scale_factor = 1.0 / n_sequences
         if self.config.loss_calc == "mean":

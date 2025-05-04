@@ -1,5 +1,6 @@
 """HIVE (HMM with Integrated Variability Estimation)."""
 
+import logging
 from typing import List
 from dataclasses import dataclass
 
@@ -8,6 +9,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import layers
 
+import osl_dynamics.data.tf as dtf
+from osl_dynamics.data import SessionLabels
 from osl_dynamics.inference.layers import (
     VectorsLayer,
     CovarianceMatricesLayer,
@@ -38,8 +41,9 @@ from osl_dynamics.models.inf_mod_base import (
     MarkovStateInferenceModelConfig,
     MarkovStateInferenceModelBase,
 )
-from osl_dynamics.data import SessionLabels
 from osl_dynamics.utils.misc import replace_argument
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -938,23 +942,47 @@ class Model(MarkovStateInferenceModelBase):
         training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
+        _logger.info("Setting regularizers")
+
         training_dataset = self.make_dataset(
             training_dataset,
+            shuffle=False,
             concatenate=True,
         )
+        n_batches, range_ = dtf.get_n_batches_and_range(training_dataset)
+        scale_factor = self.get_static_loss_scaling_factor(n_batches)
 
         if self.config.learn_means:
+            # Group means
             obs_mod.set_means_regularizer(
-                self.model, training_dataset, layer_name="group_means"
+                self.model, range_, scale_factor, layer_name="group_means"
             )
 
+            # KL divergence for the deviation
+            layer = self.model.get_layer("means_dev_mag_kl_loss")
+            layer.scale_factor = scale_factor
+
+            # MLP for the deviation
+            layer = self.model.get_layer("means_dev_decoder")
+            layer.regularizer_strength *= scale_factor
+
         if self.config.learn_covariances:
+            # Group covariances
             obs_mod.set_covariances_regularizer(
                 self.model,
-                training_dataset,
+                range_,
                 self.config.covariances_epsilon,
+                scale_factor,
                 layer_name="group_covs",
             )
+
+            # KL divergence for the deviation
+            layer = self.model.get_layer("covs_dev_mag_kl_loss")
+            layer.scale_factor = scale_factor
+
+            # MLP for the deviation
+            layer = self.model.get_layer("covs_dev_decoder")
+            layer.regularizer_strength *= scale_factor
 
     def set_dev_parameters_initializer(self, training_data):
         """Set the deviance parameters initializer based on training data.

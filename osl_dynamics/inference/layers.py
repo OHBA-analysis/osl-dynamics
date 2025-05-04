@@ -1679,21 +1679,25 @@ class GammaExponentialKLDivergenceLayer(layers.Layer):
     ----------
     epsilon : float
         Error added to the standard deviations for numerical stability.
-    scale_factor : float
-        Constant to multiple the KL loss by.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, scale_factor, **kwargs):
+    def __init__(self, epsilon, **kwargs):
         super().__init__(**kwargs)
         self.epsilon = epsilon
-        self.scale_factor = 1.0
+        self.scale_factor = -1
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs, training=None, **kwargs):
         # inference_alpha.shape = (n_sessions, n_states, 1)
         # inference_beta.shape  = (n_sessions, n_states, 1)
         # model_beta.shape      = (n_sessions, n_states, 1)
+
+        if training and self.scale_factor == -1:
+            raise AttributeError(
+                "Static loss scaling factor not set. "
+                "Please run model.set_regularizers()."
+            )
 
         inference_alpha, inference_beta, model_beta = inputs
 

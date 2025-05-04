@@ -14,6 +14,7 @@ import numpy as np
 import tensorflow as tf
 from tqdm.auto import trange
 
+import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
     TFConcatLayer,
     CorrelationMatricesLayer,
@@ -585,17 +586,21 @@ class Model(VariationalInferenceModelBase):
         training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
+        _logger.info("Setting regularizers")
 
-        scale_factor = self.get_static_loss_scaling_factor(training_dataset)
+        training_dataset = self.make_dataset(
+            training_dataset, shuffle=False, concatenate=True
+        )
+        n_batches, range_ = dtf.get_n_batches_and_range(training_dataset)
+        scale_factor = self.get_static_loss_scaling_factor(n_batches)
 
         if self.config.learn_means:
-            obs_mod.set_means_regularizer(self.model, training_dataset, scale_factor)
+            obs_mod.set_means_regularizer(self.model, range_, scale_factor)
 
         if self.config.learn_stds:
             obs_mod.set_stds_regularizer(
                 self.model,
-                training_dataset,
+                range_,
                 self.config.stds_epsilon,
                 scale_factor,
             )
@@ -603,7 +608,7 @@ class Model(VariationalInferenceModelBase):
         if self.config.learn_corrs:
             obs_mod.set_corrs_regularizer(
                 self.model,
-                training_dataset,
+                self.config.n_channels,
                 self.config.corrs_epsilon,
                 scale_factor,
             )
