@@ -374,7 +374,7 @@ def get_range(dataset):
 
     Returns
     -------
-    range : np.ndarray
+    range_ : np.ndarray
         Range of each channel.
     """
     amax = []
@@ -437,3 +437,34 @@ def get_n_batches(dataset):
         return i + 1
 
     return cardinality.numpy()
+
+
+def get_n_batches_and_range(dataset):
+    """Get number of batches and range (max-min) of values.
+
+    Parameters
+    ----------
+    dataset : tf.data.Dataset
+        TensorFlow dataset.
+
+    Returns
+    -------
+    n_batches : int
+        Number of batches.
+    range_ : np.ndarray
+        Range of each channel.
+    """
+    count = 0
+    amax = []
+    amin = []
+    dataset = _validate_tf_dataset(dataset)
+    for batch in dataset:
+        if isinstance(batch, dict):
+            batch = batch["data"]
+        batch = batch.numpy()
+        n_channels = batch.shape[-1]
+        batch = batch.reshape(-1, n_channels)
+        amin.append(np.amin(batch, axis=0))
+        amax.append(np.amax(batch, axis=0))
+        count += 1
+    return count, np.amax(amax, axis=0) - np.amin(amin, axis=0)

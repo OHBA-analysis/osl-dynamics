@@ -315,10 +315,6 @@ class ModelBase:
                 kwargs,
             )
 
-        # Set the scaling factor for losses that are associated
-        # with static quantities
-        self.set_static_loss_scaling_factor(x)
-
         # Fit model
         history = self.model.fit(*args, **kwargs)
 
@@ -464,6 +460,30 @@ class ModelBase:
             concatenate=concatenate,
         )
 
+    def get_static_loss_scaling_factor(self, n_batches):
+        """Get scaling factor for static losses.
+
+        When calculating loss, we want to approximate the effect of the
+        regularization across the entire training dataset. To do this
+        We divide the regularization by the total number of sequences.
+
+        Parameters
+        ----------
+        n_batches : int
+            Total number of batches in the training dataset.
+
+        Returns
+        -------
+        scale_factor : float
+            Scale factor for 'static' losses, i.e. those which are not
+            time varying.
+        """
+        n_sequences = self.config.batch_size * n_batches
+        scale_factor = 1.0 / n_sequences
+        if self.config.loss_calc == "mean":
+            scale_factor /= self.config.sequence_length
+        return scale_factor
+
     def summary_string(self):
         """Return a summary of the model as a string.
 
@@ -566,26 +586,6 @@ class ModelBase:
         """
         self.save_config(dirname)
         self.model.save_weights(f"{dirname}/model.weights.h5")
-
-    def set_static_loss_scaling_factor(self, dataset):
-        """Set the :code:`n_batches` attribute of the
-        :code:`"static_loss_scaling_factor"` layer.
-
-        Parameters
-        ----------
-        dataset : tf.data.Dataset
-            TensorFlow dataset.
-
-        Note
-        ----
-        This assumes every model has a layer called
-        :code:`"static_loss_scaling_factor"`, with an attribure called
-        :code:`"n_batches"`.
-        """
-        if "static_loss_scaling_factor" in [layer.name for layer in self.model.layers]:
-            n_batches = dtf.get_n_batches(dataset)
-            layer = self.model.get_layer("static_loss_scaling_factor")
-            layer.n_batches = n_batches
 
     @contextmanager
     def set_trainable(self, layers, values):

@@ -194,7 +194,7 @@ def set_embeddings_initializer(model, initial_embeddings):
         _set_embeddings_initializer(f"{k}_embeddings", v)
 
 
-def set_means_regularizer(model, training_dataset, layer_name="means"):
+def set_means_regularizer(model, range_, scale_factor, layer_name="means"):
     """Set the means regularizer based on training data.
 
     A multivariate normal prior is applied to the mean vectors with
@@ -204,30 +204,30 @@ def set_means_regularizer(model, training_dataset, layer_name="means"):
     ----------
     model : osl_dynamics.models.*.Model.model
         The model.
-    training_dataset : osl_dynamics.data.Data
-        The training dataset.
+    range_ : np.ndarray
+        Range (max-min) of the training data for each channel.
+        Shape is (n_channels,).
+    scale_factor : float
+        Scale factor for regularization.
     layer_name : str, optional
         Layer name of the means. Can be :code:`"means"` or
         :code:`"group_means"`.
     """
-    n_channels = dtf.get_n_channels(training_dataset)
-    range_ = dtf.get_range(training_dataset)
-
+    n_channels = range_.shape[0]
     mu = np.zeros(n_channels, dtype=np.float32)
     sigma = np.diag((range_ / 2) ** 2)
-
     means_layer = model.get_layer(layer_name)
     learnable_tensor_layer = means_layer.layers[0]
     learnable_tensor_layer.regularizer = regularizers.MultivariateNormal(
-        mu,
-        sigma,
+        mu, sigma, scale_factor
     )
 
 
 def set_covariances_regularizer(
     model,
-    training_dataset,
+    range_,
     epsilon,
+    scale_factor,
     diagonal=False,
     layer_name="covs",
 ):
@@ -243,40 +243,38 @@ def set_covariances_regularizer(
     ----------
     model : osl_dynamics.models.*.Model.model
         The model.
-    training_dataset : osl_dynamics.data.Data
-        The training dataset.
+    range_ : np.ndarray
+        Range (max-min) of the training data for each channel.
+        Shape is (n_channels,).
     epsilon : float
         Error added to the covariance matrices.
+    scale_factor : float
+        Scale factor for regularization.
     diagonal : bool, optional
         Whether the covariances are diagonal.
     layer_name : str, optional
         Layer name of the covariances. Can be :code:`"covs"` or
         :code:`"group_covs"`.
     """
-    n_channels = dtf.get_n_channels(training_dataset)
-    range_ = dtf.get_range(training_dataset)
-
+    n_channels = range_.shape[0]
     covs_layer = model.get_layer(layer_name)
     if diagonal:
         mu = np.zeros([n_channels], dtype=np.float32)
         sigma = np.sqrt(np.log(2 * range_))
         learnable_tensor_layer = covs_layer.layers[0]
         learnable_tensor_layer.regularizer = regularizers.LogNormal(
-            mu,
-            sigma,
-            epsilon,
+            mu, sigma, epsilon, scale_factor
         )
-
     else:
         nu = n_channels - 1 + 0.1
         psi = np.diag(range_)
         learnable_tensor_layer = covs_layer.layers[0]
         learnable_tensor_layer.regularizer = regularizers.InverseWishart(
-            nu, psi, epsilon
+            nu, psi, epsilon, scale_factor
         )
 
 
-def set_stds_regularizer(model, training_dataset, epsilon):
+def set_stds_regularizer(model, range_, epsilon, scale_factor, layer_name="stds"):
     """Set the standard deviations regularizer based on training data.
 
     A log-normal prior is applied to the standard deviations with :code:`mu=0`,
@@ -286,27 +284,27 @@ def set_stds_regularizer(model, training_dataset, epsilon):
     ----------
     model : osl_dynamics.models.*.Model.model
         The model.
-    training_dataset : osl_dynamics.data.Data
-        The training dataset.
+    range_ : np.ndarray
+        Range (max-min) of the training data for each channel.
+        Shape is (n_channels,).
     epsilon : float
         Error added to the standard deviations.
+    scale_factor : float
+        Scale factor for regularization.
+    layer_name : str, optional
+        Layer name of the covariances.
     """
-    n_channels = dtf.get_n_channels(training_dataset)
-    range_ = dtf.get_range(training_dataset)
-
+    n_channels = range_.shape[0]
     mu = np.zeros([n_channels], dtype=np.float32)
     sigma = np.sqrt(np.log(2 * range_))
-
-    stds_layer = model.get_layer("stds")
+    stds_layer = model.get_layer(layer_name)
     learnable_tensor_layer = stds_layer.layers[0]
     learnable_tensor_layer.regularizer = regularizers.LogNormal(
-        mu,
-        sigma,
-        epsilon,
+        mu, sigma, epsilon, scale_factor
     )
 
 
-def set_corrs_regularizer(model, training_dataset, epsilon):
+def set_corrs_regularizer(model, n_channels, epsilon, scale_factor, layer_name="corrs"):
     """Set the correlations regularizer based on training data.
 
     A marginal inverse Wishart prior is applied to the correlations
@@ -316,21 +314,21 @@ def set_corrs_regularizer(model, training_dataset, epsilon):
     ----------
     model : osl_dynamics.models.*.Model.model
         The model.
-    training_dataset : osl_dynamics.data.Data
-        The training dataset.
+    range_ : np.ndarray
+        Range (max-min) of the training data for each channel.
+        Shape is (n_channels,).
     epsilon : float
         Error added to the correlations.
+    scale_factor : float
+        Scale factor for regularization.
+    layer_name : str, optional
+        Layer name of the covariances.
     """
-    n_channels = dtf.get_n_channels(training_dataset)
-
     nu = n_channels - 1 + 0.1
-
-    corrs_layer = model.get_layer("corrs")
+    corrs_layer = model.get_layer(layer_name)
     learnable_tensor_layer = corrs_layer.layers[0]
     learnable_tensor_layer.regularizer = regularizers.MarginalInverseWishart(
-        nu,
-        epsilon,
-        n_channels,
+        nu, epsilon, n_channels, scale_factor
     )
 
 

@@ -14,6 +14,7 @@ import numpy as np
 import tensorflow as tf
 from tqdm.auto import trange
 
+import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
     TFConcatLayer,
     CorrelationMatricesLayer,
@@ -30,7 +31,6 @@ from osl_dynamics.inference.layers import (
     SampleNormalDistributionLayer,
     SoftmaxLayer,
     VectorsLayer,
-    StaticLossScalingFactorLayer,
 )
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.inf_mod_base import (
@@ -286,12 +286,6 @@ class Model(VariationalInferenceModelBase):
             learn_temperature=False,
             name="beta",
         )
-        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            config.sequence_length,
-            config.batch_size,
-            config.loss_calc,
-            name="static_loss_scaling_factor",
-        )
         means_layer = VectorsLayer(
             config.n_modes,
             config.n_channels,
@@ -412,10 +406,9 @@ class Model(VariationalInferenceModelBase):
         beta = beta_layer(fc_theta)
 
         # Observation model
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-        mu = means_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
-        E = stds_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
-        R = corrs_layer(data, static_loss_scaling_factor=static_loss_scaling_factor)
+        mu = means_layer(data)
+        E = stds_layer(data)
+        R = corrs_layer(data)
         pca_mu, pca_E, pca_R = pca_layer([mu, E, R])
         m = mix_means_layer([alpha, pca_mu])
         G = mix_stds_layer([alpha, pca_E])
@@ -593,19 +586,31 @@ class Model(VariationalInferenceModelBase):
         training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
-        training_dataset = self.make_dataset(training_dataset, concatenate=True)
+        _logger.info("Setting regularizers")
+
+        training_dataset = self.make_dataset(
+            training_dataset, shuffle=False, concatenate=True
+        )
+        n_batches, range_ = dtf.get_n_batches_and_range(training_dataset)
+        scale_factor = self.get_static_loss_scaling_factor(n_batches)
 
         if self.config.learn_means:
-            obs_mod.set_means_regularizer(self.model, training_dataset)
+            obs_mod.set_means_regularizer(self.model, range_, scale_factor)
 
         if self.config.learn_stds:
             obs_mod.set_stds_regularizer(
-                self.model, training_dataset, self.config.stds_epsilon
+                self.model,
+                range_,
+                self.config.stds_epsilon,
+                scale_factor,
             )
 
         if self.config.learn_corrs:
             obs_mod.set_corrs_regularizer(
-                self.model, training_dataset, self.config.corrs_epsilon
+                self.model,
+                self.config.n_channels,
+                self.config.corrs_epsilon,
+                scale_factor,
             )
 
     def sample_time_courses(self, n_samples):

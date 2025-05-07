@@ -22,9 +22,11 @@ class InverseWishart(regularizers.Regularizer):
         Shape must be (n_channels, n_channels).
     epsilon : float
         Error added to the diagonal of the covariances.
+    strength : float
+        The regularization will be multiplied by the strength.
     """
 
-    def __init__(self, nu, psi, epsilon, **kwargs):
+    def __init__(self, nu, psi, epsilon, strength, **kwargs):
         super().__init__(**kwargs)
         self.nu = nu
         self.psi = psi
@@ -33,8 +35,8 @@ class InverseWishart(regularizers.Regularizer):
         self.bijector = tfb.Chain(
             [tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()],
         )
+        self.strength = strength
 
-        # Validation
         if not self.nu > self.n_channels - 1:
             raise ValueError("nu must be greater than (n_channels - 1).")
 
@@ -61,7 +63,7 @@ class InverseWishart(regularizers.Regularizer):
             ((self.nu + self.n_channels + 1) / 2) * log_det_cov
             + (1 / 2) * tf.linalg.trace(tf.matmul(tf.expand_dims(self.psi, 0), inv_cov))
         )
-        return reg
+        return self.strength * reg
 
 
 class MultivariateNormal(regularizers.Regularizer):
@@ -74,14 +76,16 @@ class MultivariateNormal(regularizers.Regularizer):
     sigma : np.ndarray
         2D array of covariance matrix of the prior.
         Shape must be (n_channels, n_channels).
+    strength : float
+        The regularization will be multiplied by the strength.
     """
 
-    def __init__(self, mu, sigma, **kwargs):
+    def __init__(self, mu, sigma, strength, **kwargs):
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
+        self.strength = strength
 
-        # Validation
         if self.mu.ndim != 1:
             raise ValueError("mu must be a 1D array.")
 
@@ -113,7 +117,7 @@ class MultivariateNormal(regularizers.Regularizer):
                 ),
             )
         )
-        return reg
+        return self.strength * reg
 
 
 class MarginalInverseWishart(regularizers.Regularizer):
@@ -127,6 +131,8 @@ class MarginalInverseWishart(regularizers.Regularizer):
         Error added to the correlations.
     n_channels : int
         Number of channels of the correlation matrices.
+    strength : float
+        The regularization will be multiplied by the strength.
 
     Note
     ----
@@ -135,7 +141,7 @@ class MarginalInverseWishart(regularizers.Regularizer):
     independent of the scale matrix.
     """
 
-    def __init__(self, nu, epsilon, n_channels, **kwargs):
+    def __init__(self, nu, epsilon, n_channels, strength, **kwargs):
         super().__init__(**kwargs)
         self.nu = nu
         self.epsilon = epsilon
@@ -143,8 +149,8 @@ class MarginalInverseWishart(regularizers.Regularizer):
         self.bijector = tfb.Chain(
             [tfb.CholeskyOuterProduct(), tfb.CorrelationCholesky()]
         )
+        self.strength = strength
 
-        # Validation
         if not self.nu > self.n_channels - 1:
             raise ValueError("nu must be greater than (n_channels - 1).")
 
@@ -157,7 +163,7 @@ class MarginalInverseWishart(regularizers.Regularizer):
         reg = tf.reduce_sum(
             ((self.nu + self.n_channels + 1) / 2) * log_det_corr
         ) + tf.reduce_sum((self.nu / 2) * tf.math.log(tf.linalg.diag_part(inv_corr)))
-        return reg
+        return self.strength * reg
 
 
 class LogNormal(regularizers.Regularizer):
@@ -172,16 +178,18 @@ class LogNormal(regularizers.Regularizer):
         Shape is (n_channels,). All entries must be positive.
     epsilon : float
         Error added to the standard deviations.
+    strength : float
+        The regularization will be multiplied by the strength.
     """
 
-    def __init__(self, mu, sigma, epsilon, **kwargs):
+    def __init__(self, mu, sigma, epsilon, strength, **kwargs):
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
         self.epsilon = epsilon
         self.bijector = tfb.Softplus()
+        self.strength = strength
 
-        # Validation
         if self.mu.ndim != 1:
             raise ValueError("mu must be a 1D array.")
 
@@ -204,4 +212,4 @@ class LogNormal(regularizers.Regularizer):
                 1 / (2 * tf.math.square(tf.expand_dims(self.sigma, 0))),
             )
         )
-        return reg
+        return self.strength * reg

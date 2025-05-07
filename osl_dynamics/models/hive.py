@@ -1,5 +1,6 @@
 """HIVE (HMM with Integrated Variability Estimation)."""
 
+import logging
 from typing import List
 from dataclasses import dataclass
 
@@ -8,6 +9,8 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import layers
 
+import osl_dynamics.data.tf as dtf
+from osl_dynamics.data import SessionLabels
 from osl_dynamics.inference.layers import (
     VectorsLayer,
     CovarianceMatricesLayer,
@@ -18,7 +21,6 @@ from osl_dynamics.inference.layers import (
     GammaExponentialKLDivergenceLayer,
     KLLossLayer,
     MultiLayerPerceptronLayer,
-    StaticLossScalingFactorLayer,
     HiddenMarkovStateInferenceLayer,
     SeparateLogLikelihoodLayer,
     SumLogLikelihoodLossLayer,
@@ -39,8 +41,9 @@ from osl_dynamics.models.inf_mod_base import (
     MarkovStateInferenceModelConfig,
     MarkovStateInferenceModelBase,
 )
-from osl_dynamics.data import SessionLabels
 from osl_dynamics.utils.misc import replace_argument
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 @dataclass
@@ -97,7 +100,6 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Regularizer for the MLP for deviations.
     dev_regularizer_factor : float
         Regularizer factor for the MLP for deviations.
-        This will be scaled by the amount of data.
     initial_dev : dict
         Initialisation for dev posterior parameters.
 
@@ -292,14 +294,6 @@ class Model(MarkovStateInferenceModelBase):
         batch_size_layer = BatchSizeLayer(name="batch_size")
         batch_size = batch_size_layer(data)
 
-        static_loss_scaling_factor_layer = StaticLossScalingFactorLayer(
-            config.sequence_length,
-            config.batch_size,
-            config.loss_calc,
-            name="static_loss_scaling_factor",
-        )
-        static_loss_scaling_factor = static_loss_scaling_factor_layer(data)
-
         session_id = layers.Input(
             shape=(config.sequence_length,),
             dtype=tf.int32,
@@ -349,9 +343,7 @@ class Model(MarkovStateInferenceModelBase):
             config.means_regularizer,
             name="group_means",
         )
-        group_mu = group_means_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
-        )
+        group_mu = group_means_layer(data)
 
         group_covs_layer = CovarianceMatricesLayer(
             config.n_states,
@@ -362,9 +354,7 @@ class Model(MarkovStateInferenceModelBase):
             config.covariances_regularizer,
             name="group_covs",
         )
-        group_D = group_covs_layer(
-            data, static_loss_scaling_factor=static_loss_scaling_factor
-        )
+        group_D = group_covs_layer(data)
 
         # -------- Mean deviations -------- #
 
@@ -431,10 +421,7 @@ class Model(MarkovStateInferenceModelBase):
             )  # shape = (n_sessions, n_states, embeddings_dim + spatial_embeddings_dim)
 
             # Get the mean deviation maps (no global magnitude information)
-            means_dev_decoder = means_dev_decoder_layer(
-                means_concat_embeddings,
-                static_loss_scaling_factor=static_loss_scaling_factor,
-            )
+            means_dev_decoder = means_dev_decoder_layer(means_concat_embeddings)
             means_dev_map = means_dev_map_layer(means_dev_decoder)
             norm_means_dev_map = TFGatherLayer(axis=0)(
                 [norm_means_dev_map_layer(means_dev_map), session_id[:, 0]]
@@ -534,10 +521,7 @@ class Model(MarkovStateInferenceModelBase):
             )
 
             # Get the covariance deviation maps (no global magnitude information)
-            covs_dev_decoder = covs_dev_decoder_layer(
-                covs_concat_embeddings,
-                static_loss_scaling_factor=static_loss_scaling_factor,
-            )
+            covs_dev_decoder = covs_dev_decoder_layer(covs_concat_embeddings)
             covs_dev_map = covs_dev_map_layer(covs_dev_decoder)
             norm_covs_dev_map = TFGatherLayer(axis=0)(
                 [norm_covs_dev_map_layer(covs_dev_map), session_id[:, 0]]
@@ -641,7 +625,6 @@ class Model(MarkovStateInferenceModelBase):
                     means_dev_mag_inf_beta,
                     means_dev_mag_mod_beta,
                 ],
-                static_loss_scaling_factor=static_loss_scaling_factor,
             )
         else:
             means_dev_mag_kl_loss_layer = TFZerosLayer(
@@ -669,7 +652,6 @@ class Model(MarkovStateInferenceModelBase):
                     covs_dev_mag_inf_beta,
                     covs_dev_mag_mod_beta,
                 ],
-                static_loss_scaling_factor=static_loss_scaling_factor,
             )
         else:
             covs_dev_mag_kl_loss_layer = TFZerosLayer((), name="covs_dev_mag_kl_loss")
@@ -960,23 +942,47 @@ class Model(MarkovStateInferenceModelBase):
         training_dataset : tf.data.Dataset or osl_dynamics.data.Data
             Training dataset.
         """
+        _logger.info("Setting regularizers")
+
         training_dataset = self.make_dataset(
             training_dataset,
+            shuffle=False,
             concatenate=True,
         )
+        n_batches, range_ = dtf.get_n_batches_and_range(training_dataset)
+        scale_factor = self.get_static_loss_scaling_factor(n_batches)
 
         if self.config.learn_means:
+            # Group means
             obs_mod.set_means_regularizer(
-                self.model, training_dataset, layer_name="group_means"
+                self.model, range_, scale_factor, layer_name="group_means"
             )
 
+            # KL divergence for the deviation
+            layer = self.model.get_layer("means_dev_mag_kl_loss")
+            layer.scale_factor = scale_factor
+
+            # MLP for the deviation
+            layer = self.model.get_layer("means_dev_decoder")
+            layer.regularizer_strength *= scale_factor
+
         if self.config.learn_covariances:
+            # Group covariances
             obs_mod.set_covariances_regularizer(
                 self.model,
-                training_dataset,
+                range_,
                 self.config.covariances_epsilon,
+                scale_factor,
                 layer_name="group_covs",
             )
+
+            # KL divergence for the deviation
+            layer = self.model.get_layer("covs_dev_mag_kl_loss")
+            layer.scale_factor = scale_factor
+
+            # MLP for the deviation
+            layer = self.model.get_layer("covs_dev_decoder")
+            layer.regularizer_strength *= scale_factor
 
     def set_dev_parameters_initializer(self, training_data):
         """Set the deviance parameters initializer based on training data.
