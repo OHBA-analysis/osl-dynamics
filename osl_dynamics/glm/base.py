@@ -1,4 +1,4 @@
-"""GLM Base Classes."""
+"""GLM base class."""
 
 from typing import List, Dict
 from dataclasses import dataclass
@@ -38,8 +38,7 @@ def _validate_type(feature_type):
 
 @dataclass
 class DesignConfig:
-    """
-    Configuration class for Design.
+    """Configuration class for Design.
 
     Parameters
     ----------
@@ -70,8 +69,7 @@ class DesignConfig:
     standardize_features: bool = True
 
     def create_design(self):
-        """
-        Create a Design object from the configuration.
+        """Create a Design object from the configuration.
 
         Returns
         -------
@@ -92,8 +90,7 @@ class DesignConfig:
 
 
 class Feature:
-    """
-    Base class for feature objects.
+    """Base class for feature objects.
 
     Parameters
     ----------
@@ -120,8 +117,7 @@ class Feature:
 
 
 class Contrast:
-    """
-    Base class for contrast objects.
+    """Base class for contrast objects.
 
     Parameters
     ----------
@@ -152,8 +148,7 @@ class Contrast:
 
 
 class Design:
-    """
-    Base class for design objects.
+    """Base class for design objects.
 
     Parameters
     ----------
@@ -173,8 +168,7 @@ class Design:
         self.standardize_features = standardize_features
 
     def add_feature(self, name, values, feature_type):
-        """
-        Add a feature to the design.
+        """Add a feature to the design.
 
         Parameters
         ----------
@@ -189,8 +183,7 @@ class Design:
         self.features.append(feature)
 
     def add_contrast(self, name, values):
-        """
-        Add a contrast to the design.
+        """Add a contrast to the design.
 
         Parameters
         ----------
@@ -203,9 +196,7 @@ class Design:
         self.contrasts.append(contrast)
 
     def validate(self):
-        """
-        Validate the design.
-        """
+        """Validate the design."""
         self._validate_features()
         self._validate_contrasts()
 
@@ -217,8 +208,7 @@ class Design:
             )
 
     def build_X(self):
-        """
-        Build the design matrix.
+        """Build the design matrix.
 
         Returns
         -------
@@ -237,8 +227,7 @@ class Design:
         return X
 
     def build_contrast_array(self):
-        """
-        Build the contrast array.
+        """Build the contrast array.
 
         Returns
         -------
@@ -253,8 +242,7 @@ class Design:
         return contrast_array
 
     def _standardize_features(self, X):
-        """
-        Standardize continuous features.
+        """Standardize continuous features.
 
         Parameters
         ----------
@@ -354,8 +342,7 @@ class Design:
 
 
 class GLM:
-    """
-    Base class for GLM objects.
+    """Base class for GLM objects.
 
     Parameters
     ----------
@@ -371,13 +358,12 @@ class GLM:
         self.target_dims = None
 
     def fit(self, y):
-        """
-        Fit the GLM model.
+        """Fit the GLM model.
 
         Parameters
         ----------
         y : np.ndarray or list
-            Target values. Shape is (n_samples, *target_dims).
+            Target values. Shape is :code:`(n_samples, *target_dims)`.
         """
         y_flatten = self._validate_y(y)
         betas, copes, varcopes = osl_fit(X=self.X, y=y_flatten, contrasts=self.c)
@@ -386,9 +372,7 @@ class GLM:
         self.varcopes = varcopes.reshape((self.n_contrasts, *self.target_dims))
 
     def _validate_y(self, y):
-        """
-        Validate the target values and flatten the target dimensions.
-        """
+        """Validate the target values and flatten the target dimensions."""
         if isinstance(y, list):
             y = np.array(y).copy()
 
@@ -414,21 +398,21 @@ class GLM:
         return y_copy
 
     def get_tstats(self, copes=None, varcopes=None):
-        """
-        Get t-statistics.
+        """Get t-statistics.
 
         Parameters
         ----------
         copes : np.ndarray
-            Contrast parameter estimates. Shape is (n_contrasts, *target_dims).
+            Contrast parameter estimates.
+            Shape is :code:`(n_contrasts, *target_dims)`.
         varcopes : np.ndarray
             Variance of contrast parameter estimates.
-            Shape is (n_contrasts, *target_dims).
+            Shape is :code:`(n_contrasts, *target_dims)`.
 
         Returns
         -------
         tstats : np.ndarray
-            t-statistics. Shape is (n_contrasts, *target_dims).
+            t-statistics. Shape is :code:`(n_contrasts, *target_dims)`.
         """
         if copes is None:
             copes = self.copes
