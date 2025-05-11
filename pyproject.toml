@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "osl-dynamics"
+version = "2.1.dev4"
+description = "OHBA Software Library: Dynamics Toolbox"
+readme = {file = "README.md", content-type = "text/markdown"}
+license = "Apache-2.0"
+requires-python = ">=3.8"
+
+[project.urls]
+"Homepage" = "https://github.com/OHBA-analysis/osl-dynamics"
+"Documentation" = "https://osl-dynamics.readthedocs.io/en/latest/"
+
+[project.scripts]
+osl-dynamics = "osl_dynamics.config_api.pipeline:osl_dynamics_cli"
+
+[tool.setuptools.packages.find]
+where = ["osl_dynamics"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"*" = ["*"]
