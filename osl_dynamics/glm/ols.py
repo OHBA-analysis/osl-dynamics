@@ -1,3 +1,5 @@
+"""Ordinary least squares fitting for a GLM."""
+
 import logging
 
 import numpy as np
@@ -7,9 +9,7 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def _validate_dimensions(X=None, y=None, contrasts=None):
-    """
-    Validate dimensions of input arrays.
-    """
+    """Validate dimensions of input arrays."""
     # Check X dimensions
     if X is None:
         X_n_samples, X_n_features = None, None
@@ -41,7 +41,8 @@ def _validate_dimensions(X=None, y=None, contrasts=None):
         and X_n_samples != y_n_samples
     ):
         raise ValueError(
-            f"X and y must have the same number of samples. Got {X_n_samples} samples in X and {y_n_samples} samples in y."
+            "X and y must have the same number of samples. "
+            f"Got {X_n_samples} samples in X and {y_n_samples} samples in y."
         )
     if (
         X_n_features is not None
@@ -49,13 +50,14 @@ def _validate_dimensions(X=None, y=None, contrasts=None):
         and X_n_features != contrasts_n_features
     ):
         raise ValueError(
-            f"X and contrasts must have the same number of features. Got {X_n_features} features in X and {contrasts_n_features} features in contrasts."
+            "X and contrasts must have the same number of features. "
+            f"Got {X_n_features} features in X and {contrasts_n_features} "
+            "features in contrasts."
         )
 
 
 def get_residuals(X, y, predictor):
-    """
-    Get residuals from a linear model.
+    """Get residuals from a linear model.
 
     Parameters
     ----------
@@ -80,8 +82,7 @@ def get_residuals(X, y, predictor):
 
 
 def get_degree_of_freedom(X):
-    """
-    Get degree of freedom.
+    """Get degree of freedom.
 
     Parameters
     ----------
@@ -98,8 +99,7 @@ def get_degree_of_freedom(X):
 
 
 def get_varcopes(X, y, contrasts, predictor):
-    """
-    Get the variance of the copes.
+    """Get the variance of the copes.
 
     Parameters
     ----------
@@ -137,8 +137,7 @@ def get_varcopes(X, y, contrasts, predictor):
 
 
 def osl_fit(X, y, contrasts):
-    """
-    Fit Ordinary Least Squares (OLS) model.
+    """Fit Ordinary Least Squares (OLS) model.
 
     Parameters
     ----------
@@ -172,8 +171,7 @@ def osl_fit(X, y, contrasts):
 
 
 def remove_nan_rows(X, y):
-    """
-    Remove rows with NaN values.
+    """Remove rows with NaN values.
 
     Parameters
     ----------

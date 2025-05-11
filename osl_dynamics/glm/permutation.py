@@ -1,3 +1,5 @@
+"""GLM Permutations base class."""
+
 import logging
 
 import numpy as np
@@ -13,8 +15,7 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 class Permutation:
-    """
-    Base class for permutation tests.
+    """Base class for permutation tests.
 
     Parameters
     ----------
@@ -28,7 +29,7 @@ class Permutation:
         Type of permutation. Options are 'sign_flip' and 'row_shuffle'.
         If None, it will be determined based on the feature types and contrast type.
     n_jobs : int, optional
-        Number of jobs to run in parallel. Default is 1.
+        Number of jobs to run in parallel.
     """
 
     def __init__(self, design, contrast_indx, n_perm, perm_type=None, n_jobs=1):
@@ -40,13 +41,12 @@ class Permutation:
         self.perm_type = self._validate_perm_type(perm_type)
 
     def permute_X(self):
-        """
-        Permute the design matrix based on the perm_type.
+        """Permute the design matrix based on the perm_type.
 
         Returns
         -------
         X_copy : np.ndarray
-            Permuted design matrix. Shape is (n_samples, n_features).
+            Permuted design matrix. Shape is :code:`(n_samples, n_features)`.
         """
         X_copy = self.glm.X.copy()
         permute_indx = self._get_permute_feature_indx()
@@ -62,13 +62,12 @@ class Permutation:
         return X_copy
 
     def fit(self, y):
-        """
-        Fit the GLM with unpermuted data and run permutations.
+        """Fit the GLM with unpermuted data and run permutations.
 
         Parameters
         ----------
         y : np.ndarray
-            Target variable. Shape is (n_samples, *target_dims).
+            Target variable. Shape is :code:`(n_samples, *target_dims)`.
         """
         self.glm.fit(y)
         y_flatten = np.reshape(y, (self.glm.n_samples, -1))
@@ -86,19 +85,22 @@ class Permutation:
         # Run permutations
         if len(kwargs) == 1:
             _logger.info(
-                f"Running permutations on contrast {self.glm.contrast_names[self.contrast_indx]}."
+                "Running permutations on contrast "
+                f"{self.glm.contrast_names[self.contrast_indx]}."
             )
             results = [osl_fit(**kwargs[0])]
         elif self.n_jobs == 1:
             _logger.info(
-                f"Running on contrast {self.glm.contrast_names[self.contrast_indx]} permutations with {self.n_jobs} jobs."
+                f"Running on contrast {self.glm.contrast_names[self.contrast_indx]} "
+                f"permutations with {self.n_jobs} jobs."
             )
             results = []
             for i in trange(self.n_perm, desc="Running permutations"):
                 results.append(osl_fit(**kwargs[i]))
         else:
             _logger.info(
-                f"Running on contrast {self.glm.contrast_names[self.contrast_indx]} permutations with {self.n_jobs} jobs."
+                f"Running on contrast {self.glm.contrast_names[self.contrast_indx]} "
+                f"permutations with {self.n_jobs} jobs."
             )
             results = pqdm(
                 kwargs,
@@ -119,9 +121,7 @@ class Permutation:
         self.null_tstats = np.reshape(null_tstats, (self.n_perm, *self.glm.target_dims))
 
     def _get_permute_feature_indx(self):
-        """
-        Get the indices of the features to permute.
-        """
+        """Get the indices of the features to permute."""
         return np.where(self.glm.c[self.contrast_indx] != 0.0)[0]
 
     def _validate_perm_type(self, perm_type):
@@ -139,7 +139,8 @@ class Permutation:
 
         if len(feature_type) > 1:
             raise ValueError(
-                f"Cannot determine perm_type when feature types are mixed. Got {feature_type}"
+                "Cannot determine perm_type when feature types are mixed. "
+                f"Got {feature_type}"
             )
 
         if feature_type == "constant":
@@ -154,22 +155,16 @@ class Permutation:
 
     @property
     def copes(self):
-        """
-        COPEs of the contrast of interest.
-        """
+        """Contrast Of Parameter Estimates."""
         return self.glm.copes[self.contrast_indx]
 
     @property
     def tstats(self):
-        """
-        T-stats of the contrast of interest.
-        """
+        """T-stats of the contrast of interest."""
         return self.glm.tstats[self.contrast_indx]
 
     def summary(self):
-        """
-        Print summary of the permutation test.
-        """
+        """Print summary of the permutation test."""
         sum = self.glm.summary()
         sum["n_perm"] = self.n_perm
         sum["perm_type"] = self.perm_type
@@ -192,19 +187,19 @@ class MaxStatPermutation(Permutation):
         Number of permutations.
     perm_type : str, optional
         Type of permutation. Options are 'sign_flip' and 'row_shuffle'.
-        If None, it will be determined based on the feature types and contrast type.
+        If None, it will be determined based on the feature types and
+        contrast type.
     n_jobs : int, optional
-        Number of jobs to run in parallel. Default is 1.
+        Number of jobs to run in parallel.
     """
 
     def fit(self, y):
-        """
-        Fit the GLM with unpermuted data and run permutations.
+        """Fit the GLM with unpermuted data and run permutations.
 
         Parameters
         ----------
         y : np.ndarray
-            Target variable. Shape is (n_samples, *target_dims).
+            Target variable. Shape is :code:`(n_samples, *target_dims)`.
         """
         super().fit(y)
         pool_axis = tuple(range(1, len(self.glm.target_dims) + 1))
@@ -212,19 +207,17 @@ class MaxStatPermutation(Permutation):
         self.null_max_tstats = np.nanmax(np.abs(self.null_tstats), axis=pool_axis)
 
     def get_pvalues(self, metric="copes"):
-        """
-        Get p-values.
+        """Get p-values.
 
         Parameters
         ----------
         metric : str, optional
             Metric to compute p-values. Options are 'copes' and 'tstats'.
-            Default is 'copes'.
 
         Returns
         -------
         pvalues : np.ndarray
-            P-values. Shape is (*target_dims,).
+            P-values. Shape is :code:`(*target_dims)`.
         """
         if metric == "copes":
             obs_stat = np.abs(self.glm.copes[self.contrast_indx])
