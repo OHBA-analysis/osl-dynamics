@@ -150,14 +150,15 @@ The read the docs page should be automatically updated whenever there's a new co
 
 The documentation is included as docstrings in the source code. The API reference documentation will only be automatically generated if the docstrings are written correctly. The documentation directory `/doc` also contains `.rst` files that provide additional info regarding installation, development, the models, etc.
 
-To compile the documentation locally you need to install the required packages (sphinx, etc.) in your conda environment:
+To compile the documentation locally you need to install the required packages (sphinx, etc) in your conda environment:
 ```
 cd osl-dynamics
+conda activate osld
 pip install -r doc/requirements.txt
 ```
 To compile the documentation locally use:
 ```
-python setup.py build_sphinx
+sphinx-build -b html doc build
 ```
 The local build of the documentation webpage can be found in `build/sphinx/html/index.html`.
 
