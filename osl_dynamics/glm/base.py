@@ -1,3 +1,7 @@
+"""GLM Base Classes.
+
+"""
+
 from typing import List, Dict
 from dataclasses import dataclass
 import numpy as np
@@ -28,7 +32,8 @@ def _validate_values(values):
 def _validate_type(feature_type):
     if feature_type not in ["constant", "continuous", "categorical"]:
         raise ValueError(
-            f"type must be 'constant' or 'continuous' or 'categorical', got {feature_type}"
+            f"type must be 'constant' or 'continuous' or 'categorical', "
+            f"got {feature_type}"
         )
     return feature_type
 
@@ -43,19 +48,21 @@ class DesignConfig:
     features : List[Dict]
         List of dictionaries containing feature information.
         Each dictionary should contain the following keys:
-            - name: str
-                Feature name.
-            - values: np.ndarray or list
-                Feature values. Must be 1D.
-            - feature_type: str
-                Feature type. Must be 'constant', 'continuous', or 'categorical'.
+
+        - name: str
+            Feature name.
+        - values: np.ndarray or list
+            Feature values. Must be 1D.
+        - feature_type: str
+            Feature type. Must be 'constant', 'continuous', or 'categorical'.
     contrasts : List[Dict]
         List of dictionaries containing contrast information.
         Each dictionary should contain the following keys:
-            - name: str
-                Contrast name.
-            - values: np.ndarray or list
-                Contrast values. Must be 1D.
+
+        - name: str
+            Contrast name.
+        - values: np.ndarray or list
+            Contrast values. Must be 1D.
     standardize_features : bool
         Whether to standardize continuous features. Default is True.
     """
@@ -207,7 +214,8 @@ class Design:
         # n_features (contrast length) should match the number of features
         if self.n_features != len(self.features):
             raise ValueError(
-                f"Number of features {len(self.features)} must match the length of the contrasts {self.n_features}."
+                f"Number of features {len(self.features)} must match the "
+                f"length of the contrasts {self.n_features}."
             )
 
     def build_X(self):
@@ -284,7 +292,9 @@ class Design:
                 self.n_samples = feature.n_samples
             elif feature.n_samples != self.n_samples:
                 raise ValueError(
-                    f"All features must have the same number of samples, got {feature.n_samples} samples in {feature.name} and {self.n_samples} samples in the first feature."
+                    f"All features must have the same number of samples, got "
+                    f"{feature.n_samples} samples in {feature.name} and "
+                    f"{self.n_samples} samples in the first feature."
                 )
 
     def _validate_contrasts(self):
@@ -301,7 +311,10 @@ class Design:
                 self.n_features = contrast.n_features
             elif contrast.n_features != self.n_features:
                 raise ValueError(
-                    f"All contrasts must have the same number of features as the design matrix, got {contrast.n_features} features in {contrast.name} and {self.n_features} features in the design matrix."
+                    f"All contrasts must have the same number of features as the "
+                    f"design matrix, got {contrast.n_features} features in "
+                    f"{contrast.name} and {self.n_features} features in the design "
+                    "matrix."
                 )
 
     @property
@@ -390,7 +403,8 @@ class GLM:
 
         if y.shape[0] != self.n_samples:
             raise ValueError(
-                f"Number of samples in y ({y.shape[0]}) must match the number of samples in the design matrix ({self.n_samples})."
+                f"Number of samples in y ({y.shape[0]}) must match the number "
+                f"of samples in the design matrix ({self.n_samples})."
             )
 
         y_copy = y.copy()
@@ -410,7 +424,8 @@ class GLM:
         copes : np.ndarray
             Contrast parameter estimates. Shape is (n_contrasts, *target_dims).
         varcopes : np.ndarray
-            Variance of contrast parameter estimates. Shape is (n_contrasts, *target_dims).
+            Variance of contrast parameter estimates.
+            Shape is (n_contrasts, *target_dims).
 
         Returns
         -------
