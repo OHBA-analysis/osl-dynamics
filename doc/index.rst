@@ -6,20 +6,20 @@
        <a href="https://www.win.ox.ac.uk/research/our-locations/OHBA" target="_blank">
          <img src="https://avatars.githubusercontent.com/u/15248840?s=200&v=4" width="125px">
        </a>
-       <a href="http://www.ox.ac.uk/" target="_blank">
-         <img src="https://www.win.ox.ac.uk/images/site-logos/ox-logo" width="90px">
+       <a href="https://www.win.ox.ac.uk" target="_blank">
+         <img src="https://www.win.ox.ac.uk/images/site-logos/oxcin_logo.png" width="220px">
        </a>
      </div>
    </div>
 
 This package contains models for analysing neuroimaging data. In particular, this package contains methods (based on generative models) for studying dynamics in time series data. This package can be used for:
 
-    - Inferring and visualising dynamic (and static) functional networks.
-    - Spectral estimation: including multitaper spectra and wavelet transforms.
-    - Burst detection.
-    - Statistical significant testing (using GLM permutation testing).
-    - Simulating time series data (e.g. HMMs, autoregressive models, etc).
-    - And much more!
+- Inferring and visualising dynamic (and static) functional networks.
+- Spectral estimation: including multitaper spectra and wavelet transforms.
+- Burst detection.
+- Statistical significant testing (using GLM permutation testing).
+- Simulating time series data (e.g. HMMs, autoregressive models, etc).
+- And much more!
 
 For more information on how to use osl-dynamics see the :doc:`documentation <documentation>`.
 

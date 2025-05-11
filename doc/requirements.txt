@@ -2,3 +2,4 @@ sphinx
 sphinx-rtd-theme
 sphinx-gallery
 sphinx-autoapi
+pydata-sphinx-theme
