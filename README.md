@@ -138,12 +138,6 @@ And remove the GitHub repository if you have cloned it:
 rm -rf osl-dynamics
 ```
 
-## Single osl environment (not recommended)
-
-It is possible to install both [osl-ephys](https://github.com/OHBA-analysis/osl-ephys) and osl-dynamics into a single `osl` environment. To do this install one of the `*-full.yml` environment files from [osl-ephys](https://github.com/OHBA-analysis/osl-ephys). This will create a conda environment called `osl` which will already have osl-dynamics installed in it.
-
-Note, an older version of osl-dynamics/tensorflow/python will be installed if you do this. Therefore, it is highly recommended that you have separate `osld` (osl-dynamics) and `osle` (osl-ephys) environments.
-
 ## Documentation
 
 The read the docs page should be automatically updated whenever there's a new commit on the `main` branch.
