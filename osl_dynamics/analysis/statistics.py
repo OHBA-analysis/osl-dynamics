@@ -20,9 +20,10 @@ def evoked_response_max_stat_perm(
     covariates : dict, optional
         Dictionary of continuous covariates.
 
-        - key: name of the covariate
-        - value: np.ndarray of covariate values.
-          Shape is :code:`(n_samples,)`.
+        - key: name of the covariate.
+        - value: np.ndarray of covariate values. Shape is :code:`(n_samples,)`.
+
+        These are z-transformed.
     metric : str, optional
         Metric to compute p-values. Options are 'copes' and 'tstats'.
     n_jobs : int, optional
@@ -81,9 +82,10 @@ def group_diff_max_stat_perm(
     covariates : dict, optional
         Dictionary of continuous covariates.
 
-        - key: name of the covariate
-        - value: np.ndarray of covariate values.
-          Shape is :code:`(n_samples,)`.
+        - key: name of the covariate.
+        - value: np.ndarray of covariate values. Shape is :code:`(n_samples,)`.
+
+        These are z-transformed.
     metric : str, optional
         Metric to compute p-values. Options are 'copes' and 'tstats'.
     n_jobs : int, optional

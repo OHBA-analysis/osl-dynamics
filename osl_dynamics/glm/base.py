@@ -84,7 +84,6 @@ class DesignConfig:
 
         for contrast in self.contrasts:
             design.add_contrast(contrast["name"], contrast["values"])
-
         design.validate()
         return design
 
@@ -216,14 +215,11 @@ class Design:
             Design matrix. Shape is (n_samples, n_features).
         """
         self.validate()
-        # Initialise X
         X = np.zeros((self.n_samples, self.n_features))
         for i, feature in enumerate(self.features):
             X[:, i] = feature.values
-
         if self.standardize_features:
             X = self._standardize_features(X)
-
         return X
 
     def build_contrast_array(self):
@@ -235,7 +231,6 @@ class Design:
             Contrast array. Shape is (n_contrasts, n_features).
         """
         self.validate()
-        # Initialise contrasts array
         contrast_array = np.zeros((self.n_contrasts, self.n_features))
         for i, contrast in enumerate(self.contrasts):
             contrast_array[i] = contrast.values
@@ -255,7 +250,6 @@ class Design:
             Standardized design matrix.
         """
         X_copy = X.copy()
-        # Standardise continuous features
         cts_indx = np.where(np.array(self.feature_types) == "continuous")[0]
         if len(cts_indx) > 0:
             X_mean = np.mean(X_copy[:, cts_indx], axis=0)
@@ -264,7 +258,6 @@ class Design:
         return X_copy
 
     def _validate_features(self):
-        # TODO: Deal with rows with NaNs.
         if self.features is None:
             raise ValueError("No features found.")
 
