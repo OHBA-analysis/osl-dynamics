@@ -1,3 +1,6 @@
+# Configuration file for packaging
+# See https://packaging.python.org/en/latest/guides/writing-pyproject-toml for details
+
 [build-system]
 requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
