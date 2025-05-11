@@ -27,6 +27,7 @@ build/*
 dist/*
 sdist/*
 doc/tutorials_build/*
+doc/sg_execution_times.rst
 cover/*
 MANIFEST
 
