@@ -1,6 +1,4 @@
-"""GLM Base Classes.
-
-"""
+"""GLM Base Classes."""
 
 from typing import List, Dict
 from dataclasses import dataclass
