@@ -59,9 +59,14 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 - :doc:`tutorials_build/group_contrast`.
 - :doc:`tutorials_build/group_network_response`.
 
-More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repo.
+More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repository.
 
 Workshops
 ---------
 
-- `2023 OHBA Software Library (OSL) workshop <https://osf.io/zxb6c/>`_.
+The `OHBA Methods Group <https://www.psych.ox.ac.uk/research/ohba-analysis-group>`_ organises teaching workshops for analysing M/EEG data using `osl-ephys <https://osl-ephys.readthedocs.io/en/latest/>`_ and osl-dynamics.
+
+Links to past workshops:
+
+- `2023 OSL workshop <https://osf.io/zxb6c/>`_.
+- `2025 OSL workshop <https://github.com/OHBA-analysis/osl-workshop-2025-dynamics>`_.
