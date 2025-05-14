@@ -1246,7 +1246,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             raise ValueError("rows of trans_prob must sum to one.")
 
         hidden_state_inference_layer = self.model.get_layer("hid_state_inf")
-        learnable_tensor_layer = hidden_state_inference_layer.layers[0]
+        learnable_tensor_layer = hidden_state_inference_layer.layers[1]
         learnable_tensor_layer.tensor.assign(trans_prob.astype(np.float32))
 
         if update_initializer:
