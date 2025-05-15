@@ -8,8 +8,6 @@ In this tutorial we will go through common ways to prepare M/EEG data. This tuto
 2. Time-Delay Embedding (and Principal Component Analysis)
 3. Amplitude Envelope
 4. Saving and Loading Prepared Data
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/m83ze>`_ for the expected output.
 """
 
 #%%
@@ -28,7 +26,7 @@ def get_data(name):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {name}"
 
-# Download the dataset (approximate 88 MB)
+# Download the dataset (approximate 6 MB)
 get_data("example_loading_data")
 
 # List the contents of the downloaded directory containing the dataset
@@ -78,7 +76,7 @@ data.prepare(methods)
 print(data)
 
 #%%
-# We can see the `n_samples` attribute of our Data object has changed from 147500 to 147472. We have lost 28 samples. This is due to the TDE. We lose `n_embeddings // 2` data points from each end of the time series for each subject. In other words, with `n_embeddings=15`, we lose the first 7 and last 7 data points from each subject. We lose a total of 28 data points because we have 2 subjects.
+# We can see the `n_samples` attribute of our Data object has changed from 12000 to 11972. We have lost 28 samples. This is due to the TDE. We lose `n_embeddings // 2` data points from each end of the time series for each subject. In other words, with `n_embeddings=15`, we lose the first 7 and last 7 data points from each subject. We lose a total of 28 data points because we have 2 subjects.
 #
 # When we perform PCA a `pca_components` attribute is added to the Data object. This is the `(n_raw_channels, n_pca_components)` shape array that is used to perform PCA.
 
