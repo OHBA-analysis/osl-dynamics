@@ -3,8 +3,6 @@ Time-Delay Embedding
 ====================
 
 In this tutorial we will explore the impact of different settings for time-delay embedding (`n_embeddings`) and the number of principal component analysis (PCA) components (`n_pca_components`).
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/z65tn>`_ for the expected output.
 """
 
 #%%
@@ -310,7 +308,7 @@ def get_data(name):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {name}"
 
-# Download the dataset (approximate 88 MB)
+# Download the dataset (approximate 6 MB)
 get_data("example_loading_data")
 
 # List the contents of the downloaded directory containing the dataset
