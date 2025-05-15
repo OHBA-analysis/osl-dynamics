@@ -6,8 +6,6 @@ In this tutorial we will perform static AEC analysis on source space MEG data. T
 
 1. Getting the data
 2. Calculating AEC networks
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/j56q3>`_ for the expected output.
 """
 
 #%%
@@ -15,7 +13,7 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - From 51 subjects.
+# - From 5 subjects.
 # - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
@@ -38,8 +36,8 @@ def get_data(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 720 GB)
-get_data("notts_mrc_meguk_glasser", rename="source_data")
+# Download the dataset (approximately 70 MB)
+get_data("notts_mrc_meguk_glasser_5_subjects", rename="source_data")
 
 #%%
 # Load the data
@@ -117,8 +115,8 @@ print(aec.shape)
 
 from osl_dynamics.utils import plotting
 
-# Just plot the first 5
-fig, ax = plotting.plot_matrices(aec[:5], titles=[f"Subject {i+1}" for i in range(5)])
+# Just plot the first 3
+fig, ax = plotting.plot_matrices(aec[:3], titles=[f"Subject {i+1}" for i in range(3)])
 
 
 #%%
@@ -131,8 +129,8 @@ mat = np.copy(aec)  # we don't want to change the original aec array
 for m in mat:
     np.fill_diagonal(m, 0)
 
-# Just plot first 5
-fig, ax = plotting.plot_matrices(mat[:5], titles=[f"Subject {i+1}" for i in range(5)])
+# Just plot first 3
+fig, ax = plotting.plot_matrices(mat[:3], titles=[f"Subject {i+1}" for i in range(3)])
 
 #%%
 # We can now see the off-diagonal structure a bit better. We also see there is a lot of variability between subjects.
@@ -172,7 +170,7 @@ thres_aec = connectivity.threshold(aec, percentile=95)
 #
 # Subject-specific networks
 # *************************
-# Next, let's plot the AEC network for the first 5 subjects, thresholding the top 5%.
+# Next, let's plot the AEC network for the first 3 subjects, thresholding the top 5%.
 
 
 # Keep the top 5% of connections
@@ -180,7 +178,7 @@ thres_aec = connectivity.threshold(aec, percentile=95)
 
 # Plot
 connectivity.save(
-    thres_aec[:5],
+    thres_aec[:3],
     parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
     plot_kwargs={"edge_vmin": 0, "edge_vmax": 0.5, "edge_cmap": "Reds"},
 )
