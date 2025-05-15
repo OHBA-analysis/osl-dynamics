@@ -3,15 +3,12 @@ HMM/DyNeMo: Get Inferred Parameters
 ===================================
 
 In this tutorial we will get the inferred parameters from a dynamic network model (HMM/DyNeMo).
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/gq2zw>`_ for the expected output.
 """
 
 #%%
 # Download data and trained model
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # In this tutorial, we'll download example data and a trained model from `OSF <https://osf.io/by2tc/>`_. Let's first download the (prepared) data we trained the model on.
-
 
 import os
 
@@ -26,8 +23,8 @@ def get_data(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 1.7 GB)
-get_data("notts_mrc_meguk_glasser_prepared", rename="prepared_data")
+# Download the dataset (approximately 162 MB)
+get_data("notts_mrc_meguk_glasser_prepared_5_subjects", rename="prepared_data")
 
 #%%
 # Let's also download a model. In this tutorial, we will download a trained HMM, however, this can be subsituted with a DyNeMo model without any other changes being needed.
@@ -51,7 +48,6 @@ get_model("tde_hmm_notts_mrc_meguk_glasser", rename="results/model")
 # ^^^^^^^^^^^^^^^^^^
 # First we need to load the trained model.
 
-
 from osl_dynamics.models import load
 
 model = load("results/model")
@@ -74,12 +70,10 @@ data = Data("prepared_data", n_jobs=4)
 #%%
 # Now we can  get the `alpha` for each subject.
 
-
 alpha = model.get_alpha(data)
 
 #%%
 # `alpha` is a list of numpy arrays, one for each subject.
-
 
 import pickle
 
@@ -91,9 +85,9 @@ pickle.dump(alpha, open("results/inf_params/alp.pkl", "wb"))
 # *****************
 # We can get the inferred state/mode means and covariances with the `get_means_covariances` method. Note, if we passed `learn_means=False` in the config, the means will be zero.
 
+import numpy as np
 
 means, covs = model.get_means_covariances()
 
 np.save("results/inf_params/means.npy", means)
 np.save("results/inf_params/covs.npy", covs)
-

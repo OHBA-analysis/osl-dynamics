@@ -10,7 +10,6 @@ This tutorial covers how to train a DyNeMo model. We will use MEG data in this t
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed and prepared. This dataset is:
 #
-# - From 51 subjects.
 # - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
@@ -26,16 +25,16 @@ import os
 def get_data(name, rename):
     if rename is None:
         rename = name
-    if os.path.exists(name):
+    if os.path.exists(rename):
         return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.makedirs(rename, exist_ok=True)
-    os.system(f"unzip -o {name}.zip -d {name}")
+    os.system(f"unzip -o {name}.zip -d {rename}")
     os.remove(f"{name}.zip")
-    return f"Data downloaded to: {name}"
+    return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 1.7 GB)
-get_data("notts_mrc_meguk_glasser_prepared", rename="prepared_data")
+# Download the dataset (approximately 32 MB)
+get_data("notts_mrc_meguk_glasser_prepared_1_subject", rename="prepared_data")
 
 #%%
 # Load the data
@@ -117,9 +116,11 @@ model.summary()
 # **Initialization**
 #
 # When training a model it often helps to start with a good initialization. In particular, starting with a good initial value for the mode means/covariances helps find a good solution. The `dynemo.Model <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/dynemo/index.html#osl_dynamics.models.dynemo.Model>`_ class has the `random_subset_initialization` method that can be used for this. This method train the model for a short period on a small random subset of the data. Let's use this method to initialize the model.
-
-
-init_history = model.random_subset_initialization(data, n_epochs=1, n_init=3, take=0.2)
+#
+# .. code-block:: python
+#
+#     init_history = model.random_subset_initialization(data, n_epochs=2, n_init=5, take=0.25)
+#
 
 #%%
 # The `init_history` variable is `dict` that contains the training history (`rho`, `lr`, `loss`) for the best initialization.
@@ -127,9 +128,11 @@ init_history = model.random_subset_initialization(data, n_epochs=1, n_init=3, ta
 # **Full training**
 #
 # Now, we have found a good initialization, let's do the full training of the model. We do this using the `fit` method.
-
-
-history = model.fit(data)
+#
+# .. code-block:: python
+#
+#     history = model.fit(data)
+#
 
 #%%
 # The `history` variable contains the training history of the `fit` method.
@@ -137,25 +140,27 @@ history = model.fit(data)
 # Saving a trained model
 # **********************
 # As we have just seen, training a model can be time consuming. Therefore, it is often useful to save a trained model so we can load it later. We can do this with the `save` method.
-
-
-model.save("results/model")
+#
+# .. code-block:: python
+#
+#     model.save("results/model")
+#
 
 #%%
-# This will automatically create a directory containing the trained model weights and config settings used. Note, should we wish to load the trained model we can use::
+# This will automatically create a directory containing the trained model weights and config settings used. Note, should we wish to load the trained model we can use:
+#
+# .. code-block:: python
 #
 #     from osl_dynamics.models import load
 #
 #     model = load("results/model")
 #
 # It's also useful to save the variational free energy to compare different runs.
-
-
-import pickle
-
-free_energy = model.free_energy(data)
-
-history["free_energy"] = free_energy
-
-pickle.dump(history, open("results/model/history.pkl", "wb"))
-
+#
+# .. code-block:: python
+#
+#     import pickle
+#
+#     free_energy = model.free_energy(data)
+#     history["free_energy"] = free_energy
+#     pickle.dump(history, open("results/model/history.pkl", "wb"))

@@ -10,7 +10,6 @@ This tutorial covers how to train an HMM. We will use MEG data in this tutorial,
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed and prepared. This dataset is:
 #
-# - From 51 subjects.
 # - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
@@ -26,16 +25,16 @@ import os
 def get_data(name, rename):
     if rename is None:
         rename = name
-    if os.path.exists(name):
+    if os.path.exists(rename):
         return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.makedirs(rename, exist_ok=True)
-    os.system(f"unzip -o {name}.zip -d {name}")
+    os.system(f"unzip -o {name}.zip -d {rename}")
     os.remove(f"{name}.zip")
-    return f"Data downloaded to: {name}"
+    return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 1.7 GB)
-get_data("notts_mrc_meguk_glasser_prepared", rename="prepared_data")
+# Download the dataset (approximately 32 MB)
+get_data("notts_mrc_meguk_glasser_prepared_1_subject", rename="prepared_data")
 
 #%%
 # Load the data
@@ -58,7 +57,7 @@ print(data)
 # *****************
 # First need to specify the `Config object <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html#osl_dynamics.models.hmm.Config>`_ for the HMM. This is a class that acts as a container for all hyperparameters of a model. The API reference guide lists all the arguments for a Config object. There are a lot of arguments that can be passed to this class, however, a lot of them have good default values you don't need to change.
 #
-# An important hyperparameters to specify is `n_states`, which the number of states. We advise starting with something between 6-14 and making sure any results based on the HMM are not critically sensitive to the choice for `n_states`. In this tutorial, we’ll use 8 states.
+# An important hyperparameters to specify is `n_states`, which the number of states. We advise starting with something between 6-14 and making sure any results based on the HMM are not critically sensitive to the choice for `n_states`. In this tutorial, we’ll use 6 states.
 #
 # The `sequence_length` and `batch_size` can be chosen to ensure the model fits into memory.
 
@@ -67,9 +66,9 @@ from osl_dynamics.models.hmm import Config
 
 # Create a config object
 config = Config(
-    n_states=8,
+    n_states=6,
     n_channels=data.n_channels,
-    sequence_length=1000,
+    sequence_length=200,
     learn_means=False,
     learn_covariances=True,
     batch_size=16,
@@ -78,19 +77,6 @@ config = Config(
 )
 
 #%%
-# Note, in fMRI we have much shorter time series. This means we need to use a shorter sequence length and larger batch size, for example::
-#
-#     config = Config(
-#         n_states=8,
-#         n_channels=data.n_channels,
-#         sequence_length=50,
-#         learn_means=False,
-#         learn_covariances=True,
-#         batch_size=256,
-#         learning_rate=0.01,
-#         n_epochs=20,
-#     )
-#
 # Building the model
 # ******************
 # With the Config object, we can build a model.
@@ -109,9 +95,11 @@ model.summary()
 # **Initialization**
 #
 # When training a model it often helps to start with a good initialization. In particular, starting with a good initial value for the state means/covariances helps find a good explanation. The `hmm.Model <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html#osl_dynamics.models.hmm.Model>`_ class has a few helpful methods for initialization. When training on real data, we recommend using the `random_state_time_course_initialization`, let's do this. Usually 3 initializations is enough and you only need to train for a short period, we will use a single epoch.
-
-
-init_history = model.random_state_time_course_initialization(data, n_epochs=1, n_init=3)
+#
+# .. code-block:: python
+#
+#     init_history = model.random_state_time_course_initialization(data, n_epochs=1, n_init=3)
+#
 
 #%%
 # The `init_history` variable is `dict` that contains the training history (`rho`, `lr`, `loss`) for the best initialization.
@@ -119,9 +107,11 @@ init_history = model.random_state_time_course_initialization(data, n_epochs=1, n
 # **Full training**
 #
 # Now, we have found a good initialization, let's do the full training of the model. We do this using the `fit` method.
-
-
-history = model.fit(data)
+#
+# .. code-block:: python
+#
+#     history = model.fit(data)
+#
 
 #%%
 # The `history` variable contains the training history of the `fit` method.
@@ -129,25 +119,28 @@ history = model.fit(data)
 # Saving a trained model
 # **********************
 # As we have just seen, training a model can be time consuming. Therefore, it is often useful to save a trained model so we can load it later. We can do this with the `save` method.
-
-
-model.save("results/model")
+#
+# .. code-block:: python
+#
+#     model.save("results/model")
+#
 
 #%%
-# This will automatically create a directory containing the trained model weights and config settings used. Note, should we wish to load the trained model we can use::
+# This will automatically create a directory containing the trained model weights and config settings used. Note, should we wish to load the trained model we can use:
+#
+# .. code-block:: python
 #
 #     from osl_dynamics.models import load
 #
 #     model = load("trained_model")
 #
 # It's also useful to save the variational free energy to compare different runs.
-
-
-import pickle
-
-free_energy = model.free_energy(data)
-
-history["free_energy"] = free_energy
-
-pickle.dump(history, open("results/model/history.pkl", "wb"))
-
+#
+# .. code-block:: python
+#
+#     import pickle
+#
+#     free_energy = model.free_energy(data)
+#     history["free_energy"] = free_energy
+#     pickle.dump(history, open("results/model/history.pkl", "wb"))
+#
