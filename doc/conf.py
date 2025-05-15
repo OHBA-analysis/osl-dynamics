@@ -42,8 +42,10 @@ extensions = [
 autoapi_dirs = ["../osl_dynamics"]
 
 sphinx_gallery_conf = {
-    "examples_dirs": "tutorials",  # path to your example (tutorial) scripts
-    "gallery_dirs": "tutorials_build",  # path to where to save gallery generated output
+    "examples_dirs": "tutorials",        # Contains source .py files
+    "gallery_dirs": "tutorials_build",   # Where to output rendered gallery
+    "filename_pattern": r".*\.py",       # Include all .py files
+    "run_stale_examples": True,          # Force re-run when building
 }
 
 # The suffix of source filenames.
