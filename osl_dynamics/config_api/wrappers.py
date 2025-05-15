@@ -2431,7 +2431,7 @@ def plot_burst_summary_stats(data, output_dir, sampling_frequency=None):
         x=range(1, n_states + 1),
         x_label="State",
         y_label="Mean Lifetime (s)",
-        filename=f"{summary_stats_dir}/fo.png",
+        filename=f"{summary_stats_dir}/lt.png",
     )
     plotting.plot_violin(
         intv.T,
