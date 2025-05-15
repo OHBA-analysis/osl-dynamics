@@ -9,8 +9,6 @@ This tutorial covers:
 1. Getting the Data
 2. Estimating Networks using a Sliding Window
 3. Clustering the Networks
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/bkn32>`_ for the expected output.
 """
 
 #%%
@@ -18,7 +16,7 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - From 51 subjects.
+# - From 5 subjects.
 # - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
@@ -41,8 +39,8 @@ def get_data(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 720 GB)
-get_data("notts_mrc_meguk_glasser", rename="source_data")
+# Download the dataset (approximately 70 MB)
+get_data("notts_mrc_meguk_glasser_5_subjects", rename="source_data")
 
 #%%
 # Load the data
