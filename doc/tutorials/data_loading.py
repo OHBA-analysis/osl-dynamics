@@ -9,8 +9,6 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 3. Loading Data in NumPy Format
 4. Loading Data in MATLAB Format
 5. Loading Data in fif Format
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/dvfku>`_ for the expected output.
 """
 
 #%%
@@ -55,7 +53,7 @@ def get_data(name):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {name}"
 
-# Download the dataset (approximately 88 MB)
+# Download the dataset (approximately 6 MB)
 get_data("example_loading_data")
 
 # List the contents of the downloaded directory containing the dataset
@@ -85,7 +83,7 @@ os.listdir("example_loading_data/numpy_format")
 import numpy as np
 
 # Just load one of the files
-X = np.load("example_loading_data/numpy_format/subject0.npy")
+X = np.load("example_loading_data/numpy_format/array0.npy")
 print(X.shape)
 
 #%%
@@ -104,8 +102,8 @@ print(data)
 
 
 # Load numpy files
-X0 = np.load("example_loading_data/numpy_format/subject0.npy")
-X1 = np.load("example_loading_data/numpy_format/subject1.npy")
+X0 = np.load("example_loading_data/numpy_format/array0.npy")
+X1 = np.load("example_loading_data/numpy_format/array1.npy")
 
 # Collate into a list
 X = [X0, X1]
@@ -121,7 +119,7 @@ print(data)
 
 
 # Just load one of the files
-data = Data("example_loading_data/numpy_format/subject0.npy")
+data = Data("example_loading_data/numpy_format/array0.npy")
 print(data)
 
 #%%
@@ -135,7 +133,7 @@ print(ts.shape)
 # Normally, we would want to load the data for multiple subjects. We could do this in two ways if the data is in numpy format (i.e. `.npy`). We could pass a list of file paths:
 
 
-files = [f"example_loading_data/numpy_format/subject{i}.npy" for i in [0, 1]]
+files = [f"example_loading_data/numpy_format/array{i}.npy" for i in [0, 1]]
 data = Data(files)
 print(data)
 
@@ -216,16 +214,16 @@ print(data)
 #%%
 # Loading fif files
 # *****************
-# Another data format that can be loaded with the Data class is fif files. This format is commonly used in `MNE-Python <https://mne.tools/stable/index.html>`_ and is the data format used in `OSL <https://github.com/OHBA-analysis/osl>`_. Here, we will load source reconstruct (parcellated) data created with OSL. In OSL, we often have a separate directory for each subject. The `fif_format` directory contains two directories for different subjects.
+# Another data format that can be loaded with the Data class is fif files. This format is commonly used in `MNE-Python <https://mne.tools/stable/index.html>`_ and is the data format used in `osl-ephys <https://github.com/OHBA-analysis/osl-ephys>`_. Here, we will load source reconstruct (parcellated) data created with osl-ephys. In osl-ephys, we often have a separate directory for each subject. The `fif_format` directory contains two directories for different subjects.
 
 
 os.listdir('example_loading_data/fif_format')
 
 #%%
-# Let's see what's inside `subj001_run01`.
+# Let's see what's inside `sub-001_run-01`.
 
 
-os.listdir('example_loading_data/fif_format/subj001_run01')
+os.listdir('example_loading_data/fif_format/sub-001_run-01')
 
 #%%
 # We have a fif file which contains the data for this subject. We could load this with MNE.
@@ -233,7 +231,7 @@ os.listdir('example_loading_data/fif_format/subj001_run01')
 
 import mne
 
-raw = mne.io.read_raw_fif("example_loading_data/fif_format/subj001_run01/sflip_parc-raw.fif")
+raw = mne.io.read_raw_fif("example_loading_data/fif_format/sub-001_run-01/sub-001_run-01_sflip_lcmv-parc-raw.fif")
 print(raw.info)
 
 #%%
@@ -241,7 +239,7 @@ print(raw.info)
 
 
 data = Data(
-    "example_loading_data/fif_format/subj001_run01/sflip_parc-raw.fif",
+    "example_loading_data/fif_format/sub-001_run-01/sub-001_run-01_sflip_lcmv-parc-raw.fif",
     picks="misc",
     reject_by_annotation="omit",
 )
@@ -254,7 +252,7 @@ print(data)
 
 
 files =[
-    f"example_loading_data/fif_format/subj{i:03d}_run01/sflip_parc-raw.fif"
+    f"example_loading_data/fif_format/sub-{i:03d}_run-01/sub-{i:03d}_run-01_sflip_lcmv-parc-raw.fif"
     for i in range(1,3)
 ]
 data = Data(files, picks="misc", reject_by_annotation="omit")
