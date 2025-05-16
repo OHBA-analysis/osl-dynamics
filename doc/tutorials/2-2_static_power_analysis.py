@@ -13,7 +13,7 @@ In this tutorial we will perform static power analysis on source space MEG data.
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
+# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
 #
@@ -34,8 +34,8 @@ def get_data(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 70 MB)
-get_data("notts_mrc_meguk_glasser_5_subjects", rename="source_data")
+# Download the dataset (approximately 52 MB)
+get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
 
 #%%
 # Load the data
@@ -127,7 +127,7 @@ group_p = np.mean(p, axis=0)
 fig, ax = power.save(
     group_p,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
 )
 
@@ -137,6 +137,6 @@ fig, ax = power.save(
 fig, ax = power.save(
     p[:4],  # first four
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
 )

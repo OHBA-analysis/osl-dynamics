@@ -12,6 +12,25 @@ In this tutorial we will plot networks from a DyNeMo model trained on source rec
 """
 
 #%%
+# Download post-hoc spectra
+# ^^^^^^^^^^^^^^^^^^^^^^^^^
+# In this tutorial, we'll download example data from `OSF <https://osf.io/by2tc/>`_.
+
+import os
+
+def get_spectra(name, rename):
+    if rename is None:
+        rename = name
+    os.system(f"osf -p by2tc fetch spectra/{name}.zip")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {rename}"
+
+# Download the dataset (approximately 7 MB)
+get_spectra("tde_dynemo_notts_mrc_meguk_giles_5_subjects", rename="results/spectra")
+
+#%%
 # Load regression spectra
 # ^^^^^^^^^^^^^^^^^^^^^^^
 # We calculate the networks based on the regression spectra. Let's load these.
@@ -80,7 +99,7 @@ print(mean_p.shape)
 fig, ax = power.save(
     mean_p,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
     subtract_mean=True,  # just for visualisation
 )
@@ -116,7 +135,7 @@ thres_mean_c = connectivity.threshold(mean_c, percentile=97, subtract_mean=True)
 
 connectivity.save(
     thres_mean_c,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"edge_vmin": 0, "edge_vmax": np.max(thres_mean_c), "edge_cmap": "Reds"},
 )
 
@@ -132,7 +151,7 @@ mean_c_map = connectivity.mean_connections(mean_c)
 fig, ax = power.save(
     mean_c_map,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
     subtract_mean=True,  # just for visualisation
 )

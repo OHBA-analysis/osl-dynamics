@@ -16,7 +16,7 @@ def get_data(name, rename):
     if rename is None:
         rename = name
     if os.path.exists(rename):
-        return f"{name} already downloaded. Skipping.."
+        os.system(f"rm -r {rename}")
     os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")
@@ -24,7 +24,7 @@ def get_data(name, rename):
     return f"Data downloaded to: {rename}"
 
 # Download the dataset (approximately 162 MB)
-get_data("notts_mrc_meguk_glasser_prepared_5_subjects", rename="prepared_data")
+get_data("notts_mrc_meguk_giles_prepared_5_subjects", rename="prepared_data")
 
 #%%
 # Let's also download a model. In this tutorial, we will download a trained HMM, however, this can be subsituted with a DyNeMo model without any other changes being needed.
@@ -32,15 +32,13 @@ get_data("notts_mrc_meguk_glasser_prepared_5_subjects", rename="prepared_data")
 def get_model(name, rename=None):
     if rename is None:
         rename = name
-    if os.path.exists(rename):
-        return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch trained_models/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")
     os.remove(f"{name}.zip")
     return f"Model downloaded to: {rename}"
 
-get_model("tde_hmm_notts_mrc_meguk_glasser", rename="results/model")
+get_model("tde_hmm_notts_mrc_meguk_giles", rename="results/model")
 
 #%%
 # Load Trained Model

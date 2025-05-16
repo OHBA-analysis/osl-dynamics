@@ -13,8 +13,7 @@ In this tutorial we will perform static AEC analysis on source space MEG data. T
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - From 5 subjects.
-# - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
+# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
 #
@@ -35,8 +34,8 @@ def get_data(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 70 MB)
-get_data("notts_mrc_meguk_glasser_5_subjects", rename="source_data")
+# Download the dataset (approximately 52 MB)
+get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
 
 #%%
 # Load the data
@@ -132,7 +131,7 @@ from osl_dynamics.analysis import connectivity
 
 connectivity.save(
     aec[0],
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
 )
 
 #%%
@@ -140,7 +139,7 @@ connectivity.save(
 
 connectivity.save(
     aec[0],
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"edge_vmin": 0, "edge_vmax": 0.4, "edge_cmap": "Reds"},
 )
 
@@ -166,7 +165,7 @@ thres_aec = connectivity.threshold(aec, percentile=95)
 # Plot
 connectivity.save(
     thres_aec[:3],
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"edge_vmin": 0, "edge_vmax": 0.5, "edge_cmap": "Reds"},
 )
 
@@ -186,7 +185,7 @@ thres_group_aec = connectivity.threshold(group_aec, percentile=95)
 # Plot
 connectivity.save(
     thres_group_aec,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"edge_vmin": 0, "edge_vmax": 0.5, "edge_cmap": "Reds"},
 )
 
@@ -196,7 +195,7 @@ connectivity.save(
 # Display the network
 connectivity.save_interactive(
     thres_group_aec,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
 )
 
 #%%
@@ -247,7 +246,7 @@ thres_group_aec = connectivity.threshold(group_aec, percentile=percentile)
 # Display the network
 connectivity.save_interactive(
     thres_group_aec,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"edge_cmap": "Reds", "symmetric_cmap": False},
 )
 
@@ -268,7 +267,7 @@ thres_group_aec = connectivity.threshold(group_aec, percentile=percentile)
 # Display the network
 connectivity.save_interactive(
     thres_group_aec,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"edge_cmap": "Reds", "symmetric_cmap": False},
 )
 

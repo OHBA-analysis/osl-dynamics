@@ -5,7 +5,7 @@ Static: Spectral Analysis
 MEG data is useful because it has a high temporal resolution. We can take advantage of this by examining the spectral (i.e. frequency) content of the data. In this tutorial we will perform static spectral analysis on source space MEG data. This tutorial covers:
 
 1. Getting the data
-2. Calculating spectral for each subject
+2. Calculating spectra for each subject
 """
 
 #%%
@@ -13,7 +13,7 @@ MEG data is useful because it has a high temporal resolution. We can take advant
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
+# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
 #
@@ -34,8 +34,8 @@ def get_data(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 70 MB)
-get_data("notts_mrc_meguk_glasser_5_subjects", rename="source_data")
+# Download the dataset (approximately 52 MB)
+get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
 
 #%%
 # Load the data

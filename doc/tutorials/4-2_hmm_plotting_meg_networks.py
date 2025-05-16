@@ -13,6 +13,25 @@ In this tutorial we will plot networks from an HMM trained on source reconstruct
 """
 
 #%%
+# Download post-hoc spectra
+# ^^^^^^^^^^^^^^^^^^^^^^^^^
+# In this tutorial, we'll download example data from `OSF <https://osf.io/by2tc/>`_.
+
+import os
+
+def get_spectra(name, rename):
+    if rename is None:
+        rename = name
+    os.system(f"osf -p by2tc fetch spectra/{name}.zip")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {rename}"
+
+# Download the dataset (approximately 21 MB)
+get_spectra("tde_hmm_notts_mrc_meguk_giles_5_subjects", rename="results/spectra")
+
+#%%
 # Load multitaper spectra
 # ^^^^^^^^^^^^^^^^^^^^^^^
 # We calculate networks based on multitaper spectra. Let's load these.
@@ -78,7 +97,7 @@ print(p_mean.shape)
 fig, ax = power.save(
     p_mean,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
 )
 
@@ -89,7 +108,7 @@ fig, ax = power.save(
 fig, ax = power.save(
     p_mean,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
     subtract_mean=True,
 )
@@ -127,7 +146,7 @@ print(mean_c.shape)
 mean_c -= np.mean(mean_c, axis=0)
 connectivity.save(
     mean_c,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
 )
 
 #%%
@@ -141,7 +160,7 @@ print(thres_mean_c.shape)
 
 connectivity.save(
     thres_mean_c,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
 )
 
 #%%
@@ -190,7 +209,7 @@ print(thres_mean_c.shape)
 
 connectivity.save(
     thres_mean_c,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     component=0,
 )
 
@@ -204,7 +223,7 @@ mean_c_map = connectivity.mean_connections(mean_c)
 fig, ax = power.save(
     mean_c_map,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
 )
 

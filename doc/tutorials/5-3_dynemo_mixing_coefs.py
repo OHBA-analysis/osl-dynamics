@@ -9,6 +9,26 @@ In this tutorial we analyse DyNeMo mixing coefficients. This tutorial covers:
 """
 
 #%%
+# Download inferred parameters
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+import os
+
+def get_inf_params(name, rename):
+    if rename is None:
+        rename = name
+    if os.path.exists(rename):
+        return f"{name} already downloaded. Skipping.."
+    os.system(f"osf -p by2tc fetch inf_params/{name}.zip")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {rename}"
+
+# Download the dataset (approximately 11 MB)
+get_inf_params("tde_dynemo_notts_mrc_meguk_giles_5_subjects", rename="results/inf_params")
+
+#%%
 # Summarizing the mixing coefficient time course
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Let's start by plotting the mixing coefficients to get a feel for the description provided by DyNeMo. First, we load the inferred mixing coefficients.

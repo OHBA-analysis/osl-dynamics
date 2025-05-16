@@ -13,6 +13,26 @@ In this tutorial we calculate summary statistics for dynamics:
 """
 
 #%%
+# Download inferred parameters
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+import os
+
+def get_inf_params(name, rename):
+    if rename is None:
+        rename = name
+    if os.path.exists(rename):
+        return f"{name} already downloaded. Skipping.."
+    os.system(f"osf -p by2tc fetch inf_params/{name}.zip")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {rename}"
+
+# Download the dataset (approximately 11 MB)
+get_inf_params("tde_hmm_notts_mrc_meguk_giles_5_subjects", rename="results/inf_params")
+
+#%%
 # Load the inferred state probabilities
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # We first need to load the inferred state probabilities to calculate the summary statistics.

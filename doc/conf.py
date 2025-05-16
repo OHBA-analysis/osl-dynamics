@@ -44,7 +44,7 @@ autoapi_dirs = ["../osl_dynamics"]
 sphinx_gallery_conf = {
     "examples_dirs": "tutorials",        # Contains source .py files
     "gallery_dirs": "tutorials_build",   # Where to output rendered gallery
-    "filename_pattern": r".*\.py",       # Include all .py files
+    "filename_pattern": r".*\.py",       # Include all .py files, can specific a particular set tutorials, e.g. r"1-.*\.py" for 1-*.py tutorials
     "run_stale_examples": True,          # Force re-run when building
 }
 

@@ -10,40 +10,44 @@ This tutorial covers how to train an HMM. We will use MEG data in this tutorial,
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed and prepared. This dataset is:
 #
-# - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
+# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
-# - Prepared using 15 time-delay embeddings and 120 PCA components.
+# - Prepared using 15 time-delay embeddings and 80 PCA components.
 #
 # Download the dataset
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
-
-import os
-
-def get_data(name, rename):
-    if rename is None:
-        rename = name
-    if os.path.exists(rename):
-        return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p by2tc fetch data/{name}.zip")
-    os.makedirs(rename, exist_ok=True)
-    os.system(f"unzip -o {name}.zip -d {rename}")
-    os.remove(f"{name}.zip")
-    return f"Data downloaded to: {rename}"
-
-# Download the dataset (approximately 32 MB)
-get_data("notts_mrc_meguk_glasser_prepared_1_subject", rename="prepared_data")
+#
+# .. code-block:: python
+#
+#     import os
+#
+#     def get_data(name, rename):
+#         if rename is None:
+#             rename = name
+#         if os.path.exists(rename):
+#             return f"{name} already downloaded. Skipping.."
+#         os.system(f"osf -p by2tc fetch data/{name}.zip")
+#         os.makedirs(rename, exist_ok=True)
+#         os.system(f"unzip -o {name}.zip -d {rename}")
+#         os.remove(f"{name}.zip")
+#         return f"Data downloaded to: {rename}"
+#
+#     # Download the dataset (approximately 21 MB)
+#     get_data("notts_mrc_meguk_giles_prepared_1_subject", rename="prepared_data")
 
 #%%
 # Load the data
 # *************
 # We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
-
-from osl_dynamics.data import Data
-
-data = Data("prepared_data", n_jobs=4)
-print(data)
+#
+# .. code-block:: python
+#
+#     from osl_dynamics.data import Data
+#
+#     data = Data("prepared_data")
+#     print(data)
 
 #%%
 # Note, we can pass `use_tfrecord=True` when creating the Data object if we are training on large datasets and run into an out of memory error.
@@ -64,7 +68,7 @@ from osl_dynamics.models.hmm import Config
 # Create a config object
 config = Config(
     n_states=6,
-    n_channels=data.n_channels,
+    n_channels=80,
     sequence_length=200,
     learn_means=False,
     learn_covariances=True,
@@ -95,7 +99,6 @@ model.summary()
 # .. code-block:: python
 #
 #     init_history = model.random_state_time_course_initialization(data, n_epochs=1, n_init=3)
-#
 
 #%%
 # The `init_history` variable is `dict` that contains the training history (`rho`, `lr`, `loss`) for the best initialization.
@@ -107,7 +110,6 @@ model.summary()
 # .. code-block:: python
 #
 #     history = model.fit(data)
-#
 
 #%%
 # The `history` variable contains the training history of the `fit` method.
@@ -119,7 +121,6 @@ model.summary()
 # .. code-block:: python
 #
 #     model.save("results/model")
-#
 
 #%%
 # This will automatically create a directory containing the trained model weights and config settings used. Note, should we wish to load the trained model we can use:
@@ -128,8 +129,9 @@ model.summary()
 #
 #     from osl_dynamics.models import load
 #
-#     model = load("trained_model")
-#
+#     model = load("results/model")
+
+#%%
 # It's also useful to save the variational free energy to compare different runs.
 #
 # .. code-block:: python
@@ -139,4 +141,3 @@ model.summary()
 #     free_energy = model.free_energy(data)
 #     history["free_energy"] = free_energy
 #     pickle.dump(history, open("results/model/history.pkl", "wb"))
-#
