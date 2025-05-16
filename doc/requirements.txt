@@ -3,3 +3,16 @@ sphinx-rtd-theme
 sphinx-gallery
 sphinx-autoapi
 pydata-sphinx-theme
+matplotlib
+mne
+nibabel
+nilearn
+numpy
+osfclient
+pandas
+pyyaml
+pqdm
+scipy
+scikit-learn
+seaborn
+tqdm
