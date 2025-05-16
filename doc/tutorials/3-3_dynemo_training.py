@@ -19,7 +19,6 @@ This tutorial covers how to train a DyNeMo model. We will use MEG data in this t
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
 
-
 import os
 
 def get_data(name, rename):
@@ -41,7 +40,6 @@ get_data("notts_mrc_meguk_glasser_prepared_1_subject", rename="prepared_data")
 # *************
 # We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
 
-
 from osl_dynamics.data import Data
 
 data = Data("prepared_data", n_jobs=4)
@@ -60,7 +58,7 @@ print(data)
 # The important hyperparameters to specify are:
 #
 # - `n_modes`, the number of modes. Unfortunately, this is a hyperparameters that must be pre-specified. We advise starting with something between 6-12 and making sure any results based on the DyNeMo are not critically sensitive to the choice for `n_modes`. In this tutorial, we'll use 6 modes.
-# - `sequence_length`. This is a continuous segment that represents one training example. DyNeMo utilises recurrent neural networks (RNNs) which need to be evaluated sequentially. This makes training with very long sequences slow. We advise a sequence length less than 200. 100 has historically been a good option.
+# - `sequence_length`. This is a continuous segment that represents one training example. DyNeMo utilises recurrent neural networks (RNNs) which need to be evaluated sequentially. This makes training with very long sequences slow. We advise a sequence length of 200 or less. 100 is often a good choice.
 # - Inference RNN parameters: `inference_n_units` and `inference_normalization`. This is the number of units/neurons and the normalization used in the RNN used to infer the mixing coefficients respectively. (The inference RNN outputs the posterior distribution). The values below should work well in most cases.
 # - Model RNN: `model_n_units` and `model_normalization`. Same as above but for the model RNN, which is part of the generative model. (The model RNN outputs the prior distribution). The values given below should work well for most cases.
 # - Softmax function parameters: `learn_alpha_temperature` and `initial_alpha_temperature`. The softmax transformation is used to ensure the mode mixing coefficients in DyNeMo are positive and sum to one. This transformation has a 'temperature' parameter that controls how much mixing occurs. We can learn this temperature from the data by specifying `learn_alpha_temperature=True`. We recommend doing this with `initial_alpha_temperature=1.0`.
@@ -71,7 +69,6 @@ print(data)
 # - `n_epochs`, the number of epochs. This is the number of times you loop through the data. We recommend a value between ~50 for small datasets (<50 subjects). For large datasets (100s of subjects) you could train a model with 10 epochs. You can look at the loss as a function of epochs (see below) to see when the model has stopped improving. You can use this as an indicator for when you can stop training.
 #
 # In general, you can use the final loss value (lower is better) to select a good set of hyperparameters. Note, we want to compare the full loss function (after the KL term has fully turned on), so you should only use the loss after `n_kl_annealing_epochs` of training have been performed.
-
 
 from osl_dynamics.models.dynemo import Config
 
@@ -96,12 +93,10 @@ config = Config(
     n_epochs=20,
 )
 
-
 #%%
 # Building the model
 # ******************
 # With the Config object, we can build a model.
-
 
 from osl_dynamics.models.dynemo import Model
 

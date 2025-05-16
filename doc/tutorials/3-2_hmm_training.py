@@ -19,7 +19,6 @@ This tutorial covers how to train an HMM. We will use MEG data in this tutorial,
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
 
-
 import os
 
 def get_data(name, rename):
@@ -41,7 +40,6 @@ get_data("notts_mrc_meguk_glasser_prepared_1_subject", rename="prepared_data")
 # *************
 # We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
 
-
 from osl_dynamics.data import Data
 
 data = Data("prepared_data", n_jobs=4)
@@ -61,7 +59,6 @@ print(data)
 #
 # The `sequence_length` and `batch_size` can be chosen to ensure the model fits into memory.
 
-
 from osl_dynamics.models.hmm import Config
 
 # Create a config object
@@ -80,7 +77,6 @@ config = Config(
 # Building the model
 # ******************
 # With the Config object, we can build a model.
-
 
 from osl_dynamics.models.hmm import Model
 

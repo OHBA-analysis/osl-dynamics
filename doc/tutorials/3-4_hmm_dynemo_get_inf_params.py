@@ -29,7 +29,6 @@ get_data("notts_mrc_meguk_glasser_prepared_5_subjects", rename="prepared_data")
 #%%
 # Let's also download a model. In this tutorial, we will download a trained HMM, however, this can be subsituted with a DyNeMo model without any other changes being needed.
 
-
 def get_model(name, rename=None):
     if rename is None:
         rename = name
@@ -61,7 +60,6 @@ model = load("results/model")
 # Both the HMM and DyNeMo refer to the latent variable as `alpha`. In the HMM, `alpha` corresponds to the state probability time courses, and in DyNeMo, `alpha` corresponds to the mixing coefficient time courses. We can get these using the `get_alpha` method by passing the (prepared) training data.
 #
 # Let's first load the training data.
-
 
 from osl_dynamics.data import Data
 

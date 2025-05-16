@@ -13,7 +13,6 @@ In this tutorial we will perform static power analysis on source space MEG data.
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - From 5 subjects.
 # - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
@@ -21,7 +20,6 @@ In this tutorial we will perform static power analysis on source space MEG data.
 # Download the dataset
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
-
 
 import os
 
@@ -44,7 +42,6 @@ get_data("notts_mrc_meguk_glasser_5_subjects", rename="source_data")
 # ^^^^^^^^^^^^^
 # We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
 
-
 from osl_dynamics.data import Data
 
 data = Data("source_data", n_jobs=4)
@@ -52,7 +49,6 @@ print(data)
 
 #%%
 # For static analysis we just need the time series for the parcellated data. We can access this using the `time_series` method.
-
 
 ts = data.time_series()
 
@@ -62,7 +58,6 @@ ts = data.time_series()
 # Calculate spectra
 # ^^^^^^^^^^^^^^^^^
 # First, we calculate the subject-specific power spectra. See the Static Power Spectra Analysis tutorial for more comprehensive description of power spectra analysis.
-
 
 import numpy as np
 from osl_dynamics.analysis import static
@@ -85,13 +80,11 @@ np.save("spectra/psd.npy", psd)
 # ^^^^^^^^^^^^^^^
 # Let's first load the power spectra we previously calculated.
 
-
 f = np.load("spectra/f.npy")
 psd = np.load("spectra/psd.npy")
 
 #%%
 # To understand these arrays it's useful to print their shape:
-
 
 print(f.shape)
 print(psd.shape)
@@ -110,7 +103,6 @@ print(psd.shape)
 #
 # osl-dynamics has a `analysis.power.variance_from_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.variance_from_spectra>`_ function to calculate power from a spectrum. Let's use this function to calculate power for the alpha band.
 
-
 from osl_dynamics.analysis import power
 
 # Calculate power in the alpha band (8-12 Hz) from the spectra
@@ -121,7 +113,6 @@ p = power.variance_from_spectra(f, psd, frequency_range=[7, 13])
 #
 # We can print the shape of the `p` array to help understand what is contained within it.
 
-
 print(p.shape)
 
 #%%
@@ -130,7 +121,6 @@ print(p.shape)
 # Plot power maps
 # ^^^^^^^^^^^^^^^
 # We can use `power.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_ to visualise the power maps. Let's plot the group average.
-
 
 group_p = np.mean(p, axis=0)
 
@@ -143,7 +133,6 @@ fig, ax = power.save(
 
 #%%
 # Or we can plot power maps for individual subjects, e.g.
-
 
 fig, ax = power.save(
     p[:4],  # first four

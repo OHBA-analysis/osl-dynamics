@@ -6,8 +6,6 @@ In this tutorial we analyse DyNeMo mixing coefficients. This tutorial covers:
 
 1. Summarizing the mixing coefficient time course
 2. Binarizing the mixing coefficeint time course
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/zktn6>`_ for the expected output.
 """
 
 #%%
@@ -15,14 +13,12 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Let's start by plotting the mixing coefficients to get a feel for the description provided by DyNeMo. First, we load the inferred mixing coefficients.
 
-
 import pickle
 
 alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
 
 #%%
 # We can use the `utils.plotting.plot_alpha <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_ to plot the mixing coefficients.
-
 
 from osl_dynamics.utils import plotting
 
@@ -35,7 +31,6 @@ fig, ax = plotting.plot_alpha(alpha[0], n_samples=2000)
 # Normalizing the mixing coefficients
 # ***********************************
 # To account for the difference in mode covariances we can renormalise the mixing coefficients include the 'size' of the mode covariances.
-
 
 import numpy as np
 from osl_dynamics.inference import modes
@@ -56,7 +51,6 @@ fig, ax = plotting.plot_alpha(norm_alpha[0], n_samples=2000)
 # ******************
 # An analogous summary measure to the Hidden Markov Model's (HMM's) fractional occupancy is the time average mixing coefficient. This is the average contribution a mode makes to the total covariance. Let's calculate this for each subject.
 
-
 mean_norm_alpha = np.array([np.mean(a, axis=0) for a in norm_alpha])
 
 # Print group average
@@ -70,7 +64,6 @@ fig, ax = plotting.plot_violin(mean_norm_alpha.T, x_label="Mode", y_label="Mean 
 #
 # Another summary measure we could calculate for each subject is the standard deviation of the mixing coefficient time course, which can be a measure for how variable the mixing of each modes is.
 
-
 std_norm_alpha = np.array([np.std(a, axis=0) for a in norm_alpha])
 
 # Print group average
@@ -81,7 +74,6 @@ fig, ax = plotting.plot_violin(std_norm_alpha.T, x_label="Mode", y_label="Std al
 
 #%%
 # Another summary statistic is the kurtosis, which reflects spiking the in mixing coefficient time course.
-
 
 from scipy import stats
 
@@ -109,7 +101,6 @@ fig, ax = plotting.plot_violin(kurt_norm_alpha.T, x_label="Mode", y_label="Kurt.
 # ********************
 # We can use the `inference.modes.argmax_time_courses <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.argmax_time_courses>`_ function to calculate a mutually exclusive mode activation time course.
 
-
 from osl_dynamics.inference import modes
 
 # Use the mode with the largest value to define mode activations
@@ -118,10 +109,8 @@ atc = modes.argmax_time_courses(norm_alpha)
 # Plot the mode activation time course for the first subject (first 8 seconds)
 fig, ax = plotting.plot_alpha(atc[0], n_samples=2000)
 
-
 #%%
 # With the mode activation time course we can calculate the usual HMM summary statistics like fractional occupancy.
-
 
 fo = modes.fractional_occupancies(atc)
 
@@ -134,7 +123,6 @@ print(np.round(np.mean(fo, axis=0), 2))
 # Binarize with a percentile threshold
 # ************************************
 # Next, let's first specify a threshold by hand. Looking at the distribution of mixing coefficients could help us evaluate a good threshold.
-
 
 import matplotlib.pyplot as plt
 
@@ -154,12 +142,10 @@ plot_hist(concat_norm_alpha, x_label="Normalized mixing coefficients")
 #%%
 # We see the distribution of each mode's mixing coefficients has a long tail. We're interested in picking out the time points when the mixing coefficients take values in the long tail. We also see the appropriate threshold for each mode is very different. Let's use the 90th percentile to determine the threshold of each mode.
 
-
 thres = np.array([np.percentile(a, 90, axis=0) for a in norm_alpha])
 
 #%%
 # We see the threshold varies a lot across the subjects. Now we have the threshold, let's binarize.
-
 
 # Binarize the mixing coefficients
 thres_norm_alpha = []
@@ -174,7 +160,6 @@ fig, ax = plotting.plot_separate_time_series(thres_norm_alpha[0], n_samples=2000
 #%%
 # When we threshold using a percentile with the group concatenated data, by definition the fractional occupancy equals the percentile.
 
-
 fo = modes.fractional_occupancies(thres_norm_alpha)
 
 # Print group average
@@ -182,7 +167,6 @@ print(np.mean(fo, axis=0))
 
 #%%
 # We see the fractional occupancy for each subject and state is 0.1, which corresponds to the segments with normalised alpha values in the top 10%. In contrast, the lifetimes are interpretable.
-
 
 mlt = modes.mean_lifetimes(thres_norm_alpha, sampling_frequency=250)
 
@@ -195,7 +179,6 @@ print(np.mean(mlt, axis=0) * 1000)  # in ms
 # Binarize with a GMM threshold
 # *****************************
 # An aternative approach is to use a two-component GMM to identify an on and off component. This involves fitting the two-component GMM to the distribution of mixing coefficients. We can do this with the `inference.modes.gmm_time_courses <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.gmm_time_courses>`_ function in osl-dynamics.
-
 
 # Binarize the mixing coefficients using a GMM
 thres_norm_alpha = modes.gmm_time_courses(norm_alpha)

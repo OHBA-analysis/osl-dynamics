@@ -18,7 +18,6 @@ fMRI data needs to be preprocessed in a particular way to train a dynamic networ
 #
 # The first step is to load the group-ICA (source) time courses into osl-dynamics using the Data object, see the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details. In this tutorial, we will simulate some random data (for 2 subjects). You should substitute this with your preprocessed fMRI data.
 
-
 import numpy as np
 from osl_dynamics.data import Data
 
@@ -30,7 +29,6 @@ print(data)
 #%%
 # To prepare the data, all we need to do is standardize it. Let's use the `Data.prepare` method to do this.
 
-
 data.prepare({"standardize": {}})
 
 #%%
@@ -39,7 +37,6 @@ data.prepare({"standardize": {}})
 # Anatomically parcellated data
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Alternatively, if you have defined regions of interest (ROIs) using an anatomical parcellation and loaded these into osl-dynamics instead of the group-ICA time courses, it is important to apply PCA to infer good dynamics (state switching). Below we apply a full rank PCA to the data.
-
 
 data.prepare({
     "pca": {"n_pca_components": data.n_channels},
@@ -56,9 +53,7 @@ data.prepare({
 # ********************
 # For large datasets, preparing the data can sometimes be time consuming. In this case it is useful to save the data after preparing it. Then we can just load the prepared data before training a model. To save prepared data we can use the `save` method. We simply need to pass the output directory to write the data to.
 
-
 data.save("prepared_data")
-
 
 #%%
 # This method has created a directory called `prepared_data`. Let's list its contents.
@@ -73,7 +68,6 @@ os.listdir('prepared_data')
 # Loading prepared data
 # *********************
 # We can load the prepared data by simply passing the path to the directory to the Data class.
-
 
 data = Data("prepared_data")
 print(data)
