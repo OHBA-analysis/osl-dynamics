@@ -9,8 +9,6 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 3. Loading Data in NumPy Format
 4. Loading Data in MATLAB Format
 5. Loading Data in fif Format
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/dvfku>`_ for the expected output.
 """
 
 #%%
@@ -44,7 +42,6 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/zxb6c/>`_.
 
-
 import os
 
 def get_data(name):
@@ -55,7 +52,7 @@ def get_data(name):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {name}"
 
-# Download the dataset (approximately 88 MB)
+# Download the dataset (approximately 6 MB)
 get_data("example_loading_data")
 
 # List the contents of the downloaded directory containing the dataset
@@ -75,24 +72,21 @@ os.listdir("example_loading_data")
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Let's first list the `example_loading_data/numpy_format` directory.
 
-
 os.listdir("example_loading_data/numpy_format")
 
 #%%
 # We can see there's two numpy files. These files contain 2D numpy array data. It is in time by channels format. If we wanted to load this data using the numpy package, we could do:
 
-
 import numpy as np
 
 # Just load one of the files
-X = np.load("example_loading_data/numpy_format/subject0.npy")
+X = np.load("example_loading_data/numpy_format/array0.npy")
 print(X.shape)
 
 #%%
 # Importing a numpy array directly
 # ********************************
 # If we have already loaded a numpy array and just want to create an `osl_dynamics.data.Data` object, we can simply pass it to the class:
-
 
 from osl_dynamics.data import Data
 
@@ -102,10 +96,9 @@ print(data)
 #%%
 # We normally like to keep the data for each subject separate. If we had multiple 2D numpy arrays (one for each subject), we can collate them into a python list and pass that to the Data class:
 
-
 # Load numpy files
-X0 = np.load("example_loading_data/numpy_format/subject0.npy")
-X1 = np.load("example_loading_data/numpy_format/subject1.npy")
+X0 = np.load("example_loading_data/numpy_format/array0.npy")
+X1 = np.load("example_loading_data/numpy_format/array1.npy")
 
 # Collate into a list
 X = [X0, X1]
@@ -119,14 +112,12 @@ print(data)
 # *****************
 # Rather than loading the data into memory then creating a Data object, we could load the data directly from the file.
 
-
 # Just load one of the files
-data = Data("example_loading_data/numpy_format/subject0.npy")
+data = Data("example_loading_data/numpy_format/array0.npy")
 print(data)
 
 #%%
 # We can see the data loaded matches the array shape when we loaded it using numpy. To access the 2D numpy array we can use the `time_series()` method.
-
 
 ts = data.time_series()
 print(ts.shape)
@@ -134,21 +125,18 @@ print(ts.shape)
 #%%
 # Normally, we would want to load the data for multiple subjects. We could do this in two ways if the data is in numpy format (i.e. `.npy`). We could pass a list of file paths:
 
-
-files = [f"example_loading_data/numpy_format/subject{i}.npy" for i in [0, 1]]
+files = [f"example_loading_data/numpy_format/array{i}.npy" for i in [0, 1]]
 data = Data(files)
 print(data)
 
 #%%
 # or just pass the path to the directory containing the `.npy` files:
 
-
 data = Data("example_loading_data/numpy_format")
 print(data)
 
 #%%
 # Note, when we have multiple subjects, if we call the `time_series()` method, we will now get a list of numpy arrays. Each item in the list is the data for each subject.
-
 
 ts = data.time_series()
 print(len(ts))
@@ -166,12 +154,10 @@ print(ts[1].shape)
 #
 # Let first see what files we have in the `example_loading_data/matlab_format` directory.
 
-
 os.listdir("example_loading_data/matlab_format")
 
 #%%
 # Let's load the first subject's data using standard python function.
-
 
 from scipy.io import loadmat
 
@@ -182,7 +168,6 @@ print(mat)
 #%%
 # We can see the `loadmat` function returns a python dict. We can list the fields using:
 
-
 mat.keys()
 
 #%%
@@ -192,13 +177,11 @@ mat.keys()
 # ***************************************
 # We can pass the numpy array contained in the `X` field of the dictionary directly to the Data class:
 
-
 data = Data(mat["X"])
 print(data)
 
 #%%
 # However, we would prefer to load the data directly from the file. We can do this by passing the file path to the `.mat` file and the `data_field` argument to the Data class.
-
 
 data = Data("example_loading_data/matlab_format/subject0.mat", data_field="X")
 print(data)
@@ -208,7 +191,6 @@ print(data)
 #
 # If we wanted to load multiple data files in MATLAB format we would need to pass a list of file paths.
 
-
 files = [f"example_loading_data/matlab_format/subject{i}.mat" for i in [0, 1]]
 data = Data(files)
 print(data)
@@ -216,32 +198,28 @@ print(data)
 #%%
 # Loading fif files
 # *****************
-# Another data format that can be loaded with the Data class is fif files. This format is commonly used in `MNE-Python <https://mne.tools/stable/index.html>`_ and is the data format used in `OSL <https://github.com/OHBA-analysis/osl>`_. Here, we will load source reconstruct (parcellated) data created with OSL. In OSL, we often have a separate directory for each subject. The `fif_format` directory contains two directories for different subjects.
-
+# Another data format that can be loaded with the Data class is fif files. This format is commonly used in `MNE-Python <https://mne.tools/stable/index.html>`_ and is the data format used in `osl-ephys <https://github.com/OHBA-analysis/osl-ephys>`_. Here, we will load source reconstruct (parcellated) data created with osl-ephys. In osl-ephys, we often have a separate directory for each subject. The `fif_format` directory contains two directories for different subjects.
 
 os.listdir('example_loading_data/fif_format')
 
 #%%
-# Let's see what's inside `subj001_run01`.
+# Let's see what's inside `sub-001_run-01`.
 
-
-os.listdir('example_loading_data/fif_format/subj001_run01')
+os.listdir('example_loading_data/fif_format/sub-001_run-01')
 
 #%%
 # We have a fif file which contains the data for this subject. We could load this with MNE.
 
-
 import mne
 
-raw = mne.io.read_raw_fif("example_loading_data/fif_format/subj001_run01/sflip_parc-raw.fif")
+raw = mne.io.read_raw_fif("example_loading_data/fif_format/sub-001_run-01/sub-001_run-01_sflip_lcmv-parc-raw.fif")
 print(raw.info)
 
 #%%
 # We can see this particular fif file contains 38 `misc` channels and 3 `stim` channels. We're interested in the `misc` channels. Let's load these into the Data class.
 
-
 data = Data(
-    "example_loading_data/fif_format/subj001_run01/sflip_parc-raw.fif",
+    "example_loading_data/fif_format/sub-001_run-01/sub-001_run-01_sflip_lcmv-parc-raw.fif",
     picks="misc",
     reject_by_annotation="omit",
 )
@@ -252,9 +230,8 @@ print(data)
 #
 # To load multiple subjects we can do:
 
-
 files =[
-    f"example_loading_data/fif_format/subj{i:03d}_run01/sflip_parc-raw.fif"
+    f"example_loading_data/fif_format/sub-{i:03d}_run-01/sub-{i:03d}_run-01_sflip_lcmv-parc-raw.fif"
     for i in range(1,3)
 ]
 data = Data(files, picks="misc", reject_by_annotation="omit")

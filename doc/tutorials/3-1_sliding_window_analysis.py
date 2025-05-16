@@ -9,8 +9,6 @@ This tutorial covers:
 1. Getting the Data
 2. Estimating Networks using a Sliding Window
 3. Clustering the Networks
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/bkn32>`_ for the expected output.
 """
 
 #%%
@@ -18,15 +16,13 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - From 51 subjects.
-# - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
+# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
 #
 # Download the dataset
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
-
 
 import os
 
@@ -41,14 +37,13 @@ def get_data(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 720 GB)
-get_data("notts_mrc_meguk_glasser", rename="source_data")
+# Download the dataset (approximately 70 MB)
+get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
 
 #%%
 # Load the data
 # *************
 # We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
-
 
 from osl_dynamics.data import Data
 
@@ -59,7 +54,6 @@ print(data)
 
 #%%
 # For the sliding window analysis we just need the time series for the parcellated data. We can access this using the `time_series` method.
-
 
 ts = data.time_series()
 
@@ -84,7 +78,6 @@ ts = data.time_series()
 # *********************************************************
 # Now that we have loaded the data we want to study, let's estimate sliding window networks. The first thing we need to do is choose the the metric for connectivity we will use. In this tutorial we're use the absolute value of the Pearson correlation of the source space time series. osl-dynamics has a function for calculating sliding window networks: `analysis.connectivity.sliding_window_connectivity <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.sliding_window_connectivity>`_. Let's use this function to calculate dynamics networks.
 
-
 from osl_dynamics.analysis import connectivity
 
 # Calculate the sliding window connectivity
@@ -92,7 +85,6 @@ swc = connectivity.sliding_window_connectivity(ts, window_length=100, step_size=
 
 #%%
 # `swc` is a list of numpy arrays. Each subject has its own numpy array which is a series of connectivity matrices. Let's concatenate these to give one time series and take the absolute value.
-
 
 import numpy as np
 
@@ -104,10 +96,9 @@ print(swc_concat.shape)
 #%%
 # We can see there are a total of 14,520 windows we calculated networks for. Let's plot the first few networks. We can use the `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ function to do this.
 
-
 connectivity.save(
     swc_concat[:5],
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     threshold=0.95,  # only display the top 5% of connections
 )
 
@@ -123,7 +114,6 @@ connectivity.save(
 #
 # First, let's initiate a K-means object. When we do this we need to specify the number of clusters. We will use 6.
 
-
 from sklearn.cluster import KMeans
 
 # Initiate the K-means class
@@ -131,7 +121,6 @@ kmeans = KMeans(n_clusters=6, n_init="auto", verbose=0)
 
 #%%
 # Next, we need to prepare the input for the K-means algorithm. It requires a set of vectors, which is stored as a 2D numpy array. To convert our connectivity matrices to vectors, we will simply take the upper right triangle. We can do this because we know correlation matrices are symmetric.
-
 
 # Get indices that correspond to an upper triangle of a matrix
 # (not including the diagonal)
@@ -144,7 +133,6 @@ swc_vectors = swc_concat[:, i, j]
 #%%
 # We can check this worked by printing the shape of the `swc_vectors` array.
 
-
 print(swc_vectors.shape)
 
 #%%
@@ -152,12 +140,10 @@ print(swc_vectors.shape)
 #
 # Now we can train the Kmeans algorithm using the `fit` method.
 
-
 kmeans.fit(swc_vectors)
 
 #%%
 # We can access the cluster centroids using the `cluster_centers_` attribute. Let's see what this gives and print the shape to double check it's what we expected.
-
 
 centroids = kmeans.cluster_centers_
 print(centroids.shape)
@@ -166,7 +152,6 @@ print(centroids.shape)
 # We see the first dimension is the number of clusters and the second dimension is the length of the input vectors, which is what we expect.
 #
 # Now, we just need to put the vectors back into ROIs by ROIs form and then we can visualise them as networks.
-
 
 n_clusters = centroids.shape[0]
 n_channels = data.n_channels
@@ -179,10 +164,9 @@ kmean_networks[:, j, i] = centroids
 #%%
 # Finally, let's display the Kmeans networks using glass brain plots.
 
-
 connectivity.save(
     kmean_networks,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     threshold=0.95,  # only display the top 5% of connections
 )
 

@@ -10,43 +10,44 @@ This tutorial covers how to train a DyNeMo model. We will use MEG data in this t
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed and prepared. This dataset is:
 #
-# - From 51 subjects.
-# - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
+# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
-# - Prepared using 15 time-delay embeddings and 120 PCA components.
+# - Prepared using 15 time-delay embeddings and 80 PCA components.
 #
 # Download the dataset
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
-
-
-import os
-
-def get_data(name, rename):
-    if rename is None:
-        rename = name
-    if os.path.exists(name):
-        return f"{name} already downloaded. Skipping.."
-    os.system(f"osf -p by2tc fetch data/{name}.zip")
-    os.makedirs(rename, exist_ok=True)
-    os.system(f"unzip -o {name}.zip -d {name}")
-    os.remove(f"{name}.zip")
-    return f"Data downloaded to: {name}"
-
-# Download the dataset (approximately 1.7 GB)
-get_data("notts_mrc_meguk_glasser_prepared", rename="prepared_data")
+#
+# .. code-block:: python
+#
+#     import os
+#
+#     def get_data(name, rename):
+#         if rename is None:
+#             rename = name
+#         if os.path.exists(rename):
+#             return f"{name} already downloaded. Skipping.."
+#         os.system(f"osf -p by2tc fetch data/{name}.zip")
+#         os.makedirs(rename, exist_ok=True)
+#         os.system(f"unzip -o {name}.zip -d {rename}")
+#         os.remove(f"{name}.zip")
+#         return f"Data downloaded to: {rename}"
+#
+#     # Download the dataset (approximately 21 MB)
+#     get_data("notts_mrc_meguk_giles_prepared_1_subject", rename="prepared_data")
 
 #%%
 # Load the data
 # *************
 # We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
-
-
-from osl_dynamics.data import Data
-
-data = Data("prepared_data", n_jobs=4)
-print(data)
+#
+# .. code-block:: python
+#
+#     from osl_dynamics.data import Data
+#
+#     data = Data("prepared_data")
+#     print(data)
 
 #%%
 # Note, we can pass `use_tfrecord=True` when creating the Data object if we are training on large datasets and run into an out of memory error.
@@ -61,7 +62,7 @@ print(data)
 # The important hyperparameters to specify are:
 #
 # - `n_modes`, the number of modes. Unfortunately, this is a hyperparameters that must be pre-specified. We advise starting with something between 6-12 and making sure any results based on the DyNeMo are not critically sensitive to the choice for `n_modes`. In this tutorial, we'll use 6 modes.
-# - `sequence_length`. This is a continuous segment that represents one training example. DyNeMo utilises recurrent neural networks (RNNs) which need to be evaluated sequentially. This makes training with very long sequences slow. We advise a sequence length less than 200. 100 has historically been a good option.
+# - `sequence_length`. This is a continuous segment that represents one training example. DyNeMo utilises recurrent neural networks (RNNs) which need to be evaluated sequentially. This makes training with very long sequences slow. We advise a sequence length of 200 or less. 100 is often a good choice.
 # - Inference RNN parameters: `inference_n_units` and `inference_normalization`. This is the number of units/neurons and the normalization used in the RNN used to infer the mixing coefficients respectively. (The inference RNN outputs the posterior distribution). The values below should work well in most cases.
 # - Model RNN: `model_n_units` and `model_normalization`. Same as above but for the model RNN, which is part of the generative model. (The model RNN outputs the prior distribution). The values given below should work well for most cases.
 # - Softmax function parameters: `learn_alpha_temperature` and `initial_alpha_temperature`. The softmax transformation is used to ensure the mode mixing coefficients in DyNeMo are positive and sum to one. This transformation has a 'temperature' parameter that controls how much mixing occurs. We can learn this temperature from the data by specifying `learn_alpha_temperature=True`. We recommend doing this with `initial_alpha_temperature=1.0`.
@@ -73,12 +74,11 @@ print(data)
 #
 # In general, you can use the final loss value (lower is better) to select a good set of hyperparameters. Note, we want to compare the full loss function (after the KL term has fully turned on), so you should only use the loss after `n_kl_annealing_epochs` of training have been performed.
 
-
 from osl_dynamics.models.dynemo import Config
 
 config = Config(
     n_modes=6,
-    n_channels=data.n_channels,
+    n_channels=80,
     sequence_length=100,
     inference_n_units=64,
     inference_normalization="layer",
@@ -97,12 +97,10 @@ config = Config(
     n_epochs=20,
 )
 
-
 #%%
 # Building the model
 # ******************
 # With the Config object, we can build a model.
-
 
 from osl_dynamics.models.dynemo import Model
 
@@ -117,9 +115,10 @@ model.summary()
 # **Initialization**
 #
 # When training a model it often helps to start with a good initialization. In particular, starting with a good initial value for the mode means/covariances helps find a good solution. The `dynemo.Model <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/dynemo/index.html#osl_dynamics.models.dynemo.Model>`_ class has the `random_subset_initialization` method that can be used for this. This method train the model for a short period on a small random subset of the data. Let's use this method to initialize the model.
-
-
-init_history = model.random_subset_initialization(data, n_epochs=1, n_init=3, take=0.2)
+#
+# .. code-block:: python
+#
+#     init_history = model.random_subset_initialization(data, n_epochs=2, n_init=5, take=0.25)
 
 #%%
 # The `init_history` variable is `dict` that contains the training history (`rho`, `lr`, `loss`) for the best initialization.
@@ -127,9 +126,10 @@ init_history = model.random_subset_initialization(data, n_epochs=1, n_init=3, ta
 # **Full training**
 #
 # Now, we have found a good initialization, let's do the full training of the model. We do this using the `fit` method.
-
-
-history = model.fit(data)
+#
+# .. code-block:: python
+#
+#     history = model.fit(data)
 
 #%%
 # The `history` variable contains the training history of the `fit` method.
@@ -137,25 +137,27 @@ history = model.fit(data)
 # Saving a trained model
 # **********************
 # As we have just seen, training a model can be time consuming. Therefore, it is often useful to save a trained model so we can load it later. We can do this with the `save` method.
-
-
-model.save("results/model")
+#
+# .. code-block:: python
+#
+#     model.save("results/model")
 
 #%%
-# This will automatically create a directory containing the trained model weights and config settings used. Note, should we wish to load the trained model we can use::
+# This will automatically create a directory containing the trained model weights and config settings used. Note, should we wish to load the trained model we can use:
+#
+# .. code-block:: python
 #
 #     from osl_dynamics.models import load
 #
 #     model = load("results/model")
-#
+
+#%%
 # It's also useful to save the variational free energy to compare different runs.
-
-
-import pickle
-
-free_energy = model.free_energy(data)
-
-history["free_energy"] = free_energy
-
-pickle.dump(history, open("results/model/history.pkl", "wb"))
-
+#
+# .. code-block:: python
+#
+#     import pickle
+#
+#     free_energy = model.free_energy(data)
+#     history["free_energy"] = free_energy
+#     pickle.dump(history, open("results/model/history.pkl", "wb"))

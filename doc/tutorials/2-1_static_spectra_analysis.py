@@ -5,9 +5,7 @@ Static: Spectral Analysis
 MEG data is useful because it has a high temporal resolution. We can take advantage of this by examining the spectral (i.e. frequency) content of the data. In this tutorial we will perform static spectral analysis on source space MEG data. This tutorial covers:
 
 1. Getting the data
-2. Calculating spectral for each subject
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/d9jpu>`_ for the expected output.
+2. Calculating spectra for each subject
 """
 
 #%%
@@ -15,15 +13,13 @@ Note, this webpage does not contain the output of running each cell. See `OSF <h
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - From 51 subjects.
-# - Parcellated to 52 regions of interest (ROI). The parcellation file used was `Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz`.
+# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
 #
 # Download the dataset
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
-
 
 import os
 
@@ -38,14 +34,13 @@ def get_data(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 720 GB)
-get_data("notts_mrc_meguk_glasser", rename="source_data")
+# Download the dataset (approximately 52 MB)
+get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
 
 #%%
 # Load the data
 # *************
 # We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
-
 
 from osl_dynamics.data import Data
 
@@ -54,7 +49,6 @@ print(data)
 
 #%%
 # For static analysis we just need the time series for the parcellated data. We can access this using the `time_series` method.
-
 
 ts = data.time_series()
 
@@ -78,7 +72,6 @@ ts = data.time_series()
 #
 # - `standardize`. This will z-transform the data (for each subejct separately) before calculate the power spectra. This can be helpful if you want to examine power the fraction of power in a frequency band relative to the total power (across all frequencies) of the subject.
 
-
 from osl_dynamics.analysis import static
 
 f, psd = static.welch_spectra(
@@ -93,7 +86,6 @@ f, psd = static.welch_spectra(
 #
 # Calculating power spectra can be time consuming. We will want to use the power spectra many times to make different plots. We don't want to have to calculate them repeatedly, so often it is convinent to save the `f` and `p` numpy arrays so we can load them later (instead of calculating them again). Let's save the spectra.
 
-
 import numpy as np
 
 os.makedirs("spectra", exist_ok=True)
@@ -105,22 +97,19 @@ np.save("spectra/psd.npy", psd)
 # **********************
 # Let's first load the power spectra we previously calculated.
 
-
 f = np.load("spectra/f.npy")
 psd = np.load("spectra/psd.npy")
 
 #%%
 # To understand these arrays it's useful to print their shape:
 
-
 print(f.shape)
 print(psd.shape)
 
 #%%
-# We can see `f` is a 1D numpy array of length 256. This is the frequency axis of the power spectra. We can see `psd` is a subjects by channels (ROIs) by frequency array. E.g. `psd[0]` is a `(52, 256)` shaped array containing the power spectra for each of the 52 ROIs.
+# We can see `f` is a 1D numpy array of length 256. This is the frequency axis of the power spectra. We can see `psd` is a subjects by channels (ROIs) by frequency array. E.g. `psd[0]` is a `(38, 256)` shaped array containing the power spectra for each of the 38 ROIs.
 #
 # Let's plot the power spectrum for each ROI for the first subject. We will use the `osl_dynamics.utils.plotting <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html>`_ module to do the basic plotting. See the Plotting tutorial for further info.
-
 
 from osl_dynamics.utils import plotting
 
@@ -134,7 +123,6 @@ fig, ax = plotting.plot_line(
 #%%
 # Each line in this plot is a ROI. We can see there's a lot of activity in the 1-20 Hz range. Let's zoom into the 1-45 Hz range.
 
-
 fig, ax = plotting.plot_line(
     [f] * psd.shape[1],
     psd[0],
@@ -147,7 +135,6 @@ fig, ax = plotting.plot_line(
 # Note, if you wanted to save this as an image you could pass a `filename="<filename>.png"` argument to this function. All functions in `osl_dynamics.utils.plotting <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html>`_ have this argument.
 #
 # Rather than plotting the power spectrum for each ROI, let's average over channels to give a single line for each subject.
-
 
 # Average over channels
 psd_mean = np.mean(psd, axis=1)
@@ -164,7 +151,6 @@ fig, ax = plotting.plot_line(
 #%%
 # We can add a shaded area around the solid line to give an idea of the variability around the mean.
 
-
 # Standard deviation around the mean
 psd_std = np.std(psd, axis=1)
 
@@ -180,7 +166,6 @@ fig, ax = plotting.plot_line(
 
 #%%
 # Finally, let's plot the average power spectrum for each subject in the same figure.
-
 
 fig, ax = plotting.plot_line(
     [f] * psd.shape[0],

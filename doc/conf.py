@@ -13,14 +13,12 @@ import os
 import shutil
 import sys
 
-__location__ = os.path.join(
-    os.getcwd(), os.path.dirname(inspect.getfile(inspect.currentframe()))
-)
+from sphinx_gallery.sorting import FileNameSortKey
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.join(__location__, "../osl_dynamics"))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # -- General configuration -----------------------------------------------------
 
@@ -42,8 +40,11 @@ extensions = [
 autoapi_dirs = ["../osl_dynamics"]
 
 sphinx_gallery_conf = {
-    "examples_dirs": "tutorials",  # path to your example (tutorial) scripts
-    "gallery_dirs": "tutorials_build",  # path to where to save gallery generated output
+    "examples_dirs": "tutorials",        # Contains source .py files
+    "gallery_dirs": "tutorials_build",   # Where to output rendered gallery
+    "filename_pattern": r".*\.py",       # Include all .py files, can specific a particular set tutorials, e.g. r"1-.*\.py" for 1-*.py tutorials
+    "run_stale_examples": True,          # Force re-run when building
+    "within_subsection_order": FileNameSortKey,  # Build in alphabetical order of the filenames
 }
 
 # The suffix of source filenames.

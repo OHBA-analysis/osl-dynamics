@@ -3,13 +3,10 @@ Time-Delay Embedding
 ====================
 
 In this tutorial we will explore the impact of different settings for time-delay embedding (`n_embeddings`) and the number of principal component analysis (PCA) components (`n_pca_components`).
-
-Note, this webpage does not contain the output of running each cell. See `OSF <https://osf.io/z65tn>`_ for the expected output.
 """
 
 #%%
 # Time-delay embedding (TDE) is a process of augmenting a time series with extra channels. These extra channels are time-lagged versions of the original channels. We do this to add extra entries to the covariance matrix of the data which are sensitive to the frequency of oscillations in the data. To understand this better, let's simulate some sinusoidal data.
-
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -44,7 +41,6 @@ plt.tight_layout()
 #%%
 # Let's plot the covariance of this data.
 
-
 cov = np.cov(x)
 
 plt.matshow(cov)
@@ -52,7 +48,6 @@ plt.colorbar()
 
 #%%
 # The covariance here is a 3x3 matrix because we have 3 channels. The diagonal of this matrix is the variance and reflects the amplitude of each sine wave. The off-diagonal elements reflect the covariance between channels. In this example the covariance between the channels 1 and 2 is close to zero, however there is some covariance between channels 2 and 3 due to the phase synchronisation. Let's see what happens to the covariance matrix when we TDE the data.
-
 
 from osl_dynamics.data import Data
 
@@ -70,14 +65,12 @@ data.tde(n_embeddings=5)
 #
 # We should expect a total of `n_embeddings * 3` channels, in our example this is `5 * 3 = 15`. We can verify this by printing the Data object.
 
-
 print(data)
 
 #%%
 # We can see we have 15 channels as expected. Note, we have also lost `n_embeddings - 1 = 4` time points (we have 9996 samples when originally we simulated 10000). This is because we don't have the full window to TDE the time points at the start and end of the time series.
 #
 # Let's look at the covariance of the TDE data.
-
 
 cov_tde = np.cov(data.time_series(), rowvar=False)
 
@@ -88,7 +81,6 @@ plt.colorbar()
 # This covariance matrix is 15x15 because we have 15 channels. The blocks on the diagonal of the above matrix represents the covariance of a channel with a time-lagged version of itself - this quantity is known as the **auto**-correlation function. Blocks on the off-diagonal represent the covariance of a channel with a time-lagged version of **another** channel - this quantity is known as the **cross**-correlation function.
 #
 # We can extract an estimate of the auto/cross-correlation function (A/CCF) by taking values from this covariance matrix. osl-dynamics has a function we can use for this: `analysis.modes.autocorr_from_tde_cov <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/modes/index.html#osl_dynamics.analysis.modes.autocorr_from_tde_cov>`_. This function will extract both ACFs and CCFs from a TDE covariance matrix.
-
 
 from osl_dynamics.analysis import modes, spectral
 
@@ -110,7 +102,6 @@ plt.tight_layout()
 #
 # The ACF and power spectral density (PSD) form a Fourier pair. This means we can calculate an estimate of the PSD of each channel by Fourier transforming the ACF. Let's do this using the `analysis.spectral.autocorr_to_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.autocorr_to_spectra>`_ function in osl-dynamics. Note, this function will also calculate cross PSD using the CCFs.
 
-
 # Calculate PSD by Fourier transforming the ACF
 f, psd, _ = spectral.autocorr_to_spectra(acf, sampling_frequency=200)
 print(psd.shape)  # channels x channels x frequency
@@ -129,7 +120,6 @@ plt.legend()
 # Note, we can see some ringing, this is due to padding the ACF with zeros (to obtain an interger multiple of 2) before calculating the Fourier transform, we can change the padding via the `nfft` argument to `analysis.spectral.autocorr_to_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.autocorr_to_spectra>`_.
 #
 # Let's try again with more lags - this will mean we evaluate the ACF for a greater window of time lags, this will result in a higher resolution PSD.
-
 
 # Redo the TDE on the original data
 data.tde(n_embeddings=11, use_raw=True)
@@ -160,7 +150,6 @@ plt.tight_layout()
 
 #%%
 # We can see the ACF extends over a wider range and we're now able to better model the 10 Hz sine wave in channel 1. We can also see what happens if we change the frequency of the sine wave for channel 1. Let's simulate a 30 Hz sine wave for channel 1.
-
 
 # Simulate new data
 x = np.array([
@@ -202,7 +191,6 @@ plt.tight_layout()
 #
 # In addition to modelling the frequency of oscillations in an individual channel, we can also model phase synchronisation across channels using TDE data. We can see from the above TDE covariance matrix the off-diagonal block for channels 2 and 3 (row 10-20, column 20-30) shows some structure. Let's plot the CCF for each pair of channels.
 
-
 plt.plot(tau, acf[0,1], label="Channel 1+2")
 plt.plot(tau, acf[1,2], label="Channel 2+3")
 plt.xlabel("Time Lag (Samples)")
@@ -213,7 +201,6 @@ plt.legend()
 # The structure in the CCF for channels 2 and 3 shows the time-lagged versions of these channels are correlated. Such structure arises from phase synchronisation. In contrast, we don't see any structure for the CCF between channels 1 and 2. This is because we simulated random phases for these channels.
 #
 # Let's plot the cross PSD for these channels.
-
 
 plt.plot(f, psd[0,1], label="Channel 1+2")
 plt.plot(f, psd[1,2], label="Channel 2+3")
@@ -229,7 +216,6 @@ plt.legend()
 # Impact of different parameters
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # When we apply TDE-PCA, we need to specify the number of embeddings and PCA components. The number of embeddings affects the frequencies we are able to distinguish in the data. To demonstrate we can simulate sinusoidal data and apply TDE.
-
 
 from osl_dynamics.analysis import spectral
 
@@ -263,7 +249,6 @@ covs, psds = calc_covs_psds(frequencies, n_embeddings, fs)
 #%%
 # Let's plot the covariance of the TDE data and corresponding PSD for these different sine waves.
 
-
 def plot_covs_psds(covs, psds):
     fig, ax = plt.subplots(nrows=2, ncols=len(psds), figsize=(12,3))
     for i in range(len(psds)):
@@ -282,7 +267,6 @@ plot_covs_psds(covs, psds)
 #%%
 # We can see despite using a small number of embeddings we are sensitive to a changes in a wide range of frequencies. However, we see we strugle to distinguish between low frequencies. We can improve the frequency resolution by increasing the number of embeddings. Let's do 
 
-
 frequencies = [1, 4, 8, 13, 20, 30, 40]
 n_embeddings = 11
 fs = 250
@@ -299,7 +283,6 @@ plot_covs_psds(covs, psds)
 # ********************
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
 
-
 import os
 
 def get_data(name):
@@ -310,7 +293,7 @@ def get_data(name):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {name}"
 
-# Download the dataset (approximate 88 MB)
+# Download the dataset (approximate 6 MB)
 get_data("example_loading_data")
 
 # List the contents of the downloaded directory containing the dataset
@@ -319,7 +302,6 @@ os.listdir("example_loading_data")
 
 #%%
 # Let's load the data in numpy format. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
-
 
 from osl_dynamics.data import Data
 
@@ -332,7 +314,6 @@ print(data)
 # Apply TDE and PCA
 # *****************
 # Both TDE and PCA can be done in one step using the `tde_pca` method. We often also want to standardize (z-transform) the data before training a model. Both of these steps can be done with the `prepare` method.
-
 
 methods = {
     "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
@@ -347,7 +328,6 @@ print(data)
 # Scan different parameters
 # *************************
 # Let calculate the PSD of prepared data using different parameters for TDE-PCA.
-
 
 def calc_psds(n_time_embeddings, n_pca_components, fs):
     psds = []
@@ -377,7 +357,6 @@ f, psds = calc_psds(n_time_embeddings, n_pca_components, fs)
 
 #%%
 # Let's plot the PSD for each set of parameters.
-
 
 fig, ax = plt.subplots(nrows=1, ncols=len(n_time_embeddings), figsize=(12,3))
 for i, n_tde in enumerate(n_time_embeddings):
