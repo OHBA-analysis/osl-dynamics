@@ -90,7 +90,7 @@ print(f.shape)
 print(psd.shape)
 
 #%%
-# We can see `f` is a 1D numpy array of length 256. This is the frequency axis of the power spectra. We can see `psd` is a subjects by channels (ROIs) by frequency array. E.g. `psd[0]` is a `(52, 256)` shaped array containing the power spectra for each of the 52 ROIs.
+# We can see `f` is a 1D numpy array of length 256. This is the frequency axis of the power spectra. We can see `psd` is a subjects by channels (ROIs) by frequency array. E.g. `psd[0]` is a `(38, 256)` shaped array containing the power spectra for each of the 38 ROIs.
 #
 # A useful property of a power spectrum is that the integral over a frequency range gives the power (or equivalently the variance of activity over the frequency range). osl-dynamics has a `analysis.power <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html>`_ module for performing power analyses.
 #
@@ -116,7 +116,7 @@ p = power.variance_from_spectra(f, psd, frequency_range=[7, 13])
 print(p.shape)
 
 #%%
-# From this, we can see it is a subjects by ROIs array. It has integrated the power spectrum for each ROI separately. If we wanted the alpha power at each ROI for the first subject, we would use `p[0]`, which would be a `(52,)` shaped array.
+# From this, we can see it is a subjects by ROIs array. It has integrated the power spectrum for each ROI separately. If we wanted the alpha power at each ROI for the first subject, we would use `p[0]`, which would be a `(38,)` shaped array.
 #
 # Plot power maps
 # ^^^^^^^^^^^^^^^
@@ -128,7 +128,6 @@ fig, ax = power.save(
     group_p,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
-    plot_kwargs={"symmetric_cbar": True},
 )
 
 #%%
@@ -138,5 +137,4 @@ fig, ax = power.save(
     p[:4],  # first four
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
-    plot_kwargs={"symmetric_cbar": True},
 )

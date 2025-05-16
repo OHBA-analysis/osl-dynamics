@@ -44,7 +44,6 @@ Note, we assume a group ICA parcellation was used and the HMM was trained on the
 #         means,
 #         mask_file="MNI152_T1_2mm_brain.nii.gz",
 #         parcellation_file="melodic_IC.nii.gz",
-#         plot_kwargs={"symmetric_cbar": True},
 #     )
 
 #%%

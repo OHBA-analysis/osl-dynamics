@@ -100,7 +100,6 @@ fig, ax = power.save(
     mean_p,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
-    plot_kwargs={"symmetric_cbar": True},
     subtract_mean=True,  # just for visualisation
 )
 
@@ -152,6 +151,5 @@ fig, ax = power.save(
     mean_c_map,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
-    plot_kwargs={"symmetric_cbar": True},
     subtract_mean=True,  # just for visualisation
 )
