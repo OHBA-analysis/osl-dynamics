@@ -49,6 +49,8 @@ fig, ax = plotting.plot_evoked_response(
     t,
     group_network_response,
     pvalues,
+    x_label="Sample",
+    y_label="Network Activation",
 )
 
 #%%

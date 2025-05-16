@@ -13,6 +13,8 @@ import os
 import shutil
 import sys
 
+from sphinx_gallery.sorting import FileNameSortKey
+
 __location__ = os.path.join(
     os.getcwd(), os.path.dirname(inspect.getfile(inspect.currentframe()))
 )
@@ -46,6 +48,7 @@ sphinx_gallery_conf = {
     "gallery_dirs": "tutorials_build",   # Where to output rendered gallery
     "filename_pattern": r".*\.py",       # Include all .py files, can specific a particular set tutorials, e.g. r"1-.*\.py" for 1-*.py tutorials
     "run_stale_examples": True,          # Force re-run when building
+    "within_subsection_order": FileNameSortKey,  # Build in alphabetical order of the filenames
 }
 
 # The suffix of source filenames.
