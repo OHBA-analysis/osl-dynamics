@@ -439,8 +439,8 @@ def get_n_batches(dataset):
     return cardinality.numpy()
 
 
-def get_n_batches_and_range(dataset):
-    """Get number of batches and range (max-min) of values.
+def get_n_sequences_and_range(dataset):
+    """Get number of sequences and range (max-min) of values.
 
     Parameters
     ----------
@@ -449,12 +449,12 @@ def get_n_batches_and_range(dataset):
 
     Returns
     -------
-    n_batches : int
+    n_sequences : int
         Number of batches.
     range_ : np.ndarray
         Range of each channel.
     """
-    count = 0
+    n_sequences = 0
     amax = []
     amin = []
     dataset = _validate_tf_dataset(dataset)
@@ -462,9 +462,10 @@ def get_n_batches_and_range(dataset):
         if isinstance(batch, dict):
             batch = batch["data"]
         batch = batch.numpy()
-        n_channels = batch.shape[-1]
+        batch_size, _, n_channels = batch.shape
         batch = batch.reshape(-1, n_channels)
         amin.append(np.amin(batch, axis=0))
         amax.append(np.amax(batch, axis=0))
-        count += 1
-    return count, np.amax(amax, axis=0) - np.amin(amin, axis=0)
+        n_sequences += batch_size
+    range_ = np.amax(amax, axis=0) - np.amin(amin, axis=0)
+    return n_sequences, range_
