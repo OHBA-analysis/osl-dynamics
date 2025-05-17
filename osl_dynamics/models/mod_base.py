@@ -250,7 +250,6 @@ class ModelBase:
             x,
             shuffle=True,
             concatenate=True,
-            drop_last_batch=True,
             repeat_count=repeat_count,
         )
         args, kwargs = replace_argument(self.model.fit, "x", x, args, kwargs)
