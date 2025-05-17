@@ -31,7 +31,7 @@ print("Importing packages")
 
 import numpy as np
 
-from osl_dynamics.analysis import power
+from osl_dynamics.analysis import power, workbench
 
 #%% Plot group-level amplitude maps
 

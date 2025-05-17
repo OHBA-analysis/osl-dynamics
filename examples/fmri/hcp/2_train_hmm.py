@@ -37,6 +37,7 @@ with open("data_files.txt", "r") as file:
 # Create Data object for training
 data = Data(
     inputs,
+    use_tfrecord=True,
     store_dir=f"tmp_{id}",
     n_jobs=8,
 )
@@ -49,10 +50,10 @@ data.standardize()
 config = Config(
     n_states=10,
     n_channels=data.n_channels,
-    sequence_length=800,
+    sequence_length=50,
     learn_means=True,
     learn_covariances=True,
-    batch_size=128,
+    batch_size=512,
     learning_rate=0.01,
     n_epochs=20,
 )
@@ -98,7 +99,7 @@ np.save(f"{inf_params_dir}/covs.npy", covs)
 
 #%% Calculate summary statistics
 
-# Viterbi path
+# State time course
 stc = modes.argmax_time_courses(alp)
 
 # Calculate summary statistics
@@ -115,3 +116,7 @@ np.save(f"{summary_stats_dir}/fo.npy", fo)
 np.save(f"{summary_stats_dir}/lt.npy", lt)
 np.save(f"{summary_stats_dir}/intv.npy", intv)
 np.save(f"{summary_stats_dir}/sr.npy", sr)
+
+#%% Delete temporary directory
+
+data.delete_dir()

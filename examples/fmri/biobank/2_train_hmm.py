@@ -99,7 +99,7 @@ np.save(f"{inf_params_dir}/covs.npy", covs)
 
 #%% Calculate summary statistics
 
-# Viterbi path
+# State time course
 stc = modes.argmax_time_courses(alp)
 
 # Calculate summary statistics
@@ -116,3 +116,7 @@ np.save(f"{summary_stats_dir}/fo.npy", fo)
 np.save(f"{summary_stats_dir}/lt.npy", lt)
 np.save(f"{summary_stats_dir}/intv.npy", intv)
 np.save(f"{summary_stats_dir}/sr.npy", sr)
+
+#%% Delete temporary directory
+
+data.delete_dir()
