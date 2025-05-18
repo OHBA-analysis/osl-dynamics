@@ -203,10 +203,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data,
-            shuffle=True,
-            concatenate=True,
-            drop_last_batch=True,
+            training_data, shuffle=True, concatenate=True
         )
 
         # Calculate the number of batches to use
@@ -416,10 +413,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data,
-            shuffle=True,
-            concatenate=True,
-            drop_last_batch=True,
+            training_data, shuffle=True, concatenate=True
         )
 
         # Calculate the number of batches to use
@@ -1291,10 +1285,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data,
-            shuffle=True,
-            concatenate=True,
-            drop_last_batch=True,
+            training_data, shuffle=True, concatenate=True
         )
 
         # Calculate the number of batches to use
@@ -1377,10 +1368,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         # Make a TensorFlow Dataset
         training_dataset = self.make_dataset(
-            training_data,
-            shuffle=True,
-            concatenate=True,
-            drop_last_batch=True,
+            training_data, shuffle=True, concatenate=True
         )
 
         # Calculate the number of batches to use

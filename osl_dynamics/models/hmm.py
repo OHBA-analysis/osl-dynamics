@@ -348,8 +348,8 @@ class Model(MarkovStateInferenceModelBase):
         training_dataset = self.make_dataset(
             training_dataset, shuffle=False, concatenate=True
         )
-        n_batches, range_ = dtf.get_n_batches_and_range(training_dataset)
-        scale_factor = self.get_static_loss_scaling_factor(n_batches)
+        n_sequences, range_ = dtf.get_n_sequences_and_range(training_dataset)
+        scale_factor = self.get_static_loss_scaling_factor(n_sequences)
 
         if self.config.learn_means:
             obs_mod.set_means_regularizer(self.model, range_, scale_factor)

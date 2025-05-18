@@ -250,7 +250,6 @@ class ModelBase:
             x,
             shuffle=True,
             concatenate=True,
-            drop_last_batch=True,
             repeat_count=repeat_count,
         )
         args, kwargs = replace_argument(self.model.fit, "x", x, args, kwargs)
@@ -460,7 +459,7 @@ class ModelBase:
             concatenate=concatenate,
         )
 
-    def get_static_loss_scaling_factor(self, n_batches):
+    def get_static_loss_scaling_factor(self, n_sequences):
         """Get scaling factor for static losses.
 
         When calculating loss, we want to approximate the effect of the
@@ -469,8 +468,8 @@ class ModelBase:
 
         Parameters
         ----------
-        n_batches : int
-            Total number of batches in the training dataset.
+        n_sequences : int
+            Total number of sequences in the training dataset.
 
         Returns
         -------
@@ -478,7 +477,6 @@ class ModelBase:
             Scale factor for 'static' losses, i.e. those which are not
             time varying.
         """
-        n_sequences = self.config.batch_size * n_batches
         scale_factor = 1.0 / n_sequences
         if self.config.loss_calc == "mean":
             scale_factor /= self.config.sequence_length
