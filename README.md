@@ -166,9 +166,9 @@ pip install build twine
 
 The following steps can be used to release a new version:
 
-1. Update the version on line 5 of `setup.cfg` by removing `dev` from the version number.
+1. Update the version on line 10 of `pyproject.toml` by removing `dev` from the version number.
 
-2. Commit the updated `setup.cfg` to the `main` branch of the GitHub repo.
+2. Commit the updated `pyproject.toml` to the `main` branch of the GitHub repo.
 
 3. Delete any old distributions that have been built (if there are any):
 ```
@@ -194,7 +194,7 @@ You will need to enter the username and password that you used to register with 
 
 7. Tag the commit uploaded to PyPI with the version number using the 'Create a new release' link on the right of the GitHub repo webpage. You will need to untick 'Set as a pre-release' and tick 'Set as the latest release'.
 
-8. Change the version to `X.Y.devZ` in `setup.cfg` and commit the new dev version to `main`.
+8. Change the version to `X.Y.devZ` in `pyproject.toml` and commit the new dev version to `main`.
 
 The uploaded distribution will then be available to be installed with:
 ```
