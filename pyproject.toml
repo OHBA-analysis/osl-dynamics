@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "osl-dynamics"
-version = "2.1.4"
+version = "2.1.4.post1"
 description = "OHBA Software Library: Dynamics Toolbox"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
@@ -21,7 +21,7 @@ requires-python = ">=3.8"
 osl-dynamics = "osl_dynamics.config_api.pipeline:osl_dynamics_cli"
 
 [tool.setuptools.packages.find]
-where = ["osl_dynamics"]
+where = ["."]
 
 [tool.setuptools]
 include-package-data = true
