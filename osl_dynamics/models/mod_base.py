@@ -202,6 +202,37 @@ class ModelBase:
         # Override the original Keras method
         self.model.compute_metrics = compute_metrics
 
+    def initialization(self, *args, method=None, **kwargs):
+        """Wrapper for an initialization method.
+
+        Parameters
+        ----------
+        *args : arguments
+            Arguments to pass to the initialization method.
+        method : str
+            Initialization method name.
+        **kwargs : keyword arguments
+            Keyword arguments to pass to the initialization method.
+
+        Returns
+        -------
+        history : dict
+            Training history for the initialization.
+        """
+        if method is None:
+            raise ValueError(
+                "Please pass the initialization method name: "
+                "model.initialization(data, method='...')"
+            )
+        if "_initialization" not in method:
+            method += "_initialization"
+        if not hasattr(self, method):
+            raise AttributeError(
+                f"{method} not implemented for model {self.config.model_name}."
+            )
+        method = getattr(self, method)
+        return method(*args, **kwargs)
+
     def fit(
         self,
         *args,
