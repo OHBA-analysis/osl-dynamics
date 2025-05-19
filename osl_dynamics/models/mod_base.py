@@ -2,6 +2,7 @@
 
 import logging
 import os
+import pickle
 import re
 import warnings
 from abc import abstractmethod
@@ -361,23 +362,60 @@ class ModelBase:
 
         return history
 
-    def train(self, *args, **kwargs):
+    def train(self, *args, best_of=1, save_dir=None, **kwargs):
         """Wrapper for initializing and fitting the model.
 
         Parameters
         ----------
         *args : arguments
             Arguments to pass to both the initialization and fit method.
+        best_of : int, optional
+            How many runs should we perform? We will return the best run
+            (which is the one with the lowest variational free energy).
+        save_dir : str, optional
+            Directory to save each run to. If None, the models are not saved.
         **kwargs : keyword arguments
             Keyword arguments to pass to both the initialization and fit method.
-
-        Returns
-        -------
-        history : dict
-            The training history.
         """
-        self.initialization(*args, **kwargs)
-        return self.fit(*args, **kwargs)
+        best_fe = np.inf
+        best_weights = None
+        best_run = None
+
+        for run in range(best_of):
+            _logger.info(f"Training run {run}")
+
+            # Reset model weights
+            self.reset()
+
+            # Initialization
+            init_history = self.initialization(*args, **kwargs)
+
+            # Full training
+            history = self.fit(*args, **kwargs)
+
+            # Get free energy
+            data = get_argument(self.model.fit, "x", args, kwargs)
+            fe = self.free_energy(data)
+            history["free_energy"] = fe
+            _logger.info(f"Free energy (run {run}): {fe}")
+
+            if fe < best_fe:
+                best_weights = self.get_weights()
+                best_fe = fe
+                best_run = run
+
+            # Save
+            if save_dir is not None:
+                n_digits = len(str(best_of))
+                model_dir = f"{save_dir}/run{run:0{n_digits}d}"
+                self.save(model_dir)
+                pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
+                pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
+
+        # Use the best model weights
+        _logger.info(f"Best run: {best_run}")
+        self.reset()
+        self.set_weights(best_weights)
 
     def load_weights(self, filepath):
         """Load weights of the model from a file.
