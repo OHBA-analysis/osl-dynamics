@@ -273,7 +273,7 @@ class ModelBase:
 
         Returns
         -------
-        history : history
+        history : dict
             The training history.
         """
         # If step_per_epoch is passed, repeat the dataset indefinitely
@@ -360,6 +360,24 @@ class ModelBase:
         }
 
         return history
+
+    def train(self, *args, **kwargs):
+        """Wrapper for initializing and fitting the model.
+
+        Parameters
+        ----------
+        *args : arguments
+            Arguments to pass to both the initialization and fit method.
+        **kwargs : keyword arguments
+            Keyword arguments to pass to both the initialization and fit method.
+
+        Returns
+        -------
+        history : dict
+            The training history.
+        """
+        self.initialization(*args, **kwargs)
+        return self.fit(*args, **kwargs)
 
     def load_weights(self, filepath):
         """Load weights of the model from a file.
