@@ -129,6 +129,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_gs_annealing_epochs : int
         Number of epochs to perform Gumbel-Softmax temperature annealing.
 
+    init_method : str
+        Initialization method to use.
     n_init : int
         Number of initializations.
     n_init_epochs : int

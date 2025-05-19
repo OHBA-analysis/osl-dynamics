@@ -47,6 +47,7 @@ class BaseModelConfig:
     learning_rate: float = None
     lr_decay: float = 0.1
     gradient_clip: float = None
+    init_method: str = None
     n_init: int = None
     n_init_epochs: int = None
     init_take: float = 1
@@ -219,10 +220,10 @@ class ModelBase:
         history : dict
             Training history for the initialization.
         """
+        method = method or self.config.init_method
         if method is None:
-            raise ValueError(
-                "Please pass the initialization method name: "
-                "model.initialization(data, method='...')"
+            _logger.warning(
+                "No initialization method specified. Skipping initialization."
             )
         if "_initialization" not in method:
             method += "_initialization"

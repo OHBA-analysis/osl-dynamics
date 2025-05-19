@@ -127,6 +127,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
+    init_method : str
+        Initialization method to use.
     n_init : int
         Number of initializations.
     n_init_epochs : int
