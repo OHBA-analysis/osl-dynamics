@@ -1690,6 +1690,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         dataset = self.make_dataset(dataset, concatenate=True)
 
         free_energy = []
+        weights = []
         for batch in tqdm(dataset, desc="Getting free energy"):
             predictions = self.predict(batch, verbose=0)
             nll = predictions["ll_loss"][0]
@@ -1704,8 +1705,9 @@ class MarkovStateInferenceModelBase(ModelBase):
                 kl_loss = predictions["kl_loss"][0]
                 fe += kl_loss
             free_energy.append(fe)
+            weights.append(batch["data"].shape[0])
 
-        return np.mean(free_energy)
+        return np.average(free_energy, weights=weights)
 
     def evidence(self, dataset):
         """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
