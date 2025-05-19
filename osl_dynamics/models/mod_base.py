@@ -42,15 +42,17 @@ class BaseModelConfig:
     model_name: str = None
     multiple_dynamics: bool = False
 
+    # Initialization
+    init_method: str = None
+    n_init: int = None
+    n_init_epochs: int = None
+    init_take: float = 1
+
     # Training parameters
     batch_size: int = None
     learning_rate: float = None
     lr_decay: float = 0.1
     gradient_clip: float = None
-    init_method: str = None
-    n_init: int = None
-    n_init_epochs: int = None
-    init_take: float = 1
     n_epochs: int = None
     optimizer: tf.keras.optimizers.Optimizer = "adam"
     loss_calc: str = "mean"

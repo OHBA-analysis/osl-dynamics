@@ -68,13 +68,14 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Either :code:`'log'` (default) or :code:`'rescale'`.
 
     init_method : str
-        Initialization method to use.
+        Initialization method. Defaults to 'random_state_time_course'.
     n_init : int
-        Number of initializations.
+        Number of initializations. Defaults to 3.
     n_init_epochs : int
-        Number of epochs for each initialization.
+        Number of epochs for each initialization. Defaults to 1.
     init_take : float
         Fraction of dataset to use in the initialization.
+        Defaults to 1.0.
 
     batch_size : int
         Mini-batch size.
@@ -101,6 +102,12 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     # Observation model parameters
     learn_log_rates: bool = None
     initial_log_rates: np.ndarray = None
+
+    # Initialization
+    init_method: str = "random_state_time_course"
+    n_init: int = 3
+    n_init_epochs: int = 1
+    init_take: float = 1.0
 
     def __post_init__(self):
         self.validate_observation_model_parameters()

@@ -123,13 +123,14 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Number of epochs to perform KL annealing.
 
     init_method : str
-        Initialization method to use.
+        Initialization method to use. Defaults to 'random_subset'.
     n_init : int
-        Number of initializations.
+        Number of initializations. Defaults to 5.
     n_init_epochs : int
-        Number of epochs for each initialization.
+        Number of epochs for each initialization. Defaults to 2.
     init_take : float
         Fraction of dataset to use in the initialization.
+        Defaults to 1.0.
 
     batch_size : int
         Mini-batch size.
@@ -183,6 +184,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     covariances_epsilon: float = None
     means_regularizer: tf.keras.regularizers.Regularizer = None
     covariances_regularizer: tf.keras.regularizers.Regularizer = None
+
+    # Initialization
+    init_method: str = "random_subset"
+    n_init: int = 5
+    n_init_epochs: int = 2
+    init_take: float = 1.0
 
     def __post_init__(self):
         self.validate_rnn_parameters()
