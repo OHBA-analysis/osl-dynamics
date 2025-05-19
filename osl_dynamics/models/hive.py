@@ -120,6 +120,13 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         trans_prob_update_delay) ** -trans_prob_update_forget`.
         This is the forget parameter.
 
+    n_init : int
+        Number of initializations.
+    n_init_epochs : int
+        Number of epochs for each initialization.
+    init_take : float
+        Fraction of dataset to use in the initialization.
+
     batch_size : int
         Mini-batch size.
     learning_rate : float

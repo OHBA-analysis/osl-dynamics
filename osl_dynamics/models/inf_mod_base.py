@@ -153,9 +153,9 @@ class VariationalInferenceModelBase(ModelBase):
     def random_subset_initialization(
         self,
         training_data,
-        n_epochs,
-        n_init,
-        take,
+        n_epochs=None,
+        n_init=None,
+        take=None,
         n_kl_annealing_epochs=None,
         **kwargs,
     ):
@@ -168,12 +168,15 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
-        n_epochs : int
+        n_epochs : int, optional
             Number of epochs to train the model.
-        n_init : int
+            By default we use the value passed in the config.
+        n_init : int, optional
             Number of initializations.
-        take : float
+            By default we use the value passed in the config.
+        take : float, optional
             Fraction of total batches to take.
+            By default we use the value passed in the config.
         n_kl_annealing_epochs : int, optional
             Number of KL annealing epochs.
         kwargs : keyword arguments, optional
@@ -184,6 +187,10 @@ class VariationalInferenceModelBase(ModelBase):
         history : history
             The training history of the best initialization.
         """
+        n_epochs = n_epochs or self.config.n_init_epochs
+        n_init = n_init or self.config.n_init
+        take = take or self.config.init_take
+
         if n_init is None or n_init == 0:
             _logger.warning(
                 "Number of initializations was set to zero. "
@@ -258,8 +265,8 @@ class VariationalInferenceModelBase(ModelBase):
     def single_subject_initialization(
         self,
         training_data,
-        n_epochs,
-        n_init,
+        n_epochs=None,
+        n_init=None,
         n_kl_annealing_epochs=None,
         **kwargs,
     ):
@@ -272,10 +279,12 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         training_data : list of tf.data.Dataset or osl_dynamics.data.Data
             Datasets for each subject.
-        n_epochs : int
+        n_epochs : int, optional
             Number of epochs to train.
-        n_init : int
+            By default we use the value passed in the config.
+        n_init : int, optional
             How many subjects should we train on?
+            By default we use the value passed in the config.
         n_kl_annealing_epochs : int, optional
             Number of KL annealing epochs to use during initialization. If
             :code:`None` then the KL annealing epochs in the :code:`config`
@@ -283,6 +292,9 @@ class VariationalInferenceModelBase(ModelBase):
         kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
         """
+        n_epochs = n_epochs or self.config.n_init_epochs
+        n_init = n_init or self.config.n_init
+
         if n_init is None or n_init == 0:
             _logger.warning(
                 "Number of initializations was set to zero. Skipping initialization."
@@ -349,8 +361,8 @@ class VariationalInferenceModelBase(ModelBase):
     def multistart_initialization(
         self,
         training_data,
-        n_epochs,
-        n_init,
+        n_epochs=None,
+        n_init=None,
         n_kl_annealing_epochs=None,
         **kwargs,
     ):
@@ -374,7 +386,13 @@ class VariationalInferenceModelBase(ModelBase):
         )
 
     def random_state_time_course_initialization(
-        self, training_data, n_epochs, n_init, take=1, stay_prob=0.9, **kwargs
+        self,
+        training_data,
+        n_epochs=None,
+        n_init=None,
+        take=None,
+        stay_prob=0.9,
+        **kwargs,
     ):
         """Random state time course initialization.
 
@@ -385,12 +403,15 @@ class VariationalInferenceModelBase(ModelBase):
         ----------
         training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
-        n_epochs : int
+        n_epochs : int, optional
             Number of epochs to train the model.
-        n_init : int
+            By default we use the value passed in the config.
+        n_init : int, optional
             Number of initializations.
+            By default we use the value passed in the config.
         take : float, optional
             Fraction of total batches to take.
+            By default we use the value passed in the config.
         stay_prob : float, optional
             Stay probability (diagonal for the transition probability
             matrix). Other states have uniform probability.
@@ -402,6 +423,10 @@ class VariationalInferenceModelBase(ModelBase):
         history : history
             The training history of the best initialization.
         """
+        n_epochs = n_epochs or self.config.n_init_epochs
+        n_init = n_init or self.config.n_init
+        take = take or self.config.init_take
+
         if n_init is None or n_init == 0:
             _logger.info(
                 "Number of initializations was set to zero. "
@@ -1249,7 +1274,12 @@ class MarkovStateInferenceModelBase(ModelBase):
             )
 
     def random_subset_initialization(
-        self, training_data, n_epochs, n_init, take, **kwargs
+        self,
+        training_data,
+        n_epochs=None,
+        n_init=None,
+        take=None,
+        **kwargs,
     ):
         """Random subset initialization.
 
@@ -1260,12 +1290,15 @@ class MarkovStateInferenceModelBase(ModelBase):
         ----------
         training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
-        n_epochs : int
+        n_epochs : int, optional
             Number of epochs to train the model.
-        n_init : int
+            By default we use the value passed in the config.
+        n_init : int, optional
             Number of initializations.
-        take : float
+            By default we use the value passed in the config.
+        take : float, optional
             Fraction of total batches to take.
+            By default we use the value passed in the config.
         kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
@@ -1274,6 +1307,10 @@ class MarkovStateInferenceModelBase(ModelBase):
         history : history
             The training history of the best initialization.
         """
+        n_epochs = n_epochs or self.config.n_init_epochs
+        n_init = n_init or self.config.n_init
+        take = take or self.config.init_take
+
         if n_init is None or n_init == 0:
             _logger.info(
                 "Number of initializations was set to zero. "
@@ -1332,7 +1369,12 @@ class MarkovStateInferenceModelBase(ModelBase):
         return best_history
 
     def random_state_time_course_initialization(
-        self, training_data, n_epochs, n_init, take=1, **kwargs
+        self,
+        training_data,
+        n_epochs=None,
+        n_init=None,
+        take=None,
+        **kwargs,
     ):
         """Random state time course initialization.
 
@@ -1343,12 +1385,15 @@ class MarkovStateInferenceModelBase(ModelBase):
         ----------
         training_data : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to use for training.
-        n_epochs : int
+        n_epochs : int, optional
             Number of epochs to train the model.
-        n_init : int
+            By default we use the value passed in the config.
+        n_init : int, optional
             Number of initializations.
+            By default we use the value passed in the config.
         take : float, optional
             Fraction of total batches to take.
+            By default we use the value passed in the config.
         kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
@@ -1357,6 +1402,10 @@ class MarkovStateInferenceModelBase(ModelBase):
         history : history
             The training history of the best initialization.
         """
+        n_epochs = n_epochs or self.config.n_init_epochs
+        n_init = n_init or self.config.n_init
+        take = take or self.config.init_take
+
         if n_init is None or n_init == 0:
             _logger.info(
                 "Number of initializations was set to zero. "

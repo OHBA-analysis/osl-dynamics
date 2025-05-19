@@ -122,6 +122,13 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
+    n_init : int
+        Number of initializations.
+    n_init_epochs : int
+        Number of epochs for each initialization.
+    init_take : float
+        Fraction of dataset to use in the initialization.
+
     batch_size : int
         Mini-batch size.
     learning_rate : float

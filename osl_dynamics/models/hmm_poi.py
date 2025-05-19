@@ -67,6 +67,13 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Which implementation of the Baum-Welch algorithm should we use?
         Either :code:`'log'` (default) or :code:`'rescale'`.
 
+    n_init : int
+        Number of initializations.
+    n_init_epochs : int
+        Number of epochs for each initialization.
+    init_take : float
+        Fraction of dataset to use in the initialization.
+
     batch_size : int
         Mini-batch size.
     learning_rate : float

@@ -47,6 +47,9 @@ class BaseModelConfig:
     learning_rate: float = None
     lr_decay: float = 0.1
     gradient_clip: float = None
+    n_init: int = None
+    n_init_epochs: int = None
+    init_take: float = 1
     n_epochs: int = None
     optimizer: tf.keras.optimizers.Optimizer = "adam"
     loss_calc: str = "mean"
