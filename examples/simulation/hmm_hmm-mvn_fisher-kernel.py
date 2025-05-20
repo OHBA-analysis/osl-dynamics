@@ -9,7 +9,7 @@ from sklearn.svm import SVC
 from sklearn.multiclass import OneVsOneClassifier
 from sklearn.model_selection import KFold
 
-os.makedirs("figures", exist_ok=True)
+os.makedirs("results", exist_ok=True)
 
 inference.tf_ops.gpu_growth()
 
@@ -56,15 +56,18 @@ plotting.plot_scatter(
         np.array([str(i) for i in range(sim.n_sessions)])[group_mask]
         for group_mask in group_masks
     ],
-    filename="figures/sim_embeddings.png",
+    filename="results/sim_embeddings.png",
 )
 training_data = data.Data([tc for tc in sim.time_series])
 
 model = Model(config)
 model.random_state_time_course_initialization(training_data, n_epochs=2, n_init=3)
 model.fit(training_data)
-alpha = model.get_alpha(training_data)
-argmax_alpha = inference.modes.argmax_time_courses(alpha)
+
+# Temporary fix for Segmentation fault (core dumped) error
+model.save("results")
+model = Model.load("results")
+
 
 # Get the Fisher kernel matrix
 fk = fisher_kernel.FisherKernel(model)
