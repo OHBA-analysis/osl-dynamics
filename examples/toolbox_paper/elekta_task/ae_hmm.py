@@ -137,9 +137,7 @@ config = """
             n_states: 8
             learn_means: True
             learn_covariances: True
-    plot_group_ae_networks:
-        power_save_kwargs:
-            plot_kwargs: {views: [lateral]}
+    plot_group_ae_networks: {}
     plot_alpha:
         kwargs: {n_samples: 2000}
     plot_hmm_network_summary_stats: {}
