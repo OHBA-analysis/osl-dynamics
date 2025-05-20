@@ -127,6 +127,16 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_kl_annealing_epochs : int
         Number of epochs to perform KL annealing.
 
+    init_method : str
+        Initialization method to use. Defaults to 'random_subset'.
+    n_init : int
+        Number of initializations. Defaults to 5.
+    n_init_epochs : int
+        Number of epochs for each initialization. Defaults to 2.
+    init_take : float
+        Fraction of dataset to use in the initialization.
+        Defaults to 1.0.
+
     batch_size : int
         Mini-batch size.
     learning_rate : float
@@ -148,6 +158,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
+    best_of : int
+        Number of full training runs to perform. A single run includes
+        its own initialization and fitting from scratch.
     """
 
     model_name: str = "M-DyNeMo"
@@ -186,6 +199,12 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     multiple_dynamics: bool = True
 
     pca_components: np.ndarray = None
+
+    # Initialization
+    init_method: str = "random_subset"
+    n_init: int = 5
+    n_init_epochs: int = 2
+    init_take: float = 1.0
 
     def __post_init__(self):
         self.validate_rnn_parameters()

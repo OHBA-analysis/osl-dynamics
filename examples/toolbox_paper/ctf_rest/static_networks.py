@@ -140,10 +140,6 @@ power.save(
     pow_diff,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
-    plot_kwargs={
-        "views": ["lateral"],
-        "symmetric_cbar": True,
-    },
     filename=f"{output_dir}/pow_diff_.png",
 )
 power.save(
@@ -151,13 +147,11 @@ power.save(
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
     plot_kwargs={
-        "views": ["lateral"],
-        "cmap": "hot_r",
-        "bg_on_data": 1,
-        "darkness": 0.6,
-        "alpha": 1,
+        "cmap": "Greens_r",
+        "symmetric_cbar": False,
         "vmin": 0,
         "vmax": 0.1,
+        "bg_on_data": True,
     },
     filename=f"{output_dir}/pow_diff_pvalues_.png",
 )

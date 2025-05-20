@@ -2,6 +2,7 @@
 
 import logging
 import os
+import pickle
 import re
 import warnings
 from abc import abstractmethod
@@ -42,6 +43,12 @@ class BaseModelConfig:
     model_name: str = None
     multiple_dynamics: bool = False
 
+    # Initialization
+    init_method: str = None
+    n_init: int = None
+    n_init_epochs: int = None
+    init_take: float = 1
+
     # Training parameters
     batch_size: int = None
     learning_rate: float = None
@@ -52,6 +59,7 @@ class BaseModelConfig:
     loss_calc: str = "mean"
     multi_gpu: bool = False
     strategy: str = None
+    best_of: int = 1
 
     # Dimension parameters
     n_modes: int = None
@@ -199,6 +207,37 @@ class ModelBase:
         # Override the original Keras method
         self.model.compute_metrics = compute_metrics
 
+    def initialization(self, *args, method=None, **kwargs):
+        """Wrapper for an initialization method.
+
+        Parameters
+        ----------
+        *args : arguments
+            Arguments to pass to the initialization method.
+        method : str
+            Initialization method name.
+        **kwargs : keyword arguments
+            Keyword arguments to pass to the initialization method.
+
+        Returns
+        -------
+        history : dict
+            Training history for the initialization.
+        """
+        method = method or self.config.init_method
+        if method is None:
+            _logger.warning(
+                "No initialization method specified. Skipping initialization."
+            )
+        if "_initialization" not in method:
+            method += "_initialization"
+        if not hasattr(self, method):
+            raise AttributeError(
+                f"{method} not implemented for model {self.config.model_name}."
+            )
+        method = getattr(self, method)
+        return method(*args, **kwargs)
+
     def fit(
         self,
         *args,
@@ -236,7 +275,7 @@ class ModelBase:
 
         Returns
         -------
-        history : history
+        history : dict
             The training history.
         """
         # If step_per_epoch is passed, repeat the dataset indefinitely
@@ -323,6 +362,64 @@ class ModelBase:
         }
 
         return history
+
+    def train(self, *args, best_of=None, save_dir=None, **kwargs):
+        """Wrapper for initializing and fitting the model.
+
+        Parameters
+        ----------
+        *args : arguments
+            Arguments to pass to both the initialization and fit method.
+        best_of : int, optional
+            How many runs should we perform? We will return the best run
+            (which is the one with the lowest variational free energy).
+            Defaults to :code:`config.best_of`.
+        save_dir : str, optional
+            Directory to save each run to. If None, the models are not saved.
+        **kwargs : keyword arguments
+            Keyword arguments to pass to both the initialization and fit method.
+        """
+        best_of = best_of or self.config.best_of
+
+        best_fe = np.inf
+        best_weights = None
+        best_run = None
+
+        for run in range(best_of):
+            _logger.info(f"Training run {run}")
+
+            # Reset model weights
+            self.reset()
+
+            # Initialization
+            init_history = self.initialization(*args, **kwargs)
+
+            # Full training
+            history = self.fit(*args, **kwargs)
+
+            # Get free energy
+            data = get_argument(self.model.fit, "x", args, kwargs)
+            fe = self.free_energy(data)
+            history["free_energy"] = fe
+            _logger.info(f"Free energy (run {run}): {fe}")
+
+            if fe < best_fe:
+                best_weights = self.get_weights()
+                best_fe = fe
+                best_run = run
+
+            # Save
+            if save_dir is not None:
+                n_digits = len(str(best_of))
+                model_dir = f"{save_dir}/run{run:0{n_digits}d}"
+                self.save(model_dir)
+                pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
+                pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
+
+        # Use the best model weights
+        _logger.info(f"Best run: {best_run}")
+        self.reset()
+        self.set_weights(best_weights)
 
     def load_weights(self, filepath):
         """Load weights of the model from a file.

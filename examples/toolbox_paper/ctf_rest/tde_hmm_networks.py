@@ -201,8 +201,6 @@ config = """
         nnmf_components: 2
     plot_group_nnmf_tde_hmm_networks:
         nnmf_file: spectra/nnmf_2.npy
-        power_save_kwargs:
-            plot_kwargs: {views: [lateral]}
     plot_alpha:
         kwargs: {n_samples: 2000}
     plot_hmm_network_summary_stats: {}

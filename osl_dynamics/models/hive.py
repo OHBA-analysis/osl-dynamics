@@ -120,6 +120,16 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         trans_prob_update_delay) ** -trans_prob_update_forget`.
         This is the forget parameter.
 
+    init_method : str
+        Initialization method. Defaults to 'random_state_time_course'.
+    n_init : int
+        Number of initializations. Defaults to 3.
+    n_init_epochs : int
+        Number of epochs for each initialization. Defaults to 1.
+    init_take : float
+        Fraction of dataset to use in the initialization.
+        Defaults to 1.0.
+
     batch_size : int
         Mini-batch size.
     learning_rate : float
@@ -138,6 +148,9 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
+    best_of : int
+        Number of full training runs to perform. A single run includes
+        its own initialization and fitting from scratch.
 
     do_kl_annealing : bool
         Should we use KL annealing during training?
@@ -186,6 +199,12 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
 
     # Session labels
     session_labels: List[SessionLabels] = None
+
+    # Initialization
+    init_method: str = "random_state_time_course"
+    n_init: int = 3
+    n_init_epochs: int = 1
+    init_take: float = 1.0
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
