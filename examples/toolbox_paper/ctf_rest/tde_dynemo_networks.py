@@ -95,16 +95,14 @@ config = """
         kwargs:
             frequency_range: [1, 45]
             n_jobs: 8
-    plot_group_tde_dynemo_networks:
-        power_save_kwargs:
-            plot_kwargs: {views: [lateral]}
+    plot_group_tde_dynemo_networks: {}
     plot_alpha:
         normalize: True
         kwargs: {n_samples: 2000}
     plot_dynemo_network_summary_stats: {}
     compare_summary_stats:
         n_perm: 1000
-        n_jobs: 4
+        n_jobs: 8
 """
 
 # Run analysis

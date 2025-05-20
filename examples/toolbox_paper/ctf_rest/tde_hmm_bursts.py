@@ -60,7 +60,7 @@ def plot_amplitude_envelopes_and_alpha(data, output_dir, n_samples):
         filename=f"{plots_dir}/alpha.png",
     )
 
-    def get_amp_env(low_freq, high_freq, n_embeddings=21, sequence_length=2000):
+    def get_amp_env(low_freq, high_freq, n_embeddings=21, sequence_length=200):
         data.prepare({
             "filter": {"low_freq": low_freq, "high_freq": high_freq, "use_raw" : True},
             "amplitude_envelope": {},
