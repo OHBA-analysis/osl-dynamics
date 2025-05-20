@@ -44,6 +44,8 @@ config = Config(
     learning_rate=0.01,
     lr_decay=0,
     n_epochs=20,
+    n_init=5,
+    n_init_epochs=2,
 )
 
 model = Model(config)
@@ -51,28 +53,11 @@ model.summary()
 
 #%% Train model
 
-# Initialization
-init_history = model.random_state_time_course_initialization(
-    data,
-    n_init=5,
-    n_epochs=2,
-    take=1,
-)
+model.train(data)
 
-# Full training
-history = model.fit(data)
-
-# Save model
+# Save
 model_dir = f"{results_dir}/model"
 model.save(model_dir)
-
-# Calculate the free energy
-free_energy = model.free_energy(data)
-history["free_energy"] = free_energy
-
-# Save training history and free energy
-pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
-pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
 
 #%% Get inferred parameters
 
@@ -91,7 +76,7 @@ np.save(f"{inf_params_dir}/rates.npy", rates)
 
 #%% Calculate summary statistics
 
-# Viterbi path
+# State time course
 stc = modes.argmax_time_courses(alp)
 
 # Calculate summary statistics
