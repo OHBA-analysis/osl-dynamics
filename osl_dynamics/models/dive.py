@@ -160,6 +160,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
+    best_of : int
+        Number of full training runs to perform. A single run includes
+        its own initialization and fitting from scratch.
 
     n_sessions : int
         Number of sessions whose observation model parameters can vary.

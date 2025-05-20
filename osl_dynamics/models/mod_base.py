@@ -59,6 +59,7 @@ class BaseModelConfig:
     loss_calc: str = "mean"
     multi_gpu: bool = False
     strategy: str = None
+    best_of: int = 1
 
     # Dimension parameters
     n_modes: int = None
@@ -362,7 +363,7 @@ class ModelBase:
 
         return history
 
-    def train(self, *args, best_of=1, save_dir=None, **kwargs):
+    def train(self, *args, best_of=None, save_dir=None, **kwargs):
         """Wrapper for initializing and fitting the model.
 
         Parameters
@@ -372,11 +373,14 @@ class ModelBase:
         best_of : int, optional
             How many runs should we perform? We will return the best run
             (which is the one with the lowest variational free energy).
+            Defaults to :code:`config.best_of`.
         save_dir : str, optional
             Directory to save each run to. If None, the models are not saved.
         **kwargs : keyword arguments
             Keyword arguments to pass to both the initialization and fit method.
         """
+        best_of = best_of or self.config.best_of
+
         best_fe = np.inf
         best_weights = None
         best_run = None

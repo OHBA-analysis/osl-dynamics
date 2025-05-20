@@ -148,6 +148,9 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Should be use multiple GPUs for training?
     strategy : str
         Strategy for distributed learning.
+    best_of : int
+        Number of full training runs to perform. A single run includes
+        its own initialization and fitting from scratch.
 
     do_kl_annealing : bool
         Should we use KL annealing during training?
