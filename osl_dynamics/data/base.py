@@ -6,7 +6,6 @@ import re
 import logging
 import pathlib
 import pickle
-import psutil
 import random
 from contextlib import contextmanager
 from shutil import rmtree
@@ -1970,7 +1969,6 @@ class Data:
 
     def recommend_model_config(self):
         """Recommends arguments from a model config based on the data."""
-        import tensorflow as tf  # avoid slow imports
 
         # Initial recommendations
         sequence_length = 200
@@ -2013,49 +2011,9 @@ class Data:
         if n_batches > 150:
             learning_rate = 0.001
             n_epochs = 15
-
-        # How much memory do we need?
-        estimated_memory_needed_full = (
-            n_sequences
-            * sequence_length
-            * self.n_channels
-            * np.dtype(np.float32).itemsize
-        ) / 1024**3  # GB
-
-        estimated_memory_needed_batch = (
-            batch_size
-            * sequence_length
-            * self.n_channels
-            * np.dtype(np.float32).itemsize
-        ) / 1024**3  # GB
-
-        # How much CPU memory do we have?
-        mem = psutil.virtual_memory()
-        available_memory = mem.available / 1024**3  # GB
-
-        # How much GPU memory do we have
-        gpus = tf.config.list_physical_devices("GPU")
-        if gpus:
-            info = tf.config.experimental.get_memory_info("GPU:0")
-            total_memory = info["peak"] / 1024**3  # GB
-            current_memory_used = info["current"] / 1024**3  # GB
-            available_memory = total_memory - current_memory_used
-
-        # Do we need to use a TFRecord dataset?
-        if n_batches * estimated_memory_needed_batch > available_memory:
             print("Data(..., use_tfrecord=True) is recommended")
 
         # Print info
-        print(
-            "Estimated memory needed (full dataset): "
-            f"{estimated_memory_needed_full:.3g} GB"
-        )
-        print(
-            "Estimated memory needed (1 batch): "
-            f"{estimated_memory_needed_batch:.3g} GB"
-        )
-        print(f"Available memory: {available_memory:.3g} GB")
-
         print(
             "Recommendation:\n"
             "  config = Config(\n"
