@@ -1,30 +1,34 @@
+"""HMM Fisher kernel example.
+
+"""
+
+import os
+import numpy as np
+from sklearn.svm import SVC
+from sklearn.multiclass import OneVsOneClassifier
+from sklearn.model_selection import KFold
+
 from osl_dynamics import simulation, data, inference
 from osl_dynamics.analysis import fisher_kernel
 from osl_dynamics.models.hmm import Config, Model
 from osl_dynamics.utils import plotting
 
-import numpy as np
-import os
-from sklearn.svm import SVC
-from sklearn.multiclass import OneVsOneClassifier
-from sklearn.model_selection import KFold
+os.makedirs("results", exist_ok=True)
 
-os.makedirs("figures", exist_ok=True)
-
-inference.tf_ops.gpu_growth()
-
+# Settings
 config = Config(
     n_states=5,
     n_channels=20,
     sequence_length=200,
     learn_means=False,
     learn_covariances=True,
+    learn_trans_prob=True,
     batch_size=64,
     learning_rate=0.005,
     n_epochs=20,
-    learn_trans_prob=True,
 )
 
+# Simulate data
 sim = simulation.MSess_HMM_MVN(
     n_samples=3000,
     trans_prob="sequence",
@@ -42,6 +46,7 @@ sim = simulation.MSess_HMM_MVN(
     stay_prob=0.9,
 )
 sim.standardize()
+training_data = data.Data(sim.time_series)
 
 # Plot the embeddings
 sim_se = sim.embeddings
@@ -56,15 +61,19 @@ plotting.plot_scatter(
         np.array([str(i) for i in range(sim.n_sessions)])[group_mask]
         for group_mask in group_masks
     ],
-    filename="figures/sim_embeddings.png",
+    filename="results/sim_embeddings.png",
 )
-training_data = data.Data([tc for tc in sim.time_series])
 
+# Create model and train
 model = Model(config)
-model.random_state_time_course_initialization(training_data, n_epochs=2, n_init=3)
+model.random_state_time_course_initialization(training_data)
 model.fit(training_data)
-alpha = model.get_alpha(training_data)
-argmax_alpha = inference.modes.argmax_time_courses(alpha)
+
+# Save the model
+model.save("results/model")
+
+# Load the model (avoids a segmentation fault when using GPUs)
+model = Model.load("results/model")
 
 # Get the Fisher kernel matrix
 fk = fisher_kernel.FisherKernel(model)
@@ -84,7 +93,6 @@ for train_index, validation_index in kf.split(range(sim.n_sessions)):
 
     labels_predict = clf.predict(kernel_validation)
     scores.append(clf.score(kernel_validation, labels_validation))
-
 
 print("Mean score:", np.mean(scores))
 print("Score std:", np.std(scores))
