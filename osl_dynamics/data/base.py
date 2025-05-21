@@ -1968,7 +1968,7 @@ class Data:
         return self.session_labels
 
     def recommend_model_config(self):
-        """Recommends arguments from a model config based on the data."""
+        """Recommends arguments for a model config based on the data."""
 
         # Initial recommendations
         sequence_length = 200
