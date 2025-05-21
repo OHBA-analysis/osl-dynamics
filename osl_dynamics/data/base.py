@@ -1970,6 +1970,7 @@ class Data:
 
     def recommend_model_config(self):
         """Recommends arguments from a model config based on the data."""
+        import tensorflow as tf  # avoid slow imports
 
         # Initial recommendations
         sequence_length = 200
@@ -2019,21 +2020,26 @@ class Data:
             * sequence_length
             * self.n_channels
             * np.dtype(np.float32).itemsize
-        )  # bytes
-        estimated_memory_needed_full /= 1024**3  # GB
+        ) / 1024**3  # GB
 
         estimated_memory_needed_batch = (
             batch_size
             * sequence_length
             * self.n_channels
             * np.dtype(np.float32).itemsize
-        )  # bytes
-        estimated_memory_needed_batch /= 1024**3  # GB
+        ) / 1024**3  # GB
 
-        # How much memory do we have?
+        # How much CPU memory do we have?
         mem = psutil.virtual_memory()
-        available_memory = mem.available  # bytes
-        available_memory /= 1024**3  # GB
+        available_memory = mem.available / 1024**3  # GB
+
+        # How much GPU memory do we have
+        gpus = tf.config.list_physical_devices("GPU")
+        if gpus:
+            info = tf.config.experimental.get_memory_info("GPU:0")
+            total_memory = info["peak"] / 1024**3  # GB
+            current_memory_used = info["current"] / 1024**3  # GB
+            available_memory = total_memory - current_memory_used
 
         # Do we need to use a TFRecord dataset?
         if n_batches * estimated_memory_needed_batch > available_memory:
