@@ -36,7 +36,6 @@ class FisherKernel:
                 f"{model.config.model_name} was not found."
                 + f"Options are {compatible_models}."
             )
-
         self.model = model
 
     def get_features(self, dataset, batch_size=None):
@@ -69,8 +68,6 @@ class FisherKernel:
         # Initialise list to hold features for each session
         features = []
         for i in trange(n_sessions, desc="Getting features"):
-            session_data = dataset[i]
-
             # Initialise dictionary for holding gradients
             d_model = dict()
 
@@ -78,10 +75,10 @@ class FisherKernel:
                 d_model["d_initial_distribution"] = []
                 d_model["d_trans_prob"] = []
 
+            # Get trainable variables in the generative model
             trainable_variable_names = [
                 var.name for var in self.model.trainable_weights
             ]
-            # Get only variable in the generative model
             for name in trainable_variable_names:
                 if (
                     "mod" in name
@@ -95,7 +92,7 @@ class FisherKernel:
                     d_model[name] = []
 
             # Loop over data for each session
-            for inputs in session_data:
+            for inputs in dataset[i]:
                 if self.model.config.model_name == "HMM":
                     outputs = self.model.model(inputs)
                     gamma = outputs["gamma"]
