@@ -1,10 +1,12 @@
 """Base class for handling data."""
 
+import math
 import os
 import re
 import logging
 import pathlib
 import pickle
+import psutil
 import random
 from contextlib import contextmanager
 from shutil import rmtree
@@ -1965,6 +1967,101 @@ class Data:
             List of session labels.
         """
         return self.session_labels
+
+    def recommend_model_config(self):
+        """Recommends arguments from a model config based on the data."""
+
+        # Initial recommendations
+        sequence_length = 200
+        batch_size = 256
+        learning_rate = 0.01
+        n_epochs = 20
+
+        # What's the shortest session
+        min_n_samples = np.min([x.shape[0] for x in self.arrays])
+
+        # Make sure we have enough samples for one full sequence for
+        # each session
+        if min_n_samples < 10:
+            _logger.warning(
+                "Detected session with less than 10 samples, "
+                "this means we may have to have very short sequences."
+            )
+            sequence_length = min_n_samples
+
+        min_n_sequences = min_n_samples // sequence_length
+
+        if min_n_sequences < 1:
+            raise ValueError(
+                "Not enough samples in at least one session to "
+                f"split into sequences of {sequence_length}."
+            )
+
+        # How many sequences and batches do we have in total?
+        n_sequences = np.sum([x.shape[0] // sequence_length for x in self.arrays])
+        n_batches = math.ceil(n_sequences / batch_size)
+
+        # Make sure we have at least 4 batches (updates per epoch)
+        if n_batches < 4:
+            batch_size = n_sequences // 4
+
+        n_batches = math.ceil(n_sequences / batch_size)
+
+        # We have a really large dataset we can recommend a lower
+        # learning rate and less epochs
+        if n_batches > 150:
+            learning_rate = 0.001
+            n_epochs = 15
+
+        # How much memory do we need?
+        estimated_memory_needed_full = (
+            n_sequences
+            * sequence_length
+            * self.n_channels
+            * np.dtype(np.float32).itemsize
+        )  # bytes
+        estimated_memory_needed_full /= 1024**3  # GB
+
+        estimated_memory_needed_batch = (
+            batch_size
+            * sequence_length
+            * self.n_channels
+            * np.dtype(np.float32).itemsize
+        )  # bytes
+        estimated_memory_needed_batch /= 1024**3  # GB
+
+        # How much memory do we have?
+        mem = psutil.virtual_memory()
+        available_memory = mem.available  # bytes
+        available_memory /= 1024**3  # GB
+
+        # Do we need to use a TFRecord dataset?
+        if n_batches * estimated_memory_needed_batch > available_memory:
+            print("Data(..., use_tfrecord=True) is recommended")
+
+        # Print info
+        print(
+            "Estimated memory needed (full dataset): "
+            f"{estimated_memory_needed_full:.3g} GB"
+        )
+        print(
+            "Estimated memory needed (1 batch): "
+            f"{estimated_memory_needed_batch:.3g} GB"
+        )
+        print(f"Available memory: {available_memory:.3g} GB")
+
+        print(
+            "Recommendation:\n"
+            "  config = Config(\n"
+            "      ...\n"
+            f"      sequence_length={sequence_length},\n"
+            f"      batch_size={batch_size},\n"
+            f"      learning_rate={learning_rate},\n"
+            f"      n_epochs={n_epochs},\n"
+            "  )"
+        )
+        print(f"Total number of sequences: {n_sequences}")
+        print(f"Total number of batches/parameter updates: {n_batches}")
 
     def save_preparation(self, output_dir="."):
         """Save a pickle file containing preparation settings.
