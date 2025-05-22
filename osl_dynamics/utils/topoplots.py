@@ -182,7 +182,7 @@ class Topology:
             Display colorbar
         axis : matplotlib.pyplot.Axes, optional
             matplotlib axis to plot on.
-        cmap : str, optional
+        cmap : str or matplotlib.colors.ListedColormap, optional
             Colourmap to use in plot. Defaults to matplotlib's plasma.
         n_contours : int, optional
             Number of contours to use in plot.
