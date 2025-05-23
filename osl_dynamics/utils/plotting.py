@@ -1250,7 +1250,7 @@ def plot_matrices(
         Titles to give to each matrix axis.
     main_title: str, optional
         Main title to be placed at the top of the plot.
-    cmap: str, optional
+    cmap: str or matplotlib.colors.ListedColormap, optional
         Matplotlib colormap.
     nan_color: str, optional
         Matplotlib color to use for :code:`NaN` values.
@@ -1277,7 +1277,9 @@ def plot_matrices(
     if titles is None:
         titles = [""] * len(matrix)
 
-    cmap = matplotlib.cm.get_cmap(cmap).copy()
+    if isinstance(cmap, str):
+        cmap = matplotlib.cm.get_cmap(cmap)
+    cmap = cmap.copy()
     cmap.set_bad(color=nan_color)
 
     for grid, axis, title in zip_longest(matrix, axes.ravel(), titles):
@@ -1355,8 +1357,8 @@ def plot_connections(
         A name for each node in the weights matrix (e.g. parcel names)
     ax : plt.axes, optional
         A matplotlib axis on which to plot.
-    cmap : str, optional
-        A string corresponding to a matplotlib colormap.
+    cmap : str or matplotlib.colors.ListedColormap, optional
+        Matplotlib colormap.
     text_color : str, optional
         A string corresponding to a matplotlib color.
     filename : str, optional
@@ -1379,7 +1381,9 @@ def plot_connections(
     inner = 0.9
     outer = 1.0
 
-    cmap = matplotlib.cm.get_cmap(cmap)
+    if isinstance(cmap, str):
+        cmap = matplotlib.cm.get_cmap(cmap)
+    cmap = cmap.copy()
     norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
 
     highest_color = cmap(norm(1)) if text_color is None else text_color
@@ -1546,8 +1550,8 @@ def topoplot(
         Show a colorbar for the field.
     axis : plt.axis, optional
         matplotlib axis to plot on.
-    cmap : str, optional
-        matplotlib colourmap.
+    cmap : str or matplotlib.colors.ListedColormap, optional
+        Matplotlib colormap.
     n_contours : int, optional
         number of field isolines to show on the plot.
     filename : str, optional
@@ -1613,7 +1617,7 @@ def plot_brain_surface(
         Parcellation file. See osl_dynamics.files.parcellation.
     title : str, optional
         Title for the plot.
-    cmap : str, optional
+    cmap : str or matplotlib.colors.ListedColormap, optional
         Matplotlib colormap.
     colorbar : bool, optional
         Should we plot a colorbar?
@@ -1789,8 +1793,8 @@ def plot_alpha(
         A collection of alphas passed as separate arguments.
     n_samples: int, optional
         Number of time points to be plotted.
-    cmap : str, optional
-        A matplotlib colormap string.
+    cmap : str or matplotlib.colors.ListedColormap, optional
+        Matplotlib colormap.
     sampling_frequency : float, optional
         The sampling frequency of the data in Hz.
     y_labels : str, optional
@@ -1825,23 +1829,25 @@ def plot_alpha(
 
     n_modes = max(a.shape[1] for a in alpha)
     n_samples = min(n_samples or np.inf, alpha[0].shape[0])
-    if cmap in [
-        "Pastel1",
-        "Pastel2",
-        "Paired",
-        "Accent",
-        "Dark2",
-        "Set1",
-        "Set2",
-        "Set3",
-        "tab10",
-        "tab20",
-        "tab20b",
-        "tab20c",
-    ]:
-        cmap = plt.cm.get_cmap(name=cmap)
-    else:
-        cmap = plt.cm.get_cmap(name=cmap, lut=n_modes)
+    if isinstance(cmap, str):
+        if cmap in [
+            "Pastel1",
+            "Pastel2",
+            "Paired",
+            "Accent",
+            "Dark2",
+            "Set1",
+            "Set2",
+            "Set3",
+            "tab10",
+            "tab20",
+            "tab20b",
+            "tab20c",
+        ]:
+            cmap = plt.cm.get_cmap(name=cmap)
+        else:
+            cmap = plt.cm.get_cmap(name=cmap, lut=n_modes)
+    cmap = cmap.copy()
     colors = cmap.colors
 
     # Validation
