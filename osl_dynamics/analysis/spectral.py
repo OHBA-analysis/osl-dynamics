@@ -1593,13 +1593,8 @@ def _welch(
 
     # Check for nans
     if np.isnan(psd).any():
+        _logger.warn("PSD contains NaN values.")
         psd = np.nan_to_num(psd)  # zero out nan values
-        _logger.warn(
-            "PSD contains NaN values. This may indicate a potentially "
-            "poor HMM fit. You should consider running the model again "
-            "or selecting the model run with the lowest free energy after "
-            "training multiple times."
-        )
 
     if not keepdims:
         # Squeeze any axes of length 1
@@ -1934,13 +1929,8 @@ def _multitaper(
 
     # Check for nans
     if np.isnan(psd).any():
+        _logger.warn("PSD contains NaN values.")
         psd = np.nan_to_num(psd)  # zero out nan values
-        _logger.warn(
-            "PSD contains NaN values. This may indicate a potentially "
-            "poor HMM fit. You should consider running the model again "
-            "or selecting the model run with the lowest free energy after "
-            "training multiple times."
-        )
 
     if not keepdims:
         # Squeeze any axes of length 1
