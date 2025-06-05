@@ -108,7 +108,6 @@ power.save(
     means_diff,
     mask_file=mask_file,
     parcellation_file=parcellation_file,
-    plot_kwargs={"views": ["lateral"], "symmetric_cbar": True},
     filename=f"{group_diff_dir}/means_diff_.png",
 )
 

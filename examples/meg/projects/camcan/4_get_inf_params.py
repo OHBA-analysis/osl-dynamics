@@ -24,12 +24,7 @@ from osl_dynamics.data import load_tfrecord_dataset
 from osl_dynamics.models import load
 
 # Load training data
-dataset = load_tfrecord_dataset(
-    "training_dataset",
-    batch_size=32,
-    shuffle=False,
-    concatenate=False,
-)
+dataset = load_tfrecord_dataset("dataset", shuffle=False, concatenate=False)
 
 # Load model
 model = load(model_dir)

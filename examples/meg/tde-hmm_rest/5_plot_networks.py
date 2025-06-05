@@ -49,11 +49,9 @@ gpsd = np.average(psd, axis=0, weights=w)
 # Plot
 for i in range(gpsd.shape[0]):
     p = np.mean(gpsd[i], axis=0)  # mean over parcels
-    e = np.std(gpsd[i]) / np.sqrt(gpsd[i].shape[0])  # standard error on the mean
     plotting.plot_line(
         [f],
         [p],
-        errors=[[p - e], [p + e]],
         x_label="Frequency (Hz)",
         y_label="PSD (a.u.)",
         x_range=[f[0], f[-1]],
@@ -61,9 +59,6 @@ for i in range(gpsd.shape[0]):
     )
 
 #%% Plot power maps
-
-# Calculate the group average power spectrum for each state
-gpsd = np.average(psd, axis=0, weights=w)
 
 # Calculate the power map by integrating the power spectra over a frequency range
 p = power.variance_from_spectra(f, gpsd, wb_comp)
@@ -74,8 +69,7 @@ power.save(
     mask_file=mask_file,
     parcellation_file=parcellation_file,
     subtract_mean=True,
-    component=0,
-    plot_kwargs={"symmetric_cbar": True},
+    component=0,  # nnmf component
     filename=f"{networks_dir}/pow_.png",
 )
 
@@ -94,6 +88,6 @@ c = connectivity.threshold(c, percentile=98, subtract_mean=True)
 connectivity.save(
     c,
     parcellation_file=parcellation_file,
-    component=0,
+    component=0,  # nnmf component
     filename=f"{networks_dir}/coh_.png",
 )

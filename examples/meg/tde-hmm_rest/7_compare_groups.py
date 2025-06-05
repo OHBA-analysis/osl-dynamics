@@ -115,7 +115,6 @@ power.save(
     power_map_diff,
     mask_file=mask_file,
     parcellation_file=parcellation_file,
-    plot_kwargs={"views": ["lateral"], "symmetric_cbar": True},
     filename=f"{group_diff_dir}/pow_diff_.png",
 )
 
