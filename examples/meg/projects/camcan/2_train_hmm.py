@@ -27,29 +27,20 @@ config = Config(
     sequence_length=400,
     learn_means=False,
     learn_covariances=True,
-    learn_trans_prob=True,
     batch_size=32,
     learning_rate=0.001,
-    n_epochs=10,
+    n_epochs=15,
 )
 
 # Load training data
-dataset = load_tfrecord_dataset(
-    "training_dataset",
-    config.batch_size,
-    buffer_size=5000,
-)
+dataset = load_tfrecord_dataset("dataset", config.batch_size, buffer_size=1000)
 
 # Build model
 model = Model(config)
 model.summary()
 
 # Initialization
-model.random_state_time_course_initialization(
-    dataset,
-    n_init=3,
-    n_epochs=1,
-)
+model.random_state_time_course_initialization(dataset, n_init=3, n_epochs=1)
 
 # Full training
 print("Training model")

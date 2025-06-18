@@ -14,12 +14,10 @@ files = sorted(glob("/well/woolrich/projects/camcan/spring23/src/*/sflip_parc-ra
 data = Data(files, picks="misc", reject_by_annotation="omit", n_jobs=16)
 
 # Prepare TDE-PCA data
-data.prepare(
-    {
-        "tde_pca": {"n_embeddings": 15, "n_pca_components": 120},
-        "standardize": {},
-    }
-)
+data.prepare({
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": 120},
+    "standardize": {},
+})
 
 # Save a TFRecord dataset
-data.save_tfrecord_dataset("training_dataset", sequence_length=400)
+data.save_tfrecord_dataset("dataset", sequence_length=400)

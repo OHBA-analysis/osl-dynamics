@@ -13,11 +13,9 @@ run = int(argv[2])
 #%% Import packages
 
 print("Importing packages")
-
 import os
 import pickle
 import numpy as np
-
 from osl_dynamics.models import load
 from osl_dynamics.data import Data
 
@@ -41,7 +39,6 @@ data = Data(
     store_dir=f"tmp_{n_states}_{run}",
     n_jobs=8,
 )
-
 methods = {
     "amplitude_envelope": {},
     "moving_average": {"n_window": 5},
@@ -55,9 +52,7 @@ alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
 
 #%% Dual estimation
 
-# Calculate subject-specific means and covariances
 means, covs = model.dual_estimation(data, alpha)
 
-# Save
 np.save(f"{dual_estimates_dir}/means.npy", means)
 np.save(f"{dual_estimates_dir}/covs.npy", covs)

@@ -13,11 +13,9 @@ run = int(argv[2])
 #%% Import packages
 
 print("Importing packages")
-
 import os
 import numpy as np
 import pandas as pd
-
 from osl_dynamics.analysis import statistics, power, connectivity
 from osl_dynamics.utils import plotting
 
@@ -30,7 +28,6 @@ group_diff_dir = f"{results_dir}/group_diff"
 
 os.makedirs(group_diff_dir, exist_ok=True)
 
-# Source reconstruction files
 mask_file = "MNI152_T1_8mm_brain.nii.gz"
 parcellation_file = "fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz"
 
@@ -108,7 +105,6 @@ power.save(
     means_diff,
     mask_file=mask_file,
     parcellation_file=parcellation_file,
-    plot_kwargs={"views": ["lateral"], "symmetric_cbar": True},
     filename=f"{group_diff_dir}/means_diff_.png",
 )
 

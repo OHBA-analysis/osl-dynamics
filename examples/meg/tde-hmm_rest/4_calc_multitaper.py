@@ -13,17 +13,14 @@ run = int(argv[2])
 #%% Import packages
 
 print("Importing packages")
-
 import os
 import pickle
 import numpy as np
-
 from osl_dynamics.analysis import spectral
 from osl_dynamics.data import Data
 
 #%% Directories
 
-# Directories
 inf_params_dir = f"results/{n_states}_states/run{run:02d}/inf_params"
 spectra_dir = f"results/{n_states}_states/run{run:02d}/spectra"
 
@@ -52,7 +49,7 @@ data_ = data.trim_time_series(n_embeddings=15, sequence_length=200)
 alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
 
 # Sanity check: the first axis should have the same numebr of time points
-#for x, a in zip(data, alpha):
+#for x, a in zip(data_, alpha):
 #   print(x.shape, a.shape)
 
 #%% Calculate multitaper
