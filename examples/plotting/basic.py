@@ -37,7 +37,7 @@ plotting.plot_violin([x1, x2], filename="violins.png")
 
 #%% Plot time series data
 
-# Plot continous raw time series data
+# Plot continuous raw time series data
 X = np.random.normal(size=[1000, 5])
 plotting.plot_time_series(X, filename="time_series1.png")
 

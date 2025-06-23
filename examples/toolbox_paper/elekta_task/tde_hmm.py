@@ -100,7 +100,7 @@ def plot_evoked_response(data, output_dir, n_perm, metric, significance_level):
         epochs, n_perm=n_perm, metric=metric
     )
 
-    # Plot epoched state time courses with significant time points highlighed
+    # Plot epoched state time courses with significant time points highlighted
     plotting.plot_evoked_response(
         t,
         np.mean(epochs, axis=0),

@@ -101,7 +101,7 @@ fig, ax = power.save(
 )
 
 #%%
-# Because the power is always positive and a lot of the state have power in similar regions all the power maps look similar. To highlight differences we can display the power maps relative to someting. Typically we use the average across states - taking the average across states approximates the static power of the entire training dataset. We can do this by passing the `subtract_mean` argument.
+# Because the power is always positive and a lot of the state have power in similar regions all the power maps look similar. To highlight differences we can display the power maps relative to something. Typically we use the average across states - taking the average across states approximates the static power of the entire training dataset. We can do this by passing the `subtract_mean` argument.
 
 # Takes a few seconds for the power maps to appear
 fig, ax = power.save(
@@ -173,7 +173,7 @@ wb_comp = spectral.decompose_spectra(coh, n_components=2)
 print(wb_comp.shape)
 
 #%%
-# `wb_comp` refers to 'wideband component' because the spectral components cover a wide frequency range (we'll see this below). If we passed `n_components=4`, we would find more narrowband components. You can interpret the `wb_comp` array as weights for how much coherent (phase-locking) activity is occuring at a particular frequency for a particular component. It can be better understood if we plot it.
+# `wb_comp` refers to 'wideband component' because the spectral components cover a wide frequency range (we'll see this below). If we passed `n_components=4`, we would find more narrowband components. You can interpret the `wb_comp` array as weights for how much coherent (phase-locking) activity is occurring at a particular frequency for a particular component. It can be better understood if we plot it.
 
 from osl_dynamics.utils import plotting
 

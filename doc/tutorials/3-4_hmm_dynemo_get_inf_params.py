@@ -27,7 +27,7 @@ In this tutorial we will get the inferred parameters from a dynamic network mode
 #     get_data("notts_mrc_meguk_giles_prepared_5_subjects", rename="prepared_data")
 
 #%%
-# Let's also download a model. In this tutorial, we will download a trained HMM, however, this can be subsituted with a DyNeMo model without any other changes being needed.
+# Let's also download a model. In this tutorial, we will download a trained HMM, however, this can be substituted with a DyNeMo model without any other changes being needed.
 #
 # .. code-block:: python
 #

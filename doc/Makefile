@@ -105,7 +105,7 @@ devhelp: doc-requirements
 	@echo "Build finished."
 	@echo "To view the help file:"
 	@echo "# mkdir -p $HOME/.local/share/devhelp/$(PROJECT)"
-	@echo "# ln -s $(BUILDDIR)/devhelp $HOME/.local/share/devhelp/$(PROJEC)"
+	@echo "# ln -s $(BUILDDIR)/devhelp $HOME/.local/share/devhelp/$(PROJECT)"
 	@echo "# devhelp"
 
 epub: doc-requirements

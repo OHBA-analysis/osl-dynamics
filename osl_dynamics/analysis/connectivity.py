@@ -735,7 +735,7 @@ def spectral_reordering(corr_mat):
     order : np.ndarray
         New ordering. Shape is (n_channels,).
     """
-    # Add one to make all entries postive
+    # Add one to make all entries positive
     C = corr_mat + 1
 
     # Compute Q

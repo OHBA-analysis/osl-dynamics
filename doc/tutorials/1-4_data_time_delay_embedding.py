@@ -117,7 +117,7 @@ plt.legend()
 #%%
 # We can see the 20 Hz peak in the channel 2, which corresponds well to what we simulated. We also see a smaller 20 Hz peak for channel 3. However, we aren't able to resolve the 10 Hz peak we simulated for channel 1. This was because we didn't use enough lags to resolve the 10 Hz peak.
 #
-# Note, we can see some ringing, this is due to padding the ACF with zeros (to obtain an interger multiple of 2) before calculating the Fourier transform, we can change the padding via the `nfft` argument to `analysis.spectral.autocorr_to_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.autocorr_to_spectra>`_.
+# Note, we can see some ringing, this is due to padding the ACF with zeros (to obtain an integer multiple of 2) before calculating the Fourier transform, we can change the padding via the `nfft` argument to `analysis.spectral.autocorr_to_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.autocorr_to_spectra>`_.
 #
 # Let's try again with more lags - this will mean we evaluate the ACF for a greater window of time lags, this will result in a higher resolution PSD.
 

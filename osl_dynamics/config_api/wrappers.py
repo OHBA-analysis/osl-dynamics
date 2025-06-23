@@ -423,7 +423,7 @@ def train_mdynemo(
     config = mdynemo.Config(**config_kwargs)
     config.pca_components = data.pca_components
 
-    # KMeans to intialise corrs
+    # KMeans to initialise corrs
     _logger.info("Initialising corrs")
     default_corrs_init_kwargs = {
         "window_length": data.sampling_frequency * 2,

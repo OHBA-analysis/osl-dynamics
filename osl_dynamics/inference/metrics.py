@@ -24,7 +24,7 @@ def alpha_correlation(alpha_1, alpha_2):
     """
     if alpha_1.shape[1] != alpha_2.shape[1]:
         raise ValueError(
-            "alpha_1 and alpha_2 shapes are incomptible. "
+            "alpha_1 and alpha_2 shapes are incompatible. "
             + f"alpha_1.shape={alpha_1.shape}, alpha_2.shape={alpha_2.shape}."
         )
     n_modes = alpha_1.shape[1]

@@ -69,6 +69,6 @@ def epoch_mean(data, time_index, pre, post, pad=False):
     Returns
     -------
     epoch_mean : np.ndarray
-        (time, channels) data meaned over epochs.
+        (time, channels) data meant over epochs.
     """
     return np.nanmean(epoch(data, time_index, pre, post, pad=pad), axis=0)
