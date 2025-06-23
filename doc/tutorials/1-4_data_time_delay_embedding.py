@@ -367,7 +367,7 @@ ax[0].set_ylabel("PSD (a.u.)")
 ax[0].legend()
 
 #%%
-# We see as we increase the number of PCA components, we retrain more high frequency oscillations. It is important to use enough PCA components to keep the frequeny range you're interested in studying. Typically, this is at least twice the number of original channels.
+# We see as we increase the number of PCA components, we retrain more high frequency oscillations. It is important to use enough PCA components to keep the frequency range you're interested in studying. Typically, this is at least twice the number of original channels.
 #
 # Note, it is also important to select enough embeddings to be sensitive to the frequencies you're interested in based on the simulated data.
 #

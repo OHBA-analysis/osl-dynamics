@@ -478,7 +478,7 @@ def tinda(
             itc_prim = tc[:, i]
             if not np.array_equal(
                 itc_prim, itc_prim.astype(int)
-            ):  # if not binary (i.e., intervals are not well difined)
+            ):  # if not binary (i.e., intervals are not well defined)
                 stats.append(None)
                 ignore_elements.append(i)
 
