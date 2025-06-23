@@ -28,3 +28,10 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "*" = ["*"]
+
+[tool.codespell]
+# Ref: https://github.com/codespell-project/codespell#using-a-config-file
+skip = '.git*,*.pdf,*.gii,*.scene'
+check-hidden = true
+# ignore-regex = ''
+ignore-words-list = 'fo,fro,commun'
