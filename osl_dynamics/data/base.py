@@ -1582,9 +1582,7 @@ class Data:
 
         n_sequences = self.count_sequences(self.sequence_length)
 
-        def _create_dataset(
-            X, extra_channels, shuffle=shuffle, repeat_count=repeat_count
-        ):
+        def _create_dataset(X, extra_channels, shuffle=shuffle, repeat_count=None):
             # X is a list of np.ndarray
 
             # Create datasets for each array
@@ -1628,7 +1626,8 @@ class Data:
                     )
 
                 # Repeat the dataset
-                full_dataset = full_dataset.repeat(repeat_count)
+                if repeat_count is not None:
+                    full_dataset = full_dataset.repeat(repeat_count)
 
                 import tensorflow as tf  # moved here to avoid slow imports
 
@@ -1650,7 +1649,8 @@ class Data:
                         ds = ds.shuffle(self.buffer_size)
 
                     # Repeat the dataset
-                    ds = ds.repeat(repeat_count)
+                    if repeat_count is not None:
+                        ds = ds.repeat(repeat_count)
 
                     import tensorflow as tf  # moved here to avoid slow imports
 
@@ -1669,8 +1669,10 @@ class Data:
                 self._validation_split(X, extra_channels, validation_split)
             )
 
-            return _create_dataset(X_train, extra_channels_train), _create_dataset(
-                X_val, extra_channels_val, shuffle=False, repeat_count=1
+            return _create_dataset(
+                X_train, extra_channels_train, repeat_count=repeat_count
+            ), _create_dataset(
+                X_val, extra_channels_val, shuffle=False, repeat_count=None
             )
 
         else:

@@ -218,7 +218,7 @@ def load_tfrecord_dataset(
             for name, tensor in parsed_example.items()
         }
 
-    def _create_dataset(filenames, shuffle=shuffle, repeat_count=repeat_count):
+    def _create_dataset(filenames, shuffle=shuffle, repeat_count=None):
         if concatenate:
             filenames = tf.data.Dataset.from_tensor_slices(filenames)
 
@@ -260,7 +260,8 @@ def load_tfrecord_dataset(
                 )
 
             # Repeat the dataset
-            full_dataset = full_dataset.repeat(repeat_count)
+            if repeat_count is not None:
+                full_dataset = full_dataset.repeat(repeat_count)
 
             return full_dataset.prefetch(tf.data.AUTOTUNE)
 
@@ -285,7 +286,8 @@ def load_tfrecord_dataset(
                     ds = ds.shuffle(buffer_size)
 
                 # Repeat the dataset
-                ds = ds.repeat(repeat_count)
+                if repeat_count is not None:
+                    ds = ds.repeat(repeat_count)
 
                 full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
 
@@ -332,9 +334,9 @@ def load_tfrecord_dataset(
             )
             val_filenames.append(filepath)
 
-        return _create_dataset(train_filenames), _create_dataset(
-            val_filenames, shuffle=False, repeat_count=1
-        )
+        return _create_dataset(
+            train_filenames, shuffle=shuffle, repeat_count=repeat_count
+        ), _create_dataset(val_filenames, shuffle=False, repeat_count=None)
 
 
 def _validate_tf_dataset(dataset):
