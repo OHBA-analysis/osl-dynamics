@@ -24,13 +24,7 @@ from osl_dynamics.models.hmm import Config, Model
 
 # Load data
 files = sorted(glob("data/src/*/sflip_parc-raw.fif"))
-data = Data(
-    files,
-    picks="misc",
-    reject_by_annotation="omit",
-    store_dir=f"tmp_{n_states}_{run}",
-    n_jobs=8,
-)
+data = Data(files, picks="misc", reject_by_annotation="omit", n_jobs=8)
 
 # Prepare data
 methods = {

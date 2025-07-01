@@ -43,7 +43,6 @@ power.save(
     means,
     mask_file=mask_file,
     parcellation_file=parcellation_file,
-    plot_kwargs={"symmetric_cbar": True},
     filename=f"{networks_dir}/mean_.png",
 )
 

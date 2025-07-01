@@ -22,11 +22,7 @@ from osl_dynamics.models.hmm import Config, Model
 #%% Load data
 
 # Load data
-data = Data(
-    "training_data/networks",
-    store_dir=f"tmp_{n_states}_{run}",
-    n_jobs=8,
-)
+data = Data("training_data/networks", n_jobs=8)
 
 # Prepare data
 methods = {
