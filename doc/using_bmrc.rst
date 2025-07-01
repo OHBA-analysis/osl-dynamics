@@ -113,7 +113,7 @@ Similarly we can load other useful software packages, e.g.
 
 The above lines can be added to ``/users/woolrich/<username>/.bashrc`` which will load the modules automatically when you log in.
 
-Incase you need a particular version of CUDA/cuDNN to use a GPU you can check which are available and load the module with:
+In case you need a particular version of CUDA/cuDNN to use a GPU you can check which are available and load the module with:
 
 .. code-block:: shell
 
@@ -148,7 +148,7 @@ We recommend using VSCode locally and the ``Remote - SSH`` extension to edit rem
 - Install VSCode: `https://code.visualstudio.com/ <https://code.visualstudio.com/>`_.
 - Install the ``Remote - SSH`` extension: `https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh <https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-ssh>`_.
 - Click the green quick configuration button in the bottom left of VSCode.
-- Click ``Open SSH Configation File...``.
+- Click ``Open SSH Configuration File...``.
 - Select the first config file, e.g. for me: ``/Users/<username>/.ssh/config``.
 - Paste the following into the text editor with your corresponding Oxford SSO and BMRC username:
 
@@ -182,7 +182,7 @@ To format a source file:
 
     black <filename>.py
 
-Please run ``black`` on any edited files before commiting changes.
+Please run ``black`` on any edited files before committing changes.
 
 Git Workflow
 ************

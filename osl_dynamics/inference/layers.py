@@ -229,7 +229,7 @@ class DummyLayer(layers.Layer):
 
 
 class InverseCholeskyLayer(layers.Layer):
-    """Layer for getting Cholesky vectors from postive definite symmetric matrices.
+    """Layer for getting Cholesky vectors from positive definite symmetric matrices.
 
     Parameters
     ----------
@@ -935,7 +935,7 @@ class DampedOscillatorLayer(layers.Layer):
     learn_amplitude : bool
         Should the amplitudes be learnable?
         If not, they will be fixed to 1.0.
-        Overriden if the general `learn` argument is False.
+        Overridden if the general `learn` argument is False.
     learn : bool
         Should the oscillators be learnable?
     kwargs : keyword arguments, optional
@@ -1029,7 +1029,7 @@ class DampedOscillatorCovarianceMatricesLayer(layers.Layer):
     learn_amplitude : bool
         Should the amplitudes be learnable?
         If not, they will be fixed to 1.0.
-        Overriden if the general `learn` argument is False.
+        Overridden if the general `learn` argument is False.
     learn : bool
         Should the matrices be learnable?
     kwargs : keyword arguments, optional

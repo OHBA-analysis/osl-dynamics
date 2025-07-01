@@ -82,7 +82,7 @@ class MVN:
             self.covariances = self.create_covariances(covariances)
 
         else:
-            raise ValueError("means and covariance arugments not passed correctly.")
+            raise ValueError("means and covariance arguments not passed correctly.")
 
     def create_means(self, option, mu=0, sigma=0.2):
         if option == "zero":

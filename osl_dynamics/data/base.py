@@ -412,7 +412,7 @@ class Data:
         Parameters
         ----------
         sequence_length : int
-            Length of the segement of data to feed into the model.
+            Length of the segment of data to feed into the model.
         batch_size : int
             Number sequences in each mini-batch which is used to train the
             model.
@@ -1340,7 +1340,7 @@ class Data:
         Parameters
         ----------
         sequence_length : int, optional
-            Length of the segement of data to feed into the model.
+            Length of the segment of data to feed into the model.
             Can be pass to trim the time points that are lost when separating
             into sequences.
         n_embeddings : int, optional
@@ -1359,7 +1359,7 @@ class Data:
         Returns
         -------
         list of np.ndarray
-            Trimed time series for each array.
+            Trimmed time series for each array.
         """
         # How many time points from the start/end of the time series should
         # we remove?
@@ -1416,7 +1416,7 @@ class Data:
         Parameters
         ----------
         sequence_length : int
-            Length of the segement of data to feed into the model.
+            Length of the segment of data to feed into the model.
         step_size : int, optional
             The number of samples by which to move the sliding window between
             sequences. Defaults to :code:`sequence_length`.
@@ -1536,7 +1536,7 @@ class Data:
         Parameters
         ----------
         sequence_length : int
-            Length of the segement of data to feed into the model.
+            Length of the segment of data to feed into the model.
         batch_size : int
             Number sequences in each mini-batch which is used to train the
             model.
@@ -1680,7 +1680,7 @@ class Data:
         tfrecord_dir : str
             Directory to save the TFRecord datasets.
         sequence_length : int
-            Length of the segement of data to feed into the model.
+            Length of the segment of data to feed into the model.
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
             Default is no overlap.
@@ -1857,7 +1857,7 @@ class Data:
         Parameters
         ----------
         sequence_length : int
-            Length of the segement of data to feed into the model.
+            Length of the segment of data to feed into the model.
         batch_size : int
             Number sequences in each mini-batch which is used to train the model.
         shuffle : bool, optional

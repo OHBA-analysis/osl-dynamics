@@ -39,7 +39,7 @@ print("Finding best circular sequence. This might take a while.")
 best_sequence = optimise_sequence(fo_density)
 
 # Stats
-print("Finding statistically significant assymetries in interval densities")
+print("Finding statistically significant asymmetries in interval densities")
 fo_density = np.squeeze(fo_density)
 tstat = np.nan * np.ones((fo_density.shape[:2]))
 pval = np.nan * np.ones((fo_density.shape[:2]))

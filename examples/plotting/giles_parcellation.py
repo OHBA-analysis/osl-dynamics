@@ -17,7 +17,7 @@ plot_hemisphere_conn = True
 os.makedirs("plots", exist_ok=True)
 
 if plot_parcels:
-    # Plot a map with only one parcel activiated
+    # Plot a map with only one parcel activated
 
     # Loop through the number of parcels
     for i in range(38):

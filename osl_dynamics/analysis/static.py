@@ -146,7 +146,7 @@ def multitaper_spectra(
     sampling_frequency : float
         Sampling frequency in Hz.
     window_length : int, optional
-        Length of the data segement to use to calculate the multitaper.
+        Length of the data segment to use to calculate the multitaper.
     time_half_bandwidth : float, optional
         Parameter to control the resolution of the spectra.
     n_tapers : int, optional

@@ -135,7 +135,7 @@ connectivity.save(
 )
 
 #%%
-# If we wanted to save the plot to an image file we could pass the `filename` argument. If we wanted to pass any arguments to nilearn's `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_ function, we could use the `plot_kwargs` arguement. Let's pass some extra arguments to `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_ to adjust the color bar and color map.
+# If we wanted to save the plot to an image file we could pass the `filename` argument. If we wanted to pass any arguments to nilearn's `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_ function, we could use the `plot_kwargs` argument. Let's pass some extra arguments to `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_ to adjust the color bar and color map.
 
 connectivity.save(
     aec[0],
@@ -221,7 +221,7 @@ plot_dist(group_aec)
 # We see there is a cluster of connections between AEC=0 and 0.4 and another at AEC=1. The AEC=1 connections are on the diagonal of the connectivity matrix. Let's remove these to examine the distribution of off-diagonal elements, which is what we're interested in.
 
 # Fill diagonal with nan values
-# (nan is prefered to zeros because a zeo value will be included in the distribution, nans won't)
+# (nan is preferred to zeros because a zeo value will be included in the distribution, nans won't)
 np.fill_diagonal(group_aec, np.nan)
 
 # Note, np.fill_diagonal alters the group_aec array in place,
@@ -231,7 +231,7 @@ np.fill_diagonal(group_aec, np.nan)
 plot_dist(group_aec)
 
 #%%
-# We can see there is a peak around AEC=0.05 and a long tail for higher values. We want the connections around the AEC=0.05 peak to be captured by a Gaussian and the long tail to be captured by another Gaussian. Let's fit a two component Gaussian to this distribution. Fortunately, osl-dynamics has a function to do this for us: `analysis.connectivity.fit_gmm <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.fit_gmm>`_. This function returns the threshold (as a percentile) that determines the Gaussian component a connection belows to.
+# We can see there is a peak around AEC=0.05 and a long tail for higher values. We want the connections around the AEC=0.05 peak to be captured by a Gaussian and the long tail to be captured by another Gaussian. Let's fit a two component Gaussian to this distribution. Fortunately, osl-dynamics has a function to do this for us: `analysis.connectivity.fit_gmm <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.fit_gmm>`_. This function returns the threshold (as a percentile) that determines the Gaussian component a connection belongs to.
 
 # Fit a two-component Gaussian mixture model to the connectivity matrix
 percentile = connectivity.fit_gmm(group_aec, show=True)

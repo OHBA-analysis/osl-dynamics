@@ -33,7 +33,7 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 # *****************************
 # Note, there is an option to load the data as a `memory map <https://numpy.org/doc/stable/reference/generated/numpy.memmap.html>`_. This allows us to access the data without holding it in memory. To use this feature, pass `load_memmaps=True`. The Data class creates a directory called `tmp` which is used for storing temporary data (memory map files and prepared data). This directory can be safely deleted after you run your script. You can specify the name of the temporary directory by passing the `store_dir` argument.
 #
-# We will demonstate how the Data class is used with example data below.
+# We will demonstrate how the Data class is used with example data below.
 #
 # Getting Example Data
 # ^^^^^^^^^^^^^^^^^^^^

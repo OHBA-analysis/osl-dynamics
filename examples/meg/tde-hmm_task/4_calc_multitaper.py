@@ -55,7 +55,7 @@ data_ = data.trim_time_series(n_embeddings=15, sequence_length=200)
 # State probabilities
 alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
 
-# Sanity check: the first axis should have the same numebr of time points
+# Sanity check: the first axis should have the same number of time points
 #for x, a in zip(data, alpha):
 #   print(x.shape, a.shape)
 

@@ -37,7 +37,7 @@ correlations = cov2corr(covariances)
 # - Use a GMM to calculate a threshold (X) for us.
 #
 # Here we will plot the top 5% of connections (irrespective of sign and relative
-# to the mean) and we will separate maps for the postive and negative edges
+# to the mean) and we will separate maps for the positive and negative edges
 conn_map = connectivity.threshold(
     correlations, percentile=95, absolute_value=True, subtract_mean=True
 )

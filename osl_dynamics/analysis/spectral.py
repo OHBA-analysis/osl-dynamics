@@ -695,7 +695,7 @@ def regression_spectra(
         else:
             return f, np.squeeze(Pj)
 
-    # Number of channels and freqency bins
+    # Number of channels and frequency bins
     n_channels = data[0].shape[1]
     n_modes = alpha[0].shape[1]
     n_freq = Pj.shape[-1]
@@ -770,7 +770,7 @@ def rescale_regression_coefs(
         Inferred mode mixing coefficients. Shape must be (n_sessions, n_samples,
         n_modes) or (n_samples, n_modes).
     window_length : int
-        Number samples used as the window to calcualte a PSD.
+        Number samples used as the window to calculate a PSD.
     step_size : int
         Step size used for shifting the window.
     n_sub_windows : int, optional
@@ -1064,7 +1064,7 @@ def decompose_spectra(
         Number of spectral components to fit.
     max_iter : int, optional
         Maximum number of iterations in
-        `sklearn.decomposion.non_negative_factorization
+        `sklearn.decomposition.non_negative_factorization
         <https://scikit-learn.org/stable/modules/generated/sklearn\
         .decomposition.non_negative_factorization.html>`_.
     random_state : int, optional
@@ -1260,7 +1260,7 @@ def autocorr_to_spectra(
     n_lags = autocorr_func.shape[-1]
     nfft = max(nfft, 2 ** nextpow2(n_lags))
 
-    # Calculate the argments to keep for the given frequency range
+    # Calculate the arguments to keep for the given frequency range
     f = np.arange(
         0,
         sampling_frequency / 2,

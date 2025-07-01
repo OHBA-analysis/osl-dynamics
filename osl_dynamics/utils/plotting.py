@@ -753,7 +753,7 @@ def plot_gmm(
     stddevs : np.ndarray
         Standard deviation of each Gaussian component.
     bins : list of int, optional
-        Number of bins for the historgram.
+        Number of bins for the histogram.
     legend_loc : int, optional
         Position for the legend.
     x_range : list, optional
@@ -1124,7 +1124,7 @@ def plot_epoched_time_series(
     ax=None,
     filename=None,
 ):
-    """Plot continuous data, epoched and meaned over epochs.
+    """Plot continuous data, epoched and meant over epochs.
 
     Parameters
     ----------
@@ -1630,10 +1630,10 @@ def plot_brain_surface(
         Label for the color bar.
     vmin : float, optional
         Minimum value for the color bar.
-        May be overriden if :code:`symmetric_cbar=True`.
+        May be overridden if :code:`symmetric_cbar=True`.
     vmax : float, optional
         Maximum value for the color bar.
-        May be overriden if :code:`symmetric_cbar=True`.
+        May be overridden if :code:`symmetric_cbar=True`.
     hemispheres : list, optional.
         :code:`['left', 'right']` or :code:`['left']` or :code:`['right']`.
         Defaults to :code:`['left', 'right']`.
@@ -1641,7 +1641,7 @@ def plot_brain_surface(
         The list can contain :code:`'lateral'` or :code:`'medial'`.
         Defaults to :code:`['lateral']`, which will show one row with
         lateral views. :code:`['lateral', 'medial']` will show two
-        rows with the lateral view ontop and medial view below.
+        rows with the lateral view on top and medial view below.
     bg_on_data : bool, optional
         If True, the sulcal depth is jointly visible with surface data.
         Otherwise, the background image will only be visible where there

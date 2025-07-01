@@ -57,7 +57,7 @@ print(data)
 #%%
 # Trim data
 # *********
-# If we trained on time-delay embedded data we lose a few time points from the start and end of the data. Additionally, when we separate the data into sequences we lose time points from the end of the time series (that do not form a complete sequence). Consequently, we need to trim the source-space data to match the inferred state probablities (`alpha`).
+# If we trained on time-delay embedded data we lose a few time points from the start and end of the data. Additionally, when we separate the data into sequences we lose time points from the end of the time series (that do not form a complete sequence). Consequently, we need to trim the source-space data to match the inferred state probabilities (`alpha`).
 
 trimmed_data = data.trim_time_series(n_embeddings=15, sequence_length=2000)  # needs to match values used to prepare the data and build the model
 
