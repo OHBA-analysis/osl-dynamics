@@ -1134,8 +1134,11 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         alpha = []
         for i in iterator:
-            predictions = self.predict(dataset[i], **kwargs)
-            alpha_ = predictions["gamma"]
+            alp = []
+            for batch in dataset[i]:
+                pred = self.predict(batch, **kwargs)
+                alp.append(pred["gamma"])
+            alpha_ = np.concatenate(alp)  # concat over batches
             if remove_edge_effects:
                 trim = step_size // 2  # throw away 25%
                 alpha_ = (
