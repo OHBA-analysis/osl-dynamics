@@ -445,8 +445,9 @@ class ModelBase:
 
     def reset(self):
         """Reset the model as if you've built a new model."""
-        self.reset_weights()
-        self.compile()
+        with self.config.strategy.scope():
+            self.reset_weights()
+            self.compile()
 
     def make_dataset(
         self,
