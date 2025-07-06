@@ -16,7 +16,7 @@ ctf275_channel_names = np.load(files.scanner.path / "ctf275_channel_names.npy")
 # file containing the [channels x 1] channel names:
 # chan_names = spio.loadmat('chan_names.mat')
 #
-# access the variables in the cell array (called "ans" here):
+# access the variables in the cell array (called "and" here):
 # chan_names = chan_names['ans'][0]
 #
 # extract the channel names:

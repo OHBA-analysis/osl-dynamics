@@ -103,7 +103,7 @@ connectivity.save(
 )
 
 #%%
-# Clearly, these networks are very noisy. The large number of networks also makes the sliding window networks difficult to intepret. A common next step is to cluster the sliding window networks to give a discrete set of networks. We'll do this next.
+# Clearly, these networks are very noisy. The large number of networks also makes the sliding window networks difficult to interpret. A common next step is to cluster the sliding window networks to give a discrete set of networks. We'll do this next.
 #
 # Clustering the Networks
 # ^^^^^^^^^^^^^^^^^^^^^^^

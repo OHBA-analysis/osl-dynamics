@@ -158,7 +158,6 @@ def load_tfrecord_dataset(
     shuffle=True,
     concatenate=True,
     drop_last_batch=False,
-    repeat_count=1,
     buffer_size=4000,
     keep=None,
 ):
@@ -176,8 +175,6 @@ def load_tfrecord_dataset(
         Should we concatenate the datasets for each array?
     drop_last_batch : bool, optional
         Should we drop the last batch if it is smaller than the batch size?
-    repeat_count : int, optional
-        Number of times to repeat the dataset. Default is 1.
     buffer_size : int, optional
         Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
         to less random shuffling but will be quicker. Default is 100000.
@@ -218,7 +215,7 @@ def load_tfrecord_dataset(
             for name, tensor in parsed_example.items()
         }
 
-    def _create_dataset(filenames, shuffle=shuffle, repeat_count=repeat_count):
+    def _create_dataset(filenames, shuffle=shuffle):
         if concatenate:
             filenames = tf.data.Dataset.from_tensor_slices(filenames)
 
@@ -259,9 +256,6 @@ def load_tfrecord_dataset(
                     batch_size, drop_remainder=drop_last_batch
                 )
 
-            # Repeat the dataset
-            full_dataset = full_dataset.repeat(repeat_count)
-
             return full_dataset.prefetch(tf.data.AUTOTUNE)
 
         # Otherwise create a dataset for each array separately
@@ -283,9 +277,6 @@ def load_tfrecord_dataset(
                 if shuffle:
                     # Shuffle batches
                     ds = ds.shuffle(buffer_size)
-
-                # Repeat the dataset
-                ds = ds.repeat(repeat_count)
 
                 full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
 
@@ -332,8 +323,8 @@ def load_tfrecord_dataset(
             )
             val_filenames.append(filepath)
 
-        return _create_dataset(train_filenames), _create_dataset(
-            val_filenames, shuffle=False, repeat_count=1
+        return _create_dataset(train_filenames, shuffle=shuffle), _create_dataset(
+            val_filenames, shuffle=False
         )
 
 

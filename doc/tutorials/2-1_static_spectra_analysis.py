@@ -84,7 +84,7 @@ f, psd = static.welch_spectra(
 #%%
 # We have two numpy arrays: `f`, which is the frequency axis of the power spectra in Hz, and `p`, which contains the power spectra.
 #
-# Calculating power spectra can be time consuming. We will want to use the power spectra many times to make different plots. We don't want to have to calculate them repeatedly, so often it is convinent to save the `f` and `p` numpy arrays so we can load them later (instead of calculating them again). Let's save the spectra.
+# Calculating power spectra can be time consuming. We will want to use the power spectra many times to make different plots. We don't want to have to calculate them repeatedly, so often it is convenient to save the `f` and `p` numpy arrays so we can load them later (instead of calculating them again). Let's save the spectra.
 
 import numpy as np
 

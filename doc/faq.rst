@@ -88,7 +88,7 @@ See the 'What is time-delay embedding' question for a description of what happen
 
 A choice we have to make is how many lagged versions of each channel we add. The number of lagged channels we add (i.e. the number of embeddings) determines how many points in the auto-correlation function (and therefore power spectrum) we encode into the covariance matrix of the data. I.e. if we include more embeddings, we add more off-diagonal elements into the covariance matrix, which corresponds to specifying more data points in the auto-correlation function and therefore power spectrum. In other words, having more embeddings allows you to be more sensitive to oscillations in your data.
 
-The number of embeddings should be chosen for a particular sampling frequency. See the :doc:`Time-Delay Embedding tutorial <tutorials_build/data_time_delay_embedding>` for example code comparing different TDE settings. We recomments 15 embeddings for 250 Hz data and 7 embeddings for 100 Hz data.
+The number of embeddings should be chosen for a particular sampling frequency. See the :doc:`Time-Delay Embedding tutorial <tutorials_build/data_time_delay_embedding>` for example code comparing different TDE settings. We recommends 15 embeddings for 250 Hz data and 7 embeddings for 100 Hz data.
 
 Why doesn't the number of time points in my inferred alphas match the original data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -160,7 +160,7 @@ How do I choose what hyperparameters to use?
 Unfortunately, many modern machine learning models come with hyperparameters (parameters that are not part of the generative model) which need to be pre-specified. The best approach is to try and few combinations and do the following:
 
 - Make sure any conclusions are robust to the choice of hyperparameters.
-- Use the variational free energy (see the model desciptions in the :doc:`docs <documentation>`) to compare models. Preferably, the variational free energy would be calculated on a hold out validation dataset, which is not used for training.
+- Use the variational free energy (see the model descriptions in the :doc:`docs <documentation>`) to compare models. Preferably, the variational free energy would be calculated on a hold out validation dataset, which is not used for training.
 
 The `config API <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/index.html>`_ has two wrapper functions for training an `HMM <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/wrappers/index.html#osl_dynamics.config_api.wrappers.train_hmm>`_ or `DyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/wrappers/index.html#osl_dynamics.config_api.wrappers.train_dynemo>`_, which pre-specify hyperparameters that have worked well in the past. These might be a good place to start.
 
@@ -199,7 +199,7 @@ Yes! See the tutorials :doc:`here <documentation>`.
 Can I use this package with task data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Yes! the models contained in osl-dynamics can be applied to task data. **The recommended approch is to preprocess/prepare task data as if it is resting-state data and fit an HMM/DyNeMo to it as normal**. When you have inferred a state/mode time course you can then do post-hoc analysis using the task timings, e.g. by epoching the state/mode time course around an event.
+Yes! the models contained in osl-dynamics can be applied to task data. **The recommended approach is to preprocess/prepare task data as if it is resting-state data and fit an HMM/DyNeMo to it as normal**. When you have inferred a state/mode time course you can then do post-hoc analysis using the task timings, e.g. by epoching the state/mode time course around an event.
 
 Can I train an HMM/DyNeMo on EEG data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

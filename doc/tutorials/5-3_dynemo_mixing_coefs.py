@@ -5,7 +5,7 @@ DyNeMo: Mixing Coefficients
 In this tutorial we analyse DyNeMo mixing coefficients. This tutorial covers:
 
 1. Summarizing the mixing coefficient time course
-2. Binarizing the mixing coefficeint time course
+2. Binarizing the mixing coefficient time course
 """
 
 #%%

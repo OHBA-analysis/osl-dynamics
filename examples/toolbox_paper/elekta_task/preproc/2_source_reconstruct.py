@@ -22,7 +22,7 @@ def fix_headshape_points(outdir, subject):
     hs = hs[:, ~remove]
 
     # Overwrite headshape file
-    utils.logger.log_or_print(f"overwritting {filenames['polhemus_headshape_file']}")
+    utils.logger.log_or_print(f"overwriting {filenames['polhemus_headshape_file']}")
     np.savetxt(filenames["polhemus_headshape_file"], hs)
 
 if __name__ == "__main__":

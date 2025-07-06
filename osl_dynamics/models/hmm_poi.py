@@ -275,7 +275,7 @@ class Model(MarkovStateInferenceModelBase):
         Parameters
         ----------
         training_dataset : tf.data.Dataset
-            Training datas.
+            Training data.
         """
         _logger.info("Setting random log_rates")
 

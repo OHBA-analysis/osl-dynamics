@@ -278,10 +278,6 @@ class ModelBase:
         history : dict
             The training history.
         """
-        # If step_per_epoch is passed, repeat the dataset indefinitely
-        steps_per_epoch = get_argument(self.model.fit, "steps_per_epoch", args, kwargs)
-        repeat_count = 1 if steps_per_epoch is None else -1
-
         # If a osl_dynamics.data.Data object has been passed for the x
         # arguments, replace it with a tensorflow dataset
         x = get_argument(self.model.fit, "x", args, kwargs)
@@ -289,9 +285,16 @@ class ModelBase:
             x,
             shuffle=True,
             concatenate=True,
-            repeat_count=repeat_count,
         )
-        args, kwargs = replace_argument(self.model.fit, "x", x, args, kwargs)
+
+        # If step_per_epoch is not passed, calculate it from the dataset
+        if get_argument(self.model.fit, "steps_per_epoch", args, kwargs) is None:
+            steps_per_epoch = dtf.get_n_batches(x)
+
+        args, kwargs = replace_argument(self.model.fit, "x", x.repeat(), args, kwargs)
+        args, kwargs = replace_argument(
+            self.model.fit, "steps_per_epoch", steps_per_epoch, args, kwargs
+        )
 
         # Use the number of epochs in the config if it has not been passed
         if get_argument(self.model.fit, "epochs", args, kwargs) is None:
@@ -442,8 +445,9 @@ class ModelBase:
 
     def reset(self):
         """Reset the model as if you've built a new model."""
-        self.reset_weights()
-        self.compile()
+        with self.config.strategy.scope():
+            self.reset_weights()
+            self.compile()
 
     def make_dataset(
         self,
@@ -452,7 +456,6 @@ class ModelBase:
         concatenate=False,
         step_size=None,
         drop_last_batch=False,
-        repeat_count=1,
     ):
         """Converts a Data object into a TensorFlow Dataset.
 
@@ -470,8 +473,6 @@ class ModelBase:
             Default is no overlap.
         drop_last_batch : bool, optional
             Should we drop the last batch if it is smaller than the batch size?
-        repeat_count : int, optional
-            Number of times to repeat the dataset.
 
         Returns
         -------
@@ -505,7 +506,6 @@ class ModelBase:
                     concatenate=concatenate,
                     step_size=step_size,
                     drop_last_batch=drop_last_batch,
-                    repeat_count=repeat_count,
                     overwrite=True,
                 )
             else:
@@ -516,7 +516,6 @@ class ModelBase:
                     concatenate=concatenate,
                     step_size=step_size,
                     drop_last_batch=drop_last_batch,
-                    repeat_count=repeat_count,
                 )
 
         elif isinstance(inputs, Dataset) and not concatenate:

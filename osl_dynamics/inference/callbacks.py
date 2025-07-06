@@ -447,7 +447,7 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
     step_offset : int, optional
         Offset to add to the epoch number when logging gradients. Defaults to 0.
     print_stats : bool, optional
-        Wheter to print the summary statistics (mean, std, min, max, L2 norm) for each variable.
+        Whether to print the summary statistics (mean, std, min, max, L2 norm) for each variable.
         Defaults to False.
     """
 

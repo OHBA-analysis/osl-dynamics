@@ -29,7 +29,7 @@ pvalues = statistics.evoked_response_max_stat_perm(data=epochs, n_perm=100)
 t = np.arange(n_samples) - pre
 avg_epochs = np.mean(epochs, axis=0)
 
-# Plot epoched time courses with significant time points highlighed
+# Plot epoched time courses with significant time points highlighted
 plotting.plot_evoked_response(
     t,
     avg_epochs,

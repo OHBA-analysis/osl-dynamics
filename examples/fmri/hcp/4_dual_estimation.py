@@ -62,7 +62,7 @@ alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
 
 #%% Dual estimation
 
-# Calcualte subject-specific means and covariances
+# Calculate subject-specific means and covariances
 means, covs = model.dual_estimation(data, alpha)
 
 # Save
