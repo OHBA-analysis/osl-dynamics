@@ -13,18 +13,15 @@ run = int(argv[2])
 #%% Import packages
 
 print("Importing packages")
-
 import os
 import pickle
 import numpy as np
 from glob import glob
-
 from osl_dynamics.data import Data
 from osl_dynamics.models import load
 
 #%% Setup directories
 
-# Directories
 model_dir = f"results/{n_states}_states/run{run:02d}/model"
 inf_params_dir = f"results/{n_states}_states/run{run:02d}/inf_params"
 
@@ -32,7 +29,6 @@ os.makedirs(inf_params_dir, exist_ok=True)
 
 #%% Prepare data
 
-# Load data
 files = sorted(glob("data/src/*/sflip_parc-raw.fif"))
 data = Data(
     files,
@@ -41,8 +37,6 @@ data = Data(
     store_dir=f"tmp_{n_states}_{run}",
     n_jobs=8,
 )
-
-# Perform time-delay embedding and PCA
 methods = {
     "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
     "standardize": {},

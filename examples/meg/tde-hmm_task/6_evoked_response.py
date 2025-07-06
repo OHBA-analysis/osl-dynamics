@@ -13,13 +13,11 @@ run = int(argv[2])
 #%% Import packages
 
 print("Importing packages")
-
 import os
 import mne
 import pickle
 import numpy as np
 from glob import glob
-
 from osl_dynamics.analysis import statistics
 from osl_dynamics.inference import modes
 from osl_dynamics.utils import plotting

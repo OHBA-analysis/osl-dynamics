@@ -5,18 +5,18 @@
 from sys import argv
 
 if len(argv) != 2:
-    print("Please pass the number of states, e.g. python 2_print_free_energy.py 8")
+    print("Please pass the number of modes, e.g. python 2_print_free_energy.py 6")
     exit()
-n_states = int(argv[1])
+n_modes = int(argv[1])
 
 import pickle
 import numpy as np
 
-best_fe = np.Inf
+best_fe = np.inf
 for run in range(1, 11):
     try:
         history = pickle.load(
-            open(f"results/{n_states}_states/run{run:02d}/model/history.pkl", "rb")
+            open(f"results/{n_modes}_modes/run{run:02d}/model/history.pkl", "rb")
         )
         free_energy = history["free_energy"]
         print(f"run {run}: {free_energy}")
