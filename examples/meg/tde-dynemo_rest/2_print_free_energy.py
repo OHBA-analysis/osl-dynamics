@@ -5,7 +5,7 @@
 from sys import argv
 
 if len(argv) != 2:
-    print("Please pass the number of modes, e.g. python 2_print_free_energy.py 8")
+    print("Please pass the number of modes, e.g. python 2_print_free_energy.py 6")
     exit()
 n_modes = int(argv[1])
 

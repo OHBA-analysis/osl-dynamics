@@ -5,7 +5,7 @@
 from sys import argv
 
 if len(argv) != 3:
-    print("Please pass the number of states and run id, e.g. python 5_plot_networks.py 8 1")
+    print("Please pass the number of states and run id, e.g. python 6_plot_networks.py 8 1")
     exit()
 n_states = int(argv[1])
 run = int(argv[2])

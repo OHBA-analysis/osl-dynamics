@@ -66,7 +66,7 @@ f, psd, coh, w = spectral.multitaper_spectra(
     n_tapers=7,
     frequency_range=[1, 45],
     return_weights=True,  # weighting for each subject when we average the spectra
-    n_jobs=8,  # parallelisation, if you get a RuntimeError set to 1
+    n_jobs=8,
 )
 
 np.save(f"{spectra_dir}/f.npy", f)

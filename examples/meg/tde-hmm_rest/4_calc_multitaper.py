@@ -29,11 +29,7 @@ os.makedirs(spectra_dir, exist_ok=True)
 #%% Load data and inferred state probabilities
 
 # Load source reconstructed data
-data = Data(
-    "training_data/networks",
-    store_dir=f"tmp_{n_states}_{run}",
-    n_jobs=8,
-)
+data = Data("training_data", n_jobs=8)
 
 # Trim time point we lost during time-delay embedding and separating
 # the data into sequences
@@ -62,7 +58,7 @@ f, psd, coh, w = spectral.multitaper_spectra(
     n_tapers=7,
     frequency_range=[1, 45],
     return_weights=True,  # weighting for each subject when we average the spectra
-    n_jobs=8,  # parallelisation, if you get a RuntimeError set to 1
+    n_jobs=8,
 )
 
 np.save(f"{spectra_dir}/f.npy", f)

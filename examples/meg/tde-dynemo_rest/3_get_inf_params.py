@@ -5,7 +5,7 @@
 from sys import argv
 
 if len(argv) != 3:
-    print("Please pass the number of modes and run id, e.g. python 3_get_inf_params.py 8 1")
+    print("Please pass the number of modes and run id, e.g. python 3_get_inf_params.py 6 1")
     exit()
 n_modes = int(argv[1])
 run = int(argv[2])
@@ -28,13 +28,9 @@ os.makedirs(inf_params_dir, exist_ok=True)
 
 #%% Prepare data
 
-data = Data(
-    "training_data/networks",
-    store_dir=f"tmp_{n_modes}_{run}",
-    n_jobs=8,
-)
+data = Data("training_data", n_jobs=8)
 methods = {
-    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": 120},
     "standardize": {},
 }
 data.prepare(methods)

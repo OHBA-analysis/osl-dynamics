@@ -19,9 +19,9 @@ from osl_dynamics.models.hmm import Config, Model
 
 #%% Load data
 
-data = Data("training_data/networks", n_jobs=8)
+data = Data("training_data", n_jobs=8)
 methods = {
-    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": 120},
     "standardize": {},
 }
 data.prepare(methods)
@@ -50,7 +50,9 @@ model.summary()
 
 #%% Training
 
-init_history = model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
+init_history = model.random_state_time_course_initialization(
+    data, n_init=3, n_epochs=1, take=1
+)
 history = model.fit(data)
 
 model_dir = f"results/{n_states}_states/run{run:02d}/model"

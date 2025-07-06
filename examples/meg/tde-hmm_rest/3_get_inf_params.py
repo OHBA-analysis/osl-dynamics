@@ -28,13 +28,9 @@ os.makedirs(inf_params_dir, exist_ok=True)
 
 #%% Prepare data
 
-data = Data(
-    "training_data/networks",
-    store_dir=f"tmp_{n_states}_{run}",
-    n_jobs=8,
-)
+data = Data("training_data", n_jobs=8)
 methods = {
-    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": 120},
     "standardize": {},
 }
 data.prepare(methods)

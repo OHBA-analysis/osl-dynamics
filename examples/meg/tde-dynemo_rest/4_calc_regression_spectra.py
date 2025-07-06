@@ -5,7 +5,7 @@
 from sys import argv
 
 if len(argv) != 3:
-    print("Please pass the number of modes and run id, e.g. python 4_calc_regression_spectra.py 8 1")
+    print("Please pass the number of modes and run id, e.g. python 4_calc_regression_spectra.py 6 1")
     exit()
 n_modes = int(argv[1])
 run = int(argv[2])
@@ -29,11 +29,7 @@ os.makedirs(spectra_dir, exist_ok=True)
 #%% Load data and inferred state probabilities
 
 # Load source reconstructed data
-data = Data(
-    "training_data/networks",
-    store_dir=f"tmp_{n_modes}_{run}",
-    n_jobs=8,
-)
+data = Data("training_data", n_jobs=8)
 
 # Trim time point we lost during time-delay embedding and separating
 # the data into sequences
@@ -43,7 +39,7 @@ data = Data(
 #   data.
 # - sequence_length must be the same as used in the Config to create
 #   the model.
-data_ = data.trim_time_series(n_embeddings=15, sequence_length=100)
+data_ = data.trim_time_series(n_embeddings=15, sequence_length=200)
 
 # State probabilities
 alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
@@ -64,7 +60,7 @@ f, psd, coh, w = spectral.regression_spectra(
     n_sub_windows=8,
     return_coef_int=True,  # return the coefficients and intercept separately
     return_weights=True,  # weighting for each subject when we average the spectra
-    n_jobs=8,  # parallelisation, if you get a RuntimeError set to 1
+    n_jobs=8,
 )
 
 np.save(f"{spectra_dir}/f.npy", f)
