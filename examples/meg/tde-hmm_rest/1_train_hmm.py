@@ -55,7 +55,7 @@ init_history = model.random_state_time_course_initialization(
 )
 history = model.fit(data)
 
-model_dir = f"results/{n_states}_states/run{run:02d}/model"
+model_dir = f"results/{n_states:02d}_states/run{run:02d}/model"
 model.save(model_dir)
 
 #%% Variational free energy

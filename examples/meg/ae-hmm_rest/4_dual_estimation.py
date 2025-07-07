@@ -5,7 +5,7 @@
 from sys import argv
 
 if len(argv) != 3:
-    print("Please pass the number of states and run id, e.g. python 5_dual_estimation.py 8 1")
+    print("Please pass the number of states and run id, e.g. python 4_dual_estimation.py 8 1")
     exit()
 n_states = int(argv[1])
 run = int(argv[2])
@@ -21,7 +21,7 @@ from osl_dynamics.data import Data
 
 #%% Directories
 
-results_dir = f"results/{n_states}_states/run{run:02d}"
+results_dir = f"results/{n_states:02d}_states/run{run:02d}"
 model_dir = f"{results_dir}/model"
 inf_params_dir = f"{results_dir}/inf_params"
 dual_estimates_dir = f"{results_dir}/dual_estimates"
@@ -34,11 +34,7 @@ model = load(model_dir)
 
 #%% Load data
 
-data = Data(
-    "training_data/networks",
-    store_dir=f"tmp_{n_states}_{run}",
-    n_jobs=8,
-)
+data = Data("training_data", n_jobs=8)
 methods = {
     "amplitude_envelope": {},
     "moving_average": {"n_window": 5},

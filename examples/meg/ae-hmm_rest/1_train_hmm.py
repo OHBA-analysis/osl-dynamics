@@ -19,7 +19,7 @@ from osl_dynamics.models.hmm import Config, Model
 
 #%% Load data
 
-data = Data("training_data/networks", n_jobs=8)
+data = Data("training_data", n_jobs=8)
 methods = {
     "amplitude_envelope": {},
     "moving_average": {"n_window": 5},
@@ -54,7 +54,7 @@ model.summary()
 init_history = model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
 history = model.fit(data)
 
-model_dir = f"results/{n_states}_states/run{run:02d}/model"
+model_dir = f"results/{n_states:02d}_states/run{run:02d}/model"
 model.save(model_dir)
 
 #%% Variational free energy

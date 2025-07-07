@@ -24,7 +24,7 @@ from osl_dynamics.utils import plotting
 
 #%% Setup directories
 
-results_dir = f"results/{n_states}_states/run{run:02d}"
+results_dir = f"results/{n_states:02d}_states/run{run:02d}"
 inf_params_dir = f"{results_dir}/inf_params"
 evoked_response_dir = f"{results_dir}/evoked_response"
 

@@ -5,7 +5,7 @@
 from sys import argv
 
 if len(argv) != 3:
-    print("Please pass the number of states and run id, e.g. python 6_calc_summary_stats.py 8 1")
+    print("Please pass the number of states and run id, e.g. python 5_calc_summary_stats.py 8 1")
     exit()
 n_states = int(argv[1])
 run = int(argv[2])
@@ -20,8 +20,8 @@ from osl_dynamics.inference import modes
 
 #%% Setup directories
 
-inf_params_dir = f"results/{n_states}_states/run{run:02d}/inf_params"
-summary_stats_dir = f"results/{n_states}_states/run{run:02d}/summary_stats"
+inf_params_dir = f"results/{n_states:02d}_states/run{run:02d}/inf_params"
+summary_stats_dir = f"results/{n_states:02d}_states/run{run:02d}/summary_stats"
 
 os.makedirs(summary_stats_dir, exist_ok=True)
 

@@ -21,8 +21,8 @@ from osl_dynamics.data import Data
 
 #%% Directories
 
-inf_params_dir = f"results/{n_states}_states/run{run:02d}/inf_params"
-spectra_dir = f"results/{n_states}_states/run{run:02d}/spectra"
+inf_params_dir = f"results/{n_states:02d}_states/run{run:02d}/inf_params"
+spectra_dir = f"results/{n_states:02d}_states/run{run:02d}/spectra"
 
 os.makedirs(spectra_dir, exist_ok=True)
 

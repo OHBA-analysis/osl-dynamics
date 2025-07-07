@@ -9,7 +9,6 @@ These script outline a common pipeline for studying MEG data using an Amplitude 
 - **4_dual_estimation.py**: Re-estimate subject-specific observation model parameters based on the group-level model.
 - **5_calc_summary_stats.py**: This script calculates statistics that summarise the dynamics of each state. These are calculated for each subject individually.
 - **6_plot_networks.py**: This script plots spatial mean activity maps and amplitude envelope correlation networks taken directly from the observation model parameters.
-- **7_compare_groups.py**: This script performs a group-level analysis on the subject-specific quantities (power, coherence, summary statistics) and performs statistical significance testing.
 
 We also include a script to download example data (**0_get_data.py**) that can be used to go through these scripts.
 

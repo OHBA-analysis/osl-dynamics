@@ -20,8 +20,8 @@ from osl_dynamics.utils import plotting
 
 #%% Setup directories and files
 
-spectra_dir = f"results/{n_states}_states/run{run:02d}/spectra"
-networks_dir = f"results/{n_states}_states/run{run:02d}/networks"
+spectra_dir = f"results/{n_states:02d}_states/run{run:02d}/spectra"
+networks_dir = f"results/{n_states:02d}_states/run{run:02d}/networks"
 
 os.makedirs(networks_dir, exist_ok=True)
 

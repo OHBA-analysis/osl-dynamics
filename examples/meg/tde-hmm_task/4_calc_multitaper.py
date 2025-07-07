@@ -22,8 +22,8 @@ from osl_dynamics.data import Data
 
 #%% Directories
 
-inf_params_dir = f"results/{n_states}_states/run{run:02d}/inf_params"
-spectra_dir = f"results/{n_states}_states/run{run:02d}/spectra"
+inf_params_dir = f"results/{n_states:02d}_states/run{run:02d}/inf_params"
+spectra_dir = f"results/{n_states:02d}_states/run{run:02d}/spectra"
 
 os.makedirs(spectra_dir, exist_ok=True)
 
@@ -31,13 +31,7 @@ os.makedirs(spectra_dir, exist_ok=True)
 
 # Load source reconstructed data
 files = sorted(glob("data/src/*/sflip_parc-raw.fif"))
-data = Data(
-    files,
-    picks="misc",
-    reject_by_annotation="omit",
-    store_dir=f"tmp_{n_states}_{run}",
-    n_jobs=8,
-)
+data = Data(files, picks="misc", reject_by_annotation="omit", n_jobs=8)
 
 # Trim time point we lost during time-delay embedding and separating
 # the data into sequences

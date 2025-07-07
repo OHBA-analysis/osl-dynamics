@@ -67,7 +67,7 @@ init_history = model.random_state_time_course_initialization(data, n_init=3, n_e
 history = model.fit(data)
 
 # Save trained model
-model_dir = f"results/{n_states}_states/run{run:02d}/model"
+model_dir = f"results/{n_states:02d}_states/run{run:02d}/model"
 model.save(model_dir)
 
 # Calculate the free energy

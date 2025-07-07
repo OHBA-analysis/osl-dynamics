@@ -5,7 +5,7 @@
 from sys import argv
 
 if len(argv) != 3:
-    print("Please pass the number of states and run id, e.g. python 4_plot_networks.py 8 1")
+    print("Please pass the number of states and run id, e.g. python 6_plot_networks.py 8 1")
     exit()
 n_states = int(argv[1])
 run = int(argv[2])
@@ -20,7 +20,7 @@ from osl_dynamics.utils import plotting
 
 #%% Setup directories and files
 
-results_dir = f"results/{n_states}_states/run{run:02d}"
+results_dir = f"results/{n_states:02d}_states/run{run:02d}"
 inf_params_dir = f"{results_dir}/inf_params"
 networks_dir = f"{results_dir}/networks"
 

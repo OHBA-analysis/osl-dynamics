@@ -21,8 +21,8 @@ from osl_dynamics.models import load
 
 #%% Setup directories
 
-model_dir = f"results/{n_states}_states/run{run:02d}/model"
-inf_params_dir = f"results/{n_states}_states/run{run:02d}/inf_params"
+model_dir = f"results/{n_states:02d}_states/run{run:02d}/model"
+inf_params_dir = f"results/{n_states:02d}_states/run{run:02d}/inf_params"
 
 os.makedirs(inf_params_dir, exist_ok=True)
 

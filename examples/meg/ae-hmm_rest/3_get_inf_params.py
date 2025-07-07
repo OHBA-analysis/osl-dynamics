@@ -21,18 +21,14 @@ from osl_dynamics.models import load
 
 #%% Setup directories
 
-model_dir = f"results/{n_states}_states/run{run:02d}/model"
-inf_params_dir = f"results/{n_states}_states/run{run:02d}/inf_params"
+model_dir = f"results/{n_states:02d}_states/run{run:02d}/model"
+inf_params_dir = f"results/{n_states:02d}_states/run{run:02d}/inf_params"
 
 os.makedirs(inf_params_dir, exist_ok=True)
 
 #%% Prepare data
 
-data = Data(
-    "training_data/networks",
-    store_dir=f"tmp_{n_states}_{run}",
-    n_jobs=8,
-)
+data = Data("training_data", n_jobs=8)
 methods = {
     "amplitude_envelope": {},
     "moving_average": {"n_window": 5},
