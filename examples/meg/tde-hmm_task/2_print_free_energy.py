@@ -12,7 +12,7 @@ n_states = int(argv[1])
 import pickle
 import numpy as np
 
-best_fe = np.Inf
+best_fe = np.inf
 for run in range(1, 11):
     try:
         history = pickle.load(

@@ -13,20 +13,17 @@ run = int(argv[2])
 #%% Import packages
 
 print("Importing packages")
-
 import os
 import pickle
 import numpy as np
 from glob import glob
-
 from osl_dynamics.analysis import spectral
 from osl_dynamics.data import Data
 
 #%% Directories
 
-# Directories
-inf_params_dir = f"results/{n_states}_states/run{run:02d}/inf_params"
-spectra_dir = f"results/{n_states}_states/run{run:02d}/spectra"
+inf_params_dir = f"results/{n_states:02d}_states/run{run:02d}/inf_params"
+spectra_dir = f"results/{n_states:02d}_states/run{run:02d}/spectra"
 
 os.makedirs(spectra_dir, exist_ok=True)
 
@@ -34,13 +31,7 @@ os.makedirs(spectra_dir, exist_ok=True)
 
 # Load source reconstructed data
 files = sorted(glob("data/src/*/sflip_parc-raw.fif"))
-data = Data(
-    files,
-    picks="misc",
-    reject_by_annotation="omit",
-    store_dir=f"tmp_{n_states}_{run}",
-    n_jobs=8,
-)
+data = Data(files, picks="misc", reject_by_annotation="omit", n_jobs=8)
 
 # Trim time point we lost during time-delay embedding and separating
 # the data into sequences
@@ -56,7 +47,7 @@ data_ = data.trim_time_series(n_embeddings=15, sequence_length=200)
 alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
 
 # Sanity check: the first axis should have the same number of time points
-#for x, a in zip(data, alpha):
+#for x, a in zip(data_, alpha):
 #   print(x.shape, a.shape)
 
 #%% Calculate multitaper
@@ -69,7 +60,7 @@ f, psd, coh, w = spectral.multitaper_spectra(
     n_tapers=7,
     frequency_range=[1, 45],
     return_weights=True,  # weighting for each subject when we average the spectra
-    n_jobs=8,  # parallelisation, if you get a RuntimeError set to 1
+    n_jobs=8,
 )
 
 np.save(f"{spectra_dir}/f.npy", f)

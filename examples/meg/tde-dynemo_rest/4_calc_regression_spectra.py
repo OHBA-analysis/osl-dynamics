@@ -1,13 +1,13 @@
-"""Post-hoc calculation of state-spectra using a multitaper.
+"""Post-hoc calculation of mode-spectra using a GLM regression.
 
 """
 
 from sys import argv
 
 if len(argv) != 3:
-    print("Please pass the number of states and run id, e.g. python 4_calc_multitaper.py 8 1")
+    print("Please pass the number of modes and run id, e.g. python 4_calc_regression_spectra.py 6 1")
     exit()
-n_states = int(argv[1])
+n_modes = int(argv[1])
 run = int(argv[2])
 
 #%% Import packages
@@ -21,8 +21,8 @@ from osl_dynamics.data import Data
 
 #%% Directories
 
-inf_params_dir = f"results/{n_states:02d}_states/run{run:02d}/inf_params"
-spectra_dir = f"results/{n_states:02d}_states/run{run:02d}/spectra"
+inf_params_dir = f"results/{n_modes}_modes/run{run:02d}/inf_params"
+spectra_dir = f"results/{n_modes}_modes/run{run:02d}/spectra"
 
 os.makedirs(spectra_dir, exist_ok=True)
 
@@ -48,15 +48,17 @@ alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
 #for x, a in zip(data_, alpha):
 #   print(x.shape, a.shape)
 
-#%% Calculate multitaper
+#%% Calculate spectra
 
-f, psd, coh, w = spectral.multitaper_spectra(
+f, psd, coh, w = spectral.regression_spectra(
     data=data_,
     alpha=alpha,
     sampling_frequency=250,
-    time_half_bandwidth=4,
-    n_tapers=7,
     frequency_range=[1, 45],
+    window_length=1000,
+    step_size=20,
+    n_sub_windows=8,
+    return_coef_int=True,  # return the coefficients and intercept separately
     return_weights=True,  # weighting for each subject when we average the spectra
     n_jobs=8,
 )
@@ -65,10 +67,3 @@ np.save(f"{spectra_dir}/f.npy", f)
 np.save(f"{spectra_dir}/psd.npy", psd)
 np.save(f"{spectra_dir}/coh.npy", coh)
 np.save(f"{spectra_dir}/w.npy", w)
-
-#%% Calculate non-negative matrix factorisation (NNMF)
-
-# We fit 2 'wideband' components
-wb_comp = spectral.decompose_spectra(coh, n_components=2)
-
-np.save(f"{spectra_dir}/nnmf_2.npy", wb_comp)

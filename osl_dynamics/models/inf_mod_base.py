@@ -986,7 +986,7 @@ class MarkovStateInferenceModelConfig:
         if self.initial_state_probs is not None:
             if (
                 not isinstance(self.initial_state_probs, np.ndarray)
-                or self.initial_trans_prob.ndim != 1
+                or self.initial_state_probs.ndim != 1
             ):
                 raise ValueError("initial_state_probs must be a 1D numpy array.")
 

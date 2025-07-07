@@ -13,20 +13,18 @@ run = int(argv[2])
 #%% Import packages
 
 print("Importing packages")
-
 import os
 import mne
 import pickle
 import numpy as np
 from glob import glob
-
 from osl_dynamics.analysis import statistics
 from osl_dynamics.inference import modes
 from osl_dynamics.utils import plotting
 
 #%% Setup directories
 
-results_dir = f"results/{n_states}_states/run{run:02d}"
+results_dir = f"results/{n_states:02d}_states/run{run:02d}"
 inf_params_dir = f"{results_dir}/inf_params"
 evoked_response_dir = f"{results_dir}/evoked_response"
 
@@ -102,6 +100,6 @@ plotting.plot_evoked_response(
     significance_level=0.05,
     labels=[f"State {i + 1}" for i in range(epochs.shape[-1])],
     x_label="Time (s)",
-    y_label="State Probability",
+    y_label="State Activation",
     filename=f"{evoked_response_dir}/epoched_stc.png",
 )

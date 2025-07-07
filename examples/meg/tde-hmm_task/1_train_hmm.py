@@ -24,13 +24,7 @@ from osl_dynamics.models.hmm import Config, Model
 
 # Load data
 files = sorted(glob("data/src/*/sflip_parc-raw.fif"))
-data = Data(
-    files,
-    picks="misc",
-    reject_by_annotation="omit",
-    store_dir=f"tmp_{n_states}_{run}",
-    n_jobs=8,
-)
+data = Data(files, picks="misc", reject_by_annotation="omit", n_jobs=8)
 
 # Prepare data
 methods = {
@@ -73,7 +67,7 @@ init_history = model.random_state_time_course_initialization(data, n_init=3, n_e
 history = model.fit(data)
 
 # Save trained model
-model_dir = f"results/{n_states}_states/run{run:02d}/model"
+model_dir = f"results/{n_states:02d}_states/run{run:02d}/model"
 model.save(model_dir)
 
 # Calculate the free energy
