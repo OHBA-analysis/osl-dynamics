@@ -476,6 +476,10 @@ def tinda(
 
         for i in range(dim[1]):
             itc_prim = tc[:, i]
+            if np.all(itc_prim == 0):
+                print(f"Skipping state {i}: no activations detected.")
+                continue
+            
             if not np.array_equal(
                 itc_prim, itc_prim.astype(int)
             ):  # if not binary (i.e., intervals are not well defined)
