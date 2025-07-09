@@ -12,11 +12,14 @@ See Also
 /examples/simulation/hmm_tinda.py>`_ applying TINDA to simulated HMM data.
 """
 
+import logging
 from itertools import permutations
 
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def find_intervals(tc_hot):
@@ -476,6 +479,10 @@ def tinda(
 
         for i in range(dim[1]):
             itc_prim = tc[:, i]
+            if np.all(itc_prim == 0):
+                _logger.info(f"Skipping state {i}: no activations detected.")
+                continue
+
             if not np.array_equal(
                 itc_prim, itc_prim.astype(int)
             ):  # if not binary (i.e., intervals are not well defined)
