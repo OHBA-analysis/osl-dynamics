@@ -481,6 +481,20 @@ def tinda(
             itc_prim = tc[:, i]
             if np.all(itc_prim == 0):
                 _logger.info(f"Skipping state {i}: no activations detected.")
+
+                stats.append(
+                    {
+                        "durations": [],
+                        "intervals": [],
+                        "interval_wavg": np.full((tc.shape[1]-1, n_bins, 1), 0),
+                        "interval_sum": np.full((tc.shape[1]-1, n_bins, 1), 0),
+                        "divided_intervals": [],
+                        "bin_sizes": [],
+                        "interval_range": [],
+                        "all_interval_wavg": [],
+                        "all_interval_sum": [],
+                    }
+                )
                 continue
 
             if not np.array_equal(
