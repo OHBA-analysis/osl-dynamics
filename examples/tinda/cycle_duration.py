@@ -45,10 +45,10 @@ def get_best_state_sequence(W: int = 16):
     # assumes state time course is timepoints X states
     n_states = stc[0].shape[1]
 
-    # Load best sequence with numpy instead of pickle (Version conflict)
+    # Load best sequence with numpy instead of pickle (version conflict)
     best_sequence_group = np.load(f"{home_dir}/best_sequence_group.npy")
 
-    # calculcate fo's
+    # Calculate FOs
     fo = modes.fractional_occupancies(stc)
 
     # here we reorder state sequences
