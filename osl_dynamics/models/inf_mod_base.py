@@ -990,8 +990,8 @@ class MarkovStateInferenceModelConfig:
             ):
                 raise ValueError("initial_state_probs must be a 1D numpy array.")
 
-            if not all(np.isclose(np.sum(self.initial_state_probs), 1)):
-                raise ValueError("rows of initial_state_probs must sum to one.")
+            if not np.isclose(np.sum(self.initial_state_probs), 1):
+                raise ValueError("initial_state_probs must sum to one.")
 
         if self.baum_welch_implementation not in ["log", "rescale"]:
             raise ValueError("baum_welch_implementation must be 'log' or 'rescale'.")

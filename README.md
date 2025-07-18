@@ -4,7 +4,7 @@ See the read the docs page for a description of this project: [https://osl-dynam
 
 ## Citation
 
-If you find this toolbox useful, please cite:
+If you find this toolbox useful, please cite the [paper](https://elifesciences.org/articles/91949):
 
 > **Chetan Gohil, Rukuang Huang, Evan Roberts, Mats WJ van Es, Andrew J Quinn, Diego Vidaurre, Mark W Woolrich (2024) osl-dynamics, a toolbox for modeling fast dynamic brain activity eLife 12:RP91949.**
 
