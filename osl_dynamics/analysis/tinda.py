@@ -8,8 +8,8 @@ visits to state i.
 
 See Also
 --------
-`Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main\
-/examples/simulation/hmm_tinda.py>`_ applying TINDA to simulated HMM data.
+`Example scripts <https://github.com/OHBA-analysis/osl-dynamics/blob/main\
+/examples/tinda>`_ for applying TINDA.
 """
 
 import logging
