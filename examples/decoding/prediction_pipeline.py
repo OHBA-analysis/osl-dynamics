@@ -1,6 +1,8 @@
 """
-Example of how to use the prediction pipeline to 
-perform a grid search and nested cross-validation.
+Example of how to use the prediction pipeline inside osl-dynamics
+to perform a grid search and nested cross-validation.
+
+This script is based on simulated data.
 """
 
 import numpy as np
