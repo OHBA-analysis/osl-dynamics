@@ -1595,6 +1595,7 @@ def plot_brain_surface(
     colorbar=True,
     symmetric_cbar=True,
     cbar_tick_format="%.2g",
+    cbar_fontsize=24,
     cbar_label=None,
     vmin=None,
     vmax=None,
@@ -1626,6 +1627,8 @@ def plot_brain_surface(
     cbar_tick_format : str, optional
         Formatting for the color bar tick labels.
         Example use: :code:`cbar_tick_format='%.2f'`.
+    cbar_fontsize : int, optional
+        Fontsize for the color bar ticks and label.
     cbar_label : str, optional
         Label for the color bar.
     vmin : float, optional
@@ -1738,8 +1741,8 @@ def plot_brain_surface(
                 orientation="horizontal",
                 format=cbar_tick_format,
             )
-            cbar.ax.tick_params(labelsize=24)
-            cbar.set_label(cbar_label, fontsize=24)
+            cbar.ax.tick_params(labelsize=cbar_fontsize)
+            cbar.set_label(cbar_label, fontsize=cbar_fontsize)
     else:
         # Plotting 4 views
 
@@ -2058,6 +2061,7 @@ def plot_psd_topo(
     parcellation_file=None,
     topomap_pos=None,
     fig_kwargs=None,
+    ax=None,
     filename=None,
 ):
     """PLot PSDs for parcels and a topomap.
@@ -2080,6 +2084,8 @@ def plot_psd_topo(
         :code:`parcellation_file=None`.
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
+    ax : matplotlib Axis, optional
+        Axis to plot on.
     filename : str, optional
         Output filename.
 
@@ -2114,8 +2120,14 @@ def plot_psd_topo(
     if only_show is None:
         only_show = np.arange(n_parcels)
 
+    # Create axis
+    if ax is None:
+        fig, ax = create_figure(**fig_kwargs)
+        ax_passed = False
+    else:
+        ax_passed = True
+
     # Plot PSDs
-    fig, ax = create_figure(**fig_kwargs)
     cmap = plt.cm.viridis_r
     for i in reversed(range(n_parcels)):
         if i in only_show:
@@ -2137,9 +2149,9 @@ def plot_psd_topo(
         )
 
     # Save
-    if filename is not None:
+    if filename is not None and not ax_passed:
         save(fig, filename)
-    else:
+    elif not ax_passed:
         return fig, ax
 
 
