@@ -10,7 +10,7 @@ The :doc:`API reference <autoapi/index>` provides documentation for the classes,
 Models
 ------
 
-Various models are implemented in osl-dynamics. Finalised models that have been used in published papers are described below.
+Descriptions for models implemented in osl-dynamics:
 
 - :doc:`Hidden Markov Model (HMM) <models/hmm>`.
 - :doc:`Dynamic Network Modes (DyNeMo) <models/dynemo>`.
@@ -58,6 +58,8 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 
 - :doc:`tutorials_build/6-1_group_contrast`.
 - :doc:`tutorials_build/6-2_group_network_response`.
+
+For the **task analysis** of electrophysiological data, this `repository <https://github.com/OHBA-analysis/Gohil2024_NetworkAnalysisOfTaskData>`_ might be useful.
 
 More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repository.
 
