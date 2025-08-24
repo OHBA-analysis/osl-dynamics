@@ -635,16 +635,12 @@ def train_hive(
     # Training
     history = model.fit(data, **fit_kwargs)
 
-    _logger.info(f"Saving model to: {model_dir}")
-    model.save(model_dir)
-
-    del model
-    model = hive.Model.load(model_dir)
-
     # Get the variational free energy
     history["free_energy"] = model.free_energy(data)
 
     # Save trained model
+    _logger.info(f"Saving model to: {model_dir}")
+    model.save(model_dir)
     save(f"{model_dir}/init_history.pkl", init_history)
     save(f"{model_dir}/history.pkl", history)
 
