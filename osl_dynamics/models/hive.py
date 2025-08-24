@@ -687,6 +687,10 @@ class Model(MarkovStateInferenceModelBase):
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
+    def compile(self, *args, **kwargs):
+        """Wrapper for the keras model compile method."""
+        super().compile(*args, jit_compile=False, **kwargs)
+
     def fit(self, *args, kl_annealing_callback=None, **kwargs):
         """Wrapper for the standard keras fit method.
 

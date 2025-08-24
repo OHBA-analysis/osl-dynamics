@@ -1046,7 +1046,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return super().fit(*args, **kwargs)
 
-    def compile(self, optimizer=None):
+    def compile(self, optimizer=None, **kwargs):
         """Compile the model.
 
         Parameters
@@ -1083,7 +1083,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         )
 
         # Compile
-        super().compile(optimizer)
+        super().compile(optimizer, **kwargs)
 
     def get_alpha(
         self, dataset, concatenate=False, remove_edge_effects=False, **kwargs

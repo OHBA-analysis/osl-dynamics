@@ -166,11 +166,15 @@ def train_hmm(
         # Get the inferred parameters
         alpha = model.get_alpha(data)
         means, covs = model.get_means_covariances()
+        initial_state_probs = model.get_initial_state_probs()
+        trans_prob = model.get_trans_prob()
 
         # Save inferred parameters
         save(f"{inf_params_dir}/alp.pkl", alpha)
         save(f"{inf_params_dir}/means.npy", means)
         save(f"{inf_params_dir}/covs.npy", covs)
+        save(f"{inf_params_dir}/initial_state_probs.npy", initial_state_probs)
+        save(f"{inf_params_dir}/trans_prob.npy", trans_prob)
 
 
 def train_dynemo(
@@ -652,6 +656,8 @@ def train_hive(
         # Get the inferred parameters
         alpha = model.get_alpha(data)
         means, covs = model.get_means_covariances()
+        initial_state_probs = model.get_initial_state_probs()
+        trans_prob = model.get_trans_prob()
         session_means, session_covs = model.get_session_means_covariances()
         summed_embeddings = model.get_summed_embeddings()
         embedding_weights = model.get_embedding_weights()
@@ -660,6 +666,8 @@ def train_hive(
         save(f"{inf_params_dir}/alp.pkl", alpha)
         save(f"{inf_params_dir}/means.npy", means)
         save(f"{inf_params_dir}/covs.npy", covs)
+        save(f"{inf_params_dir}/initial_state_probs.npy", initial_state_probs)
+        save(f"{inf_params_dir}/trans_prob.npy", trans_prob)
         save(f"{inf_params_dir}/session_means.npy", session_means)
         save(f"{inf_params_dir}/session_covs.npy", session_covs)
         save(f"{inf_params_dir}/summed_embeddings.npy", summed_embeddings)
@@ -698,21 +706,44 @@ def get_inf_params(data, output_dir, observation_model_only=False):
     model = load(model_dir)
 
     if observation_model_only:
-        # Get the inferred parameters
         means, covs = model.get_means_covariances()
-
-        # Save
         save(f"{inf_params_dir}/means.npy", means)
         save(f"{inf_params_dir}/covs.npy", covs)
+
+        if model.name == "HIVE":
+            session_means, session_covs = model.get_session_means_covariances()
+            summed_embeddings = model.get_summed_embeddings()
+            embedding_weights = model.get_embedding_weights()
+            save(f"{inf_params_dir}/session_means.npy", session_means)
+            save(f"{inf_params_dir}/session_covs.npy", session_covs)
+            save(f"{inf_params_dir}/summed_embeddings.npy", summed_embeddings)
+            save(f"{inf_params_dir}/embedding_weights.pkl", embedding_weights)
     else:
-        # Get the inferred parameters
+        if model.name == "HIVE" and not data.get_session_labels():
+            data.add_session_labels(
+                "session_id", np.arange(data.n_sessions), "categorical"
+            )
+
         alpha = model.get_alpha(data)
         means, covs = model.get_means_covariances()
-
-        # Save
         save(f"{inf_params_dir}/alp.pkl", alpha)
         save(f"{inf_params_dir}/means.npy", means)
         save(f"{inf_params_dir}/covs.npy", covs)
+
+        if model.name in ["HMM", "HIVE"]:
+            initial_state_probs = model.get_initial_state_probs()
+            trans_prob = model.get_trans_prob()
+            save(f"{inf_params_dir}/initial_state_probs.npy", initial_state_probs)
+            save(f"{inf_params_dir}/trans_prob.npy", trans_prob)
+
+        if model.name == "HIVE":
+            session_means, session_covs = model.get_session_means_covariances()
+            summed_embeddings = model.get_summed_embeddings()
+            embedding_weights = model.get_embedding_weights()
+            save(f"{inf_params_dir}/session_means.npy", session_means)
+            save(f"{inf_params_dir}/session_covs.npy", session_covs)
+            save(f"{inf_params_dir}/summed_embeddings.npy", summed_embeddings)
+            save(f"{inf_params_dir}/embedding_weights.pkl", embedding_weights)
 
 
 def plot_power_maps_from_covariances(

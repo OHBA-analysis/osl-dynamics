@@ -154,7 +154,7 @@ class ModelBase:
         """Build a keras model."""
         pass
 
-    def compile(self, optimizer=None):
+    def compile(self, optimizer=None, **kwargs):
         """Compile the model.
 
         Parameters
@@ -176,7 +176,7 @@ class ModelBase:
             )
 
         # Compile
-        self.model.compile(optimizer)
+        self.model.compile(optimizer, **kwargs)
 
         # Add losses to metrics to print during training
         self.add_metrics_for_loss()
