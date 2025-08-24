@@ -654,11 +654,7 @@ class ModelBase:
         os.makedirs(dirname, exist_ok=True)
 
         config_dict = self.config.__dict__.copy()
-        # for serialisability of the dict
-        non_serializable_keys = [
-            key for key in list(config_dict.keys()) if "regularizer" in key
-        ]
-        non_serializable_keys.append("strategy")
+        non_serializable_keys = ["strategy"]
         for key in non_serializable_keys:
             config_dict[key] = None
 
