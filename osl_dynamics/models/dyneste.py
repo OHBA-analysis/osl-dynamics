@@ -286,7 +286,7 @@ class Model(VariationalInferenceModelBase):
 
         # Inference RNN:
         # - Learns q(state_t) = softmax(inf_theta_t), where
-        #     - inf_theta_t ~ affine(RNN(inputs_<=t)) is a set of logits
+        #     - inf_theta_t ~ affine(RNN(inputs)) is a set of logits
 
         inf_rnn_layer = InferenceRNNLayer(
             config.inference_rnn,
