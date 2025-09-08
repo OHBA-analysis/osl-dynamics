@@ -2147,6 +2147,62 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         output_shape_1 = [input_shape[0], input_shape[1], self.n_states, self.n_states]
         return (output_shape_0, tuple(output_shape_1))
 
+class SingleStateInferenceLayer(tf.keras.layers.Layer):
+    def __init__(
+        self,
+        n_states,
+        sequence_length,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.n_states = 1
+        self.sequence_length = sequence_length
+
+        if self.n_states == 1:
+            # Define fixed tensors
+            initial_state_probs = tf.constant([1.0], dtype=tf.float32)
+            initial_trans_prob = tf.constant([[1.0]], dtype=tf.float32)
+
+            # # Wrap them as non-trainable "layers" (really variables)
+            # initial_state_probs_layer = tf.Variable(initial_state_probs, trainable=False, name="initial_state_probs")
+            # trans_prob_layer = tf.Variable(initial_trans_prob, trainable=False, name="trans_probs")
+
+            # # Store as a list of layers (non-learnable)
+            # self.layers = [initial_state_probs_layer, trans_prob_layer]
+        else:
+            raise ValueError("This layer is only implemented for n_states=1.")
+    
+    def get_stationary_distribution(self):
+        if self.n_states == 1:
+            # For 1 state, the stationary distribution is always [1.0]
+            return tf.constant([1.0], dtype=tf.float32)
+    
+    def get_initial_state_probs(self):
+        if self.n_states == 1:
+            return tf.constant([1.0], dtype=tf.float32)
+        
+    def get_trans_prob(self):
+        if self.n_states == 1:
+            return tf.constant([[1.0]], dtype=tf.float32)
+
+    def call(self, inputs, **kwargs):
+        x = inputs
+        # x.shape = (None, sequence_length, n_channels)
+        batch_size = tf.shape(x)[0]
+        sequence_length = tf.shape(x)[1]
+
+        # gamma: all ones since there's only one state
+        gamma = tf.ones((batch_size, sequence_length, self.n_states), dtype=tf.float32)
+
+        # xi: all ones, one fewer time step
+        xi = tf.ones((batch_size, sequence_length - 1, self.n_states, self.n_states), dtype=tf.float32)
+
+        return gamma, xi
+    
+    def compute_output_shape(self, input_shape):
+        output_shape_0 = input_shape
+        output_shape_1 = [input_shape[0], input_shape[1], self.n_states, self.n_states]
+        return (output_shape_0, tuple(output_shape_1))
 
 class SeparateLogLikelihoodLayer(layers.Layer):
     """Layer to calculate the log-likelihood for different HMM states.
