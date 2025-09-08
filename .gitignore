@@ -33,3 +33,4 @@ MANIFEST
 
 # Per-project virtualenvs
 .venv*/
+bmrc.yml
