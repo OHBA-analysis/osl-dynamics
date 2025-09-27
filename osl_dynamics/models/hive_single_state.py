@@ -1,4 +1,4 @@
-"""HIVE (HMM with Integrated Variability Estimation)."""
+"""HIVE (HMM with Integrated Variability Estimation). with modification of single state case;"""
 
 import logging
 from typing import List
@@ -15,13 +15,13 @@ from osl_dynamics.inference.layers import (
     VectorsLayer,
     CovarianceMatricesLayer,
     ConcatEmbeddingsLayer,
-    SessionParamLayer,
     InverseCholeskyLayer,
     SampleGammaDistributionLayer,
     GammaExponentialKLDivergenceLayer,
     KLLossLayer,
     MultiLayerPerceptronLayer,
-    HiddenMarkovStateInferenceLayer,
+    SingleStateInferenceLayer,
+    SessionParamLayer,
     SeparateLogLikelihoodLayer,
     SumLogLikelihoodLossLayer,
     LearnableTensorLayer,
@@ -33,6 +33,7 @@ from osl_dynamics.inference.layers import (
     TFZerosLayer,
     EmbeddingLayer,
 )
+
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.inference import callbacks
@@ -201,15 +202,14 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     session_labels: List[SessionLabels] = None
 
     # Initialization
-    init_method: str = "random_state_time_course"
-    n_init: int = 3
-    n_init_epochs: int = 1
+    init_method: str = "random_subset"
+    n_init: int = 5
+    n_init_epochs: int = 2
     init_take: float = 1.0
 
     def __post_init__(self):
         self.validate_observation_model_parameters()
         self.validate_hmm_parameters()
-        self.validate_dimension_parameters()
         self.validate_training_parameters()
         self.validate_embedding_parameters()
         self.validate_kl_annealing_parameters()
@@ -289,7 +289,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
 
 
 class Model(MarkovStateInferenceModelBase):
-    """HIVE model class.
+    """HIVE-single state model class.
 
     Parameters
     ----------
@@ -606,20 +606,25 @@ class Model(MarkovStateInferenceModelBase):
 
         # -------- Hidden state inference -------- #
 
-        # Posterior
-        hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
+        # # Posterior
+        # hidden_state_inference_layer = HiddenMarkovStateInferenceLayer(
+        #     config.n_states,
+        #     config.sequence_length,
+        #     config.initial_trans_prob,
+        #     config.initial_state_probs,
+        #     config.learn_trans_prob,
+        #     config.learn_initial_state_probs,
+        #     implementation=config.baum_welch_implementation,
+        #     dtype="float64",
+        #     name="hid_state_inf",
+        # )
+        # gamma, xi = hidden_state_inference_layer(ll)
+        single_state_inference_layer = SingleStateInferenceLayer(
             config.n_states,
             config.sequence_length,
-            config.initial_trans_prob,
-            config.initial_state_probs,
-            config.learn_trans_prob,
-            config.learn_initial_state_probs,
-            implementation=config.baum_welch_implementation,
-            dtype="float64",
             name="hid_state_inf",
         )
-        gamma, xi = hidden_state_inference_layer(ll)
-
+        gamma, xi = single_state_inference_layer(data)
         # Loss
         ll_loss_layer = SumLogLikelihoodLossLayer(config.loss_calc, name="ll_loss")
         ll_loss = ll_loss_layer([ll, gamma])
@@ -686,10 +691,6 @@ class Model(MarkovStateInferenceModelBase):
         outputs = {"ll_loss": ll_loss, "kl_loss": kl_loss, "gamma": gamma, "xi": xi}
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
-
-    def compile(self, *args, **kwargs):
-        """Wrapper for the keras model compile method."""
-        super().compile(*args, jit_compile=False, **kwargs)
 
     def fit(self, *args, kl_annealing_callback=None, **kwargs):
         """Wrapper for the standard keras fit method.
@@ -1023,7 +1024,7 @@ class Model(MarkovStateInferenceModelBase):
                 "The number of sessions in the training data must match "
                 "the number of sessions in the model."
             )
-
+        print(f"length of training dataset: {len(training_dataset)}")
         obs_mod.set_dev_parameters_initializer(
             self.model,
             training_dataset,
