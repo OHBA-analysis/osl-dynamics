@@ -1260,19 +1260,15 @@ def autocorr_to_spectra(
     n_lags = autocorr_func.shape[-1]
     nfft = max(nfft, 2 ** nextpow2(n_lags))
 
-    # Calculate the arguments to keep for the given frequency range
-    f = np.arange(
-        0,
-        sampling_frequency / 2,
-        sampling_frequency / nfft,
-    )
+    # Calculate the argments to keep for the given frequency range
+    f = np.arange(nfft // 2 + 1) * sampling_frequency / nfft
     [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
-    f = f[min_arg:max_arg]
+    f = f[min_arg:max_arg + 1]
 
     # Calculate cross power spectra as the Fourier transform of the
     # auto/cross-correlation function
     psd = np.fft.fft(autocorr_func, nfft)
-    psd = psd[..., min_arg:max_arg]
+    psd = psd[..., min_arg:max_arg + 1]
     psd = abs(psd)
 
     # Normalise the power spectra
@@ -1385,14 +1381,14 @@ def _welch_spectrogram(
 
     # Time and frequency axis
     t = np.arange(n_samples) / sampling_frequency
-    f = np.arange(nfft // 2) * sampling_frequency / nfft
+    f = np.arange(nfft // 2 + 1) * sampling_frequency / nfft
 
     # Only keep a particular frequency range
     [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
-    f = f[min_arg:max_arg]
+    f = f[min_arg:max_arg + 1]
 
     # Number of frequency bins
-    n_freq = max_arg - min_arg
+    n_freq = max_arg - min_arg + 1
 
     # Indices of an upper triangle of an n_channels by n_channels array
     m, n = np.triu_indices(n_channels)
@@ -1432,7 +1428,7 @@ def _welch_spectrogram(
 
                 # Calculate cross spectra for the sub-window
                 X = np.fft.fft(x_sub_window, nfft)
-                X = X[..., min_arg:max_arg]
+                X = X[..., min_arg:max_arg + 1]
                 XY = np.conj(X)[np.newaxis, :, :] * X[:, np.newaxis, :]
                 XY_sub_window[k] = XY[m, n]
 
@@ -1467,7 +1463,7 @@ def _welch_spectrogram(
 
                 # Calculate PSD for the sub-window
                 X = np.fft.fft(x_sub_window, nfft)
-                X = X[..., min_arg:max_arg]
+                X = X[..., min_arg:max_arg + 1]
                 XX_sub_window[k] = np.real(np.conj(X) * X)
 
             # Average the cross spectra for each sub-window
@@ -1696,14 +1692,14 @@ def _multitaper_spectrogram(
 
     # Time and frequency axis
     t = np.arange(n_samples) / sampling_frequency
-    f = np.arange(nfft // 2) * sampling_frequency / nfft
+    f = np.arange(nfft // 2 + 1) * sampling_frequency / nfft
 
     # Only keep a particular frequency range
     [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
-    f = f[min_arg:max_arg]
+    f = f[min_arg:max_arg + 1]
 
     # Number of frequency bins
-    n_freq = max_arg - min_arg
+    n_freq = max_arg - min_arg + 1
 
     # Indices of an upper triangle of an n_channels by n_channels array
     m, n = np.triu_indices(n_channels)
@@ -1743,7 +1739,7 @@ def _multitaper_spectrogram(
 
                 # Fourier transform
                 X = np.fft.fft(x_sub_window, nfft)
-                X = X[..., min_arg:max_arg]
+                X = X[..., min_arg:max_arg + 1]
 
                 # Calculate cross spectra for the sub-window
                 XY = np.conj(X)[:, :, np.newaxis, :] * X[:, np.newaxis, :, :]
@@ -1780,7 +1776,7 @@ def _multitaper_spectrogram(
 
                 # Fourier transform
                 X = np.fft.fft(x_sub_window, nfft)
-                X = X[..., min_arg:max_arg]
+                X = X[..., min_arg:max_arg + 1]
 
                 # Calculate spectra for the sub-window
                 XX = np.real(np.conj(X) * X)
