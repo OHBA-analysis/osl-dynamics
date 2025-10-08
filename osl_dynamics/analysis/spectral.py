@@ -1260,7 +1260,7 @@ def autocorr_to_spectra(
     n_lags = autocorr_func.shape[-1]
     nfft = max(nfft, 2 ** nextpow2(n_lags))
 
-    # Calculate the argments to keep for the given frequency range
+    # Calculate the arguments to keep for the given frequency range
     f = np.arange(nfft // 2 + 1) * sampling_frequency / nfft
     [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
     f = f[min_arg : max_arg + 1]

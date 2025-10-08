@@ -216,7 +216,7 @@ def remove_bad_segments(
         Time series with bad segments removed.
         Shape is (n_samples - n_bad_samples, n_channels).
     bad : np.ndarray
-        Times of True (bad) or False (good) to indices whether
+        Times of True (bad) or False (good) to indicate whether
         a time point is good or bad. This is the full length of
         the original time series. Shape is (n_samples,).
     """
