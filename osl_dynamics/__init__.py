@@ -1,16 +1,16 @@
 import logging
-from pkg_resources import DistributionNotFound, get_distribution
+from importlib.metadata import PackageNotFoundError, version
 
 from osl_dynamics.config_api.pipeline import run_pipeline
 
 
 # Setup the version
 try:
-    __version__ = get_distribution("osl-dynamics").version
-except DistributionNotFound:
+    __version__ = version("osl-dynamics")
+except PackageNotFoundError:
     __version__ = "unknown"
 finally:
-    del get_distribution, DistributionNotFound
+    del version, PackageNotFoundError
 
 # Configure logging
 logging.basicConfig(
