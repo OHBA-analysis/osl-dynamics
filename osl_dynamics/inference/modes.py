@@ -12,7 +12,8 @@ from tqdm.auto import trange
 from scipy import cluster, spatial, optimize
 from sklearn.cluster import AgglomerativeClustering
 
-from osl_dynamics import analysis, array_ops
+from osl_dynamics import array_ops
+from osl_dynamics.analysis import post_hoc
 from osl_dynamics.inference import metrics
 from osl_dynamics.utils import plotting
 from osl_dynamics.utils.misc import override_dict_defaults
@@ -451,58 +452,56 @@ def reduce_state_time_course(state_time_course):
 
 
 def fractional_occupancies(state_time_course):
-    """Wrapper for `analysis.modes.fractional_occupancies \
+    """Wrapper for `analysis.post_hoc.fractional_occupancies \
     <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/modes/index.html#osl_dynamics.analysis.modes\
+    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc\
     .fractional_occupancies>`_."""
-    return analysis.modes.fractional_occupancies(state_time_course)
+    return post_hoc.fractional_occupancies(state_time_course)
 
 
 def mean_lifetimes(state_time_course, sampling_frequency=None):
-    """Wrapper for `analysis.modes.mean_lifetimes \
+    """Wrapper for `analysis.post_hoc.mean_lifetimes \
     <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/modes/index.html#osl_dynamics.analysis.modes.mean_lifetimes>`_."""
-    return analysis.modes.mean_lifetimes(state_time_course, sampling_frequency)
+    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.mean_lifetimes>`_."""
+    return post_hoc.mean_lifetimes(state_time_course, sampling_frequency)
 
 
 def mean_intervals(state_time_course, sampling_frequency=None):
-    """Wrapper for `analysis.modes.mean_intervals \
+    """Wrapper for `analysis.post_hoc.mean_intervals \
     <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/modes/index.html#osl_dynamics.analysis.modes.mean_intervals>`_."""
-    return analysis.modes.mean_intervals(state_time_course, sampling_frequency)
+    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.mean_intervals>`_."""
+    return post_hoc.mean_intervals(state_time_course, sampling_frequency)
 
 
 def switching_rates(state_time_course, sampling_frequency=None):
-    """Wrapper for `analysis.modes.switching_rates \
+    """Wrapper for `analysis.post_hoc.switching_rates \
     <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/modes/index.html#osl_dynamics.analysis.modes\
+    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc\
     .switching_rates>`_."""
-    return analysis.modes.switching_rates(state_time_course, sampling_frequency)
+    return post_hoc.switching_rates(state_time_course, sampling_frequency)
 
 
 def mean_amplitudes(state_time_course, data):
-    """Wrapper for `analysis.modes.mean_amplitudes \
+    """Wrapper for `analysis.post_hoc.mean_amplitudes \
     <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/modes/index.html#osl_dynamics.analysis.modes\
+    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc\
     .mean_amplitudes>`_."""
-    return analysis.modes.mean_amplitudes(state_time_course, data)
+    return post_hoc.mean_amplitudes(state_time_course, data)
 
 
 def lifetime_statistics(state_time_course, sampling_frequency=None):
-    """Wrapper for `analysis.modes.lifetime_statistics \
+    """Wrapper for `analysis.post_hoc.lifetime_statistics \
     <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/modes/index.html#osl_dynamics.analysis.modes\
+    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc\
     .lifetime_statistics>`_."""
-    return analysis.modes.lifetime_statistics(state_time_course, sampling_frequency)
+    return post_hoc.lifetime_statistics(state_time_course, sampling_frequency)
 
 
 def fano_factor(state_time_course, window_length, sampling_frequency=1.0):
-    """Wrapper for `analysis.modes.fano_factor \
+    """Wrapper for `analysis.post_hoc.fano_factor \
     <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/modes/index.html#osl_dynamics.analysis.modes.fano_factor>`_."""
-    return analysis.modes.fano_factor(
-        state_time_course, window_length, sampling_frequency
-    )
+    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.fano_factor>`_."""
+    return post_hoc.fano_factor(state_time_course, window_length, sampling_frequency)
 
 
 def convert_to_mne_raw(
