@@ -1971,7 +1971,7 @@ def plot_state_lifetimes(
         Matplotlib axis object(s). Only returned if :code:`ax=None` and
         :code:`filename=None`.
     """
-    from osl_dynamics.analysis import modes
+    from osl_dynamics.analysis import post_hoc
 
     n_plots = state_time_course.shape[1]
     short, long, empty = rough_square_axes(n_plots)
@@ -1992,7 +1992,7 @@ def plot_state_lifetimes(
         plot_kwargs = {}
 
     # Calculate state lifetimes
-    channel_lifetimes = modes.lifetimes(state_time_course)
+    channel_lifetimes = post_hoc.lifetimes(state_time_course)
 
     # Create figure
     fig, axes = create_figure(short, long, **fig_kwargs)
