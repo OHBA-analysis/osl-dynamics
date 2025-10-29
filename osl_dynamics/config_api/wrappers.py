@@ -823,9 +823,9 @@ def plot_power_maps_from_covariances(
     covs = load(f"{inf_params_dir}/covs.npy")
 
     # Reverse the effects of preparing the data
-    from osl_dynamics.analysis import modes
+    from osl_dynamics.analysis import post_hoc
 
-    covs = modes.raw_covariances(covs, n_embeddings, pca_components)
+    covs = post_hoc.raw_covariances(covs, n_embeddings, pca_components)
 
     # Save
     from osl_dynamics.analysis import power
@@ -872,9 +872,9 @@ def plot_tde_covariances(data, output_dir):
 
     if hasattr(data, "pca_components"):
         if data.pca_components is not None:
-            from osl_dynamics.analysis import modes
+            from osl_dynamics.analysis import post_hoc
 
-            covs = modes.reverse_pca(covs, data.pca_components)
+            covs = post_hoc.reverse_pca(covs, data.pca_components)
 
     from osl_dynamics.utils import plotting
 
