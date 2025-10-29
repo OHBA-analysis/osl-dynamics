@@ -1828,80 +1828,93 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
     ):
         super().__init__(**kwargs)
         self.n_states = n_states
-        self.sequence_length = sequence_length
-        self.use_stationary_distribution = use_stationary_distribution
+        if self.n_states != 1:
+            self.sequence_length = sequence_length
+            self.use_stationary_distribution = use_stationary_distribution
 
-        # Implementation for Baum-Welch algorithm
-        if implementation not in ["rescale", "log"]:
-            raise ValueError("implementation should be 'rescale' or 'log'.")
-        self.implementation = implementation
+            # Implementation for Baum-Welch algorithm
+            if implementation not in ["rescale", "log"]:
+                raise ValueError("implementation should be 'rescale' or 'log'.")
+            self.implementation = implementation
 
-        # Initial state probabilities
-        if initial_state_probs is None:
-            initial_state_probs = np.ones(self.n_states) / self.n_states
+            # Initial state probabilities
+            if initial_state_probs is None:
+                initial_state_probs = np.ones(self.n_states) / self.n_states
 
-        if initial_state_probs.shape != (n_states,):
-            raise ValueError(f"initial_trans_prob shape must be ({n_states},).")
-        initial_state_probs = initial_state_probs.astype("float32")
+            if initial_state_probs.shape != (n_states,):
+                raise ValueError(f"initial_trans_prob shape must be ({n_states},).")
+            initial_state_probs = initial_state_probs.astype("float32")
 
-        initial_state_probs_layer = LearnableTensorLayer(
-            shape=(n_states,),
-            learn=learn_initial_state_probs,
-            initializer=osld_initializers.WeightInitializer(initial_state_probs),
-            initial_value=initial_state_probs,
-            regularizer=None,
-            name=self.name + "_initial_state_probs_kernel",
-        )
-
-        # Transition probability matrix
-        if initial_trans_prob is None:
-            initial_trans_prob = np.ones((n_states, n_states)) * 0.1 / (n_states - 1)
-            np.fill_diagonal(initial_trans_prob, 0.9)
-
-        if initial_trans_prob.shape != (n_states, n_states):
-            raise ValueError(
-                f"initial_trans_prob shape must be ({n_states}, {n_states})."
+            initial_state_probs_layer = LearnableTensorLayer(
+                shape=(n_states,),
+                learn=learn_initial_state_probs,
+                initializer=osld_initializers.WeightInitializer(initial_state_probs),
+                initial_value=initial_state_probs,
+                regularizer=None,
+                name=self.name + "_initial_state_probs_kernel",
             )
-        initial_trans_prob = initial_trans_prob.astype("float32")
 
-        trans_prob_layer = LearnableTensorLayer(
-            shape=(n_states, n_states),
-            learn=learn_trans_prob,
-            initializer=osld_initializers.WeightInitializer(initial_trans_prob),
-            initial_value=initial_trans_prob,
-            regularizer=None,
-            name=self.name + "_trans_prob_kernel",
-        )
+            # Transition probability matrix
+            if initial_trans_prob is None:
+                initial_trans_prob = (
+                    np.ones((n_states, n_states)) * 0.1 / (n_states - 1)
+                )
+                np.fill_diagonal(initial_trans_prob, 0.9)
 
-        # We use self.layers for compatibility with
-        # initializers.reinitialize_model_weights
-        self.layers = [initial_state_probs_layer, trans_prob_layer]
+            if initial_trans_prob.shape != (n_states, n_states):
+                raise ValueError(
+                    f"initial_trans_prob shape must be ({n_states}, {n_states})."
+                )
+            initial_trans_prob = initial_trans_prob.astype("float32")
+
+            trans_prob_layer = LearnableTensorLayer(
+                shape=(n_states, n_states),
+                learn=learn_trans_prob,
+                initializer=osld_initializers.WeightInitializer(initial_trans_prob),
+                initial_value=initial_trans_prob,
+                regularizer=None,
+                name=self.name + "_trans_prob_kernel",
+            )
+
+            # We use self.layers for compatibility with
+            # initializers.reinitialize_model_weights
+            self.layers = [initial_state_probs_layer, trans_prob_layer]
 
     def build(self, input_shape):
-        for layer in self.layers:
-            layer.build(input_shape)
-        self.built = True
+        if self.n_states != 1:
+            for layer in self.layers:
+                layer.build(input_shape)
+            self.built = True
 
     def get_stationary_distribution(self):
-        trans_prob = self.get_trans_prob()
-        eigval, eigvec = tf.linalg.eig(trans_prob)
-        eigvec = tf.boolean_mask(
-            eigvec, tf.experimental.numpy.isclose(eigval, 1), axis=1
-        )
-        stationary_distribution = tf.math.real(tf.squeeze(eigvec))
-        stationary_distribution /= tf.reduce_sum(stationary_distribution)
-        return stationary_distribution
+        if self.n_states == 1:
+            return tf.constant([1.0], dtype=tf.float32)
+        else:
+            trans_prob = self.get_trans_prob()
+            eigval, eigvec = tf.linalg.eig(trans_prob)
+            eigvec = tf.boolean_mask(
+                eigvec, tf.experimental.numpy.isclose(eigval, 1), axis=1
+            )
+            stationary_distribution = tf.math.real(tf.squeeze(eigvec))
+            stationary_distribution /= tf.reduce_sum(stationary_distribution)
+            return stationary_distribution
 
     def get_initial_state_probs(self):
-        if self.use_stationary_distribution:
-            return self.get_stationary_distribution()
+        if self.n_states == 1:
+            return tf.constant([1.0], dtype=tf.float32)
         else:
-            learnable_tensors_layer = self.layers[0]
-            return learnable_tensors_layer(tf.constant(1))
+            if self.use_stationary_distribution:
+                return self.get_stationary_distribution()
+            else:
+                learnable_tensors_layer = self.layers[0]
+                return learnable_tensors_layer(tf.constant(1))
 
     def get_trans_prob(self):
-        learnable_tensors_layer = self.layers[1]
-        return learnable_tensors_layer(tf.constant(1))
+        if self.n_states == 1:
+            return tf.constant([[1.0]], dtype=tf.float32)
+        else:
+            learnable_tensors_layer = self.layers[1]
+            return learnable_tensors_layer(tf.constant(1))
 
     @tf.function
     def _baum_welch(self, log_B):
@@ -2102,106 +2115,63 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         return gamma, xi
 
     def _trans_prob_update(self, gamma, xi):
-        sum_xi = tf.reduce_sum(xi, axis=(0, 1))
-        sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=(0, 1))
-        sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
-        return sum_xi / sum_gamma
-
-    def call(self, log_B, **kwargs):
-        @tf.custom_gradient
-        def posterior(log_B):
-            # Calculate marginal (gamma) and joint (xi) posterior
-            gamma, xi = self._baum_welch(log_B)
-
-            # Calculate gradient
-            def grad(*args, **kwargs):
-                # Note, this function actually returns the estimated
-                # value for what the transition probability matrix
-                # should be based on the joint and marginal posterior
-                # rather than the gradient (i.e. change in the parameter).
-                #
-                # This is accounted for when updating the variable
-                # in inference.optimizers.ExponentialMovingAverageOptimizer
-
-                if len(kwargs) == 0:
-                    # No trainable variables to calculate the gradient for
-                    return
-
-                grads = []
-                variables = kwargs["variables"]
-                for v in variables:
-                    if "trans_prob" in v.name:
-                        update = self._trans_prob_update(gamma, xi)
-                    if "initial_state_probs" in v.name:
-                        update = tf.reduce_mean(gamma[:, 0], axis=0)
-                    update = tf.cast(update, tf.float32)
-                    grads.append(update)
-                return None, grads
-
-            return (gamma, xi), grad
-
-        return posterior(log_B)
-
-    def compute_output_shape(self, input_shape):
-        output_shape_0 = input_shape
-        output_shape_1 = [input_shape[0], input_shape[1], self.n_states, self.n_states]
-        return (output_shape_0, tuple(output_shape_1))
-
-
-class SingleStateInferenceLayer(tf.keras.layers.Layer):
-    def __init__(
-        self,
-        n_states,
-        sequence_length,
-        **kwargs,
-    ):
-        super().__init__(**kwargs)
-        self.n_states = 1
-        self.sequence_length = sequence_length
-
-        if self.n_states == 1:
-            # Define fixed tensors
-            initial_state_probs = tf.constant([1.0], dtype=tf.float32)
-            initial_trans_prob = tf.constant([[1.0]], dtype=tf.float32)
-
-            # # Wrap them as non-trainable "layers" (really variables)
-            # initial_state_probs_layer = tf.Variable(initial_state_probs, trainable=False, name="initial_state_probs")
-            # trans_prob_layer = tf.Variable(initial_trans_prob, trainable=False, name="trans_probs")
-
-            # # Store as a list of layers (non-learnable)
-            # self.layers = [initial_state_probs_layer, trans_prob_layer]
-        else:
-            raise ValueError("This layer is only implemented for n_states=1.")
-
-    def get_stationary_distribution(self):
-        if self.n_states == 1:
-            # For 1 state, the stationary distribution is always [1.0]
-            return tf.constant([1.0], dtype=tf.float32)
-
-    def get_initial_state_probs(self):
-        if self.n_states == 1:
-            return tf.constant([1.0], dtype=tf.float32)
-
-    def get_trans_prob(self):
         if self.n_states == 1:
             return tf.constant([[1.0]], dtype=tf.float32)
+        else:
+            sum_xi = tf.reduce_sum(xi, axis=(0, 1))
+            sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=(0, 1))
+            sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
+            return sum_xi / sum_gamma
 
-    def call(self, inputs, **kwargs):
-        x = inputs
-        # x.shape = (None, sequence_length, n_channels)
-        batch_size = tf.shape(x)[0]
-        sequence_length = tf.shape(x)[1]
+    def call(self, log_B, **kwargs):
+        if self.n_states == 1:
+            batch_size = tf.shape(log_B)[0]
+            sequence_length = tf.shape(log_B)[1]
+            gamma = tf.ones(
+                (batch_size, sequence_length, self.n_states),
+                dtype=tf.float32,
+            )
+            xi = tf.ones(
+                (batch_size, sequence_length - 1, self.n_states, self.n_states),
+                dtype=tf.float32,
+            )
+            return gamma, xi
 
-        # gamma: all ones since there's only one state
-        gamma = tf.ones((batch_size, sequence_length, self.n_states), dtype=tf.float32)
+        else:
 
-        # xi: all ones, one fewer time step
-        xi = tf.ones(
-            (batch_size, sequence_length - 1, self.n_states, self.n_states),
-            dtype=tf.float32,
-        )
+            @tf.custom_gradient
+            def posterior(log_B):
+                # Calculate marginal (gamma) and joint (xi) posterior
+                gamma, xi = self._baum_welch(log_B)
 
-        return gamma, xi
+                # Calculate gradient
+                def grad(*args, **kwargs):
+                    # Note, this function actually returns the estimated
+                    # value for what the transition probability matrix
+                    # should be based on the joint and marginal posterior
+                    # rather than the gradient (i.e. change in the parameter).
+                    #
+                    # This is accounted for when updating the variable
+                    # in inference.optimizers.ExponentialMovingAverageOptimizer
+
+                    if len(kwargs) == 0:
+                        # No trainable variables to calculate the gradient for
+                        return
+
+                    grads = []
+                    variables = kwargs["variables"]
+                    for v in variables:
+                        if "trans_prob" in v.name:
+                            update = self._trans_prob_update(gamma, xi)
+                        if "initial_state_probs" in v.name:
+                            update = tf.reduce_mean(gamma[:, 0], axis=0)
+                        update = tf.cast(update, tf.float32)
+                        grads.append(update)
+                    return None, grads
+
+                return (gamma, xi), grad
+
+            return posterior(log_B)
 
     def compute_output_shape(self, input_shape):
         output_shape_0 = input_shape
