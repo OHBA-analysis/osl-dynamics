@@ -1,4 +1,4 @@
-"""Functions to manipulate and analyse inferred mode/state data."""
+"""Helper functions for post-hoc analysis."""
 
 import itertools
 import logging
