@@ -5,7 +5,8 @@
 import os
 import numpy as np
 
-from osl_dynamics.analysis import power, workbench
+from osl_dynamics.analysis import power
+from osl_dynamics.utils import workbench
 
 def get_data(name, output_dir):
     if os.path.exists(output_dir):

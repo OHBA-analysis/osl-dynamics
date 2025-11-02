@@ -10,6 +10,5 @@ from osl_dynamics.analysis import (
     spectral,
     static,
     statistics,
-    workbench,
     prediction,
 )
