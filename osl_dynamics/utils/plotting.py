@@ -1603,6 +1603,7 @@ def plot_brain_surface(
     views=None,
     bg_on_data=False,
     threshold=None,
+    remove_subcortical_voxels=False,
     filename=None,
     show_plot=None,
 ):
@@ -1637,7 +1638,7 @@ def plot_brain_surface(
     vmax : float, optional
         Maximum value for the color bar.
         May be overridden if :code:`symmetric_cbar=True`.
-    hemispheres : list, optional.
+    hemispheres : list, optional
         :code:`['left', 'right']` or :code:`['left']` or :code:`['right']`.
         Defaults to :code:`['left', 'right']`.
     views : list, optional
@@ -1652,6 +1653,8 @@ def plot_brain_surface(
         or because is was thresholded).
     threshold : float, optional
         Threshold values to display. Defaults to no thresholding.
+    remove_subcortical_voxels : bool, optional
+        Should we set the subcortical voxels to np.nan?
     filename : str, optional
         Output filename. Extension can be :code:`png/svg/pdf`.
         If None is passed then the image is shown on screen and the
@@ -1699,7 +1702,9 @@ def plot_brain_surface(
     )
 
     # Convert from parcel values to voxel values
-    values = parcel_vector_to_voxel_grid(mask_file, parcellation_file, values)
+    values = parcel_vector_to_voxel_grid(
+        mask_file, parcellation_file, values, remove_subcortical_voxels
+    )
 
     # Create image to plot
     mask = nib.load(mask_file)
