@@ -2,8 +2,12 @@
 
 from dataclasses import dataclass
 
+import tensorflow as tf
+
+from osl_dynamics.models.dynemo import Config as DynemoConfig
+from osl_dynamics.models.dynemo import Model as DynemoModel
 from osl_dynamics.inference.layers import (
-    DampedOscillatorCovarianceMatricesLayer,
+    OscillatorCovarianceMatricesLayer,
     InferenceRNNLayer,
     KLDivergenceLayer,
     KLLossLayer,
@@ -11,13 +15,10 @@ from osl_dynamics.inference.layers import (
     MixMatricesLayer,
     MixVectorsLayer,
     ModelRNNLayer,
-    NormalizationLayer,
     SampleNormalDistributionLayer,
     SoftmaxLayer,
     VectorsLayer,
 )
-from osl_dynamics.models.dynemo import Config as DynemoConfig
-from osl_dynamics.models.dynemo import Model as DynemoModel
 
 
 @dataclass
@@ -28,62 +29,13 @@ class Config(DynemoConfig):
     ----------
     sampling_frequency : float
         The sampling frequency of the data (Hz).
-    oscillator_damping_limit : float, optional
-        The damping limit (Hz). If None, it is set to 40.
-    oscillator_frequency_limit : tuple[float, float], optional
-        The frequency limit (Hz). If None, it is set to (0.1, sampling_frequency / 2).
-    learn_oscillator_amplitude : bool
-        Whether to learn the amplitude. If False, the amplitude is fixed to 1.
     """
 
     sampling_frequency: float = None
-    oscillator_damping_limit: float = 40.0
-    oscillator_frequency_limit: tuple[float, float] | None = None
-    learn_oscillator_amplitude: bool = None
+    frequency_range: list = None
 
     def __post_init__(self):
         super().__post_init__()
-        if (
-            self.oscillator_frequency_limit is None
-            and self.sampling_frequency is not None
-        ):
-            self.oscillator_frequency_limit = (0.1, self.sampling_frequency / 2)
-        self.validate_sc_dynemo_params()
-
-    def validate_sc_dynemo_params(self):
-        """Validate the parameters of the model.
-
-        Raises
-        ------
-        SamplingFrequencyError
-            If the sampling frequency is not positive.
-        FrequencyLimitError
-            If the frequency limit is not between 0 and the Nyquist frequency.
-        DampingLimitError
-            If the damping limit is not positive.
-        ValueError
-            If any of the parameters are None.
-        """
-        non_optional_params = [
-            self.sampling_frequency,
-            self.learn_oscillator_amplitude,
-        ]
-
-        if any(param is None for param in non_optional_params):
-            raise ValueError(
-                "Both sampling_frequency and learn_oscillator_amplitude must be specified."
-            )
-
-        if self.sampling_frequency <= 0:
-            raise ValueError(
-                f"sampling_frequency must be greater than zero, got {self.sampling_frequency}"
-            )
-
-        nyquist_frequency = self.sampling_frequency / 2
-        if self.oscillator_frequency_limit[1] > nyquist_frequency:
-            raise ValueError(
-                f"sampling_frequency needs to be less than {nyquist_frequency}, got {self.sampling_frequency}"
-            )
 
 
 class Model(DynemoModel):
@@ -92,15 +44,15 @@ class Model(DynemoModel):
     This model is a single-channel version of DyNeMo.
     It should only be used for single-channel data which has been time-embedded.
 
-    This model parameterises the covariance matrices as a set of damped oscillators.
+    This model parameterises the covariance matrices as a set of oscillators.
     It should be used for single-channel data which has been time-embedded.
-    The parameters are the damping, frequency and amplitude of the oscillators.
+    The parameters are the frequency and amplitude of the oscillators.
     They define the auto-covariance functions of the modes using the equation:
 
     .. math::
-        R_j (\tau) = A_j e^{- \lambda_j \tau}\cos(2 \pi f_j \tau)
+        R_j (\tau) = A_j \cos(2 \pi f_j \tau)
 
-    where :math:`\lambda_j` is the damping, :math:`f_j` is the frequency and
+    where :math:`f_j` is the frequency and
     :math:`A_j` is the amplitude of the :math:`j`-th oscillator.
     :math:`\tau` is the time lag.
 
@@ -165,14 +117,12 @@ class Model(DynemoModel):
             config.means_regularizer,
             name="means",
         )
-        covs_layer = DampedOscillatorCovarianceMatricesLayer(
+        covs_layer = OscillatorCovarianceMatricesLayer(
             n=self.config.n_modes,
             m=self.config.n_channels,
             sampling_frequency=self.config.sampling_frequency,
-            damping_limit=self.config.oscillator_damping_limit,
-            frequency_limit=self.config.oscillator_frequency_limit,
-            learn_amplitude=self.config.learn_oscillator_amplitude,
-            learn=self.config.learn_covariances,
+            frequency_range=self.config.frequency_range,
+            #learn=self.config.learn_covariances,
             name="covs",
         )
         mix_means_layer = MixVectorsLayer(name="mix_means")
@@ -235,16 +185,6 @@ class Model(DynemoModel):
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
-    def _oscillator_layer(self):
-        """Get the covariance layer.
-
-        Returns
-        -------
-        covariance_layer : DampedOscillatorMatricesLayer
-            The covariance layer.
-        """
-        return self.model.get_layer("covs").oscillator_layer
-
     def get_frequency(self):
         """Get the frequencies of the oscillators.
 
@@ -253,19 +193,8 @@ class Model(DynemoModel):
         oscillator_frequencies : np.ndarray
             The frequencies of the oscillators.
         """
-        covs = self._oscillator_layer()
-        return covs.frequency(1).numpy()
-
-    def get_damping(self):
-        """Get the damping of the oscillators.
-
-        Returns
-        -------
-        oscillator_damping_factors : np.ndarray
-            The damping of the oscillators.
-        """
-        covs = self._oscillator_layer()
-        return covs.damping(1).numpy()
+        covs = self.model.get_layer("covs")
+        return covs.frequency(tf.constant(1)).numpy()
 
     def get_amplitude(self):
         """Get the amplitude of the oscillators.
@@ -275,8 +204,12 @@ class Model(DynemoModel):
         oscillator_amplitudes : np.ndarray
             The amplitude of the oscillators.
         """
-        covs = self._oscillator_layer()
-        return covs.amplitude(1).numpy()
+        covs = self.model.get_layer("covs")
+        return covs.amplitude(tf.constant(1)).numpy()
+
+    def get_variance(self):
+        covs = self.model.get_layer("covs")
+        return tf.nn.softplus(covs.variance(tf.constant(1)).numpy())
 
     def get_oscillator_parameters(self):
         """Get the parameters of the oscillators.
@@ -285,10 +218,10 @@ class Model(DynemoModel):
         -------
         oscillator_parameters : dict[str, np.ndarray]
             The parameters of the model.
-            Keys are "frequency", "damping" and "amplitude".
+            Keys are "frequency" and "amplitude".
         """
         return {
             "frequency": self.get_frequency(),
-            "damping": self.get_damping(),
             "amplitude": self.get_amplitude(),
+            "variance": self.get_variance(),
         }

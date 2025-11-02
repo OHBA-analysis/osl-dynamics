@@ -45,7 +45,7 @@ x[indices] += np.sin(2 * np.pi * 20 * t[indices] + phi)
 
 # Create Data object and prepare data
 data = Data(x)
-data.tde(n_embeddings=5)
+data.tde(n_embeddings=7)
 data.standardize()
 
 # Build model
@@ -61,17 +61,15 @@ config = Config(
     initial_alpha_temperature=1.0,
     learn_means=False,
     learn_covariances=True,
-    learn_oscillator_amplitude=True,
-    oscillator_damping_limit=20,
-    oscillator_frequency_limit=(1, 30),
     sampling_frequency=sampling_frequency,
+    frequency_range=[1,30],
     do_kl_annealing=True,
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=10,
-    n_kl_annealing_epochs=50,
+    n_kl_annealing_epochs=20,
     batch_size=16,
-    learning_rate=0.001,
-    n_epochs=100,
+    learning_rate=0.01,
+    n_epochs=40,
 )
 model = Model(config)
 model.summary()
@@ -79,19 +77,15 @@ model.summary()
 # Train model
 model.fit(data)
 
-# Get inferred mixing coefficients and hard classify
+# Post hoc analysis
 alp = model.get_alpha(data)
-alp = modes.argmax_time_courses(alp)
+sim_stc = stc[data.n_embeddings // 2 : alp.shape[0]]
+inf_stc = modes.argmax_time_courses(alp)
+sim_stc, inf_stc, alp = modes.match_modes(sim_stc, inf_stc, alp)
 
-# Trim the simulate state time courses to match the inferred alphas
-stc = stc[data.n_embeddings // 2 : alp.shape[0]]
+plotting.plot_alpha(sim_stc, alp, n_samples=2000, filename="alpha.png")
 
-# Match modes to simulation
-stc, alp = modes.match_modes(stc, alp)
-
-# Plot alphas
-plotting.plot_alpha(stc, alp, n_samples=2000, filename="alpha.png")
-
-# Print dice
-dice = metrics.dice_coefficient(stc, alp)
+dice = metrics.dice_coefficient(sim_stc, inf_stc)
 print("Dice coefficient:", dice)
+
+print(model.get_oscillator_parameters())
