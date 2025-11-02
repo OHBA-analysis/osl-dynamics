@@ -1,6 +1,7 @@
 """Parcellation related classes and functions."""
 
 import logging
+import warnings
 import numpy as np
 import nibabel as nib
 from pathlib import Path
@@ -109,7 +110,9 @@ def plot_parcellation(parcellation, **kwargs):
     )
 
 
-def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
+def parcel_vector_to_voxel_grid(
+    mask_file, parcellation_file, vector, remove_subcortical_voxels=False
+):
     """Takes a vector of parcel values and return a 3D voxel grid.
 
     Parameters
@@ -120,6 +123,8 @@ def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
         Parcellation file. Must be a NIFTI file.
     vector : np.ndarray
         Value at each parcel. Shape must be (n_parcels,).
+    remove_subcortical_voxels : bool, optional
+        Should we set the subcortical voxels to np.nan?
 
     Returns
     -------
@@ -193,5 +198,27 @@ def parcel_vector_to_voxel_grid(mask_file, parcellation_file, vector):
     voxel_grid = voxel_grid.reshape(
         mask.shape[0], mask.shape[1], mask.shape[2], order="F"
     )
+
+    if remove_subcortical_voxels:
+        if voxel_grid.shape != (23, 27, 23):
+            raise ValueError(
+                "remove_subcortical_voxels=True is only compatible with "
+                "8x8x8 mm voxel grids."
+            )
+
+        # We guess which voxels are subcortical and set them to nan (if zero)
+        for xx in range(10, 13):
+            for yy in range(12, 19):
+                if yy > 15 or yy < 13:
+                    for zz in range(10, 11):
+                        if voxel_grid[xx, yy, zz] == 0:
+                            voxel_grid[xx, yy, zz] = np.nan
+                else:
+                    for zz in range(7, 12):
+                        if voxel_grid[xx, yy, zz] == 0:
+                            voxel_grid[xx, yy, zz] = np.nan
+
+        # Suppress warning when plotting
+        warnings.filterwarnings("ignore", message="Mean of empty slice")
 
     return voxel_grid
