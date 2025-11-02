@@ -560,6 +560,10 @@ class VectorsLayer(layers.Layer):
         super().__init__(**kwargs)
 
         if initial_value is not None:
+            if isinstance(initial_value, str):
+                # Assume it's a path to a numpy file
+                initial_value = np.load(initial_value)
+
             # Check initial_value is the correct shape
             if initial_value.shape != (n, m):
                 raise ValueError(f"initial_value shape must be ({n}, {m}).")
@@ -651,6 +655,10 @@ class CovarianceMatricesLayer(layers.Layer):
 
         # Do we have an initial value?
         if initial_value is not None:
+            if isinstance(initial_value, str):
+                # Assume it's a path to a numpy file
+                initial_value = np.load(initial_value)
+
             # Check it's the correct shape
             if initial_value.shape != (n, m, m):
                 raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
@@ -755,6 +763,10 @@ class CorrelationMatricesLayer(layers.Layer):
 
         # Do we have an initial value?
         if initial_value is not None:
+            if isinstance(initial_value, str):
+                # Assume it's a path to a numpy file
+                initial_value = np.load(initial_value)
+
             # Check it's the correct shape
             if initial_value.shape != (n, m, m):
                 raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
@@ -855,6 +867,10 @@ class DiagonalMatricesLayer(layers.Layer):
 
         # Do we have an initial value?
         if initial_value is not None:
+            if isinstance(initial_value, str):
+                # Assume it's a path to a numpy file
+                initial_value = np.load(initial_value)
+
             # Check it's the correct shape
             if initial_value.shape == (n, m, m):
                 # Keep the diagonal only
@@ -1047,6 +1063,10 @@ class MatrixLayer(layers.Layer):
         self.constraint = constraint
 
         if initial_value is not None:
+            if isinstance(initial_value, str):
+                # Assume it's a path to a numpy file
+                initial_value = np.load(initial_value)
+
             if initial_value.shape[-1] != m:
                 raise ValueError(
                     "Number of rows/columns in initial_value does not match m."
@@ -1771,6 +1791,9 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             # Initial state probabilities
             if initial_state_probs is None:
                 initial_state_probs = np.ones(self.n_states) / self.n_states
+            elif isinstance(initial_state_probs, str):
+                # Assume it's a path to a numpy file
+                initial_state_probs = np.load(initial_state_probs)
 
             if initial_state_probs.shape != (n_states,):
                 raise ValueError(f"initial_trans_prob shape must be ({n_states},).")
@@ -1791,6 +1814,9 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                     np.ones((n_states, n_states)) * 0.1 / (n_states - 1)
                 )
                 np.fill_diagonal(initial_trans_prob, 0.9)
+            elif isinstance(initial_trans_prob, str):
+                # Assume it's a path to a numpy file
+                initial_trans_prob = np.load(initial_trans_prob)
 
             if initial_trans_prob.shape != (n_states, n_states):
                 raise ValueError(
@@ -2264,44 +2290,3 @@ class EmbeddingLayer(layers.Layer):
             norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)
             output = tf.concat([2 * output, norm_sq - 1], axis=-1) / (norm_sq + 1)
         return output
-
-
-class ShiftForForecastingLayer(layers.Layer):
-    """Clip two tensors to ensure they align for causal forecasting.
-
-    Parameters
-    ----------
-    clip : int
-        Number of elements to clip.
-    """
-
-    def __init__(self, clip, **kwargs):
-        super().__init__(**kwargs)
-        self.clip = clip
-
-    def call(self, inputs, **kwargs):
-        A, B = inputs
-        A = A[:, : -self.clip]
-        B = B[:, self.clip :]
-        return A, B
-
-
-class SequentialLayer(layers.Layer):
-    """Sequential layer.
-
-    Parameters
-    ----------
-    layers : list
-        List of layers.
-    """
-
-    def __init__(self, layers, **kwargs):
-        super().__init__(**kwargs)
-        self.layers = []
-        for layer in layers:
-            self.layers.append(layer)
-
-    def call(self, inputs, **kwargs):
-        for layer in self.layers:
-            inputs = layer(inputs, **kwargs)
-        return inputs
