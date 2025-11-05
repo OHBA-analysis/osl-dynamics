@@ -5,12 +5,13 @@
 print("Importing packages")
 
 import numpy as np
-
 from osl_dynamics.data import Data
 from osl_dynamics.inference import modes, metrics
 from osl_dynamics.simulation import HMM
 from osl_dynamics.models.sc_dynemo import Config, Model
-from osl_dynamics.utils import plotting
+from osl_dynamics.utils import plotting, set_random_seed
+
+set_random_seed(123)
 
 # Number of time points and sampling frequency
 n_samples = 25600
@@ -42,6 +43,19 @@ x[indices] += 2 * np.sin(2 * np.pi * 10 * t[indices] + phi)
 indices = stc[:, 2] == 1
 phi = np.random.uniform(0, 2 * np.pi)
 x[indices] += np.sin(2 * np.pi * 20 * t[indices] + phi)
+
+plotting.plot_time_series(
+    x[:, np.newaxis],
+    n_samples=2000,
+    fig_kwargs={"figsize": (20,2)},
+    filename="plots/x.png",
+)
+
+plotting.plot_alpha(
+    stc,
+    n_samples=2000,
+    filename="plots/sim_stc.png",
+)
 
 # Create Data object and prepare data
 data = Data(x)
@@ -75,7 +89,7 @@ model = Model(config)
 model.summary()
 
 # Train model
-model.fit(data)
+model.train(data)
 
 # Post hoc analysis
 alp = model.get_alpha(data)
@@ -83,7 +97,12 @@ sim_stc = stc[data.n_embeddings // 2 : alp.shape[0]]
 inf_stc = modes.argmax_time_courses(alp)
 sim_stc, inf_stc, alp = modes.match_modes(sim_stc, inf_stc, alp)
 
-plotting.plot_alpha(sim_stc, alp, n_samples=2000, filename="alpha.png")
+plotting.plot_alpha(
+    sim_stc,
+    alp,
+    n_samples=2000,
+    filename="plots/alpha.png",
+)
 
 dice = metrics.dice_coefficient(sim_stc, inf_stc)
 print("Dice coefficient:", dice)
