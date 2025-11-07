@@ -974,13 +974,13 @@ class OscillatorCovarianceMatricesLayer(layers.Layer):
         )
         self.amplitude = LearnableTensorLayer(
             shape=(n, 1),
-            learn=True,
+            learn=learn,
             initializer=initializers.Constant(1.0),
             name=self.name + "_amplitude",
         )
         self.frequency = LearnableTensorLayer(
             shape=(n, 1),
-            learn=True,
+            learn=learn,
             initializer=initializers.RandomUniform(
                 minval=frequency_range[0],
                 maxval=frequency_range[1],
@@ -989,7 +989,7 @@ class OscillatorCovarianceMatricesLayer(layers.Layer):
         )
         self.variance = LearnableTensorLayer(
             shape=(n, 1, 1),
-            learn=True,
+            learn=learn,
             initializer=initializers.Constant(tfp.math.softplus_inverse(0.05)),
             name=self.name + "_variance",
         )
