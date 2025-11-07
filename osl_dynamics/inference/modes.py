@@ -13,7 +13,7 @@ from scipy import cluster, spatial, optimize
 from sklearn.cluster import AgglomerativeClustering
 
 from osl_dynamics import array_ops
-from osl_dynamics.analysis import post_hoc
+from osl_dynamics.analysis import post_hoc, gmm
 from osl_dynamics.inference import metrics
 from osl_dynamics.utils import plotting
 from osl_dynamics.utils.misc import override_dict_defaults
@@ -136,7 +136,7 @@ def gmm_time_courses(
             sklearn_kwargs = override_dict_defaults(
                 default_sklearn_kwargs, sklearn_kwargs
             )
-            threshold, metrics = analysis.gmm.fit_gaussian_mixture(
+            threshold, metrics = gmm.fit_gaussian_mixture(
                 a,
                 logit_transform=logit_transform,
                 standardize=standardize,

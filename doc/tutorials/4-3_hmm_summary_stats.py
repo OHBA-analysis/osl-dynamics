@@ -70,10 +70,12 @@ fig, ax = plotting.plot_alpha(stc[0], n_samples=2000)
 #
 # Fractional occupancy
 # ********************
-# The `analysis.modes <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/modes/index.html>`_ module in osl-dynamics contains helpful functions for calculating summary statistics. Let's use the `analysis.modes.fractional_occupancies <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/modes/index.html#osl_dynamics.analysis.modes.fractional_occupancies>`_ function to calculate the fractional occupancy of each state for each subject.
+# The `analysis.post_hoc <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html>`_ module in osl-dynamics contains helpful functions for calculating summary statistics. Let's use the `analysis.post_hoc.fractional_occupancies <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.fractional_occupancies>`_ function to calculate the fractional occupancy of each state for each subject.
+
+from osl_dynamics.analysis import post_hoc
 
 # Calculate fractional occupancies
-fo = modes.fractional_occupancies(stc)
+fo = post_hoc.fractional_occupancies(stc)
 print(fo.shape)
 
 #%%
@@ -98,10 +100,10 @@ fig, ax = plotting.plot_violin(fo.T, x_label="State", y_label="Fractional Occupa
 #
 # Mean Lifetime
 # *************
-# Next, let's look at another popular summary statistic, i.e. the mean lifetime. We can calculate this using the `analysis.modes.mean_lifetimes <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/modes/index.html#osl_dynamics.analysis.modes.mean_lifetimes>`_ function.
+# Next, let's look at another popular summary statistic, i.e. the mean lifetime. We can calculate this using the `analysis.post_hoc.mean_lifetimes <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.mean_lifetimes>`_ function.
 
 # Calculate mean lifetimes (in seconds)
-lt = modes.mean_lifetimes(stc, sampling_frequency=250)
+lt = post_hoc.mean_lifetimes(stc, sampling_frequency=250)
 
 # Convert to ms
 lt *= 1000
@@ -115,10 +117,10 @@ fig, ax = plotting.plot_violin(lt.T, x_label="State", y_label="Mean Lifetime (ms
 #%%
 # Mean interval
 # *************
-# Next, let's look at the mean interval time for each state and subject. We can use the `analysis.modes.mean_intervals <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/modes/index.html#osl_dynamics.analysis.modes.mean_intervals>`_ function in osl-dynamics to calculate this.
+# Next, let's look at the mean interval time for each state and subject. We can use the `analysis.post_hoc.mean_intervals <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.mean_intervals>`_ function in osl-dynamics to calculate this.
 
 # Calculate mean intervals (in seconds)
-intv = modes.mean_intervals(stc, sampling_frequency=250)
+intv = post_hoc.mean_intervals(stc, sampling_frequency=250)
 
 # Print the group average
 print(np.mean(intv, axis=0))
@@ -129,10 +131,10 @@ fig, ax = plotting.plot_violin(intv.T, x_label="State", y_label="Mean Interval (
 #%%
 # Switching rate
 # **************
-# Finally, let's look at the switching rate for each state and subject. We can use the `analysis.modes.switching_rate <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/modes/index.html#osl_dynamics.analysis.modes.switching_rate>`_ function in osl-dynamics to calculate this.
+# Finally, let's look at the switching rate for each state and subject. We can use the `analysis.post_hoc.switching_rate <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.switching_rate>`_ function in osl-dynamics to calculate this.
 
 # Calculate the switching rate (Hz)
-sr = modes.switching_rates(stc, sampling_frequency=250)
+sr = post_hoc.switching_rates(stc, sampling_frequency=250)
 
 # Print the group average
 print(np.mean(sr, axis=0))

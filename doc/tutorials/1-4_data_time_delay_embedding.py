@@ -80,12 +80,12 @@ plt.colorbar()
 #%%
 # This covariance matrix is 15x15 because we have 15 channels. The blocks on the diagonal of the above matrix represents the covariance of a channel with a time-lagged version of itself - this quantity is known as the **auto**-correlation function. Blocks on the off-diagonal represent the covariance of a channel with a time-lagged version of **another** channel - this quantity is known as the **cross**-correlation function.
 #
-# We can extract an estimate of the auto/cross-correlation function (A/CCF) by taking values from this covariance matrix. osl-dynamics has a function we can use for this: `analysis.modes.autocorr_from_tde_cov <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/modes/index.html#osl_dynamics.analysis.modes.autocorr_from_tde_cov>`_. This function will extract both ACFs and CCFs from a TDE covariance matrix.
+# We can extract an estimate of the auto/cross-correlation function (A/CCF) by taking values from this covariance matrix. osl-dynamics has a function we can use for this: `analysis.post_hoc.autocorr_from_tde_cov <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.autocorr_from_tde_cov>`_. This function will extract both ACFs and CCFs from a TDE covariance matrix.
 
-from osl_dynamics.analysis import modes, spectral
+from osl_dynamics.analysis import post_hoc, spectral
 
 # Extract A/CCFs from the covariance
-tau, acf = modes.autocorr_from_tde_cov(cov_tde, n_embeddings=5)
+tau, acf = post_hoc.autocorr_from_tde_cov(cov_tde, n_embeddings=5)
 print(acf.shape)  # channels x channels x time lags
 
 # Plot ACFs
@@ -127,7 +127,7 @@ print(data)
 
 # Calculate TDE covariance, ACF and PSD
 cov_tde = np.cov(data.time_series(), rowvar=False)
-tau, acf = modes.autocorr_from_tde_cov(cov_tde, n_embeddings=11)
+tau, acf = post_hoc.autocorr_from_tde_cov(cov_tde, n_embeddings=11)
 f, psd, _ = spectral.autocorr_to_spectra(acf, sampling_frequency=200)
 
 # Plot
@@ -165,7 +165,7 @@ data.tde(n_embeddings=11)
 
 # Calculate TDE covariance, ACF and PSD
 cov_tde = np.cov(data.time_series(), rowvar=False)
-tau, acf = modes.autocorr_from_tde_cov(cov_tde, n_embeddings=11)
+tau, acf = post_hoc.autocorr_from_tde_cov(cov_tde, n_embeddings=11)
 f, psd, _ = spectral.autocorr_to_spectra(acf, sampling_frequency=200)
 
 # Plot
@@ -231,7 +231,7 @@ def calc_covs_psds(frequencies, n_embeddings, fs):
             "standardize": {},
         })
         cov = np.cov(data.time_series(), rowvar=False)
-        tau, acf = modes.autocorr_from_tde_cov(cov, n_embeddings=n_embeddings)
+        tau, acf = post_hoc.autocorr_from_tde_cov(cov, n_embeddings=n_embeddings)
         f, p, _ = spectral.autocorr_to_spectra(
             acf[np.newaxis, np.newaxis, :],
             sampling_frequency=fs,

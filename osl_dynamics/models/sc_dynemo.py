@@ -57,7 +57,7 @@ class Model(DynemoModel):
     parameters define the auto-covariance matrix as:
 
     .. math::
-        C_{ij} (\tau) = \frac{1}{2} A^2_j \cos(2 \pi f \tau) + \delta_{ij} \sigma^2
+        C_{ij} = \frac{1}{2} A^2 \cos(2 \pi f \Delta t) + \delta_{ij} \sigma^2
 
     Parameters
     ----------
