@@ -50,7 +50,7 @@ def linear(X, y, fit_intercept, normalize=False, log_message=False):
         X -= np.mean(X, axis=0)
         X /= np.std(X, axis=0)
 
-    if y.dtype == np.complex64 or y.dtype == np.complex_:
+    if y.dtype == np.complex64 or y.dtype == np.complex128:
         # Fit two linear regressions:
         # One for the real part
         reg = LinearRegression(fit_intercept=fit_intercept, n_jobs=-1)
