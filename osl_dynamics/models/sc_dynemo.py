@@ -29,7 +29,12 @@ class Config(DynemoConfig):
     ----------
     sampling_frequency : float
         The sampling frequency of the data (Hz).
+    frequency_range : tuple[float, float]
+        Limits for the frequency parameter.
+        Upper limit should not be higher than the Nyquist frequency.
     """
+
+    model_name: str = "SC-DyNeMo"
 
     sampling_frequency: float = None
     frequency_range: list = None
@@ -44,30 +49,15 @@ class Model(DynemoModel):
     This model is a single-channel version of DyNeMo.
     It should only be used for single-channel data which has been time-embedded.
 
-    This model parameterises the covariance matrices as a set of oscillators.
-    It should be used for single-channel data which has been time-embedded.
-    The parameters are the frequency and amplitude of the oscillators.
-    They define the auto-covariance functions of the modes using the equation:
+    This model parameterises the covariance matrice for each model assuming a
+    stochastic oscillators.
+
+    The parameters are the amplitude (:math:`A`), frequency (:math:`f`), and
+    variance of added Gaussian noise (:math:`\sigma^2`) of oscillators. The
+    parameters define the auto-covariance matrix as:
 
     .. math::
-        R_j (\tau) = A_j \cos(2 \pi f_j \tau)
-
-    where :math:`f_j` is the frequency and
-    :math:`A_j` is the amplitude of the :math:`j`-th oscillator.
-    :math:`\tau` is the time lag.
-
-    The covariance matrices are then defined as a symmetric Toeplitz matrix
-    with the auto-covariance function as the first row:
-
-    .. math::
-        \Sigma_j = \begin{bmatrix}
-            R_j(0) & R_j(1) & \dots & R_j(p-1) \\
-            R_j(1) & R_j(0) & \dots & R_j(p-2) \\
-            \vdots & \vdots & \ddots & \vdots \\
-            R_j(p-1) & R_j(p-2) & \dots & R_j(0)
-        \end{bmatrix}
-
-    where :math:`p` is the embedding dimension.
+        C_{ij} (\tau) = \frac{1}{2} A^2_j \cos(2 \pi f \tau) + \delta_{ij} \sigma^2
 
     Parameters
     ----------
@@ -122,7 +112,8 @@ class Model(DynemoModel):
             m=self.config.n_channels,
             sampling_frequency=self.config.sampling_frequency,
             frequency_range=self.config.frequency_range,
-            #learn=self.config.learn_covariances,
+            learn=self.config.learn_covariances,
+            epsilon=self.config.covariances_epsilon,
             name="covs",
         )
         mix_means_layer = MixVectorsLayer(name="mix_means")
@@ -185,29 +176,36 @@ class Model(DynemoModel):
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
-    def get_frequency(self):
-        """Get the frequencies of the oscillators.
-
-        Returns
-        -------
-        oscillator_frequencies : np.ndarray
-            The frequencies of the oscillators.
-        """
-        covs = self.model.get_layer("covs")
-        return covs.frequency(tf.constant(1)).numpy()
-
     def get_amplitude(self):
         """Get the amplitude of the oscillators.
 
         Returns
         -------
-        oscillator_amplitudes : np.ndarray
+        amplitude : np.ndarray
             The amplitude of the oscillators.
         """
         covs = self.model.get_layer("covs")
         return covs.amplitude(tf.constant(1)).numpy()
 
+    def get_frequency(self):
+        """Get the frequencies of the oscillators.
+
+        Returns
+        -------
+        frequency : np.ndarray
+            The frequencies of the oscillators.
+        """
+        covs = self.model.get_layer("covs")
+        return covs.frequency(tf.constant(1)).numpy()
+
     def get_variance(self):
+        """Get the variances of the oscillators.
+
+        Returns
+        -------
+        variance : np.ndarray
+            The variance of the oscillators.
+        """
         covs = self.model.get_layer("covs")
         return tf.nn.softplus(covs.variance(tf.constant(1)).numpy())
 
@@ -217,11 +215,11 @@ class Model(DynemoModel):
         Returns
         -------
         oscillator_parameters : dict[str, np.ndarray]
-            The parameters of the model.
-            Keys are "frequency" and "amplitude".
+            The parameters of the model. Keys are :code:`'amplitude'`,
+            :code:`'frequency'` and :code:`'variance'`.
         """
         return {
-            "frequency": self.get_frequency(),
             "amplitude": self.get_amplitude(),
+            "frequency": self.get_frequency(),
             "variance": self.get_variance(),
         }

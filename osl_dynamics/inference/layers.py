@@ -947,6 +947,8 @@ class OscillatorCovarianceMatricesLayer(layers.Layer):
         Upper limit should not be higher than the Nyquist frequency.
     learn : bool
         Should we learn the covariances?
+    epsilon : float
+        Error added to the diagonal matrices for numerical stability.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
@@ -957,7 +959,8 @@ class OscillatorCovarianceMatricesLayer(layers.Layer):
         m,
         sampling_frequency,
         frequency_range,
-        epsilon=1e-7,
+        learn,
+        epsilon,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -969,6 +972,12 @@ class OscillatorCovarianceMatricesLayer(layers.Layer):
             tf.expand_dims(tf.range(0, m, dtype=tf.float32), axis=0)
             / sampling_frequency
         )
+        self.amplitude = LearnableTensorLayer(
+            shape=(n, 1),
+            learn=True,
+            initializer=initializers.Constant(1.0),
+            name=self.name + "_amplitude",
+        )
         self.frequency = LearnableTensorLayer(
             shape=(n, 1),
             learn=True,
@@ -977,12 +986,6 @@ class OscillatorCovarianceMatricesLayer(layers.Layer):
                 maxval=frequency_range[1],
             ),
             name=self.name + "_frequency",
-        )
-        self.amplitude = LearnableTensorLayer(
-            shape=(n, 1),
-            learn=True,
-            initializer=initializers.Constant(1.0),
-            name=self.name + "_amplitude",
         )
         self.variance = LearnableTensorLayer(
             shape=(n, 1, 1),
