@@ -1,5 +1,6 @@
 """Example script for training Single-Channel DyNeMo on simulated data.
 
+This script should achieve a dice coefficient of ~0.8.
 """
 
 print("Importing packages")
@@ -44,19 +45,6 @@ indices = stc[:, 2] == 1
 phi = np.random.uniform(0, 2 * np.pi)
 x[indices] += np.sin(2 * np.pi * 20 * t[indices] + phi)
 
-plotting.plot_time_series(
-    x[:, np.newaxis],
-    n_samples=2000,
-    fig_kwargs={"figsize": (20,2)},
-    filename="plots/x.png",
-)
-
-plotting.plot_alpha(
-    stc,
-    n_samples=2000,
-    filename="plots/sim_stc.png",
-)
-
 # Create Data object and prepare data
 data = Data(x)
 data.tde(n_embeddings=7)
@@ -97,14 +85,18 @@ sim_stc = stc[data.n_embeddings // 2 : alp.shape[0]]
 inf_stc = modes.argmax_time_courses(alp)
 sim_stc, inf_stc, alp = modes.match_modes(sim_stc, inf_stc, alp)
 
+# Plot ground truth and inferred alphas
 plotting.plot_alpha(
     sim_stc,
     alp,
     n_samples=2000,
-    filename="plots/alpha.png",
+    filename="alpha.png",
 )
 
+# Inference accuracy
 dice = metrics.dice_coefficient(sim_stc, inf_stc)
 print("Dice coefficient:", dice)
 
+# Inferred parameters
+print("Inferred paramters:")
 print(model.get_oscillator_parameters())
