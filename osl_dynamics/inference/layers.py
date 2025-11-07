@@ -931,6 +931,98 @@ class DiagonalMatricesLayer(layers.Layer):
         return tf.linalg.diag(diagonals)
 
 
+class OscillatorCovarianceMatricesLayer(layers.Layer):
+    """Layer to learn a set of oscillator covariances.
+
+    Parameters
+    ----------
+    n : int
+        Number of matrices.
+    m : int
+        Number of rows/columns.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    frequency_range : tuple[float, float]
+        Limits for the frequency parameter.
+        Upper limit should not be higher than the Nyquist frequency.
+    learn : bool
+        Should we learn the covariances?
+    epsilon : float
+        Error added to the diagonal matrices for numerical stability.
+    kwargs : keyword arguments, optional
+        Keyword arguments to pass to the base class.
+    """
+
+    def __init__(
+        self,
+        n,
+        m,
+        sampling_frequency,
+        frequency_range,
+        learn,
+        epsilon,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+        self.m = m
+        self.n = n
+        self.sampling_frequency = sampling_frequency
+        self.epsilon = epsilon
+        self.tau = (
+            tf.expand_dims(tf.range(0, m, dtype=tf.float32), axis=0)
+            / sampling_frequency
+        )
+        self.amplitude = LearnableTensorLayer(
+            shape=(n, 1),
+            learn=learn,
+            initializer=initializers.Constant(1.0),
+            name=self.name + "_amplitude",
+        )
+        self.frequency = LearnableTensorLayer(
+            shape=(n, 1),
+            learn=learn,
+            initializer=initializers.RandomUniform(
+                minval=frequency_range[0],
+                maxval=frequency_range[1],
+            ),
+            name=self.name + "_frequency",
+        )
+        self.variance = LearnableTensorLayer(
+            shape=(n, 1, 1),
+            learn=learn,
+            initializer=initializers.Constant(tfp.math.softplus_inverse(0.05)),
+            name=self.name + "_variance",
+        )
+        self.layers = [self.frequency, self.amplitude, self.variance]
+
+    def build(self, input_shape):
+        for layer in self.layers:
+            layer.build(input_shape)
+        self.built = True
+
+    def call(self, inputs, **kwargs):
+        """Retrieve the covariance matrices.
+
+        Note
+        ----
+        The :code:`inputs` passed to this method are not used.
+        """
+        frequency = self.frequency(inputs, **kwargs)
+        frequency = tf.clip_by_value(frequency, 1, self.sampling_frequency / 2)
+        amplitude = self.amplitude(inputs, **kwargs)
+        variance = self.variance(inputs, **kwargs)
+        variance = tf.nn.softplus(variance)
+        oscillator = 0.5 * (amplitude**2) * tf.cos(2 * np.pi * frequency * self.tau)
+        covs = tf.linalg.LinearOperatorToeplitz(
+            row=oscillator,
+            col=oscillator,
+        ).to_dense()
+        I = tf.eye(self.m, batch_shape=[self.n])
+        covs = covs + I * variance
+        covs = add_epsilon(covs, self.epsilon, diag=True)
+        return covs
+
+
 class MatrixLayer(layers.Layer):
     """Layer to learn a matrix.
 
