@@ -98,5 +98,5 @@ dice = metrics.dice_coefficient(sim_stc, inf_stc)
 print("Dice coefficient:", dice)
 
 # Inferred parameters
-print("Inferred paramters:")
+print("Inferred parameters:")
 print(model.get_oscillator_parameters())
