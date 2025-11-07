@@ -972,12 +972,6 @@ class OscillatorCovarianceMatricesLayer(layers.Layer):
         self.frequency = LearnableTensorLayer(
             shape=(n, 1),
             learn=True,
-            #initializer=initializers.Constant(
-            #    [
-            #        [frequency_range[0] + i * (frequency_range[1] - frequency_range[0]) / self.n]
-            #        for i in range(self.n)
-            #    ]
-            #),
             initializer=initializers.RandomUniform(
                 minval=frequency_range[0],
                 maxval=frequency_range[1],
