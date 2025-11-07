@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "osl-dynamics"
-version = "2.1.dev8"
+version = "2.1.8"
 description = "OHBA Software Library: Dynamics Toolbox"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
