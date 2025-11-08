@@ -170,37 +170,37 @@ The following steps can be used to release a new version:
 
 2. Commit the updated `pyproject.toml` to the `main` branch of the GitHub repo.
 
-3. Delete any old distributions that have been built (if there are any):
+3. Check the latest branch has compiled successfully on [readthedocs](https://readthedocs.org/projects/osl-dynamics).
+
+4. Delete any old distributions that have been built (if there are any):
 ```
 rm -r dist
 ```
 
-4. Build a distribution in the osl-dynamics root directory with:
+5. Build a distribution in the osl-dynamics root directory with:
 ```
 python -m build
 ```
 This will create a new directory called `dist`.
 
-5. Test the build by installing with
+6. Test the build by installing with
 ```
 pip install dist/<build>.whl
 ```
 
-6. Upload the distribution to PyPI with
+7. Upload the distribution to PyPI with
 ```
 twine upload dist/*
 ```
 You will need to enter the username and password that you used to register with [https://pypi.org](https://pypi.org). You may need to setup 2FA and/or an API token, see API token instructions in your PyPI account settings.
 
-7. Tag the commit uploaded to PyPI with the version number using the 'Create a new release' link on the right of the GitHub repo webpage. You will need to untick 'Set as a pre-release' and tick 'Set as the latest release'.
+8. Tag the commit uploaded to PyPI with the version number using the 'Create a new release' link on the right of the GitHub repo webpage. You will need to untick 'Set as a pre-release' and tick 'Set as the latest release'.
 
-8. Change the version to `X.Y.devZ` in `pyproject.toml` and commit the new dev version to `main`.
+9. Change the version to `X.Y.devZ` in `pyproject.toml` and commit the new dev version to `main`.
 
-The uploaded distribution will then be available to be installed with:
+10. Reinstall your editable development version in your `osld` conda environment:
 ```
-pip install osl-dynamics
+pip install -e .
 ```
 
-9. Optional: draft a new release (click 'Releases' on the right panel on the GitHub homepage, then 'Draft a new release') to help keep note of changes for the next release.
-
-10. Activate the new version in the [readthedocs](https://readthedocs.org/projects/osl-dynamics) project.
+11. Draft a new release (click 'Releases' on the right panel on the GitHub homepage, then 'Draft a new release') to help keep note of changes for the next release.
