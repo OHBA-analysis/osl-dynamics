@@ -2064,12 +2064,14 @@ def plot_psd_topo(
     psd,
     only_show=None,
     parcellation_file=None,
+    frequency_range=None,
     topomap_pos=None,
+    cmap="viridis",
     fig_kwargs=None,
     ax=None,
     filename=None,
 ):
-    """PLot PSDs for parcels and a topomap.
+    """Plot PSDs for parcels and a topomap.
 
     Parameters
     ----------
@@ -2081,12 +2083,16 @@ def plot_psd_topo(
         Indices for parcels to include in the plot. Defaults to all parcels.
     parcellation_file : str, optional
         Path to parcellation file.
+    frequency_range : list, optional
+        Min and max frequency for the x-axis.
     topomap_pos : list, optional
         Positioning and size of the topomap: :code:`[x0, y0, width, height]`.
         :code:`x0`, :code:`y0`, :code:`width`, :code:`height` should be floats
         between 0 and 1. Defaults to :code:`[0.45, 0.55, 0.5, 0.55]` to place
         the topomap on the top right. This is not used if
         :code:`parcellation_file=None`.
+    cmap : str, optional
+        Matplotlib colormap.
     fig_kwargs : dict, optional
         Arguments to pass to :code:`plt.subplots()`.
     ax : matplotlib Axis, optional
@@ -2103,6 +2109,9 @@ def plot_psd_topo(
         Matplotlib axis object(s). Only returned if :code:`ax=None` and
         :code:`filename=None`.
     """
+    if frequency_range is None:
+        frequency_range = [f[0], f[-1]]
+
     if topomap_pos is None:
         topomap_pos = [0.45, 0.55, 0.5, 0.55]
 
@@ -2133,13 +2142,13 @@ def plot_psd_topo(
         ax_passed = True
 
     # Plot PSDs
-    cmap = plt.cm.viridis_r
+    cmap = plt.get_cmap(cmap + "_r")
     for i in reversed(range(n_parcels)):
         if i in only_show:
             ax.plot(f, psd[i], c=cmap(i / n_parcels))
     ax.set_xlabel("Frequency (Hz)")
     ax.set_ylabel("PSD (a.u.)")
-    ax.set_xlim(f[0], f[-1])
+    ax.set_xlim(frequency_range[0], frequency_range[-1])
     plt.tight_layout()
 
     if parcellation_file is not None:
@@ -2149,6 +2158,7 @@ def plot_psd_topo(
             np.arange(parcellation.n_parcels),
             roi_centers,
             node_size=12,
+            node_cmap=cmap,
             colorbar=False,
             axes=inside_ax,
         )
