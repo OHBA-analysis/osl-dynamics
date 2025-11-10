@@ -27,7 +27,6 @@ from osl_dynamics.inference.layers import (
     MixMatricesLayer,
     MixVectorsLayer,
     ModelRNNLayer,
-    NormalizationLayer,
     SampleNormalDistributionLayer,
     SoftmaxLayer,
     VectorsLayer,

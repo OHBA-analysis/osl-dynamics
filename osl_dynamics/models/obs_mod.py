@@ -5,7 +5,6 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow_probability import bijectors as tfb
 
-import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import regularizers
 from osl_dynamics.inference.initializers import (
     WeightInitializer,

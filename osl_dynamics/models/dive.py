@@ -23,7 +23,6 @@ from osl_dynamics.inference.layers import (
     VectorsLayer,
     CovarianceMatricesLayer,
     ModelRNNLayer,
-    NormalizationLayer,
     KLDivergenceLayer,
     KLLossLayer,
     SampleNormalDistributionLayer,

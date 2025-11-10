@@ -68,30 +68,6 @@ Oxford-Specific Computers (hbaws, BMRC)
 
 See the instructions on the GitHub `README <https://github.com/OHBA-analysis/osl-dynamics>`_.
 
-TensorFlow Versions
--------------------
-
-osl-dynamics v2.1+ requires tensorflow 2.19 and tensorflow-probability 0.25.
-
-osl-dynamics v2.0.0-2.0.2 has been tested with the following versions:
-
-.. list-table::
-   :widths: 25 25
-   :header-rows: 1
-
-   * - tensorflow
-     - tensorflow-probability
-   * - 2.11
-     - 0.19
-   * - 2.12
-     - 0.19
-   * - 2.13
-     - 0.20
-   * - 2.14
-     - 0.22
-   * - 2.15
-     - 0.22
-
 Test your GPUs are working
 --------------------------
 

@@ -6,7 +6,6 @@ import logging
 import numpy as np
 from scipy import signal
 from pqdm.threads import pqdm
-from tqdm.auto import trange
 
 from osl_dynamics import array_ops
 

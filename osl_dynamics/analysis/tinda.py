@@ -13,11 +13,8 @@ See Also
 """
 
 import logging
-from itertools import permutations
-
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm.auto import tqdm
 
 _logger = logging.getLogger("osl-dynamics")
 
