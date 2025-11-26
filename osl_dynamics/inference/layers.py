@@ -1806,12 +1806,37 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 name=self.name + "_initial_state_probs_kernel",
             )
 
+            # Prior for the transition probability matrix
+            if trans_prob_prior is None:
+                # No prior
+                self.trans_prob_prior = tf.zeros(
+                    (n_states, n_states), dtype=self.compute_dtype
+                )
+            else:
+                if not np.all(trans_prob_prior > 0):
+                    raise ValueError(
+                        "All Dirichlet prior parameters must be greater than or equal to zero."
+                    )
+                if trans_prob_prior.shape != (n_states, n_states):
+                    raise ValueError(
+                        f"trans_prob_prior must be ({n_states}, {n_states})."
+                    )
+                self.trans_prob_prior = tf.constant(
+                    trans_prob_prior, dtype=self.compute_dtype
+                )
+
             # Transition probability matrix
             if initial_trans_prob is None:
-                initial_trans_prob = (
-                    np.ones((n_states, n_states)) * 0.1 / (n_states - 1)
-                )
-                np.fill_diagonal(initial_trans_prob, 0.9)
+                if trans_prob_prior is not None:
+                    # Use the prior
+                    initial_trans_prob = trans_prob_prior / trans_prob_prior.sum(
+                        axis=1, keepdims=True
+                    )
+                else:
+                    initial_trans_prob = (
+                        np.ones((n_states, n_states)) * 0.1 / (n_states - 1)
+                    )
+                    np.fill_diagonal(initial_trans_prob, 0.9)
             elif isinstance(initial_trans_prob, str):
                 # Assume it's a path to a numpy file
                 initial_trans_prob = np.load(initial_trans_prob)
@@ -1830,19 +1855,6 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 regularizer=None,
                 name=self.name + "_trans_prob_kernel",
             )
-            if trans_prob_prior is None:
-                self.trans_prob_prior = tf.zeros(
-                    (n_states, n_states), dtype=self.compute_dtype
-                )
-            else:
-                assert np.all(
-                    trans_prob_prior > 0
-                ), "All Dirichlet prior parameters must be greater than or equal to zero."
-                assert tpp.shape == (
-                    n_states,
-                    n_states,
-                ), f"trans_prob_prior must be ({n_states}, {n_states})"
-                self.trans_prob_prior = tf.constant(tpp, dtype=self.compute_dtype)
 
             # We use self.layers for compatibility with
             # initializers.reinitialize_model_weights
