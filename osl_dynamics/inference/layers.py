@@ -1835,7 +1835,9 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                     (n_states, n_states), dtype=self.compute_dtype
                 )
             else:
-                tpp = np.maximum(trans_prob_prior, 0.0)
+                assert np.all(
+                    trans_prob_prior > 0
+                ), "All Dirichlet prior parameters must be greater than or equal to zero."
                 assert tpp.shape == (
                     n_states,
                     n_states,
