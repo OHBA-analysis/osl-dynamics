@@ -27,6 +27,8 @@ def linear(X, y, fit_intercept, normalize=False, log_message=False, n_jobs=-1):
         Should we z-transform the regressors?
     log_message : bool, optional
         Should we log a message?
+    n_jobs : int, optional
+        Number of parallel jobs.
 
     Returns
     -------
