@@ -983,7 +983,7 @@ class MarkovStateInferenceModelConfig:
 
             if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
                 raise ValueError("rows of initial_trans_prob must sum to one.")
-            
+
         if self.trans_prob_prior is not None:
             if (
                 not isinstance(self.trans_prob_prior, np.ndarray)

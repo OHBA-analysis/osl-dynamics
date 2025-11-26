@@ -1831,12 +1831,16 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 name=self.name + "_trans_prob_kernel",
             )
             if trans_prob_prior is None:
-                self.trans_prob_prior = tf.zeros((n_states, n_states), dtype=self.compute_dtype)
+                self.trans_prob_prior = tf.zeros(
+                    (n_states, n_states), dtype=self.compute_dtype
+                )
             else:
                 tpp = np.maximum(trans_prob_prior, 0.0)
-                assert tpp.shape == (n_states, n_states), f"trans_prob_prior must be ({n_states}, {n_states})"
+                assert tpp.shape == (
+                    n_states,
+                    n_states,
+                ), f"trans_prob_prior must be ({n_states}, {n_states})"
                 self.trans_prob_prior = tf.constant(tpp, dtype=self.compute_dtype)
-
 
             # We use self.layers for compatibility with
             # initializers.reinitialize_model_weights
@@ -2075,15 +2079,17 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             xi = tf.exp(log_xi)
 
         return gamma, xi
-    
+
     def _trans_prob_update(self, gamma, xi):
         if self.n_states == 1:
-            return tf.constant([[1.0]], dtype=tf.float32)   
+            return tf.constant([[1.0]], dtype=tf.float32)
         else:
             sum_xi = tf.reduce_mean(tf.reduce_sum(xi, axis=1), axis=0)
             sum_gamma = tf.reduce_mean(tf.reduce_sum(gamma[:, :-1], axis=1), axis=0)
             sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
-            prior_pseudo_counts = self.trans_prob_prior #This uses posterior mean instead of MAP
+            prior_pseudo_counts = (
+                self.trans_prob_prior
+            )  # This uses posterior mean instead of MAP
             num = sum_xi + prior_pseudo_counts
             den = sum_gamma + tf.reduce_sum(prior_pseudo_counts, axis=-1, keepdims=True)
             return num / den
