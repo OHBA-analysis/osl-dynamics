@@ -8,7 +8,7 @@ from sklearn.linear_model import LinearRegression
 _logger = logging.getLogger("osl-dynamics")
 
 
-def linear(X, y, fit_intercept, normalize=False, log_message=False):
+def linear(X, y, fit_intercept, normalize=False, log_message=False, n_jobs=-1):
     """Wrapper for `sklearn.linear_model.LinearRegression \
     <https://scikit-learn.org/stable/modules/generated/sklearn.linear_model\
     .LinearRegression.html>`_.
@@ -53,14 +53,14 @@ def linear(X, y, fit_intercept, normalize=False, log_message=False):
     if y.dtype == np.complex64 or y.dtype == np.complex128:
         # Fit two linear regressions:
         # One for the real part
-        reg = LinearRegression(fit_intercept=fit_intercept, n_jobs=-1)
+        reg = LinearRegression(fit_intercept=fit_intercept, n_jobs=n_jobs)
         reg.fit(X, y.real)
         coefs_real = reg.coef_.T.reshape(new_shape)
         if fit_intercept:
             intercept_real = reg.intercept_.reshape(new_shape[1:])
 
         # Another for the imaginary part
-        reg = LinearRegression(fit_intercept=fit_intercept, n_jobs=-1)
+        reg = LinearRegression(fit_intercept=fit_intercept, n_jobs=n_jobs)
         reg.fit(X, y.imag)
         coefs_imag = reg.coef_.T.reshape(new_shape)
         if fit_intercept:
@@ -73,7 +73,7 @@ def linear(X, y, fit_intercept, normalize=False, log_message=False):
 
     else:
         # Only need to fit one linear regression
-        reg = LinearRegression(fit_intercept=fit_intercept, n_jobs=-1)
+        reg = LinearRegression(fit_intercept=fit_intercept, n_jobs=n_jobs)
         reg.fit(X, y)
 
         # Regression parameters
