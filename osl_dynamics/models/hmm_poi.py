@@ -49,6 +49,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Should we make the transition probability matrix trainable?
     trans_prob_prior : np.ndarray
         Dirichlet prior for the transition probability matrix.
+        Each row is the alpha parameters of the Dirichlet distribution.
     trans_prob_update_delay : float
         We update the transition probability matrix as
         :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,

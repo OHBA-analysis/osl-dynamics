@@ -2084,15 +2084,14 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         if self.n_states == 1:
             return tf.constant([[1.0]], dtype=tf.float32)
         else:
-            sum_xi = tf.reduce_mean(tf.reduce_sum(xi, axis=1), axis=0)
-            sum_gamma = tf.reduce_mean(tf.reduce_sum(gamma[:, :-1], axis=1), axis=0)
+            sum_xi = tf.reduce_mean(xi, axis=(0, 1))
+            sum_gamma = tf.reduce_mean(gamma[:, :-1], axis=(0, 1))
             sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
-            prior_pseudo_counts = (
-                self.trans_prob_prior
-            )  # This uses posterior mean instead of MAP
-            num = sum_xi + prior_pseudo_counts
-            den = sum_gamma + tf.reduce_sum(prior_pseudo_counts, axis=-1, keepdims=True)
-            return num / den
+            numerator = sum_xi + self.trans_prob_prior  # posterior mean, not MAP
+            denominator = sum_gamma + tf.reduce_sum(
+                self.trans_prob_prior, axis=-1, keepdims=True
+            )
+            return numerator / denominator
 
     def call(self, log_B, **kwargs):
         if self.n_states == 1:
