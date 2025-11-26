@@ -73,6 +73,4 @@ data = Data("prepared_data")
 print(data)
 
 #%%
-# We can see from the number of samples it is the amplitude envelope data that we previously prepared.
-#
 # Note, if we saved data that included PCA in preparation. The `pca_components` attribute will be loaded from the pickle file when we load data using the Data class.
