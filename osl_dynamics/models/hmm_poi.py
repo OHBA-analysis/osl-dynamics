@@ -47,6 +47,8 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Initialisation for the transition probability matrix.
     learn_trans_prob : bool
         Should we make the transition probability matrix trainable?
+    trans_prob_prior : np.ndarray
+        Dirichlet prior for the transition probability matrix.
     trans_prob_update_delay : float
         We update the transition probability matrix as
         :code:`trans_prob = (1-rho) * trans_prob + rho * trans_prob_update`,
@@ -163,6 +165,7 @@ class Model(MarkovStateInferenceModelBase):
             config.n_states,
             config.sequence_length,
             config.initial_trans_prob,
+            config.trans_prob_prior,
             config.initial_state_probs,
             config.learn_trans_prob,
             config.learn_initial_state_probs,

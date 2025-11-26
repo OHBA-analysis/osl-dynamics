@@ -1744,6 +1744,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
     initial_trans_prob : np.ndarray
         Initial transition probability matrix.
         Shape must be (n_states, n_states).
+    trans_prob_prior: np.ndarray
+        Dirichlet prior for the transition probability matrix.
     initial_state_probs : np.ndarray
         Initial transition probability matrix.
         Shape must be (n_states,)
@@ -1765,6 +1767,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         n_states,
         sequence_length,
         initial_trans_prob,
+        trans_prob_prior,
         initial_state_probs,
         learn_trans_prob,
         learn_initial_state_probs,
@@ -1827,6 +1830,13 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 regularizer=None,
                 name=self.name + "_trans_prob_kernel",
             )
+            if trans_prob_prior is None:
+                self.trans_prob_prior = tf.zeros((n_states, n_states), dtype=self.compute_dtype)
+            else:
+                tpp = np.maximum(trans_prob_prior, 0.0)
+                assert tpp.shape == (n_states, n_states), f"trans_prob_prior must be ({n_states}, {n_states})"
+                self.trans_prob_prior = tf.constant(tpp, dtype=self.compute_dtype)
+
 
             # We use self.layers for compatibility with
             # initializers.reinitialize_model_weights
@@ -2065,15 +2075,18 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             xi = tf.exp(log_xi)
 
         return gamma, xi
-
+    
     def _trans_prob_update(self, gamma, xi):
         if self.n_states == 1:
-            return tf.constant([[1.0]], dtype=tf.float32)
+            return tf.constant([[1.0]], dtype=tf.float32)   
         else:
-            sum_xi = tf.reduce_sum(xi, axis=(0, 1))
-            sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=(0, 1))
+            sum_xi = tf.reduce_mean(tf.reduce_sum(xi, axis=1), axis=0)
+            sum_gamma = tf.reduce_mean(tf.reduce_sum(gamma[:, :-1], axis=1), axis=0)
             sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
-            return sum_xi / sum_gamma
+            prior_pseudo_counts = self.trans_prob_prior #This uses posterior mean instead of MAP
+            num = sum_xi + prior_pseudo_counts
+            den = sum_gamma + tf.reduce_sum(prior_pseudo_counts, axis=-1, keepdims=True)
+            return num / den
 
     def call(self, log_B, **kwargs):
         if self.n_states == 1:

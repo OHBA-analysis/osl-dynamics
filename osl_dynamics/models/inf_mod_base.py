@@ -964,6 +964,7 @@ class MarkovStateInferenceModelConfig:
 
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
+    trans_prob_prior: np.ndarray = None
     trans_prob_update_delay: float = 5  # alpha
     trans_prob_update_forget: float = 0.7  # beta
 
@@ -982,6 +983,13 @@ class MarkovStateInferenceModelConfig:
 
             if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
                 raise ValueError("rows of initial_trans_prob must sum to one.")
+            
+        if self.trans_prob_prior is not None:
+            if (
+                not isinstance(self.trans_prob_prior, np.ndarray)
+                or self.trans_prob_prior.ndim != 2
+            ):
+                raise ValueError("trans_prob_prior must be a 2D numpy array.")
 
         if self.initial_state_probs is not None:
             if (
