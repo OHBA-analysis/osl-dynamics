@@ -433,21 +433,14 @@ class Model(MarkovStateInferenceModelBase):
         # Make sure the data and alpha have the same number of samples
         data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
 
-        # Dual estimation
-        if self.config.learn_covariances:
-            means, covariances = hmm_dual_estimation(
+        # Dual estimation: always obtain session-specific parameters
+        means, covariances = hmm_dual_estimation(
                 data,
                 alpha,
                 zero_mean=(not self.config.learn_means),
                 eps=self.config.covariances_epsilon,
                 n_jobs=n_jobs,
             )
-            if not self.config.learn_means:
-                means = self.get_means()
-                # get initial means (this is not necessarily the same as
-                # the zero means)
-        else:
-            covariances = self.get_covariances()
 
         return means, covariances
 
