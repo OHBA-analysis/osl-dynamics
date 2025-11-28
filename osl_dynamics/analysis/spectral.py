@@ -2002,6 +2002,7 @@ def _regress_welch_spectrogram(
         fit_intercept=True,
         normalize=True,
         log_message=False,
+        n_jobs=1,
     )
     return f, coefs, intercept
 

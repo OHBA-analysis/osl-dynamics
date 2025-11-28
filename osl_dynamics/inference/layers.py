@@ -1744,6 +1744,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
     initial_trans_prob : np.ndarray
         Initial transition probability matrix.
         Shape must be (n_states, n_states).
+    trans_prob_prior: np.ndarray
+        Dirichlet prior for the transition probability matrix.
     initial_state_probs : np.ndarray
         Initial transition probability matrix.
         Shape must be (n_states,)
@@ -1765,6 +1767,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         n_states,
         sequence_length,
         initial_trans_prob,
+        trans_prob_prior,
         initial_state_probs,
         learn_trans_prob,
         learn_initial_state_probs,
@@ -1803,12 +1806,41 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 name=self.name + "_initial_state_probs_kernel",
             )
 
+            # Prior for the transition probability matrix
+            if trans_prob_prior is None:
+                # No prior
+                self.trans_prob_prior = tf.zeros(
+                    (n_states, n_states), dtype=self.compute_dtype
+                )
+            else:
+                if isinstance(trans_prob_prior, str):
+                    # Assume it's a path to a numpy file
+                    trans_prob_prior = np.load(trans_prob_prior)
+
+                if trans_prob_prior.shape != (n_states, n_states):
+                    raise ValueError(
+                        f"trans_prob_prior must be ({n_states}, {n_states})."
+                    )
+                if np.any(trans_prob_prior < 0):
+                    raise ValueError(
+                        "All Dirichlet prior parameters must be greater than or equal to zero."
+                    )
+                self.trans_prob_prior = tf.constant(
+                    trans_prob_prior, dtype=self.compute_dtype
+                )
+
             # Transition probability matrix
             if initial_trans_prob is None:
-                initial_trans_prob = (
-                    np.ones((n_states, n_states)) * 0.1 / (n_states - 1)
-                )
-                np.fill_diagonal(initial_trans_prob, 0.9)
+                if trans_prob_prior is not None:
+                    # Use the prior
+                    initial_trans_prob = trans_prob_prior / trans_prob_prior.sum(
+                        axis=1, keepdims=True
+                    )
+                else:
+                    initial_trans_prob = (
+                        np.ones((n_states, n_states)) * 0.1 / (n_states - 1)
+                    )
+                    np.fill_diagonal(initial_trans_prob, 0.9)
             elif isinstance(initial_trans_prob, str):
                 # Assume it's a path to a numpy file
                 initial_trans_prob = np.load(initial_trans_prob)
@@ -2070,10 +2102,14 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         if self.n_states == 1:
             return tf.constant([[1.0]], dtype=tf.float32)
         else:
-            sum_xi = tf.reduce_sum(xi, axis=(0, 1))
-            sum_gamma = tf.reduce_sum(gamma[:, :-1], axis=(0, 1))
+            sum_xi = tf.reduce_mean(xi, axis=(0, 1))
+            sum_gamma = tf.reduce_mean(gamma[:, :-1], axis=(0, 1))
             sum_gamma = tf.expand_dims(sum_gamma, axis=-1)
-            return sum_xi / sum_gamma
+            numerator = sum_xi + self.trans_prob_prior  # posterior mean, not MAP
+            denominator = sum_gamma + tf.reduce_sum(
+                self.trans_prob_prior, axis=-1, keepdims=True
+            )
+            return numerator / denominator
 
     def call(self, log_B, **kwargs):
         if self.n_states == 1:

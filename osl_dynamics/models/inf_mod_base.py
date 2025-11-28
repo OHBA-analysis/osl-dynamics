@@ -964,6 +964,7 @@ class MarkovStateInferenceModelConfig:
 
     initial_trans_prob: np.ndarray = None
     learn_trans_prob: bool = True
+    trans_prob_prior: np.ndarray = None
     trans_prob_update_delay: float = 5  # alpha
     trans_prob_update_forget: float = 0.7  # beta
 
@@ -982,6 +983,13 @@ class MarkovStateInferenceModelConfig:
 
             if not all(np.isclose(np.sum(self.initial_trans_prob, axis=1), 1)):
                 raise ValueError("rows of initial_trans_prob must sum to one.")
+
+        if self.trans_prob_prior is not None:
+            if (
+                not isinstance(self.trans_prob_prior, np.ndarray)
+                or self.trans_prob_prior.ndim != 2
+            ):
+                raise ValueError("trans_prob_prior must be a 2D numpy array.")
 
         if self.initial_state_probs is not None:
             if (
@@ -1547,6 +1555,11 @@ class MarkovStateInferenceModelBase(ModelBase):
             State time course with shape (n_samples, n_states).
         """
         trans_prob = self.get_trans_prob()
+        if np.allclose(trans_prob, np.eye(self.config.n_states)):
+            raise ValueError(
+                "trans_prob must have some non-zero off diagonal elements "
+                "to sample a state time course with transitions."
+            )
         sim = HMM(trans_prob)
         return sim.generate_states(n_samples)
 
