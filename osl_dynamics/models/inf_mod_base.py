@@ -1555,6 +1555,11 @@ class MarkovStateInferenceModelBase(ModelBase):
             State time course with shape (n_samples, n_states).
         """
         trans_prob = self.get_trans_prob()
+        if np.allclose(trans_prob, np.eye(self.config.n_states)):
+            raise ValueError(
+                "trans_prob must have some non-zero off diagonal elements "
+                "to sample a state time course with transitions."
+            )
         sim = HMM(trans_prob)
         return sim.generate_states(n_samples)
 

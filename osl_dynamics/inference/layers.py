@@ -1813,13 +1813,17 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                     (n_states, n_states), dtype=self.compute_dtype
                 )
             else:
-                if not np.all(trans_prob_prior > 0):
-                    raise ValueError(
-                        "All Dirichlet prior parameters must be greater than or equal to zero."
-                    )
+                if isinstance(trans_prob_prior, str):
+                    # Assume it's a path to a numpy file
+                    trans_prob_prior = np.load(trans_prob_prior)
+
                 if trans_prob_prior.shape != (n_states, n_states):
                     raise ValueError(
                         f"trans_prob_prior must be ({n_states}, {n_states})."
+                    )
+                if np.any(trans_prob_prior < 0):
+                    raise ValueError(
+                        "All Dirichlet prior parameters must be greater than or equal to zero."
                     )
                 self.trans_prob_prior = tf.constant(
                     trans_prob_prior, dtype=self.compute_dtype
