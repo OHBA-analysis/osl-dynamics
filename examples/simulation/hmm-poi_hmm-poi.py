@@ -64,8 +64,10 @@ model.save(model_dir)
 # Inferred state probabilities
 alp = model.get_alpha(data)
 
-# Observation model parameters
+# Group-level HMM parameters
 rates = model.get_rates()
+initial_state_probs = model.get_initial_state_probs()
+trans_prob = model.get_trans_prob()
 
 # Save
 inf_params_dir = f"{results_dir}/inf_params"
@@ -73,6 +75,8 @@ os.makedirs(inf_params_dir, exist_ok=True)
 
 pickle.dump(alp, open(f"{inf_params_dir}/alp.pkl", "wb"))
 np.save(f"{inf_params_dir}/rates.npy", rates)
+np.save(f"{inf_params_dir}/initial_state_probs.npy", initial_state_probs)
+np.save(f"{inf_params_dir}/trans_prob.npy", trans_prob)
 
 #%% Calculate summary statistics
 
