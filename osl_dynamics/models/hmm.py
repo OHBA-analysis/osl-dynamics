@@ -433,7 +433,7 @@ class Model(MarkovStateInferenceModelBase):
         # Make sure the data and alpha have the same number of samples
         data = [d[: a.shape[0]] for d, a in zip(data, alpha)]
 
-        # Dual estimation: always obtain session-specific parameters
+        # Estimate session-specific observation model parameters
         means, covariances = hmm_dual_estimation(
             data,
             alpha,
