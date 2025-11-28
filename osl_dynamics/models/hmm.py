@@ -435,12 +435,12 @@ class Model(MarkovStateInferenceModelBase):
 
         # Dual estimation: always obtain session-specific parameters
         means, covariances = hmm_dual_estimation(
-                data,
-                alpha,
-                zero_mean=(not self.config.learn_means),
-                eps=self.config.covariances_epsilon,
-                n_jobs=n_jobs,
-            )
+            data,
+            alpha,
+            zero_mean=(not self.config.learn_means),
+            eps=self.config.covariances_epsilon,
+            n_jobs=n_jobs,
+        )
 
         return means, covariances
 
