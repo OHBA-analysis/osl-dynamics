@@ -27,13 +27,11 @@ def standardize(x, axis=0, create_copy=True):
     X :  np.ndarray
         Standardized data.
     """
-    mean = np.expand_dims(np.mean(x, axis=axis), axis=axis)
-    std = np.expand_dims(np.std(x, axis=axis), axis=axis)
+    mean = np.mean(x, axis=axis, keepdims=True)
+    std = np.std(x, axis=axis, keepdims=True)
     if create_copy:
-        X = (np.copy(x) - mean) / std
-    else:
-        X = (x - mean) / std
-    return X
+        return (np.copy(x) - mean) / std
+    return (x - mean) / std
 
 
 def time_embed(x, n_embeddings):
@@ -147,16 +145,15 @@ def moving_average(x, n_window):
     """
     if n_window % 2 == 0:
         raise ValueError("n_window must be odd.")
-    X = np.array(
-        [
-            np.convolve(
-                x[:, i],
-                np.ones(n_window) / n_window,
-                mode="valid",
-            )
-            for i in range(x.shape[1])
-        ],
-    ).T
+
+    # Calculate cumulative sum
+    c = np.cumsum(x, axis=0)
+
+    # Pad cumulative sum with leading zeros
+    c = np.vstack([np.zeros((1, x.shape[1])), c])
+
+    # Calculate moving average
+    X = (c[n_window:] - c[:-n_window]) / float(n_window)
     return X.astype(x.dtype)
 
 
