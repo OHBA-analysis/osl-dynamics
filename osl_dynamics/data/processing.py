@@ -67,7 +67,7 @@ def time_embed(x, n_embeddings):
 
 
 def temporal_filter(x, low_freq, high_freq, sampling_frequency, order=5):
-    """Apply temporal filtering.
+    """Applies temporal filtering.
 
     Parameters
     ----------
@@ -111,7 +111,7 @@ def temporal_filter(x, low_freq, high_freq, sampling_frequency, order=5):
 
 
 def amplitude_envelope(x):
-    """Calculate amplitude envelope.
+    """Calculates amplitude envelope.
 
     Parameters
     ----------
@@ -128,7 +128,10 @@ def amplitude_envelope(x):
 
 
 def moving_average(x, n_window):
-    """Calculate a moving average.
+    """Calculates a moving average over a sliding window along the time axis.
+
+    This function uses a cumulative-sum trick for efficiency and returns only
+    resulting values where the full window fits.
 
     Parameters
     ----------
