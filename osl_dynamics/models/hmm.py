@@ -412,6 +412,8 @@ class Model(MarkovStateInferenceModelBase):
         covariances : np.ndarray
             Session-specific covariances.
             Shape is (n_sessions, n_states, n_channels, n_channels).
+            When ``config.diagonal_covariances=True``, the matrices are
+            diagonal (zeros off-diagonal) and encode per-channel variances only.
         """
         if alpha is None:
             # Get the posterior
@@ -444,6 +446,7 @@ class Model(MarkovStateInferenceModelBase):
             zero_mean=(not self.config.learn_means),
             eps=self.config.covariances_epsilon,
             n_jobs=n_jobs,
+            diagonal_covariances=self.config.diagonal_covariances,
         )
 
         return means, covariances
