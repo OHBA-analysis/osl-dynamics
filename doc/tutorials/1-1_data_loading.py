@@ -9,6 +9,7 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 3. Loading Data in NumPy Format
 4. Loading Data in MATLAB Format
 5. Loading Data in fif Format
+6. Loading Data in txt Format
 """
 
 #%%
@@ -21,7 +22,7 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 # There is one mandatory argument that needs to be passed to the Data class: `inputs`. This can be:
 #
 # - A path to a directory containing .npy files. Each .npy file should be a subject or session.
-# - A list of paths to .npy, .mat, or .fif files. Each file should be a subject or session.
+# - A list of paths to .npy, .mat, .fif, or .txt files. Each file should be a subject or session.
 # - A numpy array. The array will be treated as continuous data from the same subject.
 # - A list of numpy arrays. Each numpy array should be the data for a subject or session.
 #
@@ -34,6 +35,10 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 # Note, there is an option to load the data as a `memory map <https://numpy.org/doc/stable/reference/generated/numpy.memmap.html>`_. This allows us to access the data without holding it in memory. To use this feature, pass `load_memmaps=True`. The Data class creates a directory called `tmp` which is used for storing temporary data (memory map files and prepared data). This directory can be safely deleted after you run your script. You can specify the name of the temporary directory by passing the `store_dir` argument.
 #
 # We will demonstrate how the Data class is used with example data below.
+#
+# Loading data in parallel
+# ************************
+# The Data class has a `n_jobs` argument that can be used to load multiple data files in parallel. Note, if `n_jobs` is passed, the Data class will automatically also prepare data in parallel.
 #
 # Getting Example Data
 # ^^^^^^^^^^^^^^^^^^^^
@@ -65,6 +70,7 @@ os.listdir("example_loading_data")
 # - `numpy_format`, which contains `.npy` files.
 # - `matlab_format`, which contains `.mat` files.
 # - `fif_format`, which contains directories with `.fif` files.
+# - `txt_format`, which contains `.txt` files.
 #
 # We'll show how to load data in each of these data types.
 #
@@ -196,8 +202,8 @@ data = Data(files)
 print(data)
 
 #%%
-# Loading fif files
-# *****************
+# Loading Data in fif Format
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Another data format that can be loaded with the Data class is fif files. This format is commonly used in `MNE-Python <https://mne.tools/stable/index.html>`_ and is the data format used in `osl-ephys <https://github.com/OHBA-analysis/osl-ephys>`_. Here, we will load source reconstruct (parcellated) data created with osl-ephys. In osl-ephys, we often have a separate directory for each subject. The `fif_format` directory contains two directories for different subjects.
 
 os.listdir('example_loading_data/fif_format')
@@ -237,3 +243,14 @@ files =[
 data = Data(files, picks="misc", reject_by_annotation="omit")
 print(data)
 
+#%%
+# Loading Data in txt Format
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^
+# The final data format we will load using the Data class is txt files. FMRI data preprocessed with `FSL <https://fsl.fmrib.ox.ac.uk/fsl/docs/>`_ is in this format. To load this type of data simply pass the list of filenames.
+
+files =[
+    f"example_loading_data/txt_format/dr_stage1_subject{i:05d}.txt"
+    for i in range(1,3)
+]
+data = Data(files)
+print(data)
