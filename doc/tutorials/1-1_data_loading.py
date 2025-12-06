@@ -38,7 +38,7 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 #
 # Loading data in parallel
 # ************************
-# The Data class has a `n_jobs` argument that can be used to load multiple data files in parallel. Note, if `n_jobs` is passed, the Data class will automatically also prepare data in parallel.
+# The Data class has a `n_jobs` argument that can be used to load multiple data files in parallel. Note, if `n_jobs` is passed, the Data class will automatically also prepare data in parallel (see `Preparing M/EEG Data <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/1-2_data_prepare_meg.html>`_ and `Preparing fMRI data <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/1-3_data_prepare_fmri.html>`_ for more information regarding data preparation).
 #
 # Getting Example Data
 # ^^^^^^^^^^^^^^^^^^^^
