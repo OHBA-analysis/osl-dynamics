@@ -537,13 +537,25 @@ class VariationalInferenceModelBase(ModelBase):
 
             # Make sure each state activates
             non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
-            while np.any(non_active_states):
-                new_stc = sim.generate_states(data.shape[0])
-                new_active_states = np.sum(new_stc, axis=0) != 0
-                for j in range(self.config.n_states or self.config.n_modes):
-                    if non_active_states[j] and new_active_states[j]:
-                        stc[:, j] = new_stc[:, j]
-                non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+            if np.any(non_active_states):
+                for _ in range(100):
+                    new_stc = self.sample_state_time_course(data.shape[0])
+                    new_active_states = np.sum(new_stc, axis=0) != 0
+                    for j in range(self.config.n_states):
+                        if non_active_states[j] and new_active_states[j]:
+                            stc[:, j] = new_stc[:, j]
+                    non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+                    if not np.any(non_active_states):
+                        break
+
+            if np.any(non_active_states):
+                # Some states still haven't activated
+                raise ValueError(
+                    "random_state_time_course_initialization can't simulate a state "
+                    "time course where each state activates.\n"
+                    "Try increasing the batch_size or sequence_length.\n"
+                    "Or switch to using model.random_subset_initialization() instead."
+                )
 
             # Calculate the mean/covariance for each state for this batch
             m = []
@@ -1508,13 +1520,25 @@ class MarkovStateInferenceModelBase(ModelBase):
 
             # Make sure each state activates
             non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
-            while np.any(non_active_states):
-                new_stc = self.sample_state_time_course(data.shape[0])
-                new_active_states = np.sum(new_stc, axis=0) != 0
-                for j in range(self.config.n_states):
-                    if non_active_states[j] and new_active_states[j]:
-                        stc[:, j] = new_stc[:, j]
-                non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+            if np.any(non_active_states):
+                for _ in range(100):
+                    new_stc = self.sample_state_time_course(data.shape[0])
+                    new_active_states = np.sum(new_stc, axis=0) != 0
+                    for j in range(self.config.n_states):
+                        if non_active_states[j] and new_active_states[j]:
+                            stc[:, j] = new_stc[:, j]
+                    non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
+                    if not np.any(non_active_states):
+                        break
+
+            if np.any(non_active_states):
+                # Some states still haven't activated
+                raise ValueError(
+                    "random_state_time_course_initialization can't simulate a state "
+                    "time course where each state activates.\n"
+                    "Try increasing the batch_size or sequence_length.\n"
+                    "Or switch to using model.random_subset_initialization() instead."
+                )
 
             # Calculate the mean/covariance for each state for this batch
             m = []
