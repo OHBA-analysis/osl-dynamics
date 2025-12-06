@@ -12,18 +12,84 @@ fMRI data needs to be preprocessed in a particular way to train a dynamic networ
 """
 
 #%%
-# Group-ICA time courses
-# ^^^^^^^^^^^^^^^^^^^^^^
-# **This is the recommended data to train an HMM/DyNeMo on.**
+# Preparing group-ICA data
+# ^^^^^^^^^^^^^^^^^^^^^^^^
+# This is the recommended data to train an HMM/DyNeMo on.
+# 
+# Deriving subject-specific time series via dual regression
+# *********************************************************
+# This section describes how group ICA time courses can be extracted from preprocessed fMRI data using **dual regression**. This process is applicable to data in both volumetric space and surface space.
+# 
+# **1. Input Requirements**
+# 
+# Dual regression requires two inputs: the preprocessed subject data and a set of group-level spatial maps (Group ICA) to act as a template.
+# 
+# **A. Preprocessed Subject Data**
+# 
+# Ensure your subject data has been preprocessed in one of the following formats:
+# 
+# - **Volumetric Space:** Standard 4D fMRI nifti files.
+# - **Surface Space:** Data processed using the Human Connectome Project (HCP) surface-based pipeline (CIFTI/GIFTI formats).
+# 
+# **B. Group ICA Maps (Spatial Templates)**
+# 
+# You must provide a set of group-level spatial maps. These are typically obtained by running group-level Independent Component Analysis (ICA) using FSL MELODIC. These maps function as a "soft parcellation" of the brain, identifying functional networks common across the group.
+# 
+# For technical details on generating these maps, refer to the `FSL MELODIC Documentation <https://web.mit.edu/fsl_v5.0.10/fsl/doc/wiki/MELODIC.html>`_.
+# 
+# **2. Dual Regression**
+# 
+# To derive the final subject-specific time series, you must run dual Regression on your preprocessed data (Input A) using the Group ICA maps (Input B) as the spatial regressors.
+# 
+# **Understanding the Output Stages**
+# 
+# Dual regression is a two-stage process.
+# 
+# **Stage 1: Spatial Regression**
+# 
+# In this first stage, the group-level spatial maps (e.g. from UKB or HCP) are regressed into the subject's 4D dataset.
+# 
+#     **Key Output:** The result of Stage 1 is the **Group ICA time courses**. These represent the subject-specific temporal dynamics associated with each group-level spatial component.
+# 
+# **Stage 2: Temporal Regression**
+# 
+# The time courses from stage 1 are used in the second stage to regress against the subject's data again to find subject-specific *spatial* maps.
 #
-# The first step is to load the group-ICA (source) time courses into osl-dynamics using the Data object, see the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details. In this tutorial, we will simulate some random data (for 2 subjects). You should substitute this with your preprocessed fMRI data.
+#     **Note:** if you only require the time series, Stage 1 is your endpoint.
+# 
+# **3. Further Reading & Resources**
+# 
+# For a comprehensive technical explanation of the mathematical framework behind dual regression, please consult the official FSL documentation and course materials:
+# 
+# - `FSL Wiki: Dual Regression Details <https://web.mit.edu/fsl_v5.0.10/fsl/doc/wiki/DualRegression.html#Research_Overview_-_Dual_Regression>`_.
+# - `ICA and Dual Regression (FSL Course) <https://fsl.fmrib.ox.ac.uk/fslcourse/2019_Beijing/lectures/ICA_and_resting_state/ICA_and_Dual_Regression.pdf>`_.
 
-import numpy as np
+#%%
+# Example data
+# ************
+# We will download example data hosted on `OSF <https://osf.io/by2tc/>`_ that we have already calculated dual regression for.
+
+import os
+
+def get_data(name):
+    os.system(f"osf -p by2tc fetch data/{name}.zip")
+    os.system(f"unzip -o {name}.zip -d {name}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {name}"
+
+# Download the dataset (approximately 6 MB)
+get_data("example_loading_data")
+
+# List the contents of the downloaded directory containing the dataset
+print("Contents of example_loading_data:")
+os.listdir("example_loading_data")
+
+#%%
+# Now, let's load the example data into osl-dynamics. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+
 from osl_dynamics.data import Data
 
-X = [np.random.normal(size=(490,25)), np.random.normal(size=(490,25))]
-
-data = Data(X)
+data = Data("example_loading_data/txt_format")
 print(data)
 
 #%%
@@ -34,8 +100,8 @@ data.prepare({"standardize": {}})
 #%%
 # Note, this is equivalent to `data.standardize()`.
 #
-# Anatomically parcellated data
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Preparing anatomically parcellated data
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # Alternatively, if you have defined regions of interest (ROIs) using an anatomical parcellation and loaded these into osl-dynamics instead of the group-ICA time courses, it is important to apply PCA to infer good dynamics (state switching). Below we apply a full rank PCA to the data.
 
 data.prepare({
@@ -74,3 +140,10 @@ print(data)
 
 #%%
 # Note, if we saved data that included PCA in preparation. The `pca_components` attribute will be loaded from the pickle file when we load data using the Data class.
+#
+# Next steps
+# ^^^^^^^^^^
+# Once you have loaded and prepared your fMRI data, the next step is to train a dynamic network model. See:
+#
+# - `HMM: Training <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/3-2_hmm_training.html>`_
+# - `DyNeMo: Training <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/3-3_dynemo_training.html>`_

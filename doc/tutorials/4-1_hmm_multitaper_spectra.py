@@ -15,8 +15,6 @@ import os
 def get_data(name, rename):
     if rename is None:
         rename = name
-    if os.path.exists(rename):
-        return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")
@@ -33,8 +31,6 @@ get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
 def get_inf_params(name, rename):
     if rename is None:
         rename = name
-    if os.path.exists(rename):
-        return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch inf_params/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")

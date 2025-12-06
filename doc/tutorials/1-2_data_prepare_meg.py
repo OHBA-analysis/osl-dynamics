@@ -18,14 +18,12 @@ In this tutorial we will go through common ways to prepare M/EEG data. This tuto
 import os
 
 def get_data(name):
-    if os.path.exists(name):
-        return f"{name} already downloaded. Skipping.."
     os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.system(f"unzip -o {name}.zip -d {name}")
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {name}"
 
-# Download the dataset (approximate 6 MB)
+# Download the dataset (approximately 6 MB)
 get_data("example_loading_data")
 
 # List the contents of the downloaded directory containing the dataset

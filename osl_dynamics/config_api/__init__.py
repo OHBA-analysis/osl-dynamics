@@ -4,7 +4,7 @@
 
 Specify a pipeline using a config, e.g. to train a TDE-HMM::
 
-    config = ```
+    config = '''
         load_data:
             inputs: training_data
             prepare:
@@ -15,7 +15,7 @@ Specify a pipeline using a config, e.g. to train a TDE-HMM::
                 n_states: 8
                 learn_means: False
                 learn_covariances: True
-    ```
+    '''
 
 and run with::
 

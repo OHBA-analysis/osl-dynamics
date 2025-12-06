@@ -26,8 +26,6 @@ This tutorial covers how to train an HMM. We will use MEG data in this tutorial,
 #     def get_data(name, rename):
 #         if rename is None:
 #             rename = name
-#         if os.path.exists(rename):
-#             return f"{name} already downloaded. Skipping.."
 #         os.system(f"osf -p by2tc fetch data/{name}.zip")
 #         os.makedirs(rename, exist_ok=True)
 #         os.system(f"unzip -o {name}.zip -d {rename}")
@@ -78,6 +76,8 @@ config = Config(
 )
 
 #%%
+# **Note**: for fMRI data the `sequence_length` used is typically much shorter, normally `sequence_length=50`.
+#
 # Building the model
 # ******************
 # With the Config object, we can build a model.
@@ -101,7 +101,7 @@ model.summary()
 #     init_history = model.random_state_time_course_initialization(data, n_epochs=1, n_init=3)
 
 #%%
-# The `init_history` variable is `dict` that contains the training history (`rho`, `lr`, `loss`) for the best initialization.
+# The `init_history` variable is `dict` that contains the training history (`rho`, `learning_rate`, `loss`) for the best initialization.
 #
 # **Full training**
 #
