@@ -43,7 +43,6 @@ power.save(
     means,
     mask_file="MNI152_T1_2mm_brain.nii.gz",
     parcellation_file="melodic_IC.nii.gz",
-    plot_kwargs={"symmetric_cbar": True},
     filename=f"{plots_dir}/means_.png",
 )
 

@@ -86,8 +86,10 @@ pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
 # Inferred state probabilities
 alp = model.get_alpha(data)
 
-# Observation model parameters
+# HMM parameters
 means, covs = model.get_means_covariances()
+trans_prob = model.get_trans_prob()
+initial_state_probs = model.get_initial_state_probs()
 
 # Save
 inf_params_dir = f"{results_dir}/inf_params"
@@ -96,6 +98,8 @@ os.makedirs(inf_params_dir, exist_ok=True)
 pickle.dump(alp, open(f"{inf_params_dir}/alp.pkl", "wb"))
 np.save(f"{inf_params_dir}/means.npy", means)
 np.save(f"{inf_params_dir}/covs.npy", covs)
+np.save(f"{inf_params_dir}/trans_prob.npy", trans_prob)
+np.save(f"{inf_params_dir}/initial_state_probs.npy", initial_state_probs)
 
 #%% Calculate summary statistics
 
@@ -116,7 +120,3 @@ np.save(f"{summary_stats_dir}/fo.npy", fo)
 np.save(f"{summary_stats_dir}/lt.npy", lt)
 np.save(f"{summary_stats_dir}/intv.npy", intv)
 np.save(f"{summary_stats_dir}/sr.npy", sr)
-
-#%% Delete temporary directory
-
-data.delete_dir()

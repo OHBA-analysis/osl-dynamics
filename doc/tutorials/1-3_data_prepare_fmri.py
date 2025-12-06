@@ -16,14 +16,37 @@ fMRI data needs to be preprocessed in a particular way to train a dynamic networ
 # ^^^^^^^^^^^^^^^^^^^^^^
 # **This is the recommended data to train an HMM/DyNeMo on.**
 #
-# The first step is to load the group-ICA (source) time courses into osl-dynamics using the Data object, see the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details. In this tutorial, we will simulate some random data (for 2 subjects). You should substitute this with your preprocessed fMRI data.
+# ADD DETAILS FOR HOW TO GET THE GROUP-ICA DATA.
+#
+# Download the dataset
+# ^^^^^^^^^^^^^^^^^^^^
+# We will download example data hosted on `OSF <https://osf.io/by2tc/>`_ that have already calculate group-ICA for.
 
-import numpy as np
+import os
+
+def get_data(name):
+    if os.path.exists(name):
+        return f"{name} already downloaded. Skipping.."
+    os.system(f"osf -p by2tc fetch data/{name}.zip")
+    os.system(f"unzip -o {name}.zip -d {name}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {name}"
+
+# Download the dataset (approximately 6 MB)
+get_data("example_loading_data")
+
+# List the contents of the downloaded directory containing the dataset
+print("Contents of example_loading_data:")
+os.listdir("example_loading_data")
+
+#%%
+# Loading the data
+# ****************
+# Now, let's load the example data into osl-dynamics. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+
 from osl_dynamics.data import Data
 
-X = [np.random.normal(size=(490,25)), np.random.normal(size=(490,25))]
-
-data = Data(X)
+data = Data("example_loading_data/txt_format")
 print(data)
 
 #%%
