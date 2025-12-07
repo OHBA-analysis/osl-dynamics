@@ -293,8 +293,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
     """
 
     def __init__(self, save_best_after, *args, **kwargs):
-        self.save_best_after = save_best_after
-
+        # Set up necessary properties
         kwargs.update(
             dict(
                 save_weights_only=True,
@@ -303,8 +302,11 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
                 save_best_only=True,
             )
         )
-
         super().__init__(*args, **kwargs)
+
+        # Custom attribute to store the epoch threshold
+        self.save_best_after = save_best_after
+        self._activated = False
 
     def on_epoch_end(self, epoch, logs=None):
         """Action to perform at the end of an epoch.
@@ -317,10 +319,23 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
-        self.epochs_since_last_save += 1
-        if epoch >= self.save_best_after:
-            if self.save_freq == "epoch":
-                self._save_model(epoch=epoch, logs=logs, batch=None)
+        if epoch < self.save_best_after:
+            return
+        elif epoch == self.save_best_after:
+            # Reset the best value when activating the callback
+            if not self._activated:
+                if self.monitor_op == np.less:
+                    self.best = np.inf
+                elif self.monitor_op == np.greater:
+                    self.best = -np.inf
+                else:
+                    print("Unknown monitor operation. Monitoring for minimum loss/metric.")
+                    self.best = np.inf  # fallback to min mode
+            self._activated = True
+            print(f"\nEpoch {epoch + 1}: SaveBestCallback activated. " +
+                    f"Initial best loss/metric set to {self.best:.4f}.")
+        
+        super().on_epoch_end(epoch, logs)
 
     def on_train_end(self, logs=None):
         """Action to perform at the end of training.
