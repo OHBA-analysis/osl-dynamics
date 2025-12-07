@@ -66,7 +66,18 @@ class DiceCoefficientCallback(callbacks.Callback):
 
         # Predict time courses
         predictions = self.model.predict(self.prediction_dataset, verbose=0)
-        tc = predictions[2:]  # first two outputs are losses, rest are time courses
+        
+        if "theta" in predictions:
+            tc = np.concatenate(predictions["theta"])  # concatenate batch and sequence dimensions
+        if "gamma" in predictions:
+            tc = np.concatenate(predictions["gamma"])  # concatenate batch and sequence dimensions
+        if {"power_theta", "fc_theta"}.issubset(predictions):
+            tc = np.concatenate([predictions[k] for k in ("power_theta", "fc_theta")])
+            tc = tc.reshape(tc.shape[0], -1, tc.shape[-1])  # concatenate batch and sequence dimensions
+        
+        if tc.ndim == 2:
+            tc = tc[np.newaxis, ...]
+        
         if len(tc) != self.n_time_courses:
             raise ValueError(
                 "Mismatch between number of ground truth and predicted time courses."
