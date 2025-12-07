@@ -10,7 +10,7 @@ from osl_dynamics.glm.ols import osl_fit, get_degree_of_freedom
 # Helper functions for validation
 def _validate_name(name):
     if not isinstance(name, str):
-        raise ValueError(f"name must be a string, got {type(name)}")
+        raise TypeError(f"name must be a string, got {type(name)}")
     return name
 
 
@@ -19,7 +19,7 @@ def _validate_values(values):
         values = np.array(values)
 
     if not isinstance(values, np.ndarray):
-        raise ValueError(f"values must be a list or np.ndarray, got {type(values)}")
+        raise TypeError(f"values must be a list or np.ndarray, got {type(values)}")
 
     if values.ndim != 1:
         raise ValueError(f"values must be 1D, got {values.ndim}D")
@@ -264,7 +264,7 @@ class Design:
         # all features should have the same length
         for feature in self.features:
             if not isinstance(feature, Feature):
-                raise ValueError(
+                raise TypeError(
                     f"Expected Feature object, got {type(feature)} in features."
                 )
             if self.n_samples is None:
@@ -283,7 +283,7 @@ class Design:
         # all contrasts should have the same length
         for contrast in self.contrasts:
             if not isinstance(contrast, Contrast):
-                raise ValueError(
+                raise TypeError(
                     f"Expected Contrast object, got {type(contrast)} in contrasts."
                 )
             if self.n_features is None:
@@ -370,7 +370,7 @@ class GLM:
             y = np.array(y).copy()
 
         if not isinstance(y, np.ndarray):
-            raise ValueError(f"y must be a list or np.ndarray, got {type(y)}")
+            raise TypeError(f"y must be a list or np.ndarray, got {type(y)}")
 
         if y.ndim == 1:
             # Add target dimension

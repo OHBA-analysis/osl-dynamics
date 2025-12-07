@@ -607,7 +607,7 @@ def independent_components_to_volumetric_maps(
 
     # Validation
     if not isinstance(ica_spatial_maps, nib.nifti1.Nifti1Image):
-        raise ValueError(
+        raise TypeError(
             "ica_spatial_maps must be a path to a nifti file or "
             "nib.nifti1.Nifti1Image object."
         )
@@ -671,7 +671,7 @@ def independent_components_to_surface_maps(
 
     # Validation
     if not isinstance(ica_spatial_maps, nib.cifti2.cifti2.Cifti2Image):
-        raise ValueError(
+        raise TypeError(
             "ica_spatial_maps must be a path to a cifti file or "
             "nib.cifti2.cifti2.Cifti2Image object."
         )

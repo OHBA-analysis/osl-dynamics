@@ -259,7 +259,7 @@ class ModelSelection:
             The hyperparameter grid for tuning.
         """
         if not isinstance(params_grid, dict):
-            raise ValueError("params_grid must be a dictionary.")
+            raise TypeError("params_grid must be a dictionary.")
         self.params_grid = params_grid
 
     def set_cv(self, cv):
@@ -307,7 +307,7 @@ class ModelSelection:
             y = np.array(y)
 
         if not isinstance(X, np.ndarray) or not isinstance(y, np.ndarray):
-            raise ValueError("X and y must be numpy arrays or lists.")
+            raise TypeError("X and y must be numpy arrays or lists.")
         if X.ndim != 2:
             raise ValueError("X must be a 2D array of shape (n_samples, n_features).")
         if X.shape[0] != y.shape[0]:

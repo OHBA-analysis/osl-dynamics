@@ -33,7 +33,7 @@ def load_config(config):
         Config for a full pipeline.
     """
     if type(config) not in [str, dict]:
-        raise ValueError("config must be a str or dict, got {}.".format(type(config)))
+        raise TypeError("config must be a str or dict, got {}.".format(type(config)))
 
     if isinstance(config, str):
         try:

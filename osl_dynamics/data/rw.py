@@ -56,7 +56,7 @@ def validate_inputs(inputs):
             validated_inputs = inputs
 
     else:
-        raise ValueError("inputs must be str, np.ndarray or list.")
+        raise TypeError("inputs must be str, np.ndarray or list.")
 
     return validated_inputs
 

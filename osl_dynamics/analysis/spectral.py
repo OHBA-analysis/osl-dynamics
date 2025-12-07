@@ -188,7 +188,7 @@ def welch_spectra(
         if (isinstance(data, list) != isinstance(alpha, list)) or (
             isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
         ):
-            raise ValueError(
+            raise TypeError(
                 f"data is type {type(data)} and alpha is type "
                 f"{type(alpha)}. They must both be lists or numpy arrays."
             )
@@ -383,7 +383,7 @@ def multitaper_spectra(
         if (isinstance(data, list) != isinstance(alpha, list)) or (
             isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
         ):
-            raise ValueError(
+            raise TypeError(
                 f"data is type {type(data)} and alpha is type "
                 f"{type(alpha)}. They must both be lists or numpy arrays."
             )
@@ -590,7 +590,7 @@ def regression_spectra(
     if (isinstance(data, list) != isinstance(alpha, list)) or (
         isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
     ):
-        raise ValueError(
+        raise TypeError(
             f"data is type {type(data)} and alpha is type "
             f"{type(alpha)}. They must both be lists or numpy arrays."
         )

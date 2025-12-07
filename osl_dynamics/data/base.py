@@ -371,14 +371,14 @@ class Data:
         # Validate each channel
         for channel_name, channel in extra_channels.items():
             if not isinstance(channel_name, str):
-                raise ValueError("Channel name must be a string.")
+                raise TypeError("Channel name must be a string.")
 
             if isinstance(channel, np.ndarray):
                 channel = [channel]
                 extra_channels[channel_name] = channel
 
             if not isinstance(channel, list):
-                raise ValueError(f"Extra channel {channel_name} must be a list.")
+                raise TypeError(f"Extra channel {channel_name} must be a list.")
 
             if len(channel) != n_sessions:
                 raise ValueError(
@@ -503,10 +503,10 @@ class Data:
             sessions = list(sessions)
 
         if not isinstance(channels, list):
-            raise ValueError("channels must be an int or list of int.")
+            raise TypeError("channels must be an int or list of int.")
 
         if not isinstance(sessions, list):
-            raise ValueError("sessions must be an int or list of int.")
+            raise TypeError("sessions must be an int or list of int.")
 
         # What data should we use?
         arrays = self.raw_data_arrays if use_raw else self.arrays
@@ -683,7 +683,7 @@ class Data:
             raise ValueError("Please pass either n_pca_components or pca_components.")
 
         if pca_components is not None and not isinstance(pca_components, np.ndarray):
-            raise ValueError("pca_components must be a numpy array.")
+            raise TypeError("pca_components must be a numpy array.")
 
         self.n_pca_components = n_pca_components
         self.pca_components = pca_components
@@ -826,7 +826,7 @@ class Data:
             raise ValueError("Please pass either n_pca_components or pca_components.")
 
         if pca_components is not None and not isinstance(pca_components, np.ndarray):
-            raise ValueError("pca_components must be a numpy array.")
+            raise TypeError("pca_components must be a numpy array.")
 
         self.n_embeddings = n_embeddings
         self.n_pca_components = n_pca_components

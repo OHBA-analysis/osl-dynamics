@@ -218,7 +218,7 @@ def state_activations(state_time_course):
         equal number of elements in each array is not guaranteed.
     """
     # Make sure we have a list of numpy arrays
-    shape_error_message = (
+    error_message = (
         "State time course must be a 1D, 2D or 3D array or list of 2D arrays."
     )
     if isinstance(state_time_course, np.ndarray):
@@ -229,15 +229,15 @@ def state_activations(state_time_course):
         elif state_time_course.ndim == 1:
             state_time_course = [state_time_course[:, np.newaxis]]
         else:
-            raise ValueError(shape_error_message)
+            raise ValueError(error_message)
     elif isinstance(state_time_course, list):
         if not all(isinstance(stc, np.ndarray) for stc in state_time_course):
-            raise ValueError(shape_error_message)
+            raise ValueError(error_message)
         if not all(stc.ndim == 2 for stc in state_time_course):
-            raise ValueError(shape_error_message)
+            raise ValueError(error_message)
 
     # Make sure the list of arrays is of type bool
-    type_error_message = (
+    error_message = (
         "State time course must be strictly binary. "
         "This can either be np.bools or np.ints with values 0 and 1."
     )
@@ -249,7 +249,7 @@ def state_activations(state_time_course):
         elif np.issubdtype(stc.dtype, np.bool_):
             bool_state_time_course.append(stc)
         else:
-            raise ValueError(type_error_message)
+            raise TypeError(error_message)
 
     # Get the slices where each state is True
     slices = [
@@ -756,7 +756,7 @@ def partial_covariances(data, alpha):
       info goes into the partial covariances, :math:`\beta_i`.
     """
     if type(data) != type(alpha):
-        raise ValueError(
+        raise TypeError(
             "data and alpha must be the same type: numpy arrays or lists of "
             "numpy arrays."
         )
@@ -811,7 +811,7 @@ def hmm_dual_estimation(data, alpha, zero_mean=False, eps=1e-5, n_jobs=1):
     if (isinstance(data, list) != isinstance(alpha, list)) or (
         isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
     ):
-        raise ValueError(
+        raise TypeError(
             f"data is type {type(data)} and alpha is type "
             f"{type(alpha)}. They must both be lists or numpy arrays."
         )
@@ -943,7 +943,7 @@ def hmm_features(
     if (isinstance(data, list) != isinstance(alpha, list)) or (
         isinstance(data, np.ndarray) != isinstance(alpha, np.ndarray)
     ):
-        raise ValueError(
+        raise TypeError(
             f"data is type {type(data)} and alpha is type "
             f"{type(alpha)}. They must both be lists or numpy arrays."
         )

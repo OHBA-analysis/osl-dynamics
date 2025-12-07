@@ -705,7 +705,7 @@ def average_runs(alpha, n_clusters=None, return_cluster_info=False):
     2023-01 <https://www.biorxiv.org/content/10.1101/2023.01.18.524539v2>`_.
     """
     if not isinstance(alpha, list):
-        raise ValueError(
+        raise TypeError(
             "alpha must be a list of lists (of numpy arrays) or list of numpy arrays."
         )
     if isinstance(alpha[0], np.ndarray):

@@ -75,7 +75,7 @@ def get_residuals(X, y, predictor):
     """
     _validate_dimensions(X=X, y=y)
     if not isinstance(predictor, LinearRegression):
-        raise ValueError(
+        raise TypeError(
             f"predictor must be a LinearRegression object, got {type(predictor)}"
         )
     return y - predictor.predict(X)
@@ -119,7 +119,7 @@ def get_varcopes(X, y, contrasts, predictor):
     """
     _validate_dimensions(X=X, y=y, contrasts=contrasts)
     if not isinstance(predictor, LinearRegression):
-        raise ValueError(
+        raise TypeError(
             f"predictor must be a LinearRegression object, got {type(predictor)}"
         )
 

@@ -350,7 +350,7 @@ def _validate_tf_dataset(dataset):
             dataset = concatenate_datasets(dataset)
 
     if not isinstance(dataset, tf.data.Dataset):
-        raise ValueError("dataset must be a TensorFlow dataset or a list of datasets")
+        raise TypeError("dataset must be a TensorFlow dataset or a list of datasets")
 
     return dataset
 
