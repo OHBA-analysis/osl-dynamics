@@ -66,18 +66,24 @@ class DiceCoefficientCallback(callbacks.Callback):
 
         # Predict time courses
         predictions = self.model.predict(self.prediction_dataset, verbose=0)
-        
+
         if "theta" in predictions:
-            tc = np.concatenate(predictions["theta"])  # concatenate batch and sequence dimensions
+            tc = np.concatenate(
+                predictions["theta"]
+            )  # concatenate batch and sequence dimensions
         if "gamma" in predictions:
-            tc = np.concatenate(predictions["gamma"])  # concatenate batch and sequence dimensions
+            tc = np.concatenate(
+                predictions["gamma"]
+            )  # concatenate batch and sequence dimensions
         if {"power_theta", "fc_theta"}.issubset(predictions):
             tc = np.concatenate([predictions[k] for k in ("power_theta", "fc_theta")])
-            tc = tc.reshape(tc.shape[0], -1, tc.shape[-1])  # concatenate batch and sequence dimensions
-        
+            tc = tc.reshape(
+                tc.shape[0], -1, tc.shape[-1]
+            )  # concatenate batch and sequence dimensions
+
         if tc.ndim == 2:
             tc = tc[np.newaxis, ...]
-        
+
         if len(tc) != self.n_time_courses:
             raise ValueError(
                 "Mismatch between number of ground truth and predicted time courses."
@@ -340,12 +346,16 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
                 elif self.monitor_op == np.greater:
                     self.best = -np.inf
                 else:
-                    print("Unknown monitor operation. Monitoring for minimum loss/metric.")
+                    print(
+                        "Unknown monitor operation. Monitoring for minimum loss/metric."
+                    )
                     self.best = np.inf  # fallback to min mode
             self._activated = True
-            print(f"\nEpoch {epoch + 1}: SaveBestCallback activated. " +
-                    f"Initial best loss/metric set to {self.best:.4f}.")
-        
+            print(
+                f"\nEpoch {epoch + 1}: SaveBestCallback activated. "
+                + f"Initial best loss/metric set to {self.best:.4f}."
+            )
+
         super().on_epoch_end(epoch, logs)
 
     def on_train_end(self, logs=None):
@@ -716,7 +726,7 @@ class SummaryStatsCallback(callbacks.Callback):
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
-        
+
         # Get inferred alphas
         alphas = self.outer_model.get_alpha(self.prediction_dataset)
         self.alphas.append(alphas)
