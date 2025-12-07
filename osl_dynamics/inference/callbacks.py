@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow import tanh
 from tensorflow.keras import callbacks
 
-from osl_dynamics import inference
+from osl_dynamics.inference import metrics, modes
 
 
 class DiceCoefficientCallback(callbacks.Callback):
@@ -76,11 +76,11 @@ class DiceCoefficientCallback(callbacks.Callback):
         # ground truth
         dices = []
         for i in range(self.n_time_courses):
-            pmtc = inference.modes.argmax_time_courses(
+            pmtc = modes.argmax_time_courses(
                 tc[i], concatenate=True, n_modes=self.n_modes
             )
-            pmtc, gttc = inference.modes.match_modes(pmtc, self.gttc[i])
-            dice = inference.metrics.dice_coefficient(pmtc, gttc)
+            pmtc, gttc = modes.match_modes(pmtc, self.gttc[i])
+            dice = metrics.dice_coefficient(pmtc, gttc)
             dices.append(dice)
 
         # Add dice to the training history and print to screen
@@ -667,3 +667,57 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
                         if self.print_stats:
                             print(f"  {var.name}: Gradient is None.")
             self.writer.flush()
+
+
+class SummaryStatsCallback(callbacks.Callback):
+    """Callback to calculate summary statistics at the end of each
+       epoch during training.
+
+    Parameters
+    ----------
+    prediction_dataset : tf.data.Dataset
+        Dataset to use to calculate outputs of the model.
+    sampling_frequency : int
+        Sampling frequency of the data in Hz. Defaults to 1.
+    """
+
+    def __init__(
+        self,
+        prediction_dataset,
+        model,
+        sampling_frequency=1,
+    ):
+        super().__init__()
+        self.prediction_dataset = prediction_dataset
+        self.outer_model = model  # to access the outer model
+        self.sampling_frequency = sampling_frequency
+        self.alphas = []
+        self.summary_stats = []
+
+    def on_epoch_end(self, epoch, logs=None):
+        """Action to perform at the end of an epoch.
+
+        Parameters
+        ---------
+        epochs : int
+            Integer, index of epoch.
+        logs : dict, optional
+            Results for this training epoch, and for the validation epoch if
+            validation is performed.
+        """
+        
+        # Get inferred alphas
+        alphas = self.outer_model.get_alpha(self.prediction_dataset)
+        self.alphas.append(alphas)
+
+        # Get state time courses
+        stc = modes.argmax_time_courses(alphas)
+
+        # Get summary statistics
+        fo = modes.fractional_occupancies(stc)
+        lt = modes.mean_lifetimes(stc, sampling_frequency=self.sampling_frequency)
+        intv = modes.mean_intervals(stc, sampling_frequency=self.sampling_frequency)
+        sr = modes.switching_rates(stc, sampling_frequency=self.sampling_frequency)
+
+        summary_stat = [fo, lt, intv, sr]
+        self.summary_stats.append(summary_stat)
