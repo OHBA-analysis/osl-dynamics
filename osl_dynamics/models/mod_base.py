@@ -313,7 +313,7 @@ class ModelBase:
         # Callback to save the best model after a certain number of epochs
         if save_best_after is not None:
             if save_filepath is None:
-                save_filepath = f"/tmp/model_weights/best_{self._identifier}"
+                save_filepath = f"/tmp/model_weights/best_{self._identifier}.weights.h5"
             save_best_callback = callbacks.SaveBestCallback(
                 save_best_after=save_best_after,
                 filepath=save_filepath,

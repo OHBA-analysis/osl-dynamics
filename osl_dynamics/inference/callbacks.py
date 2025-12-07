@@ -6,7 +6,7 @@ import tensorflow as tf
 from tensorflow import tanh
 from tensorflow.keras import callbacks
 
-from osl_dynamics import inference
+from osl_dynamics.inference import metrics, modes
 
 
 class DiceCoefficientCallback(callbacks.Callback):
@@ -66,7 +66,24 @@ class DiceCoefficientCallback(callbacks.Callback):
 
         # Predict time courses
         predictions = self.model.predict(self.prediction_dataset, verbose=0)
-        tc = predictions[2:]  # first two outputs are losses, rest are time courses
+
+        if "theta" in predictions:
+            tc = np.concatenate(
+                predictions["theta"]
+            )  # concatenate batch and sequence dimensions
+        if "gamma" in predictions:
+            tc = np.concatenate(
+                predictions["gamma"]
+            )  # concatenate batch and sequence dimensions
+        if {"power_theta", "fc_theta"}.issubset(predictions):
+            tc = np.concatenate([predictions[k] for k in ("power_theta", "fc_theta")])
+            tc = tc.reshape(
+                tc.shape[0], -1, tc.shape[-1]
+            )  # concatenate batch and sequence dimensions
+
+        if tc.ndim == 2:
+            tc = tc[np.newaxis, ...]
+
         if len(tc) != self.n_time_courses:
             raise ValueError(
                 "Mismatch between number of ground truth and predicted time courses."
@@ -76,11 +93,11 @@ class DiceCoefficientCallback(callbacks.Callback):
         # ground truth
         dices = []
         for i in range(self.n_time_courses):
-            pmtc = inference.modes.argmax_time_courses(
+            pmtc = modes.argmax_time_courses(
                 tc[i], concatenate=True, n_modes=self.n_modes
             )
-            pmtc, gttc = inference.modes.match_modes(pmtc, self.gttc[i])
-            dice = inference.metrics.dice_coefficient(pmtc, gttc)
+            pmtc, gttc = modes.match_modes(pmtc, self.gttc[i])
+            dice = metrics.dice_coefficient(pmtc, gttc)
             dices.append(dice)
 
         # Add dice to the training history and print to screen
@@ -293,8 +310,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
     """
 
     def __init__(self, save_best_after, *args, **kwargs):
-        self.save_best_after = save_best_after
-
+        # Set up necessary properties
         kwargs.update(
             dict(
                 save_weights_only=True,
@@ -303,8 +319,11 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
                 save_best_only=True,
             )
         )
-
         super().__init__(*args, **kwargs)
+
+        # Custom attribute to store the epoch threshold
+        self.save_best_after = save_best_after
+        self._activated = False
 
     def on_epoch_end(self, epoch, logs=None):
         """Action to perform at the end of an epoch.
@@ -317,10 +336,27 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
-        self.epochs_since_last_save += 1
-        if epoch >= self.save_best_after:
-            if self.save_freq == "epoch":
-                self._save_model(epoch=epoch, logs=logs, batch=None)
+        if epoch < self.save_best_after:
+            return
+        elif epoch == self.save_best_after:
+            # Reset the best value when activating the callback
+            if not self._activated:
+                if self.monitor_op == np.less:
+                    self.best = np.inf
+                elif self.monitor_op == np.greater:
+                    self.best = -np.inf
+                else:
+                    print(
+                        "Unknown monitor operation. Monitoring for minimum loss/metric."
+                    )
+                    self.best = np.inf  # fallback to min mode
+            self._activated = True
+            print(
+                f"\nEpoch {epoch + 1}: SaveBestCallback activated. "
+                + f"Initial best loss/metric set to {self.best:.4f}."
+            )
+
+        super().on_epoch_end(epoch, logs)
 
     def on_train_end(self, logs=None):
         """Action to perform at the end of training.
@@ -652,3 +688,57 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
                         if self.print_stats:
                             print(f"  {var.name}: Gradient is None.")
             self.writer.flush()
+
+
+class SummaryStatsCallback(callbacks.Callback):
+    """Callback to calculate summary statistics at the end of each
+       epoch during training.
+
+    Parameters
+    ----------
+    prediction_dataset : tf.data.Dataset
+        Dataset to use to calculate outputs of the model.
+    sampling_frequency : int
+        Sampling frequency of the data in Hz. Defaults to 1.
+    """
+
+    def __init__(
+        self,
+        prediction_dataset,
+        model,
+        sampling_frequency=1,
+    ):
+        super().__init__()
+        self.prediction_dataset = prediction_dataset
+        self.outer_model = model  # to access the outer model
+        self.sampling_frequency = sampling_frequency
+        self.alphas = []
+        self.summary_stats = []
+
+    def on_epoch_end(self, epoch, logs=None):
+        """Action to perform at the end of an epoch.
+
+        Parameters
+        ---------
+        epochs : int
+            Integer, index of epoch.
+        logs : dict, optional
+            Results for this training epoch, and for the validation epoch if
+            validation is performed.
+        """
+
+        # Get inferred alphas
+        alphas = self.outer_model.get_alpha(self.prediction_dataset)
+        self.alphas.append(alphas)
+
+        # Get state time courses
+        stc = modes.argmax_time_courses(alphas)
+
+        # Get summary statistics
+        fo = modes.fractional_occupancies(stc)
+        lt = modes.mean_lifetimes(stc, sampling_frequency=self.sampling_frequency)
+        intv = modes.mean_intervals(stc, sampling_frequency=self.sampling_frequency)
+        sr = modes.switching_rates(stc, sampling_frequency=self.sampling_frequency)
+
+        summary_stat = [fo, lt, intv, sr]
+        self.summary_stats.append(summary_stat)
