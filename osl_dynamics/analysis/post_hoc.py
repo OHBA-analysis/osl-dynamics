@@ -782,9 +782,9 @@ def hmm_dual_estimation(
     data,
     alpha,
     zero_mean=False,
+    diagonal_covariances=False,
     eps=1e-5,
     n_jobs=1,
-    diagonal_covariances=False,
 ):
     """HMM dual estimation of observation model parameters.
 
@@ -798,14 +798,14 @@ def hmm_dual_estimation(
         or (n_subjects, n_samples, n_states).
     zero_mean : bool, optional
         Should we force the state means to be zero?
+    diagonal_covariances : bool, optional
+        If True, estimate diagonal covariance matrices (variances only)
+        and return them as full matrices with zeros off-diagonal.
     eps : float, optional
         Small value to add to the diagonal of each state covariance.
     n_jobs : int, optional
         Number of jobs to run in parallel. If set as None, the function
         will run sequentially.
-    diagonal_covariances : bool, optional
-        If True, estimate diagonal covariance matrices (variances only)
-        and return them as full matrices with zeros off-diagonal.
 
     Returns
     -------
