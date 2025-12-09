@@ -444,9 +444,9 @@ class Model(MarkovStateInferenceModelBase):
             data,
             alpha,
             zero_mean=(not self.config.learn_means),
+            diagonal_covariances=self.config.diagonal_covariances,
             eps=self.config.covariances_epsilon,
             n_jobs=n_jobs,
-            diagonal_covariances=self.config.diagonal_covariances,
         )
 
         return means, covariances

@@ -939,10 +939,10 @@ def hmm_features(
     alpha,
     sampling_frequency=None,
     zero_mean=False,
+    diagonal_covariances=False,
     eps=1e-5,
     use_partial=False,
     n_jobs=1,
-    diagonal_covariances=False,
 ):
     """Dual estimation of HMM features.
 
@@ -959,6 +959,9 @@ def hmm_features(
         are unitless.
     zero_mean : bool, optional
         Should we force the state means to be zero?
+    diagonal_covariances : bool, optional
+        If True, estimate diagonal covariance matrices (variances only)
+        and return them as full matrices with zeros off-diagonal.
     eps : float, optional
         Small value to add to the diagonal of each state covariance.
     use_partial : bool, optional
@@ -967,9 +970,6 @@ def hmm_features(
         reduces to per-channel variance terms on the diagonal.
     n_jobs : int, optional
         Number of jobs to run in parallel.
-    diagonal_covariances : bool, optional
-        If True, estimate diagonal covariance matrices (variances only)
-        and return them as full matrices with zeros off-diagonal.
 
     Returns
     -------
