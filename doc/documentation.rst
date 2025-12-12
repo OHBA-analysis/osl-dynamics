@@ -54,12 +54,18 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 - :doc:`tutorials_build/5-2_dynemo_plotting_networks`.
 - :doc:`tutorials_build/5-3_dynemo_mixing_coefs`.
 
+**Task analysis tutorials**:
+
+- :doc:`tutorials_build/6-1_epoching_alpha`.
+- `Dynamic Network Analysis of Electrophysiological Task Data <https://github.com/OHBA-analysis/Gohil2024_NetworkAnalysisOfTaskData>`_.
+
 **Group-level analysis tutorials**:
 
-- :doc:`tutorials_build/6-1_group_contrast`.
-- :doc:`tutorials_build/6-2_group_network_response`.
+- :doc:`tutorials_build/7-1_group_contrast`.
+- :doc:`tutorials_build/7-2_group_network_response`.
 
-For the **task analysis** of electrophysiological data, this `repository <https://github.com/OHBA-analysis/Gohil2024_NetworkAnalysisOfTaskData>`_ might be useful.
+Examples Directory
+------------------
 
 More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repository.
 

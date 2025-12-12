@@ -26,8 +26,6 @@ This tutorial covers how to train a DyNeMo model. We will use MEG data in this t
 #     def get_data(name, rename):
 #         if rename is None:
 #             rename = name
-#         if os.path.exists(rename):
-#             return f"{name} already downloaded. Skipping.."
 #         os.system(f"osf -p by2tc fetch data/{name}.zip")
 #         os.makedirs(rename, exist_ok=True)
 #         os.system(f"unzip -o {name}.zip -d {rename}")

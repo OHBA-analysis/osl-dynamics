@@ -26,10 +26,13 @@ Note, we assume a group ICA parcellation was used and the HMM was trained on the
 #     print(covs.shape)
 
 #%%
-# `means` is a (subjects, channels) array and `covariances` is a (subjects, channels, channels) array.
+# `means` is a (subjects, states, channels) array and `covariances` is a (subjects, states, channels, channels) array.
 #
 # Spatial maps
 # ^^^^^^^^^^^^
+#
+# Volumetric parcellation
+# ***********************
 # The spatial activity maps correspond to the `means`, or if we did not learn a mean, the diagonal of the `covs`. How we plot the spatial maps depends on how the data was preprocessed. If we used a volumetric parcellation, then we can plot the spatial maps with
 #
 # .. code-block:: python
@@ -43,19 +46,36 @@ Note, we assume a group ICA parcellation was used and the HMM was trained on the
 #     fig, ax = power.save(
 #         means,
 #         mask_file="MNI152_T1_2mm_brain.nii.gz",
-#         parcellation_file="melodic_IC.nii.gz",
+#         parcellation_file="melodic_IC.nii.gz",  # this should be the group-ICA spatial maps from FSL
+#         plot_kwargs={"views": ["lateral", "medial"]},
 #     )
 
 #%%
+# Surface parcellation
+# ********************
 # Alternatively, if we used a surface parcellation, we can use workbench to plot the spatial maps
 #
 # .. code-block:: python
 #
+#     # Save cifti containing the state maps
 #     power.independent_components_to_surface_maps(
 #         ica_spatial_maps="melodic_IC.dscalar.nii",
 #         ic_values=group_mean,
 #         output_file="results/inf_params/means.dscalar.nii",
 #     )
+#
+#    # Plot
+#    workbench.setup("/path/to/workbench/bin_macosxub")
+#    workbench.render(
+#        img=f"{inf_params_dir}/means.dscalar.nii",
+#        gui=False,
+#        save_dir="tmp",
+#        image_name="plots/means_.png",
+#        input_is_cifti=True,
+#    )
+#
+#    # Delete temporary directory
+#    os.system("rm -r tmp")
 
 #%%
 # You can download workbench `here <https://www.humanconnectome.org/software/get-connectome-workbench>`_.
@@ -72,7 +92,7 @@ Note, we assume a group ICA parcellation was used and the HMM was trained on the
 #
 #     connectivity.save(
 #         covs,
-#         parcellation_file="melodic_IC.nii.gz",
+#         parcellation_file="melodic_IC.nii.gz",  # this should be the group-ICA spatial maps from FSL
 #         plot_kwargs={
 #             "edge_cmap": "Reds",
 #             "display_mode": "xz",
