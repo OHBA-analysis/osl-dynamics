@@ -1,5 +1,5 @@
 """
-This module provides classes for building machine learning pipelines,
+Classes/functions for building machine learning pipelines,
 performing hyperparameter tuning, and evaluating model performance.
 """
 
@@ -379,7 +379,8 @@ class ModelSelection:
         y : array-like
             Target variable of shape (n_samples,).
         split_type : str, optional
-            Type of cross-validation split to use. Must be 'kfold' or 'stratified_kfold'. Defaults to 'kfold'.
+            Type of cross-validation split to use.
+            Must be 'kfold' or 'stratified_kfold'. Defaults to 'kfold'.
         outer_cv : int, optional
             Number of outer cross-validation folds. Defaults to 5.
         shuffle : bool, optional
