@@ -194,7 +194,12 @@ def downsample(x, new_freq, old_freq):
 
 
 def remove_bad_segments(
-    x, window_length, significance_level=0.05, maximum_fraction=0.1
+    x,
+    window_length,
+    mode=None,
+    metric="std",
+    significance_level=0.05,
+    maximum_fraction=0.1,
 ):
     """Automated bad segment removal using the G-ESD algorithm.
 
@@ -205,6 +210,11 @@ def remove_bad_segments(
     window_length : int, optional
         Window length to used to calculate statistics.
         Defaults to twice the sampling frequency.
+    mode : str, optional
+        None or 'diff' to take the difference fo the time series
+        before detecting bad segments.
+    metric : str, optional
+        Either 'std' (for standard deivation) or 'kurtosis'.
     significance_level : float, optional
         Significance level (p-value) to consider as an outlier.
     maximum_fraction : float, optional
@@ -220,6 +230,8 @@ def remove_bad_segments(
         a time point is good or bad. This is the full length of
         the original time series. Shape is (n_samples,).
     """
+    if metric not in ["std", "kurtosis"]:
+        raise ValueError("metric must be 'std' or 'kurtosis'.")
 
     def _gesd(X, alpha=significance_level, p_out=maximum_fraction, outlier_side=0):
         # Detect outliers using Generalized ESD test
@@ -272,19 +284,35 @@ def remove_bad_segments(
         mask[rm_idx[np.where(R > lam)[0]]] = True
         return mask
 
+    # Data to calculate metrics from
+    if mode == "diff":
+        X = np.diff(x, axis=0, prepend=np.zeros_like(x[:1]))
+    else:
+        X = x
+
+    # Metric to calculate
+    if metric == "kurtosis":
+
+        def _kurtosis(inputs):
+            return stats.kurtosis(inputs, axis=None)
+
+        metric_func = _kurtosis
+    else:
+        metric_func = np.std
+
     # Calculate metric for each window
     metrics = []
     indices = []
-    starts = np.arange(0, x.shape[0], window_length)
+    starts = np.arange(0, X.shape[0], window_length)
     for i in range(len(starts)):
         start = starts[i]
         if i == len(starts) - 1:
             stop = None
         else:
             stop = starts[i] + window_length
-        m = np.std(x[start:stop])
+        m = metric_func(X[start:stop])
         metrics.append(m)
-        indices += [i] * len(x[start:stop])
+        indices += [i] * len(X[start:stop])
 
     # Detect outliers
     bad_metrics_mask = _gesd(metrics)

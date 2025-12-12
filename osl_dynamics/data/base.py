@@ -1192,6 +1192,8 @@ class Data:
     def remove_bad_segments(
         self,
         window_length=None,
+        mode=None,
+        metric="std",
         significance_level=0.05,
         maximum_fraction=0.1,
         use_raw=False,
@@ -1203,6 +1205,11 @@ class Data:
         window_length : int, optional
             Window length to used to calculate statistics.
             Defaults to twice the sampling frequency.
+        mode : str, optional
+            None or 'diff' to take the difference fo the time series
+            before detecting bad segments.
+        metric : str, optional
+            Either 'std' (for standard deivation) or 'kurtosis'.
         significance_level : float, optional
             Significance level (p-value) to consider as an outlier.
         maximum_fraction : float, optional
@@ -1216,6 +1223,8 @@ class Data:
             The modified Data object.
         """
         self.gesd_window_length = window_length
+        self.gesd_mode = mode
+        self.gesd_metric = metric
         self.gesd_significance_level = significance_level
         self.gesd_maximum_fraction = maximum_fraction
 
@@ -1238,7 +1247,12 @@ class Data:
         # Function to remove bad segments to a single array
         def _apply(array, prepared_data_file):
             array, bad = processing.remove_bad_segments(
-                array, window_length, significance_level, maximum_fraction
+                array,
+                window_length,
+                mode,
+                metric,
+                significance_level,
+                maximum_fraction,
             )
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
@@ -2070,7 +2084,7 @@ class Data:
                         setattr(self, attr, value)
                     break
 
-    def save(self, output_dir=".", as_fif=False):
+    def save(self, output_dir=".", as_fif=False, outnames=None):
         """Saves (prepared) data.
 
         The ordering of the saved files matches the order of the input files.
@@ -2083,7 +2097,21 @@ class Data:
         as_fif : bool, optional
             Should we save data as fif files? If we are saving fif files
             the :code:`Data.sampling_frequency` attribute must be set.
+        outnames : list of str, optional
+            Names/IDs for output files (excluding the extension).
         """
+        if outnames is not None:
+            if len(outnames) != self.n_sessions:
+                raise ValueError(
+                    "len(outnames) should match the number of arrays. "
+                    f"We have {self.n_sessions} arrays and len(outnames)={len(outnames)}."
+                )
+        else:
+            outnames = []
+            for i in range(self.n_sessions):
+                padded_index = misc.leading_zeros(i, self.n_sessions)
+                outnames.append(f"array{padded_index}")
+
         # Create output directory
         output_dir = pathlib.Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -2091,8 +2119,7 @@ class Data:
         if as_fif:
             # Function to save a fif file
             def _save(i):
-                padded_index = misc.leading_zeros(i, self.n_sessions)
-                filename = f"{output_dir}/array{padded_index}_raw.fif"
+                filename = f"{output_dir}/{outnames[i]}_raw.fif"
                 if hasattr(self, "bad_samples"):
                     bad_samples = self.bad_samples[i]
                 else:
@@ -2121,8 +2148,7 @@ class Data:
         else:
             # Function to save a single array
             def _save(i):
-                padded_index = misc.leading_zeros(i, self.n_sessions)
-                filename = f"{output_dir}/array{padded_index}.npy"
+                filename = f"{output_dir}/{outnames[i]}.npy"
                 np.save(filename, self.arrays[i])
 
         # Save arrays in parallel

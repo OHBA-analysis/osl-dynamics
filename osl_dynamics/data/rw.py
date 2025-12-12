@@ -221,7 +221,7 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
     Parameters
     ----------
     filename : str
-        Path to fif file. Must end with :code:`'raw.fif'` or :code:`'epo.fif'`.
+        Path to fif file.
     picks : str or list of str, optional
         Argument passed to `mne.io.Raw.get_data
         <https://mne.tools/stable/generated/mne.io.Raw.html#mne.io.Raw\
@@ -238,19 +238,18 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
         If an :code:`mne.Epochs` fif file is pass (:code:`'epo.fif'`) the we
         concatenate the epochs in the first axis.
     """
-    if "raw.fif" in filename:
+    if "epo.fif" in filename:
+        epochs = mne.read_epochs(filename, verbose=False)
+        data = epochs.get_data(picks=picks)
+        data = np.swapaxes(data, 1, 2).reshape(-1, data.shape[1])
+    else:
+        # Assume it's a Raw fif
         raw = mne.io.read_raw_fif(filename, verbose=False)
         data = raw.get_data(
             picks=picks,
             reject_by_annotation=reject_by_annotation,
             verbose=False,
         ).T
-    elif "epo.fif" in filename:
-        epochs = mne.read_epochs(filename, verbose=False)
-        data = epochs.get_data(picks=picks)
-        data = np.swapaxes(data, 1, 2).reshape(-1, data.shape[1])
-    else:
-        raise ValueError("a fif file must end with 'raw.fif' or 'epo.fif'.")
     return data
 
 
