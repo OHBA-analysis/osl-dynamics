@@ -522,7 +522,7 @@ class Data:
 
         return self
 
-    def filter(self, low_freq=None, high_freq=None, use_raw=False):
+    def filter(self, low_freq=None, high_freq=None, order=5, use_raw=False):
         """Filter the data.
 
         This is an in-place operation.
@@ -535,6 +535,8 @@ class Data:
         high_freq : float, optional
             Frequency in Hz for a low pass filter. If :code:`None`, no low pass
             filtering is applied.
+        order : int, optional
+            Order for a butterworth filter.
         use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
 
@@ -561,7 +563,7 @@ class Data:
         # Function to apply filtering to a single array
         def _apply(array, prepared_data_file):
             array = processing.temporal_filter(
-                array, low_freq, high_freq, self.sampling_frequency
+                array, low_freq, high_freq, self.sampling_frequency, order
             )
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
