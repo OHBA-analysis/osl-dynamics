@@ -20,7 +20,7 @@ def functional_connectivity(
 
     This function uses the `LedoitWolf <https://scikit-learn.org/stable\
     /modules/generated/sklearn.covariance.LedoitWolf.html>`_ estimator
-    to calculate covariance. If another metric is requested it is calculated
+    to calculate covariance. If another measure is requested it is calculated
     from this covariance matrix.
 
     Parameters
@@ -29,7 +29,7 @@ def functional_connectivity(
         Time series data. Shape must be (n_sessions, n_samples, n_channels)
         or (n_samples, n_channels).
     conn_type : str or func, optional
-        What metric should we use? Must be one of:
+        What measure should we use? Must be one of:
 
         - :code:`"cov"`: covariance.
         - :code:`"pcov"`: partial covariance.
@@ -97,56 +97,56 @@ def functional_connectivity(
 
     # Covariance
     if conn_type == "cov":
-        metric = _calc_cov
+        measure = _calc_cov
 
     # Partial covariance
     elif conn_type == "pcov":
 
-        def metric(x):
+        def measure(x):
             cov = _calc_cov(x)
             return array_ops.cov2partialcov(cov)
 
     # Correlation
     elif conn_type == "corr":
 
-        def metric(x):
+        def measure(x):
             cov = _calc_cov(x)
             return array_ops.cov2corr(cov)
 
     # Partial correlation
     elif conn_type == "pcorr":
 
-        def metric(x):
+        def measure(x):
             cov = _calc_cov(x)
             return array_ops.cov2partialcorr(cov)
 
     # Precision
     elif conn_type == "prec":
 
-        def metric(x):
+        def measure(x):
             cov = _calc_cov(x)
             return np.linalg.inv(cov)
 
     # User specified function
     else:
-        metric = conn_type
+        measure = conn_type
 
     # Calculate networks
     if len(data) == 1:
         # Don't need to parallelise
         _logger.info("Calculating FC")
-        results = [metric(data[0])]
+        results = [measure(data[0])]
 
     elif n_jobs == 1:
         # We have multiple arrays but we're running in serial
         results = []
         for i in trange(len(data), desc="Calculating FC"):
-            results.append(metric(data[i]))
+            results.append(measure(data[i]))
 
     else:
         # Calculate in parallel
         _logger.info("Calculating FC")
-        results = pqdm(data, metric, n_jobs=n_jobs)
+        results = pqdm(data, measure, n_jobs=n_jobs)
 
     return np.squeeze(results)
 
