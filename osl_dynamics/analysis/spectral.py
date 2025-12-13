@@ -9,7 +9,7 @@ from pqdm.processes import pqdm
 from tqdm.auto import trange
 
 from osl_dynamics import array_ops
-from osl_dynamics.analysis import regression
+from osl_dynamics.utils.sklearn_wrappers import linear_regression
 from osl_dynamics.utils.misc import nextpow2
 
 _logger = logging.getLogger("osl-dynamics")
@@ -1996,7 +1996,7 @@ def _regress_welch_spectrogram(
         n_sub_windows=n_sub_windows,
     )
     a = _window_mean(alpha, "hann", window_length, step_size, n_sub_windows)
-    coefs, intercept = regression.linear(
+    coefs, intercept = linear_regression(
         a,
         p,
         fit_intercept=True,

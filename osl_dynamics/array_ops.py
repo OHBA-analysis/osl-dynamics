@@ -131,6 +131,60 @@ def cov2partialcorr(cov):
     return partial_corr
 
 
+def cov2partialcov(cov, use_pinv=False):
+    """Covariance to partial covariance.
+
+    Parameters
+    ----------
+    cov : np.ndarray
+        Covariance matrix or batch of covariance matrices. Shape (..., N, N).
+    use_pinv : bool, optional
+        If True, use np.linalg.pinv to calculate inverse of the covariance.
+        If False, we use np.linalg.inv.
+
+    Returns
+    -------
+    partial_cov : np.ndarray
+        Partial covariance matrices. Shape (..., N, N).
+        Off-diagonals: -Omega_ij / (Omega_ii * Omega_jj - Omega_ij^2)
+        Diagonals: 1 / Omega_ii  (conditional variances)
+    """
+    cov = np.asarray(cov)
+    if cov.ndim < 2:
+        raise ValueError(
+            "input covariances must have at least 2 dimensions (..., N, N)."
+        )
+    if cov.shape[-1] != cov.shape[-2]:
+        raise ValueError("last two dimensions must be square (N, N).")
+
+    if use_pinv:
+        precision = np.linalg.pinv(cov)
+    else:
+        precision = np.linalg.inv(cov)
+
+    diag = np.diagonal(precision, axis1=-2, axis2=-1)  # (..., N)
+    outer_diag = diag[..., :, np.newaxis] * diag[..., np.newaxis, :]
+    denom = outer_diag - precision * precision  # (..., N, N)
+
+    denom_safe = denom.copy()
+    eps = np.finfo(cov.dtype if np.issubdtype(cov.dtype, np.floating) else float).eps
+    small_mask = np.abs(denom_safe) <= eps
+    denom_safe[small_mask] = 1.0
+
+    partial = -precision / denom_safe
+
+    diag_safe = diag.copy()
+    tiny_diag_mask = np.abs(diag_safe) <= eps
+    diag_safe[tiny_diag_mask] = np.nan  # will produce nan for truly degenerate cases
+    diag_inv = 1.0 / diag_safe
+
+    N = cov.shape[-1]
+    idx = np.arange(N)
+    partial[..., idx, idx] = diag_inv
+
+    return partial
+
+
 def sliding_window_view(
     x,
     window_shape,

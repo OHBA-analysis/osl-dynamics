@@ -5,6 +5,7 @@ from osl_dynamics.utils import (
     model,
     parcellation,
     plotting,
+    sklearn_wrappers,
     topoplots,
     workbench,
 )
