@@ -134,7 +134,6 @@ def functional_connectivity(
     # Calculate networks
     if len(data) == 1:
         # Don't need to parallelise
-        _logger.info("Calculating FC")
         results = [measure(data[0])]
 
     elif n_jobs == 1:
