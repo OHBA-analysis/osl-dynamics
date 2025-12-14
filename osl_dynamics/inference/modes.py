@@ -12,10 +12,9 @@ from tqdm.auto import trange
 from scipy import cluster, spatial, optimize
 from sklearn.cluster import AgglomerativeClustering
 
-from osl_dynamics import array_ops
 from osl_dynamics.analysis import post_hoc
 from osl_dynamics.inference import metrics
-from osl_dynamics.utils import sklearn_wrappers, plotting
+from osl_dynamics.utils import array_ops, sklearn_wrappers, plotting
 from osl_dynamics.utils.misc import override_dict_defaults
 
 

@@ -8,7 +8,7 @@ from sklearn.decomposition import non_negative_factorization
 from pqdm.processes import pqdm
 from tqdm.auto import trange
 
-from osl_dynamics import array_ops
+from osl_dynamics.utils import array_ops
 from osl_dynamics.utils.sklearn_wrappers import linear_regression
 from osl_dynamics.utils.misc import nextpow2
 

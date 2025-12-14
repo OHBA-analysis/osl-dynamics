@@ -7,7 +7,7 @@ import numpy as np
 from scipy import signal
 from pqdm.threads import pqdm
 
-from osl_dynamics import array_ops
+from osl_dynamics.utils import array_ops
 
 _logger = logging.getLogger("osl-dynamics")
 

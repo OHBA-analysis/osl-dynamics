@@ -7,8 +7,8 @@ from sklearn.covariance import LedoitWolf
 from pqdm.threads import pqdm
 from tqdm.auto import trange
 
-from osl_dynamics import array_ops
 from osl_dynamics.analysis import spectral
+from osl_dynamics.utils import array_ops
 
 _logger = logging.getLogger("osl-dynamics")
 

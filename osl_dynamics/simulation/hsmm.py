@@ -2,9 +2,9 @@
 
 import numpy as np
 
-from osl_dynamics import array_ops
 from osl_dynamics.simulation.mvn import MVN
 from osl_dynamics.simulation.base import Simulation
+from osl_dynamics.utils import array_ops
 
 
 class HSMM:

@@ -11,11 +11,11 @@ from scipy.special import xlogy, logsumexp
 from tqdm.auto import tqdm, trange
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics import array_ops
 from osl_dynamics.simulation import HMM
 from osl_dynamics.inference import callbacks, optimizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.models.mod_base import ModelBase
+from osl_dynamics.utils import array_ops
 from osl_dynamics.utils.misc import replace_argument
 
 _logger = logging.getLogger("osl-dynamics")

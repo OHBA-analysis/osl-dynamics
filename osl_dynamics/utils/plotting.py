@@ -15,7 +15,7 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 from nilearn.plotting import plot_markers, plot_img_on_surf
 
 from osl_dynamics import files
-from osl_dynamics.array_ops import get_one_hot
+from osl_dynamics.utils.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
 from osl_dynamics.utils.parcellation import Parcellation, parcel_vector_to_voxel_grid

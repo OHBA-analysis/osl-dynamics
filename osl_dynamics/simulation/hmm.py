@@ -3,12 +3,12 @@
 import warnings
 import numpy as np
 
-from osl_dynamics import array_ops
 from osl_dynamics.simulation.mar import MAR
 from osl_dynamics.simulation.mvn import MVN, MDyn_MVN, MSess_MVN
 from osl_dynamics.simulation.hsmm import HSMM
 from osl_dynamics.simulation.base import Simulation
 from osl_dynamics.simulation.poi import Poisson
+from osl_dynamics.utils import array_ops
 
 
 class HMM:

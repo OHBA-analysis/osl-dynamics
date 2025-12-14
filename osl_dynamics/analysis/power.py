@@ -10,9 +10,9 @@ from tqdm.auto import trange
 from pqdm.threads import pqdm
 import matplotlib.pyplot as plt
 
-from osl_dynamics import array_ops, files
+from osl_dynamics import files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
-from osl_dynamics.utils import parcellation, plotting
+from osl_dynamics.utils import array_ops, parcellation, plotting
 
 _logger = logging.getLogger("osl-dynamics")
 
