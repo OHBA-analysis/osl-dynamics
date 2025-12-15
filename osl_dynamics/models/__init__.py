@@ -27,7 +27,7 @@ models = {
 
 
 def load(dirname, single_gpu=True):
-    """Load model from dirname.
+    """Load model.
 
     Parameters
     ----------
@@ -38,7 +38,7 @@ def load(dirname, single_gpu=True):
 
     Returns
     -------
-    model : DyNeMo model
+    model : osl-dynamics model
         Model object.
     """
     with open(f"{dirname}/config.yml", "r") as file:
