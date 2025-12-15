@@ -354,8 +354,7 @@ class MDyn_MVN(MVN):
 
 
 class MSess_MVN(MVN):
-    """Class that generates data from a multivariate normal distribution for
-    multiple sessions.
+    """Class that generates data from a multivariate normal distribution for multiple sessions.
 
     Parameters
     ----------

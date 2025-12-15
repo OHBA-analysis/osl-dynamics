@@ -7,8 +7,7 @@ import numpy as np
 
 
 def get_one_hot(values, n_states=None):
-    """Expand a categorical variable to a series of boolean columns
-    (one-hot encoding).
+    """Expand a categorical variable to a series of boolean columns (one-hot encoding).
 
     +----------------------+
     | Categorical Variable |
@@ -62,7 +61,9 @@ def get_one_hot(values, n_states=None):
 
 
 def cov2corr(cov):
-    """Converts batches of covariance matrices into batches of correlation
+    """Covariance to correlation.
+
+    Converts batches of covariance matrices into batches of correlation
     matrices.
 
     Parameters
@@ -106,8 +107,10 @@ def cov2std(cov):
 
 
 def cov2partialcorr(cov):
-    """Converts batches of covariance matrices into batches of partial
-    correlation matrices.
+    """Covariance to partial correlation.
+
+    Converts batches of covariance matrices into batches of partial correlation
+    matrices.
 
     Parameters
     ----------
@@ -133,6 +136,9 @@ def cov2partialcorr(cov):
 
 def cov2partialcov(cov, use_pinv=False):
     """Covariance to partial covariance.
+
+    Converts batches of covariance matrices into batches of partial covariance
+    matrices.
 
     Parameters
     ----------
@@ -323,8 +329,7 @@ def check_symmetry(mat, precision=1e-6):
 
 
 def ezclump(binary_array):
-    """Find the clumps (groups of data with the same values) for a 1D bool
-    array.
+    """Find the clumps (groups of data with the same values) for a 1D bool array.
 
     Taken wholesale from :code:`numpy.ma.extras.ezclump`.
     """

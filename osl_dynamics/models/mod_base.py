@@ -755,7 +755,7 @@ class ModelBase:
         else:
             raise ValueError(
                 "version could not be read from config.yml. Make sure there "
-                + "is only one comment containing the version in config.yml"
+                "is only one comment containing the version in config.yml"
             )
 
         return config_dict, version

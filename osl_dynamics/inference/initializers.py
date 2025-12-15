@@ -50,8 +50,7 @@ class RandomWeightInitializer(Initializer):
 
 
 class IdentityCholeskyInitializer(Initializer):
-    """Initialize weights to a flattened cholesky factor of identity
-    matrices."""
+    """Initialize weights to a flattened cholesky factor of identity matrices."""
 
     def __init__(self):
         # Bijector used to transform learnable vectors to covariance matrices
@@ -66,8 +65,10 @@ class IdentityCholeskyInitializer(Initializer):
 
 
 class NormalIdentityCholeskyInitializer(Initializer):
-    """Initialize weights to a flattened cholesky factor of identity
-    matrices with a normal error added to the diagonal.
+    """Normal identity cholesky initializer.
+
+    Initialize weights to a flattened cholesky factor of identity matrices
+    with a normal error added to the diagonal.
 
     Parameters
     ----------
@@ -92,8 +93,10 @@ class NormalIdentityCholeskyInitializer(Initializer):
 
 
 class NormalCorrelationCholeskyInitializer(Initializer):
-    """Initialize weights to a flattened cholesky factor of correlation
-    matrices with a normal error added to the flattened cholesky factor.
+    """Normal correlation cholesky initializer.
+
+    Initialize weights to a flattened cholesky factor of correlation matrices
+    with a normal error added to the flattened cholesky factor.
 
     Parameters
     ----------

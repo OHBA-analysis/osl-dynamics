@@ -18,7 +18,9 @@ tfb = tfp.bijectors
 
 @tf.function
 def add_epsilon(A, epsilon, diag=False):
-    """Adds epsilon the the diagonal of batches of square matrices
+    """Add epsilon.
+
+    Adds epsilon the the diagonal of batches of square matrices
     or all elements of matrices.
 
     Parameters
@@ -122,7 +124,7 @@ class TFZerosLayer(layers.Layer):
 
 class TFBroadcastToLayer(layers.Layer):
     """Wrapper for `tf.broadcast_to \
-        <https://www.tensorflow.org/api_docs/python/tf/broadcast_to>`_.
+    <https://www.tensorflow.org/api_docs/python/tf/broadcast_to>`_.
     """
 
     def __init__(self, n_modes, n_channels, **kwargs):
@@ -137,7 +139,7 @@ class TFBroadcastToLayer(layers.Layer):
 
 class TFGatherLayer(layers.Layer):
     """Wrapper for `tf.gather \
-        <https://www.tensorflow.org/api_docs/python/tf/gather>`_.
+    <https://www.tensorflow.org/api_docs/python/tf/gather>`_.
     """
 
     def __init__(self, axis, batch_dims=0, **kwargs):
@@ -153,7 +155,7 @@ class TFGatherLayer(layers.Layer):
 
 class TFAddLayer(layers.Layer):
     """Wrapper for `tf.add \
-        <https://www.tensorflow.org/api_docs/python/tf/math/add>`_.
+    <https://www.tensorflow.org/api_docs/python/tf/math/add>`_.
     """
 
     def call(self, inputs, **kwargs):
@@ -165,7 +167,7 @@ class TFAddLayer(layers.Layer):
 
 class TFConstantLayer(layers.Layer):
     """Wrapper for `tf.constant \
-        <https://www.tensorflow.org/api_docs/python/tf/constant>`_.
+    <https://www.tensorflow.org/api_docs/python/tf/constant>`_.
     """
 
     def __init__(self, values, **kwargs):
@@ -1618,7 +1620,9 @@ class MixSessionSpecificParametersLayer(layers.Layer):
 
 
 class GammaExponentialKLDivergenceLayer(layers.Layer):
-    """Layer to calculate KL divergence between Gamma posterior and exponential
+    """Gamma exponential KL diverengnce layer.
+
+    Layer to calculate KL divergence between Gamma posterior and exponential
     prior for deviation magnitude.
 
     Parameters

@@ -194,7 +194,7 @@ class VariationalInferenceModelBase(ModelBase):
         if n_init is None or n_init == 0:
             _logger.warning(
                 "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Skipping initialization."
             )
             return
 
@@ -239,7 +239,7 @@ class VariationalInferenceModelBase(ModelBase):
                 _logger.warning(e)
                 _logger.warning(
                     "Training failed! Could be due to instability of the KL "
-                    + "term. Skipping initialization."
+                    "term. Skipping initialization."
                 )
                 continue
 
@@ -430,7 +430,7 @@ class VariationalInferenceModelBase(ModelBase):
         if n_init is None or n_init == 0:
             _logger.info(
                 "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Skipping initialization."
             )
             return
 
@@ -1337,7 +1337,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         if n_init is None or n_init == 0:
             _logger.info(
                 "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Skipping initialization."
             )
             return
 
@@ -1432,7 +1432,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         if n_init is None or n_init == 0:
             _logger.info(
                 "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Skipping initialization."
             )
             return
 

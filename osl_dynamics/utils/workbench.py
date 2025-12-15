@@ -1,6 +1,6 @@
-"""Functions to use `Connectome Workbench <https://www.humanconnectome.org\
+"""
+Functions to use `Connectome Workbench <https://www.humanconnectome.org\
 /software/connectome-workbench>`_.
-
 """
 
 import os

@@ -135,8 +135,7 @@ class HMM:
 
 
 class HMM_MAR(Simulation):
-    r"""Simulate an HMM with a multivariate autoregressive (MAR) observation
-    model.
+    r"""Simulate an HMM with a multivariate autoregressive (MAR) observation model.
 
     Parameters
     ----------
@@ -508,8 +507,7 @@ class HMM_Poi(Simulation):
 
 
 class MSess_HMM_MVN(Simulation):
-    """Simulate an HMM with multivariate normal observation model for each
-    session.
+    """Simulate an HMM with multivariate normal observation model for each session.
 
     Parameters
     ----------

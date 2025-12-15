@@ -392,7 +392,8 @@ class Data:
                     )
                 if data[i].shape[0] != channel_data.shape[0]:
                     raise ValueError(
-                        f"Extra channel {channel_name} have different number of samples than the data in session {i}."
+                        f"Extra channel {channel_name} have different number of samples "
+                        f"than the data in session {i}."
                     )
 
                 extra_channels[channel_name][i] = channel_data.astype(np.float32)
@@ -451,7 +452,7 @@ class Data:
         if n_batches < 1:
             raise ValueError(
                 "Number of batches must be greater than or equal to 1. "
-                + "Please adjust your sequence length and batch size."
+                "Please adjust your sequence length and batch size."
             )
 
     def select(self, channels=None, sessions=None, use_raw=False):
@@ -973,7 +974,7 @@ class Data:
         return self
 
     def standardize(self, use_raw=False):
-        """Standardize (z-transform) the data.
+        """Standardize (z-score) the data.
 
         This is an in-place operation.
 

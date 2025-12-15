@@ -227,8 +227,7 @@ class HSMM_MVN(Simulation):
 
 
 class MixedHSMM_MVN(Simulation):
-    """Hidden Semi-Markov Model Simulation with a mixture of states at each
-    time point.
+    """Hidden Semi-Markov Model Simulation with a mixture of states at each time point.
 
     Each mixture of states has it's own row/column in the transition
     probability matrix. The lifetime of each state mixture is sampled from

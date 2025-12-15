@@ -699,8 +699,7 @@ class Model(VariationalInferenceModelBase):
         covariances,
         update_initializer=True,
     ):
-        """This is a wrapper for :code:`set_means` and
-        :code:`set_covariances`."""
+        """This is a wrapper for :code:`set_means` and :code:`set_covariances`."""
         self.set_means(
             means,
             update_initializer=update_initializer,

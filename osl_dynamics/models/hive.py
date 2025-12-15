@@ -794,8 +794,7 @@ class Model(MarkovStateInferenceModelBase):
     def get_group_means_covariances(self):
         """Get the group level state means and covariances.
 
-        This is a wrapper for :code:`get_group_means` and
-        :code:`get_group_covariances`.
+        This is a wrapper for :code:`get_group_means` and :code:`get_group_covariances`.
 
         Returns
         -------
@@ -906,8 +905,7 @@ class Model(MarkovStateInferenceModelBase):
     def set_group_means_covariances(
         self, group_means, group_covariances, update_initializer=True
     ):
-        """Wrapper for :code:`set_group_means` and
-        :code:`set_group_covariances`."""
+        """Wrapper for :code:`set_group_means` and :code:`set_group_covariances`."""
         self.set_group_means(
             group_means,
             update_initializer=update_initializer,

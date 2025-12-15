@@ -1,6 +1,6 @@
-"""Functions to manipulate and calculate statistics for inferred mode/state
+"""
+Functions to manipulate and calculate statistics for inferred mode/state
 time courses.
-
 """
 
 from pathlib import Path
@@ -635,7 +635,9 @@ def reweight_alphas(alpha, covs):
 
 
 def reweight_mtc(mtc, params, params_type):
-    """Re-weight mixing coefficients to account for the magnitude of
+    """Reweight mode time courses.
+
+    Re-weight mixing coefficients to account for the magnitude of
     observation model parameters.
 
     Parameters

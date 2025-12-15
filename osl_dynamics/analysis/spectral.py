@@ -1615,8 +1615,7 @@ def _multitaper_spectrogram(
     time_half_bandwidth=4,
     n_tapers=7,
 ):
-    """Calculates a spectogram (time-varying power spectral density)
-    using a multitaper.
+    """Calculates a spectogram (time-varying power spectral density) using a multitaper.
 
     Steps:
 

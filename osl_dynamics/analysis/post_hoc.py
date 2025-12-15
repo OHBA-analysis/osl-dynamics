@@ -665,7 +665,7 @@ def calc_trans_prob_matrix(state_time_course, n_states=None):
 
 
 def simple_moving_average(data, window_length, step_size):
-    """Calculate imple moving average.
+    """Calculate simple moving average.
 
     This function can be used to calculate a sliding window fractional occupancy
     from a state time course. This was done in `Baker et al. (2014)
