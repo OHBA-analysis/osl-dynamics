@@ -10,8 +10,8 @@ a DyNeMo fit.
 import os
 import numpy as np
 
-from osl_dynamics.array_ops import cov2corr
 from osl_dynamics.analysis import connectivity
+from osl_dynamics.utils.array_ops import cov2corr
 
 def get_data(name, output_dir):
     if os.path.exists(output_dir):

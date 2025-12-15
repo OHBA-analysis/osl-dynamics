@@ -127,7 +127,7 @@ osl-dynamics can be used in a standalone python script, e.g. the scripts in ``/o
 
 .. code-block:: shell
 
-    from osl_dynamics import array_ops
+    from osl_dynamics.utils import array_ops
     from osl_dynamics.models.dynemo import Model
 
 The script is executed via the command line on a GPU node with ``python <script>.py``.

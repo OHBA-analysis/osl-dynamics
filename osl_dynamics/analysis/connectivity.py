@@ -11,11 +11,11 @@ from tqdm.auto import trange
 from pqdm.threads import pqdm
 import matplotlib.pyplot as plt
 
-from osl_dynamics import array_ops
-from osl_dynamics.analysis import gmm
 from osl_dynamics.analysis.spectral import get_frequency_args_range
+from osl_dynamics.utils import array_ops
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.parcellation import Parcellation
+from osl_dynamics.utils.sklearn_wrappers import fit_gaussian_mixture
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -561,7 +561,7 @@ def fit_gmm(
                 plot_filename = None
 
             # Fit a GMM to get class labels
-            threshold = gmm.fit_gaussian_mixture(
+            threshold = fit_gaussian_mixture(
                 c,
                 standardize=standardize,
                 p_value=p_value,

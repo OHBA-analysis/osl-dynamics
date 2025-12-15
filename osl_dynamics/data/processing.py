@@ -4,7 +4,7 @@ import mne
 import numpy as np
 from scipy import signal, stats
 
-from osl_dynamics import array_ops
+from osl_dynamics.utils import array_ops
 
 
 def standardize(x, axis=0, create_copy=True):

@@ -73,8 +73,7 @@ class MixedSine:
 
 
 class MixedSine_MVN(Simulation):
-    """Simulates sinusoidal alphas with a multivariable normal observation
-    model.
+    """Simulates sinusoidal alphas with a multivariable normal observation model.
 
     Parameters
     ----------
@@ -168,8 +167,7 @@ class MixedSine_MVN(Simulation):
 
 
 class MSess_MixedSine_MVN(Simulation):
-    """Simulates sinusoidal alphas with a multivariable normal observation model
-    for each session.
+    """Simulates sinusoidal alphas with a multivariable normal observation model for each session.
 
     Parameters
     ----------

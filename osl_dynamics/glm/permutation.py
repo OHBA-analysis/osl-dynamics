@@ -174,8 +174,7 @@ class Permutation:
 
 
 class MaxStatPermutation(Permutation):
-    """
-    Max statistic permutation test.
+    """Max statistic permutation test.
 
     Parameters
     ----------

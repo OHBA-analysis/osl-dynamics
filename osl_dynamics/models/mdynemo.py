@@ -589,8 +589,7 @@ class Model(VariationalInferenceModelBase):
         )
 
     def set_regularizers(self, training_dataset):
-        """Set the regularizers of means, stds and corrs based on the training
-        data.
+        """Set the regularizers of means, stds and corrs based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with
         :code:`mu=0`, :code:`sigma=diag((range/2)**2)`, a log normal prior is
@@ -632,8 +631,7 @@ class Model(VariationalInferenceModelBase):
             )
 
     def sample_time_courses(self, n_samples):
-        """Uses the model RNN to sample mode mixing factors,
-        :code:`alpha` and :code:`beta`.
+        """Uses the model RNN to sample mode mixing factors, :code:`alpha` and :code:`beta`.
 
         Parameters
         ----------

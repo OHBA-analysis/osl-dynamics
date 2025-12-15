@@ -983,8 +983,7 @@ class Model(VariationalInferenceModelBase):
     def set_group_means_covariances(
         self, group_means, group_covariances, update_initializer=True
     ):
-        """This is a wrapper for :code:`set_group_means` and
-        :code:`set_group_covariances`."""
+        """This is a wrapper for :code:`set_group_means` and :code:`set_group_covariances`."""
         self.set_group_means(
             group_means,
             update_initializer=update_initializer,

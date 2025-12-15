@@ -516,6 +516,7 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
     @tf.function
     def compute_gradients(self, inputs):
         """Compute gradients for a given input batch.
+
         If there is more than one loss, losses are summed before computing gradients.
 
         Parameters
@@ -691,8 +692,7 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
 
 
 class SummaryStatsCallback(callbacks.Callback):
-    """Callback to calculate summary statistics at the end of each
-       epoch during training.
+    """Callback to calculate summary statistics at the end of each epoch during training.
 
     Parameters
     ----------

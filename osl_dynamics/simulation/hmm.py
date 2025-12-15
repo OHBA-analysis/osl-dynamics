@@ -3,12 +3,12 @@
 import warnings
 import numpy as np
 
-from osl_dynamics import array_ops
 from osl_dynamics.simulation.mar import MAR
 from osl_dynamics.simulation.mvn import MVN, MDyn_MVN, MSess_MVN
 from osl_dynamics.simulation.hsmm import HSMM
 from osl_dynamics.simulation.base import Simulation
 from osl_dynamics.simulation.poi import Poisson
+from osl_dynamics.utils import array_ops
 
 
 class HMM:
@@ -135,8 +135,7 @@ class HMM:
 
 
 class HMM_MAR(Simulation):
-    r"""Simulate an HMM with a multivariate autoregressive (MAR) observation
-    model.
+    r"""Simulate an HMM with a multivariate autoregressive (MAR) observation model.
 
     Parameters
     ----------
@@ -508,8 +507,7 @@ class HMM_Poi(Simulation):
 
 
 class MSess_HMM_MVN(Simulation):
-    """Simulate an HMM with multivariate normal observation model for each
-    session.
+    """Simulate an HMM with multivariate normal observation model for each session.
 
     Parameters
     ----------

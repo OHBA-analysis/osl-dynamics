@@ -167,8 +167,7 @@ def run_pipeline_from_file(config_file, output_directory, restrict=None):
 
 
 def osl_dynamics_cli():
-    """Command line interface function for running a pipeline from a config
-    file."""
+    """Command line interface function for running a pipeline from a config file."""
 
     # Arguments
     parser = argparse.ArgumentParser()

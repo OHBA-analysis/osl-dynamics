@@ -3,8 +3,8 @@
 This module contains functions for calculating the density profile (i.e.,
 fractional occupancy over) in any interval between events it is originally
 intended to use it on an HMM state time course to ask questions like what is
-the density of state j in the first and second part of the interval between
-visits to state i.
+the density of state :math:`j` in the first and second part of the interval
+between visits to state :math:`i`.
 
 See Also
 --------
@@ -47,7 +47,7 @@ def find_intervals(tc_hot):
 
 
 def split_intervals(intervals, n_bins=2):
-    """Splits each interval into nbin equally sized bins.
+    """Splits each interval into :code:`nbin` equally sized bins.
 
     Parameters
     ----------
@@ -670,6 +670,7 @@ def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
 
 
 def compute_cycle_strength(angleplot, asym, relative=True, whichstate=None):
+    """Compute cycle strength."""
     if len(asym.shape) == 3:
         tmp = np.stack(
             [angleplot * asym[:, :, i] for i in range(asym.shape[2])], axis=-1

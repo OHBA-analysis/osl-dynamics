@@ -430,8 +430,7 @@ class Model(VariationalInferenceModelBase):
         covariances,
         update_initializer=True,
     ):
-        """This is a wrapper for :code:`set_means` and
-        :code:`set_covariances`."""
+        """This is a wrapper for :code:`set_means` and :code:`set_covariances`."""
         self.set_means(
             means,
             update_initializer=update_initializer,
@@ -636,8 +635,7 @@ class Model(VariationalInferenceModelBase):
         learning_rate=None,
         store_dir="tmp",
     ):
-        """Dual estimation to get the session-specific observation model
-        parameters.
+        """Dual estimation to get the session-specific observation model parameters.
 
         Here, we train the observation model parameters (mode means and
         covariances) with the inference RNN and model RNN held fixed at

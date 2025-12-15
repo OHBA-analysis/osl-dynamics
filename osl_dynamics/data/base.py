@@ -392,7 +392,8 @@ class Data:
                     )
                 if data[i].shape[0] != channel_data.shape[0]:
                     raise ValueError(
-                        f"Extra channel {channel_name} have different number of samples than the data in session {i}."
+                        f"Extra channel {channel_name} have different number of samples "
+                        f"than the data in session {i}."
                     )
 
                 extra_channels[channel_name][i] = channel_data.astype(np.float32)
@@ -451,7 +452,7 @@ class Data:
         if n_batches < 1:
             raise ValueError(
                 "Number of batches must be greater than or equal to 1. "
-                + "Please adjust your sequence length and batch size."
+                "Please adjust your sequence length and batch size."
             )
 
     def select(self, channels=None, sessions=None, use_raw=False):
@@ -522,7 +523,7 @@ class Data:
 
         return self
 
-    def filter(self, low_freq=None, high_freq=None, use_raw=False):
+    def filter(self, low_freq=None, high_freq=None, order=5, use_raw=False):
         """Filter the data.
 
         This is an in-place operation.
@@ -535,6 +536,8 @@ class Data:
         high_freq : float, optional
             Frequency in Hz for a low pass filter. If :code:`None`, no low pass
             filtering is applied.
+        order : int, optional
+            Order for a butterworth filter.
         use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
 
@@ -561,7 +564,7 @@ class Data:
         # Function to apply filtering to a single array
         def _apply(array, prepared_data_file):
             array = processing.temporal_filter(
-                array, low_freq, high_freq, self.sampling_frequency
+                array, low_freq, high_freq, self.sampling_frequency, order
             )
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
@@ -971,7 +974,7 @@ class Data:
         return self
 
     def standardize(self, use_raw=False):
-        """Standardize (z-transform) the data.
+        """Standardize (z-score) the data.
 
         This is an in-place operation.
 

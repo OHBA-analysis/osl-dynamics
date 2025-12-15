@@ -11,11 +11,11 @@ from scipy.special import xlogy, logsumexp
 from tqdm.auto import tqdm, trange
 
 import osl_dynamics.data.tf as dtf
-from osl_dynamics import array_ops
 from osl_dynamics.simulation import HMM
 from osl_dynamics.inference import callbacks, optimizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.models.mod_base import ModelBase
+from osl_dynamics.utils import array_ops
 from osl_dynamics.utils.misc import replace_argument
 
 _logger = logging.getLogger("osl-dynamics")
@@ -193,8 +193,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         if n_init is None or n_init == 0:
             _logger.warning(
-                "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Number of initializations was set to zero. Skipping initialization."
             )
             return
 
@@ -238,8 +237,8 @@ class VariationalInferenceModelBase(ModelBase):
             except tf.errors.InvalidArgumentError as e:
                 _logger.warning(e)
                 _logger.warning(
-                    "Training failed! Could be due to instability of the KL "
-                    + "term. Skipping initialization."
+                    "Training failed! Could be due to instability of the KL term. "
+                    "Skipping initialization."
                 )
                 continue
 
@@ -429,8 +428,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         if n_init is None or n_init == 0:
             _logger.info(
-                "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Number of initializations was set to zero. Skipping initialization."
             )
             return
 
@@ -1336,8 +1334,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         if n_init is None or n_init == 0:
             _logger.info(
-                "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Number of initializations was set to zero. Skipping initialization."
             )
             return
 
@@ -1431,8 +1428,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         if n_init is None or n_init == 0:
             _logger.info(
-                "Number of initializations was set to zero. "
-                + "Skipping initialization."
+                "Number of initializations was set to zero. Skipping initialization."
             )
             return
 

@@ -337,8 +337,9 @@ def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
 
 
 def pairwise_l2_distance(arrays, batch_dims=0):
-    """Calculate the pairwise L2 distance
-    along the first axis after :code:`batch_dims`.
+    """Pairwise L2 distance.
+
+    Calculate the pairwise L2 distance along the first axis after :code:`batch_dims`.
 
     Parameters
     ----------

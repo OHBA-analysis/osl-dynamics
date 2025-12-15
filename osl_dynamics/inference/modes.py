@@ -1,6 +1,6 @@
-"""Functions to manipulate and calculate statistics for inferred mode/state
+"""
+Functions to manipulate and calculate statistics for inferred mode/state
 time courses.
-
 """
 
 from pathlib import Path
@@ -12,10 +12,9 @@ from tqdm.auto import trange
 from scipy import cluster, spatial, optimize
 from sklearn.cluster import AgglomerativeClustering
 
-from osl_dynamics import array_ops
-from osl_dynamics.analysis import post_hoc, gmm
+from osl_dynamics.analysis import post_hoc
 from osl_dynamics.inference import metrics
-from osl_dynamics.utils import plotting
+from osl_dynamics.utils import array_ops, sklearn_wrappers, plotting
 from osl_dynamics.utils.misc import override_dict_defaults
 
 
@@ -136,7 +135,7 @@ def gmm_time_courses(
             sklearn_kwargs = override_dict_defaults(
                 default_sklearn_kwargs, sklearn_kwargs
             )
-            threshold, metrics = gmm.fit_gaussian_mixture(
+            threshold, metrics = sklearn_wrappers.fit_gaussian_mixture(
                 a,
                 logit_transform=logit_transform,
                 standardize=standardize,
@@ -636,7 +635,9 @@ def reweight_alphas(alpha, covs):
 
 
 def reweight_mtc(mtc, params, params_type):
-    """Re-weight mixing coefficients to account for the magnitude of
+    """Reweight mode time courses.
+
+    Re-weight mixing coefficients to account for the magnitude of
     observation model parameters.
 
     Parameters

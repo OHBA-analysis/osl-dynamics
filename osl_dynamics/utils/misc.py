@@ -149,7 +149,9 @@ def replace_argument(func, name, item, args, kwargs, append=False):
 
 
 def get_argument(func, name, args, kwargs):
-    """Get an argument passed to a function call whether it is a normal
+    """Get argument.
+
+    Get an argument passed to a function call whether it is a normal
     argument or keyword argument.
 
     Parameters

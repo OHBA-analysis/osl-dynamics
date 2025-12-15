@@ -1,5 +1,5 @@
 """
-This module provides classes for building machine learning pipelines,
+Classes/functions for building machine learning pipelines,
 performing hyperparameter tuning, and evaluating model performance.
 """
 
@@ -86,8 +86,7 @@ class PipelineBuilder:
         return list(self.predictor_dict.keys())
 
     def _check_model(self, model_type, model_dict, model_name):
-        """
-        Checks if the provided model type exists in the given model dictionary.
+        """Checks if the provided model type exists in the given model dictionary.
 
         Parameters
         ----------
@@ -109,8 +108,7 @@ class PipelineBuilder:
             )
 
     def validate_model(self, scaler=None, dim_reduction=None, predictor=None):
-        """
-        Validates the provided model components (scaler, dimensionality reduction, and predictor).
+        """Validates the provided model components (scaler, dimensionality reduction, and predictor).
 
         Parameters
         ----------
@@ -131,8 +129,7 @@ class PipelineBuilder:
         self._check_model(predictor, self.predictor_dict, "predictor")
 
     def build_model(self, scaler=None, dim_reduction=None, predictor=None):
-        """
-        Constructs and returns a scikit-learn pipeline with the specified components.
+        """Constructs and returns a scikit-learn pipeline with the specified components.
 
         Parameters
         ----------
@@ -167,8 +164,7 @@ class PipelineBuilder:
     def get_params_grid(
         self, scalar_params=None, dim_reduction_params=None, predictor_params=None
     ):
-        """
-        Returns a combined parameter grid for use in hyperparameter optimization (e.g., GridSearchCV).
+        """Returns a combined parameter grid for use in hyperparameter optimization (e.g., GridSearchCV).
 
         Parameters
         ----------
@@ -201,6 +197,30 @@ class PipelineBuilder:
 
 
 class ModelSelection:
+    """Model selection class.
+
+    Parameters
+    ----------
+    model : sklearn.base.BaseEstimator
+        The machine learning model to be used.
+    params_grid : dict, optional
+        The hyperparameter grid for tuning.
+    search_type : str, default='grid'
+        The type of search: 'grid' for GridSearchCV or 'random' for RandomizedSearchCV.
+    cv : int, optional
+        Number of cross-validation folds. Defaults to 5.
+    scoring : str, optional
+        Scoring metric to optimize. Defaults to None.
+    n_iter : int, optional
+        Number of iterations for RandomizedSearchCV. Defaults to 10.
+    random_state : int, optional
+        Random seed for reproducibility.
+    n_jobs : int, optional
+        Number of CPU cores to use for parallel processing. Defaults to 1.
+    verbose : int, optional
+        Verbosity level for model selection methods. Defaults to 0.
+    """
+
     def __init__(
         self,
         model,
@@ -213,30 +233,7 @@ class ModelSelection:
         n_jobs=1,
         verbose=0,
     ):
-        """
-        Initializes the pipeline with model selection and cross-validation settings.
-
-        Parameters
-        ----------
-        model : sklearn.base.BaseEstimator
-            The machine learning model to be used.
-        params_grid : dict, optional
-            The hyperparameter grid for tuning.
-        search_type : str, default='grid'
-            The type of search: 'grid' for GridSearchCV or 'random' for RandomizedSearchCV.
-        cv : int, optional
-            Number of cross-validation folds. Defaults to 5.
-        scoring : str, optional
-            Scoring metric to optimize. Defaults to None.
-        n_iter : int, optional
-            Number of iterations for RandomizedSearchCV. Defaults to 10.
-        random_state : int, optional
-            Random seed for reproducibility.
-        n_jobs : int, optional
-            Number of CPU cores to use for parallel processing. Defaults to 1.
-        verbose : int, optional
-            Verbosity level for model selection methods. Defaults to 0.
-        """
+        """Initializes the pipeline with model selection and cross-validation settings."""
         self.model = model
         self.params_grid = params_grid
         self.search_type = search_type
@@ -275,8 +272,7 @@ class ModelSelection:
         self.cv = cv
 
     def set_scoring(self, scoring):
-        """
-        Sets the scoring metric.
+        """Sets the scoring metric.
 
         Parameters
         ----------
@@ -288,8 +284,7 @@ class ModelSelection:
         self.scoring = scoring
 
     def set_n_iter(self, n_iter):
-        """
-        Sets the number of iterations for RandomizedSearchCV.
+        """Sets the number of iterations for RandomizedSearchCV.
 
         Parameters
         ----------
@@ -314,8 +309,7 @@ class ModelSelection:
             raise ValueError("X and y must have the same number of samples.")
 
     def model_selection(self, X, y, override_best_model=True):
-        """
-        Performs hyperparameter tuning using cross-validation.
+        """Performs hyperparameter tuning using cross-validation.
 
         Parameters
         ----------
@@ -369,8 +363,7 @@ class ModelSelection:
     def nested_cross_validation(
         self, X, y, split_type="kfold", outer_cv=5, shuffle=True
     ):
-        """
-        Performs nested cross-validation to evaluate model performance.
+        """Performs nested cross-validation to evaluate model performance.
 
         Parameters
         ----------
@@ -379,7 +372,8 @@ class ModelSelection:
         y : array-like
             Target variable of shape (n_samples,).
         split_type : str, optional
-            Type of cross-validation split to use. Must be 'kfold' or 'stratified_kfold'. Defaults to 'kfold'.
+            Type of cross-validation split to use.
+            Must be 'kfold' or 'stratified_kfold'. Defaults to 'kfold'.
         outer_cv : int, optional
             Number of outer cross-validation folds. Defaults to 5.
         shuffle : bool, optional
@@ -421,8 +415,7 @@ class ModelSelection:
         return np.array(outer_scores)
 
     def cross_validation_scores(self, X, y, cv=None, scoring=None):
-        """
-        Computes cross-validation scores for the best model.
+        """Computes cross-validation scores for the best model.
 
         Parameters
         ----------

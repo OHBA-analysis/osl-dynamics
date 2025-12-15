@@ -335,8 +335,7 @@ class Model(MarkovStateInferenceModelBase):
         covariances,
         update_initializer=True,
     ):
-        """This is a wrapper for :code:`set_means` and
-        :code:`set_covariances`."""
+        """This is a wrapper for :code:`set_means` and :code:`set_covariances`."""
         self.set_means(means, update_initializer=update_initializer)
         self.set_covariances(covariances, update_initializer=update_initializer)
 
@@ -388,6 +387,7 @@ class Model(MarkovStateInferenceModelBase):
 
     def dual_estimation(self, training_data, alpha=None, concatenate=False, n_jobs=1):
         """Dual estimation to get session-specific observation model parameters.
+
         This function is the wrapper for the :code:`hmm_dual_estimation` function.
 
         Here, we estimate the state means and covariances for sessions

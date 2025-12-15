@@ -21,7 +21,7 @@ from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 
-from osl_dynamics import array_ops
+from osl_dynamics.utils import array_ops
 from osl_dynamics.utils.misc import load, override_dict_defaults, save
 
 _logger = logging.getLogger("osl-dynamics")
@@ -326,16 +326,16 @@ def train_mdynemo(
     corrs_init_kwargs=None,
     save_inf_params=True,
 ):
-    """Train `MDyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
-        /osl_dynamics/models/mdynemo/index.html>`_. This function will:
+    """Train `M-DyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
+    /osl_dynamics/models/mdynemo/index.html>`_. This function will:
     
     1. Build an :code:`mdynemo.Model` object.
     2. Initialize the mode correlations using sliding window and KMeans.
     3. Initialize the parameters of the model using
-        :code:`Model.random_subset_initialization`.
+       :code:`Model.random_subset_initialization`.
     4. Perform full training.
     5. Save the inferred parameters (mode time courses, means, stds and corrs)
-        if :code:`save_inf_params=True`.
+       if :code:`save_inf_params=True`.
 
     This function will create two directories:
 
@@ -512,23 +512,23 @@ def train_hive(
     fit_kwargs=None,
     save_inf_params=True,
 ):
-    """ Train a `HIVE Model <https://osl-dynamics.\
+    """Train a `HIVE Model <https://osl-dynamics.\
     readthedocs.io/en/latest/autoapi/osl_dynamics/models/hive/index.html>`_.
     
     This function will:
 
     1. Build an :code:`hive.Model` object.
     2. Initialize the parameters of the HIVE model using
-        :code:`Model.random_state_time_course_initialization`.
+       :code:`Model.random_state_time_course_initialization`.
     3. Perform full training.
     4. Save the inferred parameters (state probabilities, means,
-        covariances and embeddings) if :code:`save_inf_params=True`.
+       covariances and embeddings) if :code:`save_inf_params=True`.
     
     This function will create two directories:
 
     - :code:`<output_dir>/model`, which contains the trained model.
     - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
-        This directory is only created if :code:`save_inf_params=True`.
+      This directory is only created if :code:`save_inf_params=True`.
 
     Parameters
     ----------
@@ -1488,8 +1488,7 @@ def plot_group_nnmf_tde_hmm_networks(
     power_save_kwargs=None,
     conn_save_kwargs=None,
 ):
-    """Plot group-level TDE-HMM networks using a NNMF component to integrate
-    the spectra.
+    """Plot group-level TDE-HMM networks using a NNMF component to integrate the spectra.
 
     This function will:
 

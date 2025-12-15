@@ -10,29 +10,34 @@ def evoked_response_max_stat_perm(
 ):
     """Statistical significance testing for evoked responses.
 
+    This function fits a General Linear Model (GLM) with ordinary least
+    squares and performs a sign-flip permutation to build a null distribution
+    using maximum statistic across the target dimensions.
+
     Parameters
     ----------
     data : np.ndarray
         Data array for baseline corrected evoked responses.
-        Shape is :code:`(n_samples, *target_dims)`.
+        Shape is (n_samples, *target_dims).
     n_perm : int
         Number of permutations.
     covariates : dict, optional
         Dictionary of continuous covariates.
 
         - key: name of the covariate.
-        - value: np.ndarray of covariate values. Shape is :code:`(n_samples,)`.
+        - value: np.ndarray of covariate values. Shape is (n_samples,).
 
         These are z-transformed.
     metric : str, optional
-        Metric to compute p-values. Options are 'copes' and 'tstats'.
+        Statistic to compute p-values.
+        Options are :code:`'copes'` or :code:`'tstats'`.
     n_jobs : int, optional
         Number of jobs to run in parallel.
 
     Returns
     -------
     pvalues : np.ndarray
-        P-values. Shape is :code:`(*target_dims)`.
+        P-values. Shape is (*target_dims,).
     """
     features = [
         {"name": "Mean", "values": np.ones(data.shape[0]), "feature_type": "constant"}
@@ -65,17 +70,17 @@ def group_diff_max_stat_perm(
     """Statistical significance testing for difference between two groups.
 
     This function fits a General Linear Model (GLM) with ordinary least
-    squares and performs a row shuffle permutation test with maximum
-    statistic to determine a p-value for the difference between two
-    groups.
+    squares and performs a row-shuffle permutation to build a null distribution
+    using maximum statistic across the target dimensions (target_dims)
+    for the difference between two groups.
 
     Parameters
     ----------
     data : np.ndarray
         Data array for baseline corrected evoked responses.
-        Shape is :code:`(n_samples, *target_dims)`.
+        Shape is (n_samples, *target_dims).
     assignments : np.ndarray
-        Group assignments. Shape is :code:`(n_samples,)`.
+        Group assignments. Shape is (n_samples,).
         Must have exactly two unique values.
     n_perm : int
         Number of permutations.
@@ -83,20 +88,21 @@ def group_diff_max_stat_perm(
         Dictionary of continuous covariates.
 
         - key: name of the covariate.
-        - value: np.ndarray of covariate values. Shape is :code:`(n_samples,)`.
+        - value: np.ndarray of covariate values. Shape is (n_samples,).
 
         These are z-transformed.
     metric : str, optional
-        Metric to compute p-values. Options are 'copes' and 'tstats'.
+        Statistic to compute p-values with.
+        Options are :code:`'copes'` or :code:`'tstats'`.
     n_jobs : int, optional
         Number of jobs to run in parallel.
 
     Returns
     -------
     group_diff : np.ndarray
-        Difference between two groups. Shape is :code:`(*target_dims)`.
+        Difference between two groups. Shape is (*target_dims,).
     pvalues : np.ndarray
-        P-values. Shape is :code:`(*target_dims)`.
+        P-values. Shape is (*target_dims,).
     """
     if covariates is None:
         covariates = {}
@@ -142,27 +148,29 @@ def paired_diff_max_stat_perm(data, n_perm, metric="copes", n_jobs=1):
     """Statistical significance testing for paired difference.
 
     This function fits a General Linear Model (GLM) with ordinary least
-    squares and performs a sign flip permutations test with the maximum
-    statistic to determine a p-value for paired differences.
+    squares and performs sign-flip permutations to build a null distribution
+    with the maximum statistic across the target dimensions for the paired
+    differences.
 
     Parameters
     ----------
     data : np.ndarray
         Data array for baseline corrected evoked responses.
-        Shape is :code:`(n_samples, *target_dims)`.
+        Shape is (n_samples, *target_dims).
     n_perm : int
         Number of permutations.
     metric : str, optional
-        Metric to compute p-values. Options are 'copes' and 'tstats'.
+        Statistic to compute p-values with.
+        Options are :code:`'copes'` or :code:`'tstats'`.
     n_jobs : int, optional
         Number of jobs to run in parallel.
 
     Returns
     -------
     paired_diff : np.ndarray
-        Paired differences. Shape is :code:`(*target_dims)`.
+        Paired differences. Shape is (*target_dims,).
     pvalues : np.ndarray
-        P-values. Shape is :code:`(*target_dims)`.
+        P-values. Shape is (*target_dims,).
     """
     features = [
         {"name": "Mean", "values": np.ones(data.shape[0]), "feature_type": "constant"}

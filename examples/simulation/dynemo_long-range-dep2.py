@@ -10,12 +10,11 @@ print("Setting up")
 import os
 import numpy as np
 from sklearn.cluster import KMeans
-from osl_dynamics import array_ops
 from osl_dynamics.data import Data
 from osl_dynamics.inference import metrics, modes, tf_ops
 from osl_dynamics.models.dynemo import Config, Model
 from osl_dynamics.simulation import HierarchicalHMM_MVN
-from osl_dynamics.utils import plotting
+from osl_dynamics.utils import array_ops, plotting
 
 # Make directory to hold plots
 os.makedirs("figures", exist_ok=True)

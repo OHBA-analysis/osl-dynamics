@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from osl_dynamics import array_ops
+from osl_dynamics.utils import array_ops
 
 
 class MVN:
@@ -354,8 +354,7 @@ class MDyn_MVN(MVN):
 
 
 class MSess_MVN(MVN):
-    """Class that generates data from a multivariate normal distribution for
-    multiple sessions.
+    """Class that generates data from a multivariate normal distribution for multiple sessions.
 
     Parameters
     ----------

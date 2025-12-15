@@ -4,8 +4,7 @@ import re
 
 
 def tex_escape(text):
-    """Escape characters which require control sequences in text for use
-    in LaTeX.
+    """Escape characters which require control sequences in text for use in LaTeX.
 
     Parameters
     ----------

@@ -3,10 +3,8 @@
 from osl_dynamics.analysis import (
     connectivity,
     fisher_kernel,
-    gmm,
     post_hoc,
     power,
-    regression,
     spectral,
     static,
     statistics,
