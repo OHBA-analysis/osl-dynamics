@@ -24,8 +24,6 @@ MEG data is useful because it has a high temporal resolution. We can take advant
 import os
 
 def get_data(name, rename):
-    if rename is None:
-        rename = name
     os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")

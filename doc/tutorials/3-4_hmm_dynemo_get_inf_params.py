@@ -15,8 +15,6 @@ In this tutorial we will get the inferred parameters from a dynamic network mode
 #     import os
 #
 #     def get_data(name, rename):
-#         if rename is None:
-#             rename = name
 #         os.system(f"osf -p by2tc fetch data/{name}.zip")
 #         os.makedirs(rename, exist_ok=True)
 #         os.system(f"unzip -o {name}.zip -d {rename}")
@@ -32,8 +30,6 @@ In this tutorial we will get the inferred parameters from a dynamic network mode
 # .. code-block:: python
 #
 #     def get_model(name, rename=None):
-#         if rename is None:
-#             rename = name
 #         os.system(f"osf -p by2tc fetch trained_models/{name}.zip")
 #         os.makedirs(rename, exist_ok=True)
 #         os.system(f"unzip -o {name}.zip -d {rename}")
