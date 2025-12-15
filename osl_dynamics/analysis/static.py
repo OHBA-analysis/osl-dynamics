@@ -35,7 +35,7 @@ def functional_connectivity(
         - :code:`"pcov"`: partial covariance.
         - :code:`"corr"`: Pearson correlation.
         - :code:`"pcorr"`: partial correlation.
-        - :code:`"prec"`: precision (inverse of the the covariance matrix).
+        - :code:`"prec"`: precision (inverse of the covariance matrix).
 
         Or can be a function that accepts a (n_samples, n_channels) array and
         returns a (n_channels, n_channels) array.
