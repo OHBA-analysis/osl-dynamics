@@ -158,6 +158,7 @@ def welch_spectra(
     frequency_range=None,
     return_weights=False,
     standardize=True,
+    calc_cpsd=False,
     calc_coh=False,
     keepdims=False,
     n_jobs=1,
@@ -186,6 +187,9 @@ def welch_spectra(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the spectra?
+    calc_cpsd : bool, optional
+        Should we return the cross spectra for :code:`psd`?
+        If True, we force :code:`calc_coh` to False.
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
@@ -203,8 +207,10 @@ def welch_spectra(
     f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra. Shape is (n_sessions, n_channels, n_freq).
-        Any axis of length 1 is removed if :code:`keepdims=False`.
+        Power spectra for each session. Shape is (n_sessions, n_channels,
+        n_freq) if :code:`calc_cpsd=False`, otherwise the shape is (n_sessions,
+        n_channels, n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`.
     coh : np.ndarray
         Coherences. Shape is (n_sessions, n_channels, n_channels, n_freq).
         Any axis of length 1 is removed if :code:`keepdims=False`.
@@ -235,6 +241,7 @@ def multitaper_spectra(
     n_tapers=7,
     frequency_range=None,
     standardize=True,
+    calc_cpsd=False,
     calc_coh=False,
     return_weights=False,
     keepdims=False,
@@ -264,13 +271,16 @@ def multitaper_spectra(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the multitaper?
+    calc_cpsd : bool, optional
+        Should we return the cross spectra for :code:`psd`?
+        If True, we force :code:`calc_coh` to False.
     calc_coh : bool, optional
         Should we also return the coherence spectra?
     return_weights : bool, optional
         Should we return the weights for session-specific PSDs?
         Useful for calculating the group average PSD.
     keepdims : bool, optional
-        Should we enforce a (n_sessions, n_states, ...) array is returned for
+        Should we enforce a (n_sessions, ...) array is returned for
         :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimension
         of length 1.
     n_jobs : int, optional
@@ -281,8 +291,10 @@ def multitaper_spectra(
     f : np.ndarray
         Frequencies of the power spectra and coherences. Shape is (n_freq,).
     psd : np.ndarray
-        Power spectra. Shape is (n_sessions, n_channels, n_freq).
-        Any axis of length 1 is removed if :code:`keepdims=False`.
+        Power spectra for each session. Shape is (n_sessions, n_channels,
+        n_freq) if :code:`calc_cpsd=False`, otherwise the shape is (n_sessions,
+        n_channels, n_channels, n_freq). Any axis of length 1 is removed if
+        :code:`keepdims=False`.
     coh : np.ndarray
         Coherences. Shape is (n_sessions, n_channels, n_channels, n_freq).
         Any axis of length 1 is removed if :code:`keepdims=False`.
@@ -299,6 +311,7 @@ def multitaper_spectra(
         n_tapers=n_tapers,
         frequency_range=frequency_range,
         standardize=standardize,
+        calc_cpsd=calc_cpsd,
         calc_coh=calc_coh,
         return_weights=return_weights,
         keepdims=keepdims,
