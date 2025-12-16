@@ -8,7 +8,8 @@ This directory contains:
 - `meg`: scripts for analysing MEG data.
 - `plotting`: scripts for using the basic plotting functions provided in this package.
 - `simulation`: scripts for training models for dynamics on simulated data. These scripts can be useful for testing your setup is working correctly and highlight the pros/cons of various models.
+- 'spectra': scripts for calculating spectral properties.
 - `static`:  scripts for static network analysis.
-- `statistics`: scripts for performing statistical significance testing (using non-parameteric permutations with a GLM).
+- `statistics`: scripts for performing statistical significance testing (using non-parameteric GLM permutations).
 - `tinda`: scripts for using [TINDA](https://www.biorxiv.org/content/10.1101/2023.07.25.550338v3).
 - `toolbox_paper`: scripts for reproducing the results in the [eLife paper](https://elifesciences.org/reviewed-preprints/91949).

@@ -27,8 +27,6 @@ This tutorial covers:
 import os
 
 def get_data(name, rename):
-    if rename is None:
-        rename = name
     os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")

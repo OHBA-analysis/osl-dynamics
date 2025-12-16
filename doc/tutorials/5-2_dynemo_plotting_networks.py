@@ -19,8 +19,6 @@ In this tutorial we will plot networks from a DyNeMo model trained on source rec
 import os
 
 def get_spectra(name, rename):
-    if rename is None:
-        rename = name
     os.system(f"osf -p by2tc fetch spectra/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")

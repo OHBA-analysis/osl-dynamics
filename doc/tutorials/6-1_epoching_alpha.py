@@ -13,8 +13,6 @@ In this tutorial we will cover how to epoch the inferred state/mode time courses
 import os
 
 def get_data(name, rename):
-    if rename is None:
-        rename = name
     os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")
@@ -29,8 +27,6 @@ get_data("wakeman_henson_giles_5_subjects", rename="src")
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 def get_inf_params(name, rename):
-    if rename is None:
-        rename = name
     os.system(f"osf -p by2tc fetch inf_params/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")

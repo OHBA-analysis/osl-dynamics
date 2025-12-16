@@ -19,8 +19,6 @@ In this tutorial we calculate summary statistics for dynamics:
 import os
 
 def get_inf_params(name, rename):
-    if rename is None:
-        rename = name
     os.system(f"osf -p by2tc fetch inf_params/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")
