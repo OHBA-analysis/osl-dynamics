@@ -100,7 +100,7 @@ class MultivariateNormal(regularizers.Regularizer):
         except:
             raise ValueError(
                 "Cholesky decomposition of sigma failed. "
-                + "sigma must be positive definite."
+                "sigma must be positive definite."
             )
 
         self.inv_sigma = tf.linalg.inv(self.sigma)

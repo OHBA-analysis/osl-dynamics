@@ -36,7 +36,7 @@ class Poisson:
             if n_states is None or n_channels is None:
                 raise ValueError(
                     "If we are generating rates, "
-                    + "n_states and n_channels must be passed."
+                    "n_states and n_channels must be passed."
                 )
             self.n_states = n_states
             self.n_channels = n_channels

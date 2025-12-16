@@ -353,7 +353,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
             self._activated = True
             print(
                 f"\nEpoch {epoch + 1}: SaveBestCallback activated. "
-                + f"Initial best loss/metric set to {self.best:.4f}."
+                f"Initial best loss/metric set to {self.best:.4f}."
             )
 
         super().on_epoch_end(epoch, logs)

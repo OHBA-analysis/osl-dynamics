@@ -42,8 +42,8 @@ def autocorr_from_tde_cov(
     # Validation
     error_message = (
         "covs must be of shape (n_channels, n_channels) or "
-        + "(n_modes, n_channels, n_channels) or "
-        + "(n_sessions, n_modes, n_channels, n_channels)."
+        "(n_modes, n_channels, n_channels) or "
+        "(n_sessions, n_modes, n_channels, n_channels)."
     )
     covs = array_ops.validate(
         covs,
@@ -121,8 +121,8 @@ def raw_covariances(
     # Validation
     error_message = (
         "mode_covariances must be of shape (n_channels, n_channels) or "
-        + "(n_modes, n_channels, n_channels) or "
-        + "(n_sessions, n_modes, n_channels, n_channels)."
+        "(n_modes, n_channels, n_channels) or "
+        "(n_sessions, n_modes, n_channels, n_channels)."
     )
     mode_covariances = array_ops.validate(
         mode_covariances,
@@ -188,8 +188,8 @@ def reverse_pca(covariances, pca_components):
     if covariances.shape[-1] != pca_components.shape[-1]:
         raise ValueError(
             "Covariance matrix and PCA components have incompatible shapes: "
-            + f"covariances.shape={covariances.shape}, "
-            + f"pca_components.shape={pca_components.shape}."
+            f"covariances.shape={covariances.shape}, "
+            f"pca_components.shape={pca_components.shape}."
         )
 
     return pca_components @ covariances @ pca_components.T

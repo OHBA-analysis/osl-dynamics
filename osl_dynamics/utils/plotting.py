@@ -279,7 +279,7 @@ def plot_line(
         if filename is not None:
             raise ValueError(
                 "Please use plotting.save() to save the figure instead of the "
-                + "filename argument."
+                "filename argument."
             )
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
@@ -431,7 +431,7 @@ def plot_scatter(
         if filename is not None:
             raise ValueError(
                 "Please use plotting.save() to save the figure instead of the "
-                + "filename argument."
+                "filename argument."
             )
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
@@ -573,7 +573,7 @@ def plot_hist(
         if filename is not None:
             raise ValueError(
                 "Please use plotting.save() to save the figure instead of the "
-                + "filename argument."
+                "filename argument."
             )
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
@@ -686,7 +686,7 @@ def plot_bar_chart(
         if filename is not None:
             raise ValueError(
                 "Please use plotting.save() to save the figure instead of the "
-                + "filename argument."
+                "filename argument."
             )
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
@@ -794,7 +794,7 @@ def plot_gmm(
         if filename is not None:
             raise ValueError(
                 "Please use plotting.save() to save the figure instead of the "
-                + "filename argument."
+                "filename argument."
             )
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
@@ -898,7 +898,7 @@ def plot_violin(
         if filename is not None:
             raise ValueError(
                 "Please use plotting.save() to save the figure instead of the "
-                + "filename argument."
+                "filename argument."
             )
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
@@ -981,7 +981,7 @@ def plot_time_series(
         if filename is not None:
             raise ValueError(
                 "Please use plotting.save() to save the figure instead of the "
-                + "filename argument."
+                "filename argument."
             )
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
@@ -1180,7 +1180,7 @@ def plot_epoched_time_series(
         if filename is not None:
             raise ValueError(
                 "Please use plotting.save() to save the figure instead of the "
-                + "filename argument."
+                "filename argument."
             )
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
@@ -1687,7 +1687,7 @@ def plot_brain_surface(
         if not any([ext in filename for ext in allowed_extensions]):
             raise ValueError(
                 "filename must have one of following extensions: "
-                + f"{' '.join(allowed_extensions)}."
+                f"{' '.join(allowed_extensions)}."
             )
 
     if filename is None:

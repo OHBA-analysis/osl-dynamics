@@ -181,7 +181,7 @@ def downsample(x, new_freq, old_freq):
     if old_freq < new_freq:
         raise ValueError(
             f"new frequency ({new_freq} Hz) must be less than old "
-            + f"frequency ({old_freq} Hz)."
+            f"frequency ({old_freq} Hz)."
         )
     ratio = old_freq / new_freq
     X = mne.filter.resample(

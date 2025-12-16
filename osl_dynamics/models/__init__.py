@@ -47,7 +47,7 @@ def load(dirname, single_gpu=True):
     if "model_name" not in config_dict:
         raise ValueError(
             "Either use a specific `Model.load` method or "
-            + "provide a `model_name` field in config"
+            "provide a `model_name` field in config"
         )
 
     try:
@@ -55,7 +55,7 @@ def load(dirname, single_gpu=True):
     except KeyError:
         raise NotImplementedError(
             f"{config_dict['model_name']} was not found. "
-            + f"Options are {', '.join(models.keys())}"
+            f"Options are {', '.join(models.keys())}"
         )
 
     return model_type.load(dirname, single_gpu=single_gpu)

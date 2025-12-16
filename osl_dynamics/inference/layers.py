@@ -489,7 +489,7 @@ class LearnableTensorLayer(layers.Layer):
             elif self.initial_value.shape != shape:
                 raise ValueError(
                     "Shape of initial_value must match that of the tensor. "
-                    + f"Expected {shape}, got {self.initial_value.shape}."
+                    f"Expected {shape}, got {self.initial_value.shape}."
                 )
             self.tensor_initializer = osld_initializers.WeightInitializer(
                 self.initial_value

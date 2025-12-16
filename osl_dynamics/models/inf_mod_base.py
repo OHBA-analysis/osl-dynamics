@@ -632,8 +632,8 @@ class VariationalInferenceModelBase(ModelBase):
         if self.is_multi_gpu:
             raise ValueError(
                 "MirroredStrategy is not supported for this method. "
-                + "Please load a new model with "
-                + "osl_dynamics.models.load(..., single_gpu=True)."
+                "Please load a new model with "
+                "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
         if self.config.multiple_dynamics:
@@ -707,8 +707,8 @@ class VariationalInferenceModelBase(ModelBase):
         if self.is_multi_gpu:
             raise ValueError(
                 "MirroredStrategy is not supported for this method. "
-                + "Please load a new model with "
-                + "osl_dynamics.models.load(..., single_gpu=True)."
+                "Please load a new model with "
+                "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
         if not self.config.multiple_dynamics:
@@ -784,8 +784,8 @@ class VariationalInferenceModelBase(ModelBase):
         if self.is_multi_gpu:
             raise ValueError(
                 "MirroredStrategy is not supported for this method. "
-                + "Please load a new model with "
-                + "osl_dynamics.models.load(..., single_gpu=True)."
+                "Please load a new model with "
+                "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
         if self.config.multiple_dynamics:
@@ -861,8 +861,8 @@ class VariationalInferenceModelBase(ModelBase):
         if self.is_multi_gpu:
             raise ValueError(
                 "MirroredStrategy is not supported for this method. "
-                + "Please load a new model with "
-                + "osl_dynamics.models.load(..., single_gpu=True)."
+                "Please load a new model with "
+                "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
         if not self.config.multiple_dynamics:
@@ -932,8 +932,8 @@ class VariationalInferenceModelBase(ModelBase):
         if self.is_multi_gpu:
             raise ValueError(
                 "MirroredStrategy is not supported for this method. "
-                + "Please load a new model with "
-                + "osl_dynamics.models.load(..., single_gpu=True)."
+                "Please load a new model with "
+                "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
         dataset = self.make_dataset(dataset, concatenate=True)
@@ -1131,8 +1131,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         if self.is_multi_gpu:
             raise ValueError(
                 "MirroredStrategy is not supported for this method. "
-                + "Please load a new model with "
-                + "osl_dynamics.models.load(..., single_gpu=True)."
+                "Please load a new model with "
+                "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
         if remove_edge_effects:
@@ -1602,8 +1602,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         if self.is_multi_gpu:
             raise ValueError(
                 "MirroredStrategy is not supported for this method. "
-                + "Please load a new model with "
-                + "osl_dynamics.models.load(..., single_gpu=True)."
+                "Please load a new model with "
+                "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
         obs_mod_params = self.get_observation_model_parameters()
@@ -1768,8 +1768,8 @@ class MarkovStateInferenceModelBase(ModelBase):
         if self.is_multi_gpu:
             raise ValueError(
                 "MirroredStrategy is not supported for this method. "
-                + "Please load a new model with "
-                + "osl_dynamics.models.load(..., single_gpu=True)."
+                "Please load a new model with "
+                "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
         dataset = self.make_dataset(dataset, concatenate=True)

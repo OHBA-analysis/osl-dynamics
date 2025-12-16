@@ -147,9 +147,9 @@ def covariance_from_spectra(
     # Validation
     error_message = (
         "A (n_channels, n_channels, n_freq), "
-        + "(n_modes, n_channels, n_channels, n_freq) or "
-        + "(n_sessions, n_modes, n_channels, n_channels, n_freq) "
-        + "array must be passed."
+        "(n_modes, n_channels, n_channels, n_freq) or "
+        "(n_sessions, n_modes, n_channels, n_channels, n_freq) "
+        "array must be passed."
     )
     cpsd = array_ops.validate(
         cpsd,
@@ -234,8 +234,8 @@ def mean_coherence_from_spectra(
     # Validation
     error_message = (
         "a 3D numpy array (n_channels, n_channels, n_freq) "
-        + "or 4D numpy array (n_modes, n_channels, n_channels, "
-        + "n_freq) must be passed for spectra."
+        "or 4D numpy array (n_modes, n_channels, n_channels, "
+        "n_freq) must be passed for spectra."
     )
     coh = array_ops.validate(
         coh,
@@ -508,8 +508,10 @@ def fit_gmm(
         conn_map,
         correct_dimensionality=4,
         allow_dimensions=[2, 3],
-        error_message="conn_map must be (n_modes, n_channels, n_channels) "
-        + "or (n_channels, n_channels).",
+        error_message=(
+            "conn_map must be (n_modes, n_channels, n_channels) "
+            "or (n_channels, n_channels)."
+        ),
     )
 
     if sklearn_kwargs is None:
@@ -626,9 +628,11 @@ def threshold(
         conn_map,
         correct_dimensionality=4,
         allow_dimensions=[2, 3],
-        error_message="conn_map must be of shape "
-        + "(n_components, n_modes, n_channels, n_channels), "
-        + "(n_modes, n_channels, n_channels) or (n_channels, n_channels)",
+        error_message=(
+            "conn_map must be of shape "
+            "(n_components, n_modes, n_channels, n_channels), "
+            "(n_modes, n_channels, n_channels) or (n_channels, n_channels)"
+        ),
     )
 
     # Number of components and modes
@@ -644,8 +648,10 @@ def threshold(
         percentile,
         correct_dimensionality=2,
         allow_dimensions=[0, 1],
-        error_message="percentile must be of shape "
-        + "(n_components, n_modes), (n_modes,) or float",
+        error_message=(
+            "percentile must be of shape "
+            "(n_components, n_modes), (n_modes,) or float"
+        ),
     )
 
     # Copy the original connectivity map
@@ -835,7 +841,7 @@ def save(
     connectivity_map = np.copy(connectivity_map)
     error_message = (
         "Dimensionality of connectivity_map must be 3 or 4, "
-        + f"got ndim={connectivity_map.ndim}."
+        f"got ndim={connectivity_map.ndim}."
     )
     connectivity_map = array_ops.validate(
         connectivity_map,
@@ -959,7 +965,7 @@ def save_interactive(
     connectivity_map = np.copy(connectivity_map)
     error_message = (
         "Dimensionality of connectivity_map must be 3 or 4, "
-        + f"got ndim={connectivity_map.ndim}."
+        f"got ndim={connectivity_map.ndim}."
     )
     connectivity_map = array_ops.validate(
         connectivity_map,

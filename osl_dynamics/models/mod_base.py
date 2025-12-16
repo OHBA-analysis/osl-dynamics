@@ -484,8 +484,8 @@ class ModelBase:
             ):
                 _logger.warning(
                     "Using a multiple GPUs with a non-TFRecord dataset. "
-                    + "This will result in poor performance. "
-                    + "Consider using a TFRecord dataset with Data(..., use_tfrecord=True)."
+                    "This will result in poor performance. "
+                    "Consider using a TFRecord dataset with Data(..., use_tfrecord=True)."
                 )
 
             # Data object -> list of Dataset if concatenate=False
@@ -689,7 +689,7 @@ class ModelBase:
         if len(layers) != len(values):
             raise ValueError(
                 "layers and trainable must be the same length, "
-                + f"but got {len(layers)} and {len(values)}."
+                f"but got {len(layers)} and {len(values)}."
             )
 
         available_layers = [layer.name for layer in self.layers]
@@ -703,7 +703,7 @@ class ModelBase:
             elif not isinstance(layer, tf.keras.layers.Layer):
                 raise ValueError(
                     f"Layer {layer} is not a string or a Keras layer. "
-                    + f"Available layers: {available_layers}"
+                    f"Available layers: {available_layers}"
                 )
             if not isinstance(value, bool):
                 raise ValueError(f"Value {i} is not a boolean.")

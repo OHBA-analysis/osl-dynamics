@@ -147,7 +147,7 @@ def variance_from_spectra(
         # PSDs were passed, check dimensionality
         error_message = (
             "A (n_channels, n_freq), (n_modes, n_channels, n_freq) or "
-            + "(n_sessions, n_modes, n_channels, n_freq) array must be passed."
+            "(n_sessions, n_modes, n_channels, n_freq) array must be passed."
         )
         power_spectra = array_ops.validate(
             power_spectra,
@@ -161,9 +161,9 @@ def variance_from_spectra(
         # Cross spectra were passed, check dimensionality
         error_message = (
             "A (n_channels, n_channels, n_freq), "
-            + "(n_modes, n_channels, n_channels, n_freq) or "
-            + "(n_sessions, n_modes, n_channels, n_channels, n_freq) "
-            + "array must be passed."
+            "(n_modes, n_channels, n_channels, n_freq) or "
+            "(n_sessions, n_modes, n_channels, n_channels, n_freq) "
+            "array must be passed."
         )
         power_spectra = array_ops.validate(
             power_spectra,
@@ -312,7 +312,7 @@ def save(
         if not any([ext in filename for ext in allowed_extensions]):
             raise ValueError(
                 "filename must have one of following extensions: "
-                + f"{' '.join(allowed_extensions)}."
+                f"{' '.join(allowed_extensions)}."
             )
     mask_file = files.check_exists(mask_file, files.mask.directory)
     parcellation_file = files.check_exists(

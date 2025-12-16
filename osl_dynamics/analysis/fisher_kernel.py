@@ -34,7 +34,7 @@ class FisherKernel:
         if model.config.model_name not in compatible_models:
             raise NotImplementedError(
                 f"{model.config.model_name} was not found."
-                + f"Options are {compatible_models}."
+                f"Options are {compatible_models}."
             )
         self.model = model
 
