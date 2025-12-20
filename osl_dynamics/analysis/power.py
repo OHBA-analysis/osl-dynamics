@@ -135,6 +135,12 @@ def variance_from_spectra(
         Variance over a frequency band for each component of each mode.
         Shape is (n_components, n_modes, n_channels) or (n_modes, n_channels)
         or (n_channels,).
+
+    Notes
+    -----
+    To get the correct scaling so that the output of this function reflects
+    the variance of the original data, then :code:`method='integral'` should
+    be used. Otherwise, the output of this function has an arbitrary scaling.
     """
 
     # Validation

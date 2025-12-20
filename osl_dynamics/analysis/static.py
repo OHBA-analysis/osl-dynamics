@@ -226,6 +226,7 @@ def welch_spectra(
         step_size=step_size,
         frequency_range=frequency_range,
         standardize=standardize,
+        calc_cpsd=calc_cpsd,
         calc_coh=calc_coh,
         return_weights=return_weights,
         keepdims=keepdims,

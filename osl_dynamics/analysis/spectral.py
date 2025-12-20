@@ -1582,10 +1582,10 @@ def _welch(
         # Average over the time dimension and rescale
         p = np.mean(p, axis=0)
         p *= scaling[i]
+        n_freq = p.shape[-1]
 
         if calc_coh:
             # Create a channels by channels matrix for cross PSDs
-            n_freq = p.shape[-1]
             cpsd = np.empty(
                 [n_channels, n_channels, n_freq],
                 dtype=np.complex64,
@@ -1598,6 +1598,16 @@ def _welch(
 
             # Calculate coherence
             coh.append(coherence_spectra(cpsd))
+
+        elif calc_cpsd:
+            cpsd = np.empty(
+                [n_channels, n_channels, n_freq],
+                dtype=np.complex64,
+            )
+            cpsd[m, n] = p
+            cpsd[n, m] = np.conj(p)
+            psd.append(cpsd)
+
         else:
             psd.append(p)
 
