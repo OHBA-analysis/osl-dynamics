@@ -126,11 +126,11 @@ def covariance_from_spectra(
     Parameters
     ----------
     f : np.ndarray
-        Frequency axis of the spectra. Only used if :code:`frequency_range`
-        is given. Shape must be (n_freq,).
+        Frequency axis of the spectra. Shape must be (n_freq,).
     cpsd : np.ndarray
-        Cross power spectra. Shape must be
-        (n_modes, n_channels, n_channels, n_freq).
+        Cross power spectra. Shape must be (n_sessions, n_modes, n_channels,
+        n_channels, n_freq) or (n_modes, n_channels, n_channels, n_freq)
+        or (n_channels, n_channels, n_freq).
     components : np.ndarray, optional
         Spectral components. Shape must be (n_components, n_freq).
     frequency_range : list, optional
@@ -139,9 +139,11 @@ def covariance_from_spectra(
 
     Returns
     -------
-    covar : np.ndarray
+    cov : np.ndarray
         Covariance over a frequency band for each component of each mode.
-        Shape is (n_components, n_modes, n_channels, n_channels).
+        Shape is (n_sessions, n_components, n_modes, n_channels, n_channels) or
+        (n_components, n_modes, n_channels, n_channels) or (n_modes, n_channels,
+        n_channels) or (n_channels, n_channels).
     """
 
     # Validation
@@ -176,30 +178,30 @@ def covariance_from_spectra(
         n_components = components.shape[0]
 
     # Calculate connectivity maps for each array
-    covar = []
+    cov = []
     for i in range(n_sessions):
         # Cross spectral densities
         csd = cpsd[i].reshape(-1, n_freq)
-        csd = abs(csd)
 
         if components is not None:
-            # Calculate PSD for each spectral component
+            # Calculate covariance for each spectral component
             c = components @ csd.T
             for j in range(n_components):
                 c[j] /= np.sum(components[j])
 
         else:
             # Integrate over the given frequency range
+            df = f[1] - f[0]
             if frequency_range is None:
-                c = np.sum(csd, axis=-1)
+                c = np.sum(csd, axis=-1) * df
             else:
                 [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
-                c = np.sum(csd[..., min_arg:max_arg], axis=-1)
+                c = np.sum(csd[..., min_arg:max_arg], axis=-1) * df
 
         c = c.reshape(n_components, n_modes, n_channels, n_channels)
-        covar.append(c)
+        cov.append(c.real)
 
-    return np.squeeze(covar)
+    return np.squeeze(cov)
 
 
 def mean_coherence_from_spectra(
