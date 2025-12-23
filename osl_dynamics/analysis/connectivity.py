@@ -201,6 +201,9 @@ def covariance_from_spectra(
         c = c.reshape(n_components, n_modes, n_channels, n_channels)
         cov.append(c.real)
 
+    # Ensure the covariances are positive definite
+    cov = array_ops.ensure_pos_def(cov)
+
     return np.squeeze(cov)
 
 

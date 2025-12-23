@@ -191,6 +191,26 @@ def cov2partialcov(cov, use_pinv=False):
     return partial
 
 
+def ensure_pos_def(cov, eps=1e-5):
+    """Ensure a covariance (or batch of covariances) is positive definite.
+
+    Parameters
+    ----------
+    cov : np.ndarray
+        Covariances of shape (..., N, N).
+    eps : float, optional
+        Small value added to the diagonal.
+
+    Returns
+    -------
+    cov : np.ndarray
+        Covariances of shape (..., N, N), symmetrized and regularized.
+    """
+    cov = np.asarray(cov)
+    cov = 0.5 * (cov + np.swapaxes(cov, -1, -2))
+    return cov + eps * np.eye(cov.shape[-1])
+
+
 def sliding_window_view(
     x,
     window_shape,

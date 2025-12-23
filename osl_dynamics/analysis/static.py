@@ -156,10 +156,11 @@ def welch_spectra(
     window_length=None,
     step_size=None,
     frequency_range=None,
-    return_weights=False,
     standardize=True,
+    averaging="mean",
     calc_cpsd=False,
     calc_coh=False,
+    return_weights=False,
     keepdims=False,
     n_jobs=1,
 ):
@@ -187,6 +188,9 @@ def welch_spectra(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the spectra?
+    averaging : str, optional
+        Method used to average periodograms.
+        Must be :code:`'mean'` or :code:`'median'`.
     calc_cpsd : bool, optional
         Should we return the cross spectra for :code:`psd`?
         If True, we force :code:`calc_coh` to False.
@@ -226,6 +230,7 @@ def welch_spectra(
         step_size=step_size,
         frequency_range=frequency_range,
         standardize=standardize,
+        averaging=averaging,
         calc_cpsd=calc_cpsd,
         calc_coh=calc_coh,
         return_weights=return_weights,
@@ -242,6 +247,7 @@ def multitaper_spectra(
     n_tapers=7,
     frequency_range=None,
     standardize=True,
+    averaging="mean",
     calc_cpsd=False,
     calc_coh=False,
     return_weights=False,
@@ -272,6 +278,9 @@ def multitaper_spectra(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the multitaper?
+    averaging : str, optional
+        Method used to average periodograms.
+        Must be :code:`'mean'` or :code:`'median'`.
     calc_cpsd : bool, optional
         Should we return the cross spectra for :code:`psd`?
         If True, we force :code:`calc_coh` to False.
@@ -312,6 +321,7 @@ def multitaper_spectra(
         n_tapers=n_tapers,
         frequency_range=frequency_range,
         standardize=standardize,
+        averaging=averaging,
         calc_cpsd=calc_cpsd,
         calc_coh=calc_coh,
         return_weights=return_weights,

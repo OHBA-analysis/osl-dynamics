@@ -4,6 +4,7 @@ import logging
 
 import numpy as np
 from scipy import signal
+from scipy.signal._spectral_py import _median_bias
 from sklearn.decomposition import non_negative_factorization
 from pqdm.processes import pqdm
 from tqdm.auto import trange
@@ -124,6 +125,7 @@ def welch_spectra(
     step_size=None,
     frequency_range=None,
     standardize=True,
+    averaging="mean",
     calc_cpsd=False,
     calc_coh=True,
     return_weights=False,
@@ -155,6 +157,9 @@ def welch_spectra(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the spectra?
+    averaging : str, optional
+        Method used to average periodograms.
+        Must be :code:`'mean'` or :code:`'median'`.
     calc_cpsd : bool, optional
         Should we return the cross spectra for :code:`psd`?
         If True, we force :code:`calc_coh` to False.
@@ -253,6 +258,7 @@ def welch_spectra(
                 "step_size": step_size,
                 "frequency_range": frequency_range,
                 "standardize": standardize,
+                "averaging": averaging,
                 "calc_cpsd": calc_cpsd,
                 "calc_coh": calc_coh,
                 "keepdims": True,
@@ -323,6 +329,7 @@ def multitaper_spectra(
     n_tapers=7,
     frequency_range=None,
     standardize=True,
+    averaging="mean",
     calc_cpsd=False,
     calc_coh=True,
     return_weights=False,
@@ -354,6 +361,9 @@ def multitaper_spectra(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the spectra?
+    averaging : str, optional
+        Method used to average periodograms.
+        Must be :code:`'mean'` or :code:`'median'`.
     calc_cpsd : bool, optional
         Should we return the cross spectra for :code:`psd`?
         If True, we force :code:`calc_coh` to False.
@@ -454,6 +464,7 @@ def multitaper_spectra(
                 "n_tapers": n_tapers,
                 "frequency_range": frequency_range,
                 "standardize": standardize,
+                "averaging": averaging,
                 "calc_cpsd": calc_cpsd,
                 "calc_coh": calc_coh,
                 "keepdims": True,
@@ -1492,6 +1503,7 @@ def _welch(
     step_size=None,
     frequency_range=None,
     standardize=True,
+    averaging="mean",
     calc_cpsd=False,
     calc_coh=False,
     keepdims=False,
@@ -1525,6 +1537,9 @@ def _welch(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the spectra?
+    averaging : str, optional
+        Method used to average periodograms.
+        Must be :code:`'mean'` or :code:`'median'`.
     calc_cpsd : bool, optional
         Should we return the cross spectra for :code:`psd`?
     calc_coh : bool, optional
@@ -1546,6 +1561,9 @@ def _welch(
         Shape is (..., n_channels, n_channels, n_freq).
         Only returned is :code:`calc_coh=True`.
     """
+    if averaging not in ["mean", "median"]:
+        raise ValueError(f"averaging must be 'mean' or 'median', got '{averaging}'.")
+
     n_samples, n_channels = data.shape
 
     if alpha is None:
@@ -1580,7 +1598,15 @@ def _welch(
         )
 
         # Average over the time dimension and rescale
-        p = np.mean(p, axis=0)
+        if averaging == "median":
+            bias = _median_bias(p.shape[0])
+            if np.iscomplexobj(p):
+                p = np.median(p.real, axis=0) + 1j * np.median(p.imag, axis=0)
+            else:
+                p = np.median(p, axis=0)
+            p /= bias
+        else:
+            p = np.mean(p, axis=0)
         p *= scaling[i]
         n_freq = p.shape[-1]
 
@@ -1824,6 +1850,7 @@ def _multitaper(
     n_tapers=7,
     frequency_range=None,
     standardize=True,
+    averaging="mean",
     calc_cpsd=False,
     calc_coh=True,
     keepdims=False,
@@ -1858,6 +1885,9 @@ def _multitaper(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the spectra?
+    averaging : str, optional
+        Method used to average periodograms.
+        Must be :code:`'mean'` or :code:`'median'`.
     calc_cpsd : bool, optional
         Should we return the cross spectra for :code:`psd`?
     calc_coh : bool, optional
@@ -1879,6 +1909,9 @@ def _multitaper(
         Shape is (..., n_channels, n_channels, n_freq).
         Only returned is :code:`calc_coh=True`.
     """
+    if averaging not in ["mean", "median"]:
+        raise ValueError(f"averaging must be 'mean' or 'median', got '{averaging}'.")
+
     n_samples, n_channels = data.shape
 
     if alpha is None:
@@ -1915,7 +1948,15 @@ def _multitaper(
         )
 
         # Average over the time dimension and rescale
-        p = np.mean(p, axis=0)
+        if averaging == "median":
+            bias = _median_bias(p.shape[0])
+            if np.iscomplexobj(p):
+                p = np.median(p.real, axis=0) + 1j * np.median(p.imag, axis=0)
+            else:
+                p = np.median(p, axis=0)
+            p /= bias
+        else:
+            p = np.mean(p, axis=0)
         p *= scaling[i]
         n_freq = p.shape[-1]
 
