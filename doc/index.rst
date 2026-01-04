@@ -27,7 +27,7 @@ If you would like to request new features or if you're confident that you have f
 
 This package was developed by the Oxford Centre for Human Brain Activity (OHBA) Methods Group at the University of Oxford. Our group website is `here <https://www.psych.ox.ac.uk/research/ohba-analysis-group>`_.
 
-If you find this toolbox useful, please cite:
+If you find this toolbox useful, please cite this `paper <https://elifesciences.org/articles/91949>`_:
 
     **Gohil, C., Huang, R., Roberts, E., van Es, M. W., Quinn, A. J., Vidaurre, D., & Woolrich, M. W. (2024). osl-dynamics, a toolbox for modeling fast dynamic brain activity. Elife, 12, RP91949.**
 
