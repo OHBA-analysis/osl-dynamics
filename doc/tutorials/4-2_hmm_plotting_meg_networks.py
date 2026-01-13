@@ -196,7 +196,7 @@ mean_c = np.average(c, axis=0, weights=w)
 print(mean_c.shape)
 
 # Threshold each network and look for the top 3% of connections relative to the mean
-mean_c -= np.mean(mean_c, axis=0, keepdims=True)
+mean_c -= np.mean(mean_c, axis=1, keepdims=True)  # subtract mean across states
 thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True)
 print(thres_mean_c.shape)
 
