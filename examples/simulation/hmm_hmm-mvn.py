@@ -56,11 +56,24 @@ model.summary()
 
 #%% Train model
 
-model.train(data)
+# Initialization
+init_history = model.random_state_time_course_initialization(data, n_init=3, n_epochs=2)
 
-# Save
+# Full training
+history = model.fit(data)
+
+# Save model
 model_dir = f"{results_dir}/model"
 model.save(model_dir)
+
+# Calculate the free energy
+free_energy = model.free_energy(data)
+history["free_energy"] = free_energy
+print("Free energy:", free_energy)
+
+# Save training history and free energy
+pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
+pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
 
 #%% Get inferred parameters
 

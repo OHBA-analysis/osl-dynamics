@@ -69,11 +69,23 @@ model.set_regularizers(data)
 
 #%% Train model
 
-model.train(data)
+# Initialization
+init_history = model.random_subset_initialization(data, n_init=5, n_epochs=2, take=1)
 
-# Save
+# Full training
+history = model.fit(data)
+
+# Save model
 model_dir = f"{results_dir}/model"
 model.save(model_dir)
+
+# Calculate the free energy
+free_energy = model.free_energy(data)
+history["free_energy"] = free_energy
+
+# Save training history and free energy
+pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
+pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
 
 #%% Get inferred parameters
 
