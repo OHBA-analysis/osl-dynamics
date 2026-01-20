@@ -1542,7 +1542,10 @@ class MarkovStateInferenceModelBase(ModelBase):
             for j in range(self.config.n_states):
                 x = data[stc[:, j] == 1]
                 mu = np.mean(x, axis=0)
-                sigma = np.cov(x, rowvar=False)
+                if self.config.n_channels == 1:
+                    sigma = np.var(x).reshape(1, 1)
+                else:
+                    sigma = np.cov(x, rowvar=False)
                 m.append(mu)
                 C.append(sigma)
             means += m
