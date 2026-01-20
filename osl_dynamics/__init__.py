@@ -3,7 +3,6 @@ from importlib.metadata import PackageNotFoundError, version
 
 from osl_dynamics.config_api.pipeline import run_pipeline
 
-
 # Setup the version
 try:
     __version__ = version("osl-dynamics")
