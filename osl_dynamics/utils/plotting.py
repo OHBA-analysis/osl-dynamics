@@ -20,7 +20,6 @@ from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
 from osl_dynamics.utils.parcellation import Parcellation, parcel_vector_to_voxel_grid
 
-
 _logger = logging.getLogger("osl-dynamics")
 
 # Suppress matplotlib warnings

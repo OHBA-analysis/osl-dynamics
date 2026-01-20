@@ -10,7 +10,6 @@ from tqdm.auto import trange
 from osl_dynamics.glm.base import GLM
 from osl_dynamics.glm.ols import osl_fit
 
-
 _logger = logging.getLogger("osl-dynamics")
 
 

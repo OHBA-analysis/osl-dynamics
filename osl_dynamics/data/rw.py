@@ -8,7 +8,6 @@ import numpy as np
 import scipy.io
 from scipy import ndimage
 
-
 _logger = logging.getLogger("osl-dynamics")
 _allowed_ext = [".npy", ".mat", ".txt", ".fif"]
 

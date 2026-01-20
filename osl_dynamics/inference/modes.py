@@ -548,10 +548,11 @@ def convert_to_mne_raw(
         extra_chans = [extra_chans]
 
     # How many time points from the start of parcellated data should we remove?
-    if n_embeddings is not None and n_window is not None:
-        raise ValueError("Cannot pass both n_embeddings and n_window.")
-    n_trim = n_embeddings or n_window or 1
-    n_trim = n_trim // 2
+    n_trim = 0
+    if n_embeddings is not None:
+        n_trim += n_embeddings // 2
+    if n_window is not None:
+        n_trim += n_window // 2
 
     # Load the Raw object
     if isinstance(raw, str):
