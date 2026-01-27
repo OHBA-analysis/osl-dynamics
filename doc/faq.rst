@@ -38,12 +38,12 @@ For electrophysiological data we have found preprocessing the sensor-level data 
 
 The OSL workshop had a session on dynamic network modelling. The OSF project hosting workshop materials (`here <https://osf.io/zxb6c/>`_) has jupyter notebooks with recommended preprocessing and source reconstruction for fitting the HMM/DyNeMo.
 
-Can I use a structural parcellation (e.g. AAL or Desikan-Killiany atlas)?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Can I use a structural parcellation (e.g. the AAL or Desikan-Killiany atlas)?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Yes, you can. There’s nothing stopping you from using the parcellation you want during source reconstruction. Note, source reconstruction of M/EEG is performed using the `osl-ephys <https://github.com/OHBA-analysis/osl-ephys>`_ package rather than within osl-dynamics.
 
-Note, you want the number of parcels to be a good amount less than the rank of the sensor space data in order to estimate your parcel time courses well. The rank is at most equal to the number of sensors you have. With Maxfiltered data (e.g. Elekta/MEGIN data), the default rank of the sensor data is ~64, and so it is sensible to require the number of parcels to be less than 64. Even with non-maxfiltered data with hundreds of sensors (e.g. CTF, OPMs) the effective amount of information in the sensor data typically corresponds to a rank of about 100. You can look at the eigenspectrum of your sensor space data to check this.
+You want the number of parcels to be a good amount less than the rank of the sensor space data in order to estimate your parcel time courses well. The rank is at most equal to the number of sensors you have. With Maxfiltered data (e.g. Elekta/MEGIN data), the default rank of the sensor data is ~64, and so it is sensible to require the number of parcels to be less than 64. Even with non-maxfiltered data with hundreds of sensors (e.g. CTF, OPMs) the effective amount of information in the sensor data typically corresponds to a rank of about 100. You can look at the eigenspectrum of your sensor space data to check this.
 
 Also note, the requirement to have the number of parcels less than the rank is an absolute requirement if you are using the recommended **symmetric orthogonalisation** approach on the parcel time courses to correct for spatial leakage. This is not a deficiency of the symmetric orthogonalisation approach but reflects the rank needed to use this more complete spatial leakage correction (it removes so-called inherited or ghost interactions as well) while still being able to estimate parcel time courses unambiguously.
 
@@ -67,7 +67,7 @@ There are three common choices for preparing the data:
 
 #. **Calculate amplitude envelope data and standardize**. This is common approach for overcoming the dipole sign ambiguity problem in MEG - where the sign of source reconstructed channels can be misaligned cross different subjects or sessions. Here, we apply a Hilbert transform to the 'raw' data and apply a short sliding window to smooth the data. This was an approach that was previously common. Nowadays, time-delay embedding is preferred.
 
-The :doc:`Preparing M/EEG Data <tutorials_build/data_prepare_meg>` and :doc:`Preparing fMRI Data <tutorials_build/data_prepare_fmri>` tutorials cover how to prepare data.
+The :doc:`Preparing M/EEG Data <tutorials_build/1-2_data_prepare_meg>` and :doc:`Preparing fMRI Data <tutorials_build/1-3_data_prepare_fmri>` tutorials cover how to prepare data.
 
 What is time-delay embedding?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -81,6 +81,8 @@ The purpose of TDE is to encode spectral (frequency-specific) information in the
 
 Usually adding the extra channels results in a very high-dimensional time series, so we typically also apply principal component analysis for dimensionality reduction. **We recommend reducing down to at least twice the number of original channels**.
 
+Also see: :doc:`Time-Delay Embedding <tutorials_build/1-4_data_time_delay_embedding>`.
+
 How does the choice of number of lags (embeddings) affect the model when doing time-delay embedding?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -88,7 +90,7 @@ See the 'What is time-delay embedding' question for a description of what happen
 
 A choice we have to make is how many lagged versions of each channel we add. The number of lagged channels we add (i.e. the number of embeddings) determines how many points in the auto-correlation function (and therefore power spectrum) we encode into the covariance matrix of the data. I.e. if we include more embeddings, we add more off-diagonal elements into the covariance matrix, which corresponds to specifying more data points in the auto-correlation function and therefore power spectrum. In other words, having more embeddings allows you to be more sensitive to oscillations in your data.
 
-The number of embeddings should be chosen for a particular sampling frequency. See the :doc:`Time-Delay Embedding tutorial <tutorials_build/data_time_delay_embedding>` for example code comparing different TDE settings. We recommends 15 embeddings for 250 Hz data and 7 embeddings for 100 Hz data.
+The number of embeddings should be chosen for a particular sampling frequency. See the :doc:`Time-Delay Embedding tutorial <tutorials_build/1-4_data_time_delay_embedding>` for example code comparing different TDE settings. We recommends 15 embeddings for 250 Hz data and 7 embeddings for 100 Hz data.
 
 Why doesn't the number of time points in my inferred alphas match the original data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -201,12 +203,14 @@ Can I use this package with task data?
 
 Yes! the models contained in osl-dynamics can be applied to task data. **The recommended approach is to preprocess/prepare task data as if it is resting-state data and fit an HMM/DyNeMo to it as normal**. When you have inferred a state/mode time course you can then do post-hoc analysis using the task timings, e.g. by epoching the state/mode time course around an event.
 
+Also see: `Dynamic Network Analysis of Electrophysiological Task Data <https://github.com/OHBA-analysis/Gohil2024_NetworkAnalysisOfTaskData>`_.
+
 Can I train an HMM/DyNeMo on EEG data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Yes! You can train the HMM/DyNeMo on sensor-level or source reconstructed EEG data. Note, the same preparation steps (see 'Do I need to prepare my data before training a model?') should be applied to the data irrespective of if it is MEG or EEG data.
 
-Also see `Cho, et al. (2024) <https://onlinelibrary.wiley.com/doi/full/10.1002/hbm.70018>`_.
+Also see: `Cho, et al. (2024) <https://onlinelibrary.wiley.com/doi/full/10.1002/hbm.70018>`_.
 
 I've encountered a NaN when I tried to train a model? Why did this happen and how can I fix it?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -241,7 +245,7 @@ It is common to look at four summary statistics for dynamics when using the HMM:
 - The **mean interval**, which is the average duration between successive state visits.
 - The **switching rate**, which is the average number of visits to a state per second.
 
-Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <tutorials_build/hmm_summary_stats>` for example code of how to calculate these quantities.
+Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <tutorials_build/4-3_hmm_summary_stats>` for example code of how to calculate these quantities.
 
 Often, we are interested in comparing two groups or conditions. E.g. we might find static alpha (8-12 Hz) power is increased for one group/condition. Let's speculate there are segments in our data where alpha power bursts occur - this would be identified by the HMM as a state with high alpha power that only activates for particular segments. The increase in alpha power seen for a group/condition can arise in many ways, maybe the alpha bursts are longer in duration, maybe they're more frequency, maybe the dynamics are unchanged but the alpha state just has more alpha power in it. The different summary statistics can potentially help interpret which of these options it is.
 
