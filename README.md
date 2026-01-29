@@ -16,7 +16,7 @@ We recommend installing osl-dynamics using the conda environment files in `/envs
 
 Miniforge (`conda`/`mamba`) can be installed with:
 ```
-wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+curl -LO "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
 bash Miniforge3-$(uname)-$(uname -m).sh
 rm Miniforge3-$(uname)-$(uname -m).sh
 ```
@@ -27,14 +27,14 @@ Different computers have their own environment files. For more information see t
 
 #### Linux
 ```
-wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
+curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
 mamba env create -f osld-tf.yml
 rm osld-tf.yml
 ```
 
 If you have a GPU, then use the `osld-tf-cuda.yml` environment instead:
 ```
-wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-cuda.yml
+curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-cuda.yml
 mamba env create -f osld-tf-cuda.yml
 rm osld-tf-cuda.yml
 ```
@@ -43,14 +43,14 @@ rm osld-tf-cuda.yml
 
 If you have an M-series (M1, M2, M3) chip use:
 ```
-wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
+curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
 mamba env create -f osld-tf.yml
 rm osld-tf.yml
 ```
 
 Otherwise, if you have an Intel chip use:
 ```
-wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-macos.yml
+curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-macos.yml
 mamba env create -f osld-tf-macos.yml
 rm osld-tf-macos.yml
 ```
@@ -63,7 +63,7 @@ If you are using a Windows computer, we recommend first installing Linux (Ubuntu
 
 On the OHBA workstation (hbaws), install Miniforge and Mamba using the instructions above and install osl-dynamics using:
 ```
-wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/hbaws.yml
+curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/hbaws.yml
 mamba env create -f hbaws.yml
 rm hbaws.yml
 ```
@@ -76,7 +76,7 @@ module load Miniforge3
 ```
 and osl-dynamics can be installed with:
 ```
-wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/bmrc.yml
+curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/bmrc.yml
 mamba env create -f bmrc.yml
 rm bmrc.yml
 ```

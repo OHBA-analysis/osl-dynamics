@@ -10,7 +10,7 @@ Miniforge (:code:`conda`/:code:`mamba`) can be installed with:
 
 .. code::
 
-    wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+    curl -LO "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
     bash Miniforge3-$(uname)-$(uname -m).sh
     rm Miniforge3-$(uname)-$(uname -m).sh
 
@@ -22,7 +22,7 @@ The following lines can be used to download a conda environment file and install
 
 .. code::
 
-    wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
+    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
     mamba env create -f osld-tf.yml
     rm osld-tf.yml
 
@@ -30,7 +30,7 @@ If you have a GPU, then use the :code:`osld-tf-cuda.yml` environment file:
 
 .. code::
 
-    wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-cuda.yml
+    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-cuda.yml
     mamba env create -f osld-tf-cuda.yml
     rm osld-tf-cuda.yml
 
@@ -41,7 +41,7 @@ If you have an M-series (M1, M2, M3) chip, the following lines can be used to do
 
 .. code::
 
-    wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
+    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
     mamba env create -f osld-tf.yml
     rm osld-tf.yml
 
@@ -49,14 +49,14 @@ If you have an Intel chip, then use the :code:`osld-tf-macos.yml` environment fi
 
 .. code::
 
-    wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-macos.yml
+    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-macos.yml
     mamba env create -f osld-tf-macos.yml
     rm osld-tf-macos.yml
 
 Windows Instructions
 --------------------
 
-If you are using a Windows computer, we recommend first installing linux (Ubuntu) as a Windows Subsystem by following the instructions `here <https://ubuntu.com/wsl>`_. Then following the instructions above in the Ubuntu terminal.
+If you are using a Windows computer, we recommend first installing linux (Ubuntu) as a Windows Subsystem (WSL) by following the instructions `here <https://documentation.ubuntu.com/wsl/stable/howto/install-ubuntu-wsl2/>`_. Then follow the Conda/Mamba and Linux instructions above in the Ubuntu terminal.
 
 Oxford-Specific Computers (hbaws, BMRC)
 ---------------------------------------
@@ -82,7 +82,7 @@ If you want to install osl-dynamics without TensorFlow, then use the :code:`osld
 
 .. code::
 
-    wget https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld.yml
+    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld.yml
     mamba env create -f osld.yml
     rm osld.yml
 
