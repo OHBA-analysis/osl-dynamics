@@ -44,15 +44,6 @@ AAL parcellation
 | atlas-AAL_nparc-78_space-MNI_res-8x8x8.nii.gz |
 +-----------------------------------------------+
 
-Yeo parcellations
-^^^^^^^^^^^^^^^^^
-
-+-----------------------------------------------+
-| atlas-Yeo_nparc-7_space-MNI_res-8x8x8.nii.gz  |
-+-----------------------------------------------+
-| atlas-Yeo_nparc-17_space-MNI_res-8x8x8.nii.gz |
-+-----------------------------------------------+
-
 Old Naming
 ----------
 
@@ -72,10 +63,6 @@ Note, some of these have been renamed:
 | atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz   | fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz  |
 +---------------------------------------------------+--------------------------------------------------------------------------+
 | atlas-AAL_nparc-78_space-MNI_res-8x8x8.nii.gz     | aal_cortical_merged_8mm_stacked.nii.gz                                   |
-+---------------------------------------------------+--------------------------------------------------------------------------+
-| atlas-Yeo_nparc-7_space-MNI_res-8x8x8.nii.gz      | Yeo7_8mm.nii.gz                                                          |
-+---------------------------------------------------+--------------------------------------------------------------------------+
-| atlas-Yeo_nparc-17_space-MNI_res-8x8x8.nii.gz     | Yeo17_8mm.nii.gz                                                         |
 +---------------------------------------------------+--------------------------------------------------------------------------+
 
 MNI Coordinates
