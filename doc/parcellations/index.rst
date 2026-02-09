@@ -8,8 +8,8 @@ Parcellations are stored on the GitHub repository `here <https://github.com/OHBA
 Available Parcellations
 -----------------------
 
-"Glasser" parcellations
-^^^^^^^^^^^^^^^^^^^^^^^
+Glasser parcellations
+^^^^^^^^^^^^^^^^^^^^^
 
 +----------------------------------------------------------------------+
 | atlas-Glasser_nparc-50_space-MNI_res-8x8x8.nii.gz                    |
@@ -17,16 +17,16 @@ Available Parcellations
 | :doc:`atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz <glasser52>` |
 +----------------------------------------------------------------------+
 
-"Giles" parcellations
-^^^^^^^^^^^^^^^^^^^^^
+Giles parcellations
+^^^^^^^^^^^^^^^^^^^
 
-+-------------------------------------------------+
-| atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz |
-+-------------------------------------------------+
-| atlas-Giles_nparc-39_space-MNI_res-8x8x8.nii.gz |
-+-------------------------------------------------+
-| atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz |
-+-------------------------------------------------+
++------------------------------------------------------------------+
+| :doc:`atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz <giles38>` |
++------------------------------------------------------------------+
+| :doc:`atlas-Giles_nparc-39_space-MNI_res-8x8x8.nii.gz <giles39>` |
++------------------------------------------------------------------+
+| :doc:`atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz <giles42>` |
++------------------------------------------------------------------+
 
 Desikan-Killiany parcellations
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -47,7 +47,7 @@ AAL parcellation
 Old Naming
 ----------
 
-Note, some of these have been renamed:
+Note, the parcellation files in osl-dynamics have been renamed:
 
 +---------------------------------------------------+--------------------------------------------------------------------------+
 | New name                                          | Old name                                                                 |
@@ -61,6 +61,8 @@ Note, some of these have been renamed:
 | atlas-Giles_nparc-39_space-MNI_res-8x8x8.nii.gz   | fmri_d100_parcellation_with_PCC_tighterMay15_v2_8mm.nii.gz               |
 +---------------------------------------------------+--------------------------------------------------------------------------+
 | atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz   | fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz  |
++---------------------------------------------------+--------------------------------------------------------------------------+
+| atlas-DK_nparc-68_space-MNI_res-8x8x8.nii.gz      | dk_cortical.nii.gz                                                       |
 +---------------------------------------------------+--------------------------------------------------------------------------+
 | atlas-AAL_nparc-78_space-MNI_res-8x8x8.nii.gz     | aal_cortical_merged_8mm_stacked.nii.gz                                   |
 +---------------------------------------------------+--------------------------------------------------------------------------+
