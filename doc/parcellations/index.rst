@@ -80,4 +80,4 @@ Example code for obtaining the MNI coordinates of each parcel center:
 
     filename 'atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz'
     parc = Parcellation(filename)
-    mni_coords = parc.roi_centers().astype(int)
+    mni_coords = parc.roi_centers()
