@@ -151,7 +151,7 @@ sphinx-build -b html doc build
 ```
 The local build of the documentation webpage can be found in `build/sphinx/html/index.html`.
 
-To skip building the tutorials, comment out `"sphinx_gallery.gen_gallery"` [here](https://github.com/OHBA-analysis/osl-dynamics/blob/main/doc/conf.py).
+To skip building the tutorials, comment out `"sphinx_gallery.gen_gallery"` [here](https://github.com/OHBA-analysis/osl-dynamics/blob/main/doc/conf.py#L36).
 
 ## Releases
 
