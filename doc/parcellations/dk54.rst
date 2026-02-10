@@ -3,7 +3,7 @@
 DK54 Parcellation
 =================
 
-This is a reduced version of the original (cortical only) :doc:`DK68 parcellation <dk68>`.
+This is a reduced version of the original :doc:`DK68 parcellation <dk68>`.
 
 Parcels
 -------
@@ -139,3 +139,10 @@ Example code for plotting with this parcellation:
         parcellation_file="atlas-DK_nparc-54_space-MNI_res-8x8x8.nii.gz",
         filename="map_.png",
     )
+
+Reference
+---------
+
+If you use the this parcellation, please cite:
+
+    Gohil, C., Kohl, O., & Woolrich, M. (2026). DK54: a reduced version of the Desikan-Killiany parcellation [Data set]. Zenodo. https://doi.org/10.5281/zenodo.18599127

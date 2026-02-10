@@ -3,7 +3,7 @@
 DK68 Parcellation
 =================
 
-This parcellation contains the **cortical regions** of the `Desikan-Kiliany (DK) <https://surfer.nmr.mgh.harvard.edu/fswiki/CorticalParcellation>`_ atlas, which is the default atlas used in `FreeSurfer <https://surfer.nmr.mgh.harvard.edu/>`_. Note, this is a volumetric (not surface) parcellation.
+This parcellation contains a volumetric version of the `Desikan-Kiliany (DK) <https://surfer.nmr.mgh.harvard.edu/fswiki/CorticalParcellation>`_ atlas, which is the default atlas used in `FreeSurfer <https://surfer.nmr.mgh.harvard.edu/>`_.
 
 Parcels
 -------

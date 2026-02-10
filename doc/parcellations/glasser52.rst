@@ -145,6 +145,3 @@ If you use the this parcellation, please cite:
 
     Kohl, O., Woolrich, M., Nobre, A. C., & Quinn, A. (2023). Glasser52: A parcellation for MEG-Analysis [Data set].
     Zenodo. https://doi.org/10.5281/zenodo.10401793
-
-See the link for further information regarding this parcellation.
-
