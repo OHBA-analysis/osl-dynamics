@@ -13,7 +13,7 @@ In this tutorial we will perform static power analysis on source space MEG data.
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz`.
+# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
 #
@@ -123,7 +123,7 @@ group_p = np.mean(p, axis=0)
 fig, ax = power.save(
     group_p,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
 
 #%%
@@ -132,5 +132,5 @@ fig, ax = power.save(
 fig, ax = power.save(
     p[:4],  # first four
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )

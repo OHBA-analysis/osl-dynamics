@@ -1,6 +1,6 @@
 """Plot the Giles parcellation.
 
-fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz is commonly
+atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz is commonly
 referred to as the 'Giles parcellation'.
 
 This script can be helpful for understanding what brain regions each parcel
@@ -33,7 +33,7 @@ if plot_parcels:
             p,
             filename=f"plots/parc_{i}_.png",
             mask_file="MNI152_T1_8mm_brain.nii.gz",
-            parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+            parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
         )
 
 if plot_hemisphere_conn:
@@ -50,7 +50,7 @@ if plot_hemisphere_conn:
     connectivity.save(
         c,
         filename="plots/left_hemi_.png",
-        parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+        parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     )
 
     # Plot connections in the right hemisphere only
@@ -66,5 +66,5 @@ if plot_hemisphere_conn:
     connectivity.save(
         c,
         filename="plots/right_hemi_.png",
-        parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+        parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     )

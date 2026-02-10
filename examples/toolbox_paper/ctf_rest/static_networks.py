@@ -62,7 +62,7 @@ mean_pow_map = np.mean(pow_map, axis=0)  # average over subjects
 power.save(
     mean_pow_map,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     plot_kwargs={
         "views": ["lateral"],
         "symmetric_cbar": True,
@@ -86,7 +86,7 @@ for c in mean_coh_net:
     np.fill_diagonal(c, 0)
 connectivity.save(
     mean_coh_net,
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     threshold=0.95,
     plot_kwargs={
         "edge_cmap": "Reds",
@@ -112,7 +112,7 @@ for a in mean_aec:
     np.fill_diagonal(a, 0)
 connectivity.save(
     mean_aec,
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     threshold=0.95,
     plot_kwargs={
         "edge_cmap": "Reds",
@@ -139,13 +139,13 @@ pow_diff, pvalues = statistics.group_diff_max_stat_perm(
 power.save(
     pow_diff,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     filename=f"{output_dir}/pow_diff_.png",
 )
 power.save(
     pvalues,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     plot_kwargs={
         "cmap": "Greens_r",
         "symmetric_cbar": False,
@@ -166,6 +166,6 @@ aec_diffs[pvalues > 0.05] = 0
 aec_diffs = vec2mat(aec_diffs)
 connectivity.save(
     aec_diffs,
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     filename=f"{output_dir}/aec_diff_.png",
 )

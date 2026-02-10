@@ -70,7 +70,7 @@ class Parcellation:
         ]
 
     def roi_centers(self):
-        """Centroid of each parcel in MNI coordinates."""
+        """Centroid of each parcel."""
         return np.array(
             [
                 np.average(c, weights=w, axis=0)

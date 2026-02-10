@@ -44,11 +44,11 @@ conn_map = connectivity.threshold(
 pos_conn_map, neg_conn_map = connectivity.separate_edges(conn_map)
 connectivity.save(
     pos_conn_map,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
     filename="pos_corr_.png",
 )
 connectivity.save(
     neg_conn_map,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
     filename="neg_corr_.png",
 )

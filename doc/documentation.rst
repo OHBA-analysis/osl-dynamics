@@ -15,6 +15,11 @@ Descriptions for models implemented in osl-dynamics:
 - :doc:`Hidden Markov Model (HMM) <models/hmm>`.
 - :doc:`Dynamic Network Modes (DyNeMo) <models/dynemo>`.
 
+Parcellations
+-------------
+
+For information regarding the parcellations available in osl-dynamics, see :doc:`here <parcellations/index>`.
+
 Tutorials
 ---------
 

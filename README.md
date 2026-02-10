@@ -151,6 +151,8 @@ sphinx-build -b html doc build
 ```
 The local build of the documentation webpage can be found in `build/sphinx/html/index.html`.
 
+To skip building the tutorials, comment out `"sphinx_gallery.gen_gallery"` [here](https://github.com/OHBA-analysis/osl-dynamics/blob/main/doc/conf.py).
+
 ## Releases
 
 A couple packages are needed to build and upload a project to PyPI, these can be installed in your conda environment with:

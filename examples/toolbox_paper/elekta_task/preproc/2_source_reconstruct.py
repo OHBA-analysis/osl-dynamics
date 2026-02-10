@@ -46,7 +46,7 @@ if __name__ == "__main__":
             freq_range: [1, 45]
             chantypes: [mag, grad]
             rank: {meg: 60}
-            parcellation_file: fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz
+            parcellation_file: atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz
             method: spatial_basis
             orthogonalisation: symmetric
     """

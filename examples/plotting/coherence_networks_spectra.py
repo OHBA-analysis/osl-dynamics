@@ -40,6 +40,6 @@ conn_map = connectivity.threshold(conn_map, percentile=95, subtract_mean=True)
 # Plot connectivity maps
 connectivity.save(
     conn_map,
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+    parcellation_file="atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz",
     filename="coh_.png",
 )

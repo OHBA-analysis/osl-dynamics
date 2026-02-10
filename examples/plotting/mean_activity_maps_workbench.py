@@ -27,7 +27,7 @@ means = np.load("notts_ae_hmm/means.npy")
 power.save(
     means,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
     subtract_mean=True,
     filename="maps.nii.gz",
 )
