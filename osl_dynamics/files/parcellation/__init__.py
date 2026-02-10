@@ -1,6 +1,6 @@
 """Volumetric parcellations.
 
-For more information regarding the parcellations see :doc:`here <parcellations/index>`.
+For more information see :ref:`parcellations`.
 """
 
 from pathlib import Path
