@@ -119,7 +119,10 @@ def variance_from_spectra(
         given. Shape must be (n_freq,).
     power_spectra : np.ndarray
         Power/cross spectra for each channel.
-        Shape must be (n_channels, n_channels) or (n_channels,).
+        Shape must be (n_channels, n_freq) or (n_modes, n_channels, n_freq)
+        or (n_sessions, n_modes, n_channels, n_freq).
+        Cross spectra with space (..., n_channels, n_channels, n_freq)
+        can also be passed.
     components : np.ndarray, optional
         Spectral components. Shape must be (n_components, n_freq).
     frequency_range : list, optional
@@ -133,8 +136,7 @@ def variance_from_spectra(
     -------
     var : np.ndarray
         Variance over a frequency band for each component of each mode.
-        Shape is (n_components, n_modes, n_channels) or (n_modes, n_channels)
-        or (n_channels,).
+        Shape is (..., n_channels).
 
     Notes
     -----
