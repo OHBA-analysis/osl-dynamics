@@ -1,0 +1,27 @@
+:orphan:
+
+DK68 Parcellation
+=================
+
+This parcellation contains the **cortical regions** of the `Desikan-Kiliany (DK) <https://surfer.nmr.mgh.harvard.edu/fswiki/CorticalParcellation>`_ atlas, which is the default atlas used in `FreeSurfer <https://surfer.nmr.mgh.harvard.edu/>`_. Note, this is a volumetric (not surface) parcellation.
+
+Parcels
+-------
+
+.. image:: dk68.png
+
+Example Code
+------------
+
+Example code for plotting with this parcellation:
+
+.. code::
+
+    from osl_dynamics.analysis import power
+
+    power.save(
+        ...,
+        mask_file="MNI152_T1_8mm_brain.nii.gz",
+        parcellation_file="atlas-DK_nparc-68_space-MNI_res-8x8x8.nii.gz",
+        filename="map_.png",
+    )

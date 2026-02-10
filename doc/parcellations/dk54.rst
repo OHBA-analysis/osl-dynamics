@@ -1,0 +1,27 @@
+:orphan:
+
+DK54 Parcellation
+=================
+
+This is a reduced version of the original (cortical only) :doc:`DK68 parcellation <dk68>`.
+
+Parcels
+-------
+
+.. image:: dk54.png
+
+Example Code
+------------
+
+Example code for plotting with this parcellation:
+
+.. code::
+
+    from osl_dynamics.analysis import power
+
+    power.save(
+        ...,
+        mask_file="MNI152_T1_8mm_brain.nii.gz",
+        parcellation_file="atlas-DK_nparc-54_space-MNI_res-8x8x8.nii.gz",
+        filename="map_.png",
+    )

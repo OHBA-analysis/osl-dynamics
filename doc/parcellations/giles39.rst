@@ -7,7 +7,7 @@ In osl-dynamics, this parcellation file is named :code:`atlas-Giles_nparc-39_spa
 
 This is a modified version of the :doc:`original Giles parcellation <giles38>` to include the PCC.
 
-This parcellation was used in `A.J. Quinn, et al. (2018) <https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2018.00603/full>`_.
+This parcellation was used in `Quinn et al. (2018) <https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2018.00603/full>`_.
 
 Parcels
 -------

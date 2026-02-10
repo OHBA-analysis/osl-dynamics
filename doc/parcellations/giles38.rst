@@ -5,7 +5,7 @@ Giles38 Parcellation
 
 In osl-dynamics, this parcellation file is named :code:`atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz`, however, this parcellation file was previously named :code:`fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz` (both names will work).
 
-This is the original parcellation created by Giles Colclough based on applying ICA to fMRI data.
+This is the original parcellation created by Giles Colclough based on applying ICA to fMRI data from 100 subjects.
 
 Parcels
 -------

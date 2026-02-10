@@ -8,11 +8,20 @@ Parcellations are stored on the GitHub repository `here <https://github.com/OHBA
 Available Parcellations
 -----------------------
 
+Desikan-Killiany parcellations
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
++------------------------------------------------------------+
+| :doc:`atlas-DK_nparc-54_space-MNI_res-8x8x8.nii.gz <dk54>` |
++------------------------------------------------------------+
+| :doc:`atlas-DK_nparc-68_space-MNI_res-8x8x8.nii.gz <dk68>` |
++------------------------------------------------------------+
+
 Glasser parcellations
 ^^^^^^^^^^^^^^^^^^^^^
 
 +----------------------------------------------------------------------+
-| atlas-Glasser_nparc-50_space-MNI_res-8x8x8.nii.gz                    |
+| :doc:`atlas-Glasser_nparc-50_space-MNI_res-8x8x8.nii.gz <glasser50>` |
 +----------------------------------------------------------------------+
 | :doc:`atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz <glasser52>` |
 +----------------------------------------------------------------------+
@@ -28,21 +37,12 @@ Giles parcellations
 | :doc:`atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz <giles42>` |
 +------------------------------------------------------------------+
 
-Desikan-Killiany parcellations
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-+----------------------------------------------+
-| atlas-DK_nparc-54_space-MNI_res-8x8x8.nii.gz |
-+----------------------------------------------+
-| atlas-DK_nparc-68_space-MNI_res-8x8x8.nii.gz |
-+----------------------------------------------+
-
 AAL parcellation
 ^^^^^^^^^^^^^^^^^
 
-+-----------------------------------------------+
-| atlas-AAL_nparc-78_space-MNI_res-8x8x8.nii.gz |
-+-----------------------------------------------+
++--------------------------------------------------------------+
+| :doc:`atlas-AAL_nparc-78_space-MNI_res-8x8x8.nii.gz <aal78>` |
++--------------------------------------------------------------+
 
 Old Naming
 ----------
@@ -70,7 +70,9 @@ Note, the parcellation files in osl-dynamics have been renamed:
 MNI Coordinates
 ---------------
 
-The parcellations provided are in MNI space. The MNI coordinates of each parcel center can be obtained with:
+The parcellations provided are in MNI space.
+
+Example code for obtaining the MNI coordinates of each parcel center:
 
 .. code::
 

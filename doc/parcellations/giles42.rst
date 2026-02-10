@@ -7,7 +7,7 @@ In osl-dynamics, this parcellation file is named :code:`atlas-Giles_nparc-42_spa
 
 This is a modified version of the :doc:`original Giles parcellation <giles38>` to include the PCC plus 2 other parcels near it.
 
-This parcellation was used in `D. Vidaurre, et al. (2018) <https://www.nature.com/articles/s41467-018-05316-z>`_.
+This parcellation was used in `Vidaurre et al. (2018) <https://www.nature.com/articles/s41467-018-05316-z>`_.
 
 Parcels
 -------
