@@ -43,6 +43,6 @@ conn_map = abs(correlations)
 connectivity.save(
     conn_map,
     threshold=0.98,
-    parcellation_file="Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz",
+    parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
     filename="corr_.png",
 )

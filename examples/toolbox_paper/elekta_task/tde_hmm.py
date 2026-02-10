@@ -119,7 +119,7 @@ data = Data(
     reject_by_annotation="omit",
     sampling_frequency=250,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     store_dir=f"tmp_{id:02d}",
     n_jobs=8,
 )

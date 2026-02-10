@@ -27,7 +27,7 @@ networks_dir = f"{results_dir}/networks"
 os.makedirs(networks_dir, exist_ok=True)
 
 mask_file = "MNI152_T1_8mm_brain.nii.gz"
-parcellation_file = "Glasser52_binary_space-MNI152NLin6_res-8x8x8.nii.gz"
+parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
 
 #%% Plot mean activity spatial maps
 

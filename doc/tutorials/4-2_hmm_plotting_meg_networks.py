@@ -95,7 +95,7 @@ print(p_mean.shape)
 fig, ax = power.save(
     p_mean,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
 
 #%%
@@ -105,7 +105,7 @@ fig, ax = power.save(
 fig, ax = power.save(
     p_mean,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     subtract_mean=True,
 )
 
@@ -142,7 +142,7 @@ print(mean_c.shape)
 mean_c -= np.mean(mean_c, axis=0)
 connectivity.save(
     mean_c,
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
 
 #%%
@@ -156,7 +156,7 @@ print(thres_mean_c.shape)
 
 connectivity.save(
     thres_mean_c,
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
 
 #%%
@@ -205,7 +205,7 @@ print(thres_mean_c.shape)
 
 connectivity.save(
     thres_mean_c,
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     component=0,
 )
 
@@ -219,7 +219,7 @@ mean_c_map = connectivity.mean_connections(mean_c)
 fig, ax = power.save(
     mean_c_map,
     mask_file="MNI152_T1_8mm_brain.nii.gz",
-    parcellation_file="fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
 
 #%%

@@ -37,6 +37,6 @@ conn_map = np.mean(conn_map, axis=0)
 connectivity.save(
     connectivity_map=conn_map,
     filename="figures/aec_group_.png",
-    parcellation_file="fmri_d100_parcellation_with_3PCC_ips_reduced_2mm_ss5mm_ds8mm_adj.nii.gz",
+    parcellation_file="atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz",
     threshold=0.98,
 )

@@ -13,7 +13,7 @@ MEG data is useful because it has a high temporal resolution. We can take advant
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed. This dataset is:
 #
-# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `fmri_d100_parcellation_with_PCC_reduced_2mm_ss5mm_ds8mm.nii.gz`.
+# - Parcellated to 38 regions of interest (ROI). The parcellation file used was `atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz`.
 # - Downsampled to 250 Hz.
 # - Bandpass filtered over the range 1-45 Hz.
 #
