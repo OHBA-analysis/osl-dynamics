@@ -49,13 +49,13 @@ The process of inference is to learn model parameters from observed data. In our
 - The initial state probabilities, :math:`\pi_1 = p(s_1)`.
 - The observation model parameters: state means, :math:`m_k`, and covariances, :math:`C_k`.
 
-We use a Bayesian inference method called the Expectation-Maximisation (EM) algorithm to learn these parameters. In short:
+We use a Bayesian inference method called the **Expectation-Maximization (EM) algorithm** to learn these parameters. In short:
 
 - We randomly initialize the model parameters.
-- E-step: we use the current value of the model parameters :math:`\{ A_{ij}, \pi_1, m_k, C_k \}` to estimate the state probabilities :math:`q(.)` (**posterior**).
-- M-step: we use the state probabilities from the E-stop to update the model parameters.
+- E-step: we use the current value of the model parameters :math:`\{ A_{ij}, \pi_1, m_k, C_k \}` to estimate the state probabilities :math:`q(s_t)` (**posterior**).
+- M-step: we use the state probabilities :math:`q(s_t)` from the E-step to update the model parameters :math:`\{ A_{ij}, \pi_1, m_k, C_k \}`.
 
-After we have trained the model, We take the most likely value from :math:`q(.)` as our estimate for the model parameters (this is known as the **MAP estimate**).
+After we have trained the model, We take the most likely value from :math:`q(s_t)` as our estimate for the model parameters (this is known as the **MAP estimate**).
 
 We do the above for small subsets of our entire training dataset (batches), which leads to noisy updates to the model parameters. Over time they converge to the best parameters for generating the observed data.
 
