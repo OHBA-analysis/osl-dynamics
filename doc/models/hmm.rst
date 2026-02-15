@@ -19,22 +19,22 @@ Generative Model
 A generative model can be written down mathematically by specifying the joint distribution of observed and latent variables. The joint probability distribution for the HMM generating a sequence of data is
 
 .. math::
-    p(x_{1:T}, \theta_{1:T}) = p(x_1 | \theta_1) p(\theta_1) \prod^T_{t=2} p(x_t | \theta_t) p(\theta_t | \theta_{t-1}),
+    p(x_{1:T}, s_{1:T}) = p(x_1 | s_1) p(s_1) \prod^T_{t=2} p(x_t | s_t) p(s_t | s_{t-1}),
 
-where :math:`x_{1:T}` denotes a sequence of observed data (:math:`x_1, x_2, ..., x_T`) and :math:`\theta_{1:T}` denotes a sequence of hidden states (:math:`\theta_1, \theta_2, ..., \theta_T`).
+where :math:`x_{1:T}` denotes a sequence of observed data (:math:`x_1, x_2, ..., x_T`) and :math:`s_{1:T}` denotes a sequence of hidden states (:math:`s_1, s_2, ..., s_T`).
 
-:math:`p(x_t | \theta_t)` is the probability distribution for the observed data given the hidden state. In this package, we use a multivariate normal distribution to specify this distribution.
+:math:`p(x_t | s_t)` is the probability distribution for the observed data given the hidden state. In this package, we use a multivariate normal distribution to specify this distribution.
 
 .. math::
-    p(x_t | \theta_t = k) = \mathcal{N}(m_k, C_k),
+    p(x_t | s_t = k) = \mathcal{N}(m_k, C_k),
 
 where :math:`m_k` and :math:`C_k` are state means and covariances and :math:`k` indexes the state that is active.
 
-:math:`p(\theta_t | \theta_{t-1})` is the temporal model for the hidden state. Because the probability of the next state only depends on the current state (known as the **Markovian constraint**), this conditional probability distribution can be represented as a matrix.
+:math:`p(s_t | s_{t-1})` is the temporal model for the hidden state. Because the probability of the next state only depends on the current state (known as the **Markovian constraint**), this conditional probability distribution can be represented as a matrix.
 
 The generative model is shown graphically below. The hidden states are the grey nodes and the observed data are white nodes. Arrows connect variables that are conditionally dependent.
 
-.. image:: images/hmm-generative-model.png
+.. image:: images/hmm-generative-model.jpeg
     :class: no-scaled-link
     :width: 400
     :align: center
@@ -44,25 +44,27 @@ Inference
 
 The process of inference is to learn model parameters from observed data. In our case, the model parameters are:
 
-- The transition probability matrix, :math:`p(\theta_t | \theta_{t-1})`.
-- The hidden state at each time point, :math:`\theta_t`.
+- The hidden state at each time point, :math:`s_t`.
+- The transition probability matrix, :math:`A_{ij} = p(s_t = i | s_{t-1} = j)`.
+- The initial state probabilities, :math:`\pi_1 = p(s_1)`.
 - The observation model parameters: state means, :math:`m_k`, and covariances, :math:`C_k`.
 
-In addition, we want to learn the uncertainty in our estimates for the model parameters. We do this with 'Bayesian inference' by learning probability distributions for each model parameter. We use a method of Bayesian inference known as **variational Bayes**, which turns the problem of inference into an optimization task. In short, the way this process works is:
+We use a Bayesian inference method called the Expectation-Maximisation (EM) algorithm to learn these parameters. In short:
 
-- We randomly initialize approximate distributions for model parameters (known as an **approximate posterior distribution**). I.e. we propose the distribution :math:`q(.)` for the model parameters.
-- We use the generative model to calculate a cost function (**variational free energy**), which capture the likelihood of our current model parameters generating the data we have observed.
-- We tweak the model parameters distributions :math:`q(.)` to minimise the cost function.
-- We take the most likely value from :math:`q(.)` as our estimate for the model parameters (this is known as the **MAP estimate**).
+- We randomly initialize the model parameters.
+- E-step: we use the current value of the model parameters :math:`\{ A_{ij}, \pi_1, m_k, C_k \}` to estimate the state probabilities :math:`q(.)` (**posterior**).
+- M-step: we use the state probabilities from the E-stop to update the model parameters.
 
-We do the above for small subsets of our entire training dataset (batches), which leads to noisy updates to the model parameters. Over time they converge to the best parameters for generating the observed data. This process is known as **stochastic variational Bayes** and allows us to scale to large datasets.
+After we have trained the model, We take the most likely value from :math:`q(.)` as our estimate for the model parameters (this is known as the **MAP estimate**).
+
+We do the above for small subsets of our entire training dataset (batches), which leads to noisy updates to the model parameters. Over time they converge to the best parameters for generating the observed data.
 
 The process of inference is also known as 'training the model' or 'fitting a model'.
 
 HMM in osl-dynamics
 -------------------
 
-This package contains a Python implementation of the HMM. In this implementation we perform Bayesian inference on the hidden states, :math:`\theta_t`, but learn point estimates (i.e. not Bayesian) for all the other parameters, this includes the transition probability matrix and state means and covariances. Given the transition probability matrix, state means and covariances are global parameters (the same for all time points), modelling their uncertainty is less valuable, whereas the uncertainty in the hidden state may be different at different time points.
+This package contains a Python implementation of the HMM. In this implementation we perform Bayesian inference on the hidden states, :math:`s_t`, but learn point estimates (i.e. not Bayesian) for all the other parameters, this includes the transition probability matrix and state means and covariances. Given the transition probability matrix, state means and covariances are global parameters (the same for all time points), modelling their uncertainty is less valuable, whereas the uncertainty in the hidden state may be different at different time points.
 
 A derivation of the cost function used to train the HMM in osl-dynamics is :download:`here <images/hmm-cost-function.pdf>`. Note, we use different symbols in this derivation compared to the previous section.
 
