@@ -894,8 +894,8 @@ def save(
             )
 
         # If all connections are zero don't add a colourbar
-        kwargs["colorbar"] = np.any(
-            conn_map[i][~np.eye(conn_map[i].shape[-1], dtype=bool)] != 0
+        kwargs["colorbar"] = bool(
+            np.any(conn_map[i][~np.eye(conn_map[i].shape[-1], dtype=bool)] != 0)
         )
 
         # Plot maps
