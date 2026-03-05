@@ -1161,7 +1161,7 @@ class Data:
             raise e
 
         # Calculate/get template covariances
-        if template_cov is None:
+        if template_cov is None and template_data is None:
             metrics = _calc_metrics(covs)
             metrics_sum = np.sum(metrics, axis=1)
             argmedian = np.argsort(metrics_sum)[len(metrics_sum) // 2]
@@ -1169,6 +1169,7 @@ class Data:
             template_cov = covs[argmedian]
 
         if template_data is not None:
+            _logger.info(f"Using template data to calculate template covariance")
             template_cov = _calc_cov(template_data)
 
         # Perform the sign flipping
