@@ -24,7 +24,7 @@ def evoked_response_max_stat_perm(
     ----------
     data : np.ndarray
         Data array for baseline corrected evoked responses.
-        Shape is (n_samples, *target_dims).
+        Shape is (n_samples, \*target_dims).
     n_perm : int
         Number of permutations.
     covariates : dict, optional
@@ -43,7 +43,7 @@ def evoked_response_max_stat_perm(
     Returns
     -------
     pvalues : np.ndarray
-        P-values. Shape is (*target_dims,).
+        P-values. Shape is (\*target_dims,).
     """
     features = [
         {"name": "Mean", "values": np.ones(data.shape[0]), "feature_type": "constant"}
@@ -89,7 +89,7 @@ def group_diff_max_stat_perm(
     ----------
     data : np.ndarray
         Data array for baseline corrected evoked responses.
-        Shape is (n_samples, *target_dims).
+        Shape is (n_samples, \*target_dims).
     assignments : np.ndarray
         Group assignments. Shape is (n_samples,).
         Must have exactly two unique values.
@@ -111,9 +111,9 @@ def group_diff_max_stat_perm(
     Returns
     -------
     group_diff : np.ndarray
-        Difference between two groups. Shape is (*target_dims,).
+        Difference between two groups. Shape is (\*target_dims,).
     pvalues : np.ndarray
-        P-values. Shape is (*target_dims,).
+        P-values. Shape is (\*target_dims,).
     """
     if covariates is None:
         covariates = {}
@@ -172,7 +172,7 @@ def paired_diff_max_stat_perm(
     ----------
     data : np.ndarray
         Data array for baseline corrected evoked responses.
-        Shape is (n_samples, *target_dims).
+        Shape is (n_samples, \*target_dims).
     n_perm : int
         Number of permutations.
     metric : str, optional
@@ -184,9 +184,9 @@ def paired_diff_max_stat_perm(
     Returns
     -------
     paired_diff : np.ndarray
-        Paired differences. Shape is (*target_dims,).
+        Paired differences. Shape is (\*target_dims,).
     pvalues : np.ndarray
-        P-values. Shape is (*target_dims,).
+        P-values. Shape is (\*target_dims,).
     """
     features = [
         {"name": "Mean", "values": np.ones(data.shape[0]), "feature_type": "constant"}
