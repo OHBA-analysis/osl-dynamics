@@ -99,10 +99,7 @@ def gmm_time_courses(
         sklearn.mixture.GaussianMixture.html>`_.
     plot_kwargs : dict, optional
         Dictionary of keyword arguments to pass to
-        `osl_dynamics.utils.plotting.plot_gmm \
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/\
-        osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting\
-        .plot_gmm>`_.
+        :func:`osl_dynamics.utils.plotting.plot_gmm`.
 
     Returns
     -------
@@ -451,55 +448,37 @@ def reduce_state_time_course(state_time_course):
 
 
 def fractional_occupancies(state_time_course):
-    """Wrapper for `analysis.post_hoc.fractional_occupancies \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc\
-    .fractional_occupancies>`_."""
+    """Wrapper for :func:`osl_dynamics.analysis.post_hoc.fractional_occupancies`."""
     return post_hoc.fractional_occupancies(state_time_course)
 
 
 def mean_lifetimes(state_time_course, sampling_frequency=None):
-    """Wrapper for `analysis.post_hoc.mean_lifetimes \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.mean_lifetimes>`_."""
+    """Wrapper for :func:`osl_dynamics.analysis.post_hoc.mean_lifetimes`."""
     return post_hoc.mean_lifetimes(state_time_course, sampling_frequency)
 
 
 def mean_intervals(state_time_course, sampling_frequency=None):
-    """Wrapper for `analysis.post_hoc.mean_intervals \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.mean_intervals>`_."""
+    """Wrapper for :func:`osl_dynamics.analysis.post_hoc.mean_intervals`."""
     return post_hoc.mean_intervals(state_time_course, sampling_frequency)
 
 
 def switching_rates(state_time_course, sampling_frequency=None):
-    """Wrapper for `analysis.post_hoc.switching_rates \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc\
-    .switching_rates>`_."""
+    """Wrapper for :func:`osl_dynamics.analysis.post_hoc.switching_rates`."""
     return post_hoc.switching_rates(state_time_course, sampling_frequency)
 
 
 def mean_amplitudes(state_time_course, data):
-    """Wrapper for `analysis.post_hoc.mean_amplitudes \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc\
-    .mean_amplitudes>`_."""
+    """Wrapper for :func:`osl_dynamics.analysis.post_hoc.mean_amplitudes`."""
     return post_hoc.mean_amplitudes(state_time_course, data)
 
 
 def lifetime_statistics(state_time_course, sampling_frequency=None):
-    """Wrapper for `analysis.post_hoc.lifetime_statistics \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc\
-    .lifetime_statistics>`_."""
+    """Wrapper for :func:`osl_dynamics.analysis.post_hoc.lifetime_statistics`."""
     return post_hoc.lifetime_statistics(state_time_course, sampling_frequency)
 
 
 def fano_factor(state_time_course, window_length, sampling_frequency=1.0):
-    """Wrapper for `analysis.post_hoc.fano_factor \
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.fano_factor>`_."""
+    """Wrapper for :func:`osl_dynamics.analysis.post_hoc.fano_factor`."""
     return post_hoc.fano_factor(state_time_course, window_length, sampling_frequency)
 
 

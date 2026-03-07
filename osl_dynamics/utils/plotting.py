@@ -2391,10 +2391,7 @@ def plot_evoked_response(
         Evoked responses. Shape must be (n_samples, n_channels).
     pvalues : np.ndarray
         p-value for each evoked response. This can be calculated with
-        `osl_dynamics.analysis.statistics.evoked_response_max_stat_perm 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/statistics/index.html#osl_dynamics.analysis.statistics\
-        .evoked_response_max_stat_perm>`_.
+        :func:`osl_dynamics.analysis.statistics.evoked_response_max_stat_perm`.
     significance_level : float, optional
         Value to threshold the p-values with to consider significant.
         By default :code:`pvalues < 0.05` are significant.

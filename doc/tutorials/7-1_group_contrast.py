@@ -24,7 +24,7 @@ features[:10,:5] += 3
 #%%
 # Statistical significance testing
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# osl-dynamics has the `analysis.statistics.group_diff_max_stat_perm <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/statistics/index.html#osl_dynamics.analysis.statistics.group_diff_max_stat_perm>`_ function for doing GLM permutation stats testing to compare two groups. This function uses the maximum test statistic to control for multiple comparisons across the features.
+# osl-dynamics has the :func:`analysis.statistics.group_diff_max_stat_perm <osl_dynamics.analysis.statistics.group_diff_max_stat_perm>` function for doing GLM permutation stats testing to compare two groups. This function uses the maximum test statistic to control for multiple comparisons across the features.
 
 from osl_dynamics.analysis import statistics
 

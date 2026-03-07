@@ -34,7 +34,7 @@ import pickle
 alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
 
 #%%
-# We can use the `utils.plotting.plot_alpha <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_ to plot the mixing coefficients.
+# We can use the :func:`utils.plotting.plot_alpha <osl_dynamics.utils.plotting.plot_alpha>` to plot the mixing coefficients.
 
 from osl_dynamics.utils import plotting
 
@@ -104,7 +104,7 @@ fig, ax = plotting.plot_violin(kurt_norm_alpha.T, x_label="Mode", y_label="Kurt.
 #%%
 # Binarizing the mixing coefficient time course
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# If we convert the mixing coefficients into a binary time course for each mode (i.e. something similar to the HMM state time courses) we can calculate the usual summary statistics we did for the HMM states (fractional occupancies, lifetimes, intervals). See the `HMM Summary Statistics tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_summary_stats.html>`_ for further details.
+# If we convert the mixing coefficients into a binary time course for each mode (i.e. something similar to the HMM state time courses) we can calculate the usual summary statistics we did for the HMM states (fractional occupancies, lifetimes, intervals). See the :doc:`HMM Summary Statistics tutorial <tutorials_build/4-3_hmm_summary_stats>` for further details.
 #
 # We have a couple options for binarizing the mixing coefficient time course:
 #
@@ -115,7 +115,7 @@ fig, ax = plotting.plot_violin(kurt_norm_alpha.T, x_label="Mode", y_label="Kurt.
 #
 # Binarize with argmax
 # ********************
-# We can use the `inference.modes.argmax_time_courses <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.argmax_time_courses>`_ function to calculate a mutually exclusive mode activation time course.
+# We can use the :func:`inference.modes.argmax_time_courses <osl_dynamics.inference.modes.argmax_time_courses>` function to calculate a mutually exclusive mode activation time course.
 
 from osl_dynamics.inference import modes
 
@@ -194,7 +194,7 @@ print(np.mean(mlt, axis=0) * 1000)  # in ms
 #
 # Binarize with a GMM threshold
 # *****************************
-# An aternative approach is to use a two-component GMM to identify an on and off component. This involves fitting the two-component GMM to the distribution of mixing coefficients. We can do this with the `inference.modes.gmm_time_courses <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.gmm_time_courses>`_ function in osl-dynamics.
+# An aternative approach is to use a two-component GMM to identify an on and off component. This involves fitting the two-component GMM to the distribution of mixing coefficients. We can do this with the :func:`inference.modes.gmm_time_courses <osl_dynamics.inference.modes.gmm_time_courses>` function in osl-dynamics.
 
 # Binarize the mixing coefficients using a GMM
 thres_norm_alpha = modes.gmm_time_courses(norm_alpha)
@@ -209,4 +209,4 @@ print(np.mean(fo, axis=0), 2)
 #%%
 # We can see the GMM thresholds identify more mode activations, which are reflected in the higher fractional occupancies.
 #
-# With a mode activation time course we can do the same analysis we did for the HMM state time courses. See the `HMM Summary Statistics tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/hmm_summary_stats.html>`_ for more details.
+# With a mode activation time course we can do the same analysis we did for the HMM state time courses. See the :doc:`HMM Summary Statistics tutorial <tutorials_build/4-3_hmm_summary_stats>` for more details.

@@ -38,7 +38,7 @@ import pickle
 alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
 
 #%%
-# Let's also plot the state probabilities for the first few seconds of the first subject to get a feel for what they look like. We can use the `utils.plotting.plot_alpha <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_ function to do this.
+# Let's also plot the state probabilities for the first few seconds of the first subject to get a feel for what they look like. We can use the :func:`utils.plotting.plot_alpha <osl_dynamics.utils.plotting.plot_alpha>` function to do this.
 
 from osl_dynamics.utils import plotting
 
@@ -48,7 +48,7 @@ fig, ax = plotting.plot_alpha(alpha[0], n_samples=2000)
 #%%
 # When looking at the state probability time course you want to see a good number of transitions between states.
 #
-# The `alpha` list contains the state probabilities time course for each subject. To calculate summary statistics we first need to hard classify the state probabilities to give a state time course. We can use the `inference.modes.argmax_time_courses <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/inference/modes/index.html#osl_dynamics.inference.modes.argmax_time_courses>`_ function to do this.
+# The `alpha` list contains the state probabilities time course for each subject. To calculate summary statistics we first need to hard classify the state probabilities to give a state time course. We can use the :func:`inference.modes.argmax_time_courses <osl_dynamics.inference.modes.argmax_time_courses>` function to do this.
 
 from osl_dynamics.inference import modes
 
@@ -66,7 +66,7 @@ fig, ax = plotting.plot_alpha(stc[0], n_samples=2000)
 #
 # Fractional occupancy
 # ********************
-# The `analysis.post_hoc <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html>`_ module in osl-dynamics contains helpful functions for calculating summary statistics. Let's use the `analysis.post_hoc.fractional_occupancies <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.fractional_occupancies>`_ function to calculate the fractional occupancy of each state for each subject.
+# The :mod:`analysis.post_hoc <osl_dynamics.analysis.post_hoc>` module in osl-dynamics contains helpful functions for calculating summary statistics. Let's use the :func:`analysis.post_hoc.fractional_occupancies <osl_dynamics.analysis.post_hoc.fractional_occupancies>` function to calculate the fractional occupancy of each state for each subject.
 
 from osl_dynamics.analysis import post_hoc
 
@@ -86,7 +86,7 @@ print(np.mean(fo, axis=0))
 #%%
 # We can see each state shows a significant activation (i.e. non-zero), which gives us confidence in the fit. If only one state is activated, that indicates further preprocessing is likely needed.
 #
-# We can examine the distribution across subjects for each state by creating a violin plot. The `utils.plotting.plot_violin <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_violin>`_ function can be used to do this.
+# We can examine the distribution across subjects for each state by creating a violin plot. The :func:`utils.plotting.plot_violin <osl_dynamics.utils.plotting.plot_violin>` function can be used to do this.
 
 # Plot the distribution of fractional occupancy (FO) across subjects
 fig, ax = plotting.plot_violin(fo.T, x_label="State", y_label="Fractional Occupancy")
@@ -96,7 +96,7 @@ fig, ax = plotting.plot_violin(fo.T, x_label="State", y_label="Fractional Occupa
 #
 # Mean Lifetime
 # *************
-# Next, let's look at another popular summary statistic, i.e. the mean lifetime. We can calculate this using the `analysis.post_hoc.mean_lifetimes <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.mean_lifetimes>`_ function.
+# Next, let's look at another popular summary statistic, i.e. the mean lifetime. We can calculate this using the :func:`analysis.post_hoc.mean_lifetimes <osl_dynamics.analysis.post_hoc.mean_lifetimes>` function.
 
 # Calculate mean lifetimes (in seconds)
 lt = post_hoc.mean_lifetimes(stc, sampling_frequency=250)
@@ -113,7 +113,7 @@ fig, ax = plotting.plot_violin(lt.T, x_label="State", y_label="Mean Lifetime (ms
 #%%
 # Mean interval
 # *************
-# Next, let's look at the mean interval time for each state and subject. We can use the `analysis.post_hoc.mean_intervals <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.mean_intervals>`_ function in osl-dynamics to calculate this.
+# Next, let's look at the mean interval time for each state and subject. We can use the :func:`analysis.post_hoc.mean_intervals <osl_dynamics.analysis.post_hoc.mean_intervals>` function in osl-dynamics to calculate this.
 
 # Calculate mean intervals (in seconds)
 intv = post_hoc.mean_intervals(stc, sampling_frequency=250)
@@ -127,7 +127,7 @@ fig, ax = plotting.plot_violin(intv.T, x_label="State", y_label="Mean Interval (
 #%%
 # Switching rate
 # **************
-# Finally, let's look at the switching rate for each state and subject. We can use the `analysis.post_hoc.switching_rate <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.switching_rate>`_ function in osl-dynamics to calculate this.
+# Finally, let's look at the switching rate for each state and subject. We can use the :func:`analysis.post_hoc.switching_rate <osl_dynamics.analysis.post_hoc.switching_rate>` function in osl-dynamics to calculate this.
 
 # Calculate the switching rate (Hz)
 sr = post_hoc.switching_rates(stc, sampling_frequency=250)

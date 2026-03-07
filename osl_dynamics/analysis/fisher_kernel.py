@@ -1,7 +1,6 @@
 """Implementation of the Fisher kernel for prediction studies.
 
-See the `HMM description <https://osl-dynamics.readthedocs.io/en/latest/models\
-/hmm.html>`_ for further details.
+See the :doc:`HMM description </models/hmm>` for further details.
 
 See Also
 --------

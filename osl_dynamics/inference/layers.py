@@ -447,9 +447,8 @@ class LearnableTensorLayer(layers.Layer):
     initial_value : float, optional
         Initial value for the tensor if initializer is not passed.
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     constraint : tf.keras.constraints.Constraint, optional
         Constraint for the tensor. Limits the values the weights can take.
     kwargs : keyword arguments, optional
@@ -541,9 +540,8 @@ class VectorsLayer(layers.Layer):
     initial_value : np.ndarray
         Initial value for the vectors. Shape must be (n, m).
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers \
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
@@ -628,9 +626,8 @@ class CovarianceMatricesLayer(layers.Layer):
         Error added to the diagonal of covariances matrices for numerical
         stability.
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
@@ -736,9 +733,8 @@ class CorrelationMatricesLayer(layers.Layer):
         Error added to the diagonal of correlation matrices for numerical
         stability.
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
@@ -842,9 +838,8 @@ class DiagonalMatricesLayer(layers.Layer):
     epsilon : float
         Error added to the diagonal matrices for numerical stability.
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
@@ -1039,9 +1034,8 @@ class MatrixLayer(layers.Layer):
     epsilon : float
         Error added to the matrices for numerical stability.
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """

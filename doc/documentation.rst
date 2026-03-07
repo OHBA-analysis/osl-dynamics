@@ -3,9 +3,14 @@ Documentation
 
 Welcome to the osl-dynamics documentation!
 
-The :doc:`API reference <autoapi/index>` provides documentation for the classes, methods and functions in osl-dynamics. New users may find the :doc:`FAQ <faq>` useful.
+New users should start with the :doc:`Getting Started <getting_started>` guide for a quick introduction and then work through the tutorials below. The :doc:`FAQ <faq>` covers common questions about data preparation, model training, and post-hoc analysis.
 
-**New users are encouraged to have a look at the config API interface:** `here <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/index.html>`_.
+API Reference
+-------------
+
+The :doc:`API reference <autoapi/index>` provides documentation for all classes, methods, and functions in osl-dynamics.
+
+**New users are encouraged to have a look at the config API interface:** :mod:`osl_dynamics.config_api`. The config API provides high-level wrapper functions for common analysis pipelines.
 
 Models
 ------
@@ -14,7 +19,9 @@ Descriptions for models implemented in osl-dynamics:
 
 - :doc:`Hidden Markov Model (HMM) <models/hmm>`.
 - :doc:`Dynamic Network Modes (DyNeMo) <models/dynemo>`.
-- :doc:`Dynamic Network States (DyNeSte) <models/dynemo>`.
+- :doc:`Dynamic Network States (DyNeSte) <models/dyneste>`.
+
+See the :doc:`Getting Started <getting_started>` guide for a comparison of these models.
 
 Parcellations
 -------------

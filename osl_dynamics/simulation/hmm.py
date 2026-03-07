@@ -149,10 +149,8 @@ class HMM_MAR(Simulation):
         Array of MAR coefficients. Shape must be (n_states, n_lags, n_channels,
         n_channels).
     covs : np.ndarray
-        Variance of :math:`\epsilon_t`. See `simulation.MAR \
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/\
-        simulation/mar/index.html#osl_dynamics.simulation.mar.MAR>`_ for further
-        details. Shape must be (n_states, n_channels).
+        Variance of :math:`\epsilon_t`. See :class:`osl_dynamics.simulation.mar.MAR`
+        for further details. Shape must be (n_states, n_channels).
     stay_prob : float, optional
         Used to generate the transition probability matrix is
         :code:`trans_prob` is a :code:`str`. Must be between 0 and 1.

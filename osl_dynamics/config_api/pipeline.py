@@ -1,7 +1,6 @@
 """Functions for running full pipelines via the config API.
 
-See the documentation `here <https://osl-dynamics.readthedocs.io/en/latest\
-/autoapi/osl_dynamics/config_api/index.html>`_ for example usage.
+See the documentation for :mod:`osl_dynamics.config_api` for example usage.
 """
 
 import argparse

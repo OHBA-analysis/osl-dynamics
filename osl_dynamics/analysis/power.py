@@ -289,10 +289,8 @@ def save(
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     plot_kwargs : dict, optional
-        Keyword arguments to pass to `osl_dynamics.utils.plotting\
-        .plot_brain_surface <https://osl-dynamics.readthedocs.io/en/latest/\
-        autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils\
-        .plotting.plot_brain_surface>`_.
+        Keyword arguments to pass to
+        :func:`osl_dynamics.utils.plotting.plot_brain_surface`.
     combined : bool, optional
         Should the individual plots be combined into a single image?
         The combined image is always shown on screen (for Juptyer notebooks).
@@ -453,9 +451,8 @@ def multi_save(
     """Saves group level and array level power maps.
 
     When training session-specific models we want to plot the group-level map
-    and session-specific deviations. This function is a wrapper for `power.save
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-    /analysis/power/index.html#osl_dynamics.analysis.power.save>`_, which helps
+    and session-specific deviations. This function is a wrapper for
+    :func:`power.save <osl_dynamics.analysis.power.save>`, which helps
     us plot power maps for session-specific models.
 
     Parameters
@@ -488,10 +485,8 @@ def multi_save(
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     plot_kwargs : dict, optional
-        Keyword arguments to pass to `osl_dynamics.utils.plotting\
-        .plot_brain_surface <https://osl-dynamics.readthedocs.io/en/latest/\
-        autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils\
-        .plotting.plot_brain_surface>`_.
+        Keyword arguments to pass to
+        :func:`osl_dynamics.utils.plotting.plot_brain_surface`.
     """
     # Create a copy of the power maps so we don't modify them
     group_power_map = np.copy(group_power_map)

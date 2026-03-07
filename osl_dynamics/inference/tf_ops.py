@@ -42,11 +42,8 @@ def select_gpu(gpu_numbers):
 def suppress_messages(level=3):
     """Suppress messages from TensorFlow.
 
-    Must be called before `gpu_growth <https://osl-dynamics.readthedocs.io\
-    /en/latest/autoapi/osl_dynamics/inference/tf_ops/index.html#osl_dynamics\
-    .inference.tf_ops.gpu_growth>`_ and `select_gpu <https://osl-dynamics\
-    .readthedocs.io/en/latest/autoapi/osl_dynamics/inference/tf_ops/index.html\
-    #osl_dynamics.inference.tf_ops.gpu_growth>`_.
+    Must be called before :func:`osl_dynamics.inference.tf_ops.gpu_growth`
+    and :func:`osl_dynamics.inference.tf_ops.select_gpu`.
 
     Parameters
     ----------

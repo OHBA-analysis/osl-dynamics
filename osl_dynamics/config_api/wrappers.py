@@ -35,15 +35,12 @@ def load_data(inputs, kwargs=None, prepare=None):
     inputs : str
         Path to directory containing :code:`npy` files.
     kwargs : dict, optional
-        Keyword arguments to pass to the `Data <https://osl-dynamics\
-        .readthedocs.io/en/latest/autoapi/osl_dynamics/data/index.html\
-        #osl_dynamics.data.Data>`_ class. Useful keyword arguments to pass are
-        :code:`sampling_frequency`, :code:`mask_file` and
-        :code:`parcellation_file`.
+        Keyword arguments to pass to the :class:`osl_dynamics.data.Data` class.
+        Useful keyword arguments to pass are :code:`sampling_frequency`,
+        :code:`mask_file` and :code:`parcellation_file`.
     prepare : dict, optional
         Methods dict to pass to the prepare method. See docstring for
-        `Data <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
-        /osl_dynamics/data/index.html#osl_dynamics.data.Data>`_.prepare.
+        :class:`osl_dynamics.data.Data`.
 
     Returns
     -------
@@ -68,8 +65,7 @@ def train_hmm(
     fit_kwargs=None,
     save_inf_params=True,
 ):
-    """Train a `Hidden Markov Model <https://osl-dynamics.readthedocs.io/en\
-    /latest/autoapi/osl_dynamics/models/hmm/index.html>`_.
+    """Train a :mod:`Hidden Markov Model <osl_dynamics.models.hmm>`.
 
     This function will:
 
@@ -93,9 +89,8 @@ def train_hmm(
     output_dir : str
         Path to output directory.
     config_kwargs : dict
-        Keyword arguments to pass to `hmm.Config <https://osl-dynamics\
-        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hmm/index.html\
-        #osl_dynamics.models.hmm.Config>`_. Defaults to::
+        Keyword arguments to pass to :class:`osl_dynamics.models.hmm.Config`.
+        Defaults to::
 
             {'sequence_length': 200,
              'batch_size': 256,
@@ -185,8 +180,7 @@ def train_dynemo(
     fit_kwargs=None,
     save_inf_params=True,
 ):
-    """Train `DyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
-    /osl_dynamics/models/dynemo/index.html>`_.
+    """Train :mod:`DyNeMo <osl_dynamics.models.dynemo>`.
 
     This function will:
 
@@ -209,9 +203,8 @@ def train_dynemo(
     output_dir : str
         Path to output directory.
     config_kwargs : dict
-        Keyword arguments to pass to `dynemo.Config <https://osl-dynamics\
-        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/dynemo\
-        /index.html#osl_dynamics.models.dynemo.Config>`_. Defaults to::
+        Keyword arguments to pass to :class:`osl_dynamics.models.dynemo.Config`.
+        Defaults to::
 
             {'n_channels': data.n_channels.
              'sequence_length': 200,
@@ -326,8 +319,7 @@ def train_mdynemo(
     corrs_init_kwargs=None,
     save_inf_params=True,
 ):
-    """Train `M-DyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi\
-    /osl_dynamics/models/mdynemo/index.html>`_. This function will:
+    """Train :mod:`M-DyNeMo <osl_dynamics.models.mdynemo>`. This function will:
     
     1. Build an :code:`mdynemo.Model` object.
     2. Initialize the mode correlations using sliding window and KMeans.
@@ -349,9 +341,8 @@ def train_mdynemo(
     output_dir : str
         Path to output directory.
     config_kwargs : dict
-        Keyword arguments to pass to `mdynemo.Config <https://osl-dynamics\
-        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/mdynemo\
-        /index.html#osl_dynamics.models.mdynemo.Config>`_. Defaults to::
+        Keyword arguments to pass to :class:`osl_dynamics.models.mdynemo.Config`.
+        Defaults to::
 
             {
                 'n_channels': data.n_channels,
@@ -512,8 +503,7 @@ def train_hive(
     fit_kwargs=None,
     save_inf_params=True,
 ):
-    """Train a `HIVE Model <https://osl-dynamics.\
-    readthedocs.io/en/latest/autoapi/osl_dynamics/models/hive/index.html>`_.
+    """Train a :mod:`HIVE Model <osl_dynamics.models.hive>`.
     
     This function will:
 
@@ -537,9 +527,8 @@ def train_hive(
     output_dir : str
         Path to output directory.
     config_kwargs : dict
-        Keyword arguments to pass to `hive.Config <https://osl-dynamics\
-        .readthedocs.io/en/latest/autoapi/osl_dynamics/models/hive/index.html\
-        #osl_dynamics.models.hive.Config>`_. Defaults to::
+        Keyword arguments to pass to :class:`osl_dynamics.models.hive.Config`.
+        Defaults to::
 
             {
                 'sequence_length': 200,
@@ -777,9 +766,7 @@ def plot_power_maps_from_covariances(
         Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
     power_save_kwargs : dict, optional
-        Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::
 
             {'filename': '<inf_params_dir>/covs_.png',
@@ -987,10 +974,8 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
     output_dir : str
         Path to output directory.
     kwargs : dict
-        Keyword arguments to pass to `analysis.spectral.multitaper_spectra
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/spectral/index.html#osl_dynamics.analysis.spectral\
-        .multitaper_spectra>`_. Defaults to::
+        Keyword arguments to pass to
+        :func:`osl_dynamics.analysis.spectral.multitaper_spectra`. Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
              'keepdims': True}
@@ -1106,10 +1091,8 @@ def regression_spectra(data, output_dir, kwargs):
     output_dir : str
         Path to output directory.
     kwargs : dict
-        Keyword arguments to pass to `analysis.spectral.regress_spectra
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/spectral/index.html#osl_dynamics.analysis.spectral\
-        .regression_spectra>`_. Defaults to::
+        Keyword arguments to pass to
+        :func:`osl_dynamics.analysis.spectral.regress_spectra`. Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
              'window_length': 4 * sampling_frequency,
@@ -1217,19 +1200,14 @@ def plot_group_ae_networks(
         Should we take the absolute value of the amplitude envelope
         correlations?
     power_save_kwargs : dict, optional
-        Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::
 
             {'filename': '<output_dir>/networks/mean_.png',
              'mask_file': data.mask_file,
              'parcellation_file': data.parcellation_file}
     conn_save_kwargs : dict, optional
-        Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/connectivity/index.html#osl_dynamics.analysis.connectivity\
-        .save>`_. Defaults to::
+        Keyword arguments to pass to :func:`osl_dynamics.analysis.connectivity.save`. Defaults to::
 
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/aec_.png',
@@ -1348,9 +1326,7 @@ def plot_group_tde_hmm_networks(
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
     power_save_kwargs : dict, optional
-        Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::
 
             {'mask_file': mask_file,
@@ -1358,10 +1334,7 @@ def plot_group_tde_hmm_networks(
              'filename': '<output_dir>/networks/pow_.png',
              'subtract_mean': True}
     conn_save_kwargs : dict, optional
-        Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/connectivity/index.html#osl_dynamics.analysis.connectivity\
-        .save>`_. Defaults to::
+        Keyword arguments to pass to :func:`osl_dynamics.analysis.connectivity.save`. Defaults to::
 
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/coh_.png',
@@ -1512,10 +1485,7 @@ def plot_group_nnmf_tde_hmm_networks(
         Path to output directory.
     nnmf_file : str
         Path relative to :code:`output_dir` for a npy file (with the output of
-        `analysis.spectral.decompose_spectra
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/spectral/index.html#osl_dynamics.analysis.spectral\
-        .decompose_spectra>`_) containing the NNMF components.
+        :func:`osl_dynamics.analysis.spectral.decompose_spectra`) containing the NNMF components.
     mask_file : str, optional
         Mask file used to preprocess the training data. If :code:`None`,
         we use :code:`data.mask_file`.
@@ -1528,9 +1498,7 @@ def plot_group_nnmf_tde_hmm_networks(
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
     power_save_kwargs : dict, optional
-        Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::
 
             {'mask_file': mask_file,
@@ -1539,10 +1507,7 @@ def plot_group_nnmf_tde_hmm_networks(
              'filename': '<output_dir>/networks/pow_.png',
              'subtract_mean': True}
     conn_save_kwargs : dict, optional
-        Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/connectivity/index.html#osl_dynamics.analysis.connectivity\
-        .save>`_. Defaults to::
+        Keyword arguments to pass to :func:`osl_dynamics.analysis.connectivity.save`. Defaults to::
 
             {'parcellation_file': parcellation_file,
              'component': component,
@@ -1725,9 +1690,7 @@ def plot_group_tde_dynemo_networks(
         Percentile for thresholding the coherence networks. Default is 97, which
         corresponds to the top 3% of edges (relative to the mean across states).
     plot_save_kwargs : dict, optional
-        Keyword arguments to pass to `analysis.power.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/power/index.html#osl_dynamics.analysis.power.save>`_.
+        Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::
 
             {'mask_file': mask_file,
@@ -1736,10 +1699,7 @@ def plot_group_tde_dynemo_networks(
              'subtract_mean': True,
              'plot_kwargs': {'symmetric_cbar': True}}
     conn_save_kwargs : dict, optional
-        Keyword arguments to pass to `analysis.connectivity.save
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /analysis/connectivity/index.html#osl_dynamics.analysis.connectivity\
-        .save>`_. Defaults to::
+        Keyword arguments to pass to :func:`osl_dynamics.analysis.connectivity.save`. Defaults to::
 
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/coh_.png',
@@ -1871,9 +1831,7 @@ def plot_alpha(
 ):
     """Plot inferred alphas.
 
-    This is a wrapper for `utils.plotting.plot_alpha
-    <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils\
-    /plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
+    This is a wrapper for :func:`osl_dynamics.utils.plotting.plot_alpha`.
 
     This function expects a model has been trained and the following directory
     to exist:
@@ -1901,9 +1859,7 @@ def plot_alpha(
         Sampling frequency in Hz. If :code:`None`, we see if it is
         present in :code:`data.sampling_frequency`.
     kwargs : dict, optional
-        Keyword arguments to pass to `utils.plotting.plot_alpha
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_alpha>`_.
+        Keyword arguments to pass to :func:`osl_dynamics.utils.plotting.plot_alpha`.
         Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
@@ -1977,10 +1933,8 @@ def calc_gmm_alpha(data, output_dir, kwargs=None):
     output_dir : str
         Path to output directory.
     kwargs : dict, optional
-        Keyword arguments to pass to `inference.modes.gmm_time_courses
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/modes/index.html#osl_dynamics.inference.modes\
-        .gmm_time_courses>`_.
+        Keyword arguments to pass to
+        :func:`osl_dynamics.inference.modes.gmm_time_courses`.
     """
     kwargs = {} if kwargs is None else kwargs
     inf_params_dir = output_dir + "/inf_params"

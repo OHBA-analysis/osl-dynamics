@@ -4,7 +4,7 @@ Frequently Asked Questions (FAQ)
 .. contents::
    :local:
 
-If you  have a question that's not listed above, please open an issue on the `GitHub <https://github.com/OHBA-analysis/osl-dynamics/issues>`_.
+If you have a question that's not listed above, please open an issue on the `GitHub <https://github.com/OHBA-analysis/osl-dynamics/issues>`_.
 
 Installation
 ------------
@@ -124,14 +124,19 @@ What is Dynamic Network Modes (DyNeMo)?
 
 See the model description page :doc:`here <models/dynemo>`.
 
+What is Dynamic Network States (DyNeSte)?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+See the model description page :doc:`here <models/dyneste>`.
+
 What model should I use?
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unfortunately, there is no clear cut answer to this question. The two main models in this package are Dynamic Network Modes (DyNeMo) and the Hidden Markov Model (HMM). Both are valid options. The pros and cons of each are:
+Unfortunately, there is no clear cut answer to this question. The three main models in this package are the Hidden Markov Model (HMM), Dynamic Network Modes (DyNeMo), and Dynamic Network States (DyNeSte). All are valid options. The pros and cons of each are:
 
-- DyNeMo describes the data as a linear mixture of networks, whereas the HMM is a mutually exclusive network model. The lack of mutual exclusivity can actually complicate how we can interpret the data. For resting-state data the access to interpretable summary statistics such as state fractional occupancies, lifetimes, etc. might be worth the comprimised description of the data using mutually exclusive states.
-- With task data, the mutual exclusivity can harm the evoked network response and DyNeMo may provide a cleaner description of how the brain responds to a task. In this case, DyNeMo may be preferred.
-- Practically, without a GPU DyNeMo can be slow to train, whereas the HMM is much quicker.
+- The **HMM** uses mutually exclusive states with a Markovian temporal model. For resting-state data, the access to interpretable summary statistics such as state fractional occupancies, lifetimes, etc. might be worth the compromised description of the data using mutually exclusive states. Practically, the HMM is the quickest to train and does not require a GPU.
+- **DyNeMo** describes the data as a linear mixture of networks and uses an RNN for the temporal model, which can capture long-range dependencies. The lack of mutual exclusivity can complicate interpretation. With task data, DyNeMo may provide a cleaner description of how the brain responds to a task.
+- **DyNeSte** combines the discrete states of the HMM with the non-Markovian temporal model of DyNeMo. This gives you interpretable summary statistics while also capturing long-range temporal dependencies. Like DyNeMo, DyNeSte benefits from a GPU for training.
 
 What is the difference between training on amplitude envelope (AE) and time-delay embedded (TDE) data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -164,7 +169,7 @@ Unfortunately, many modern machine learning models come with hyperparameters (pa
 - Make sure any conclusions are robust to the choice of hyperparameters.
 - Use the variational free energy (see the model descriptions in the :doc:`docs <documentation>`) to compare models. Preferably, the variational free energy would be calculated on a hold out validation dataset, which is not used for training.
 
-The `config API <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/index.html>`_ has two wrapper functions for training an `HMM <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/wrappers/index.html#osl_dynamics.config_api.wrappers.train_hmm>`_ or `DyNeMo <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/wrappers/index.html#osl_dynamics.config_api.wrappers.train_dynemo>`_, which pre-specify hyperparameters that have worked well in the past. These might be a good place to start.
+The :mod:`config API <osl_dynamics.config_api>` has wrapper functions for training an :func:`HMM <osl_dynamics.config_api.wrappers.train_hmm>` or :func:`DyNeMo <osl_dynamics.config_api.wrappers.train_dynemo>`, which pre-specify hyperparameters that have worked well in the past. These might be a good place to start.
 
 I have trained a model with the same hyperparameters on the same data multiple times, why do I get a different value for the final loss (cost function)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -240,8 +245,8 @@ What are the most important summary statistics to use?
 
 It is common to look at four summary statistics for dynamics when using the HMM:
 
-- The **fractional occupancy**, which is the fraction of total that is spent in a particular state.
-- The **mean lifetime**, which is the average duration of a state visit. This is called known as the 'dwell time'.
+- The **fractional occupancy**, which is the fraction of total time that is spent in a particular state.
+- The **mean lifetime**, which is the average duration of a state visit. This is also known as the 'dwell time'.
 - The **mean interval**, which is the average duration between successive state visits.
 - The **switching rate**, which is the average number of visits to a state per second.
 

@@ -40,6 +40,7 @@ Contents
    :maxdepth: 2
 
    Install <install>
+   Getting Started <getting_started>
    Documentation <documentation>
    FAQ <faq>
 

@@ -146,9 +146,8 @@ def fit_gaussian_mixture(
     plot_filename : str, optional
         Filename to save a plot of the Gaussian mixture model.
     plot_kwargs : dict, optional
-        Keyword arguments to pass to `utils.plotting.plot_gmm
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_
+        Keyword arguments to pass to
+        :func:`osl_dynamics.utils.plotting.plot_gmm`
         Only used if :code:`plot_filename` is not :code:`None`.
     log_message : bool
         Should we log a message?

@@ -36,7 +36,7 @@ get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
 #%%
 # Load the data
 # ^^^^^^^^^^^^^
-# We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+# We now load the data into osl-dynamics using the Data class. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
 
 from osl_dynamics.data import Data
 
@@ -88,7 +88,7 @@ print(psd.shape)
 #%%
 # We can see `f` is a 1D numpy array of length 256. This is the frequency axis of the power spectra. We can see `psd` is a subjects by channels (ROIs) by frequency array. E.g. `psd[0]` is a `(38, 256)` shaped array containing the power spectra for each of the 38 ROIs.
 #
-# A useful property of a power spectrum is that the integral over a frequency range gives the power (or equivalently the variance of activity over the frequency range). osl-dynamics has a `analysis.power <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html>`_ module for performing power analyses.
+# A useful property of a power spectrum is that the integral over a frequency range gives the power (or equivalently the variance of activity over the frequency range). osl-dynamics has a :mod:`osl_dynamics.analysis.power` module for performing power analyses.
 #
 # Let's say we are interested in alpha (10 Hz) power. We can calculate alpha power by integrating a power spectrum over a frequency range near 10 Hz. Typically, 7-13 Hz power is referred to as the 'alpha band'. Other common frequency bands are:
 #
@@ -97,7 +97,7 @@ print(psd.shape)
 # - Beta: 13-30 Hz.
 # - Gamma: 30+ Hz.
 #
-# osl-dynamics has a `analysis.power.variance_from_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.variance_from_spectra>`_ function to calculate power from a spectrum. Let's use this function to calculate power for the alpha band.
+# osl-dynamics has a :func:`analysis.power.variance_from_spectra <osl_dynamics.analysis.power.variance_from_spectra>` function to calculate power from a spectrum. Let's use this function to calculate power for the alpha band.
 
 from osl_dynamics.analysis import power
 
@@ -105,7 +105,7 @@ from osl_dynamics.analysis import power
 p = power.variance_from_spectra(f, psd, frequency_range=[7, 13])
 
 #%%
-# Note, if `frequency_range` is not passed, `power.variance_from_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.variance_from_spectra>`_ will integrate the power spectrum over all frequencies.
+# Note, if `frequency_range` is not passed, :func:`power.variance_from_spectra <osl_dynamics.analysis.power.variance_from_spectra>` will integrate the power spectrum over all frequencies.
 #
 # We can print the shape of the `p` array to help understand what is contained within it.
 
@@ -116,7 +116,7 @@ print(p.shape)
 #
 # Plot power maps
 # ^^^^^^^^^^^^^^^
-# We can use `power.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.save>`_ to visualise the power maps. Let's plot the group average.
+# We can use :func:`power.save <osl_dynamics.analysis.power.save>` to visualise the power maps. Let's plot the group average.
 
 group_p = np.mean(p, axis=0)
 

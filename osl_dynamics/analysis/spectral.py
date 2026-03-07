@@ -547,9 +547,8 @@ def regression_spectra(
 ):
     """Calculates mode-specific spectra by regressing a spectrogram with alpha.
 
-    We use `_welch_spectrogram <https://osl-dynamics.readthedocs.io/en\
-    /latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics\
-    .analysis.spectral._welch_spectrogram>`_ to calculate the spectrogram.
+    We use :func:`osl_dynamics.analysis.spectral._welch_spectrogram`
+    to calculate the spectrogram.
 
     Parameters
     ----------
@@ -1511,9 +1510,8 @@ def _welch(
     """Calculate a (cross) power spectrum using Welch's method.
 
     This function first calculates a spectrogram using
-    `_welch_spectrogram <https://osl-dynamics.readthedocs.io/en/latest\
-    /autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis\
-    .spectral._welch_spectrogram>`_ then takes the time average.
+    :func:`osl_dynamics.analysis.spectral._welch_spectrogram`
+    then takes the time average.
 
     The scaling for the power spectra calculated by this function
     matches SciPy (:code:`scipy.signal.welch`).
@@ -1858,9 +1856,8 @@ def _multitaper(
     """Calculate a multitaper.
 
     This function first calculates a spectrogram using
-    `_multitaper_spectrogram <https://osl-dynamics.readthedocs.io/en/latest\
-    /autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis\
-    .spectral._multitaper_spectrogram>`_ then takes the time average.
+    :func:`osl_dynamics.analysis.spectral._multitaper_spectrogram`
+    then takes the time average.
 
     Parameters
     ----------

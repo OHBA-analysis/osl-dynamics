@@ -375,12 +375,10 @@ def gmm_threshold(
 ):
     """Threshold a connectivity matrix using the GMM method.
 
-    Wrapper for combining `connectivity.fit_gmm <https://osl-dynamics\
-    .readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity\
-    /index.html#osl_dynamics.analysis.connectivity.fit_gmm>`_ and
-    `connectivity.threshold <https://osl-dynamics.readthedocs.io/en/latest\
-    /autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics\
-    .analysis.connectivity.threshold>`_.
+    Wrapper for combining
+    :func:`connectivity.fit_gmm <osl_dynamics.analysis.connectivity.fit_gmm>`
+    and
+    :func:`connectivity.threshold <osl_dynamics.analysis.connectivity.threshold>`.
 
     Parameters
     ----------
@@ -418,9 +416,8 @@ def gmm_threshold(
     filename : str, optional
         Filename to save fit to.
     plot_kwargs : dict, optional
-        Dictionary of keyword arguments to pass to `utils.plotting.plot_gmm
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
+        Dictionary of keyword arguments to pass to
+        :func:`utils.plotting.plot_gmm <osl_dynamics.utils.plotting.plot_gmm>`.
 
     Returns
     -------
@@ -499,9 +496,8 @@ def fit_gmm(
     filename : str, optional
         Filename to save fit to.
     plot_kwargs : dict, optional
-        Dictionary of keyword arguments to pass to `utils.plotting.plot_gmm
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
+        Dictionary of keyword arguments to pass to
+        :func:`utils.plotting.plot_gmm <osl_dynamics.utils.plotting.plot_gmm>`.
 
     Returns
     -------

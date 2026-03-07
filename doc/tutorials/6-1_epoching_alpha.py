@@ -107,4 +107,4 @@ print(famous.shape)
 #%%
 # Statistical significance testing
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# We can average the trials (epochs) for a given subject and do stats to see if there's a significant response. See the `Network Response <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/6-2_group_network_response.html>`_ tutorial for how to do group-level stats on the subject-level network responses.
+# We can average the trials (epochs) for a given subject and do stats to see if there's a significant response. See the :doc:`Network Response <tutorials_build/7-2_group_network_response>` tutorial for how to do group-level stats on the subject-level network responses.

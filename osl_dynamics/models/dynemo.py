@@ -1,7 +1,6 @@
 """Dynamic Network Modes (DyNeMo).
 
-See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
-/dynemo.html>`_ for a description of this model.
+See the :doc:`documentation </models/dynemo>` for a description of this model.
 """
 
 import os
