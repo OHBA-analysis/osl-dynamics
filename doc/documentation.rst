@@ -15,15 +15,36 @@ The :doc:`API reference <autoapi/index>` provides documentation for all classes,
 Models
 ------
 
-Descriptions for models implemented in osl-dynamics:
+.. list-table::
+   :header-rows: 1
+   :widths: 15 20 20 20
 
-- :doc:`Hidden Markov Model (HMM) <models/hmm>`.
-- :doc:`Dynamic Network Modes (DyNeMo) <models/dynemo>`.
-- :doc:`Dynamic Network States (DyNeSte) <models/dyneste>`.
-- :doc:`Multi-Dynamic Network Modes (M-DyNeMo) <models/mdynemo>`.
-- :doc:`HIVE (HMM with Integrated Variability Estimation) <models/hive>`.
+   * - Model
+     - State type
+     - Temporal model
+     - Best for
+   * - :doc:`HMM <models/hmm>`
+     - Discrete (mutually exclusive)
+     - Markovian (transition probability matrix)
+     - Resting-state analysis; interpretable summary stats
+   * - :doc:`DyNeMo <models/dynemo>`
+     - Continuous (linear mixture of modes)
+     - Non-Markovian (RNN)
+     - Task data; overlapping network activity
+   * - :doc:`DyNeSte <models/dyneste>`
+     - Discrete (mutually exclusive)
+     - Non-Markovian (RNN)
+     - Discrete states with long-range dynamics
+   * - :doc:`M-DyNeMo <models/mdynemo>`
+     - Continuous (linear mixture; separate for power and FC)
+     - Non-Markovian (RNN)
+     - Separate power and connectivity dynamics
+   * - :doc:`HIVE <models/hive>`
+     - Discrete (mutually exclusive)
+     - Markovian (transition probability matrix)
+     - Modelling inter-session variability (e.g. subjects, scanners, sites)
 
-See the :doc:`Getting Started <getting_started>` guide for a comparison of these models.
+Also see the :doc:`FAQ <faq>` for guidance on choosing a model and hyperparameters.
 
 Parcellations
 -------------

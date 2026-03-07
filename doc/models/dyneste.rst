@@ -61,16 +61,6 @@ The cost function used to train DyNeSte is the variational free energy, consisti
 
 As with DyNeMo, **KL annealing** can be used to stabilize training — the KL term is slowly turned on over the first part of training.
 
-DyNeSte in osl-dynamics
------------------------
-
-DyNeSte can be trained using the ``osl_dynamics.models.dyneste`` module. The key configuration options are similar to DyNeMo, with the addition of Gumbel-Softmax temperature annealing parameters:
-
-- ``do_gs_annealing``: Whether to anneal the Gumbel-Softmax temperature.
-- ``initial_gs_temperature``: Starting temperature (default: 1.0).
-- ``final_gs_temperature``: Final temperature after annealing (default: 0.01).
-- ``n_gs_annealing_epochs``: Number of epochs over which to anneal.
-
 Post-hoc Analysis
 -----------------
 

@@ -28,26 +28,9 @@ A typical analysis with osl-dynamics follows these steps:
 Quick Example
 -------------
 
-Here is a minimal example of training an HMM using the config API::
+Here is a minimal example of training an HMM using a YAML config::
 
-    from osl_dynamics.config_api import wrappers
-
-    # Train a TDE-HMM
-    model, data = wrappers.train_hmm(
-        "training_data",
-        output_dir="results",
-        config_kwargs={
-            "n_states": 8,
-            "learn_means": False,
-            "learn_covariances": True,
-        },
-        prepare={
-            "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
-            "standardize": {},
-        },
-    )
-
-Or equivalently, using a YAML config::
+    from osl_dynamics.config_api import run_pipeline
 
     config = """
         load_data:
@@ -62,14 +45,30 @@ Or equivalently, using a YAML config::
                 learn_covariances: True
     """
 
-    from osl_dynamics.config_api import run_pipeline
     run_pipeline(config, output_dir="results")
 
-You can also use the command line::
+You can also run this from the command line::
 
     osl-dynamics config.yml results
 
-For more details on the config API, see the :mod:`osl_dynamics.config_api` API reference.
+where ``config.yml`` is a YAML file containing the pipeline configuration, e.g.:
+
+.. code-block:: yaml
+
+    load_data:
+        inputs: training_data
+        prepare:
+            tde_pca: {n_embeddings: 15, n_pca_components: 80}
+            standardize: {}
+    train_hmm:
+        config_kwargs:
+            n_states: 8
+            learn_means: False
+            learn_covariances: True
+
+and ``results`` is the output directory.
+
+The YAML config specifies a pipeline of functions to run. Each top-level key (e.g. ``load_data``, ``train_hmm``) corresponds to a function in :mod:`osl_dynamics.config_api.wrappers`. See the :mod:`wrappers API reference <osl_dynamics.config_api.wrappers>` for the full list of available functions and their arguments.
 
 Step-by-Step with the Data API
 ------------------------------
@@ -103,42 +102,6 @@ For more control, you can use the lower-level API directly::
 
     # Get inferred state probabilities
     alpha = model.get_alpha(data)
-
-Choosing a Model
-----------------
-
-The models in osl-dynamics are:
-
-+---------------+--------------------+---------------------+---------------------+
-| Model         | State type         | Temporal model      | Best for            |
-+===============+====================+=====================+=====================+
-| **HMM**       | Discrete           | Markovian           | Resting-state       |
-|               | (mutually          | (transition         | analysis;           |
-|               | exclusive)         | probability matrix) | interpretable       |
-|               |                    |                     | summary stats       |
-+---------------+--------------------+---------------------+---------------------+
-| **DyNeMo**    | Continuous         | Non-Markovian       | Task data;          |
-|               | (linear mixture    | (RNN)               | overlapping         |
-|               | of modes)          |                     | network activity    |
-+---------------+--------------------+---------------------+---------------------+
-| **DyNeSte**   | Discrete           | Non-Markovian       | Discrete states     |
-|               | (mutually          | (RNN)               | with long-range     |
-|               | exclusive)         |                     | dynamics            |
-+---------------+--------------------+---------------------+---------------------+
-| **M-DyNeMo**  | Continuous         | Non-Markovian       | Separate power      |
-|               | (linear mixture;   | (RNN)               | and connectivity    |
-|               | separate for       |                     | dynamics            |
-|               | power and FC)      |                     |                     |
-+---------------+--------------------+---------------------+---------------------+
-| **HIVE**      | Discrete           | Markovian           | Modelling inter-    |
-|               | (mutually          | (transition         | session variability |
-|               | exclusive)         | probability matrix) | (e.g. subjects,     |
-|               |                    |                     | scanners, sites)    |
-+---------------+--------------------+---------------------+---------------------+
-
-See the model description pages for more details: :doc:`HMM <models/hmm>`, :doc:`DyNeMo <models/dynemo>`, :doc:`DyNeSte <models/dyneste>`, :doc:`M-DyNeMo <models/mdynemo>`, :doc:`HIVE <models/hive>`.
-
-Also see the :doc:`FAQ <faq>` for guidance on choosing hyperparameters and other common questions.
 
 What Next?
 ----------

@@ -21,12 +21,12 @@ HIVE builds on the HMM generative model. The key addition is a **variability enc
 For session :math:`n`, the observation model is:
 
 .. math::
-    p(x_t | s_t = k, n) = \mathcal{N}(m_k + \delta m_{k,n}, ~ C_k + \delta C_{k,n}),
+    p(x_t | s_t = k, n) = \mathcal{N}(m_k + \Delta m_{k,n}, ~ C_k + \Delta C_{k,n}),
 
 where:
 
 - :math:`m_k` and :math:`C_k` are the **group-level** state means and covariances (shared across all sessions).
-- :math:`\delta m_{k,n}` and :math:`\delta C_{k,n}` are **session-specific deviations**, predicted by a multi-layer perceptron (MLP) that takes the session's embedding vector as input.
+- :math:`\Delta m_{k,n}` and :math:`\Delta C_{k,n}` are **session-specific deviations**, predicted by a multi-layer perceptron (MLP) that takes the session's embedding vector as input.
 
 The temporal model (transition probability matrix) is the same as the standard HMM.
 
@@ -37,7 +37,6 @@ HIVE uses the same Bayesian inference approach as the HMM (Expectation-Maximizat
 
 Key configuration options specific to HIVE:
 
-- ``n_sessions``: Number of sessions in the dataset.
 - ``embeddings_dim``: Dimensionality of the embedding vectors.
 - ``spatial_embeddings_dim``: Dimensionality of spatial embeddings.
 - ``dev_n_layers``, ``dev_n_units``: Architecture of the MLP that predicts deviations.

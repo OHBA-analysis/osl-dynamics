@@ -35,15 +35,6 @@ M-DyNeMo uses the same **amortised variational inference** approach as DyNeMo. A
 
 The number of power modes (``n_modes``) and FC modes (``n_corr_modes``) can be set independently, allowing for different numbers of power and connectivity patterns.
 
-M-DyNeMo in osl-dynamics
--------------------------
-
-M-DyNeMo can be trained using the ``osl_dynamics.models.mdynemo`` module. Key configuration options that differ from DyNeMo:
-
-- ``n_modes``: Number of modes for power (standard deviations).
-- ``n_corr_modes``: Number of modes for FC (correlations). Defaults to ``n_modes`` if not specified.
-- ``learn_means``, ``learn_stds``, ``learn_corrs``: Control which observation model parameters are trainable.
-
 Post-hoc Analysis
 -----------------
 

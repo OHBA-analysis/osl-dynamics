@@ -73,6 +73,11 @@ HMM-MAR Toolbox
 
 Our group has previously implemented an HMM in MATLAB: `HMM-MAR <https://github.com/OHBA-analysis/HMM-MAR>`_. The model in HMM-MAR is fully Bayesian, i.e. it learns the uncertainty in all model parameters.
 
+Canonical HMM Networks
+-----------------------
+
+A set of canonical HMM networks trained on a large MEG dataset are available in the `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ repository. These can be used as a reference or starting point for HMM analyses.
+
 Post-hoc Analysis
 -----------------
 
