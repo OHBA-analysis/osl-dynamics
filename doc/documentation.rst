@@ -20,6 +20,8 @@ Descriptions for models implemented in osl-dynamics:
 - :doc:`Hidden Markov Model (HMM) <models/hmm>`.
 - :doc:`Dynamic Network Modes (DyNeMo) <models/dynemo>`.
 - :doc:`Dynamic Network States (DyNeSte) <models/dyneste>`.
+- :doc:`Multi-Dynamic Network Modes (M-DyNeMo) <models/mdynemo>`.
+- :doc:`HIVE (HMM with Integrated Variability Estimation) <models/hive>`.
 
 See the :doc:`Getting Started <getting_started>` guide for a comparison of these models.
 

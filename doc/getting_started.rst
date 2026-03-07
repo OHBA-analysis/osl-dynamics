@@ -107,27 +107,36 @@ For more control, you can use the lower-level API directly::
 Choosing a Model
 ----------------
 
-The three main models in osl-dynamics are:
+The models in osl-dynamics are:
 
-+-------------+--------------------+---------------------+-------------------+
-| Model       | State type         | Temporal model      | Best for          |
-+=============+====================+=====================+===================+
-| **HMM**     | Discrete           | Markovian           | Resting-state     |
-|             | (mutually          | (transition         | analysis;         |
-|             | exclusive)         | probability matrix) | interpretable     |
-|             |                    |                     | summary stats     |
-+-------------+--------------------+---------------------+-------------------+
-| **DyNeMo**  | Continuous         | Non-Markovian       | Task data;        |
-|             | (linear mixture    | (RNN)               | overlapping       |
-|             | of modes)          |                     | network activity  |
-+-------------+--------------------+---------------------+-------------------+
-| **DyNeSte** | Discrete           | Non-Markovian       | When you need     |
-|             | (mutually          | (RNN)               | both discrete     |
-|             | exclusive)         |                     | states and long-  |
-|             |                    |                     | range dynamics    |
-+-------------+--------------------+---------------------+-------------------+
++---------------+--------------------+---------------------+---------------------+
+| Model         | State type         | Temporal model      | Best for            |
++===============+====================+=====================+=====================+
+| **HMM**       | Discrete           | Markovian           | Resting-state       |
+|               | (mutually          | (transition         | analysis;           |
+|               | exclusive)         | probability matrix) | interpretable       |
+|               |                    |                     | summary stats       |
++---------------+--------------------+---------------------+---------------------+
+| **DyNeMo**    | Continuous         | Non-Markovian       | Task data;          |
+|               | (linear mixture    | (RNN)               | overlapping         |
+|               | of modes)          |                     | network activity    |
++---------------+--------------------+---------------------+---------------------+
+| **DyNeSte**   | Discrete           | Non-Markovian       | Discrete states     |
+|               | (mutually          | (RNN)               | with long-range     |
+|               | exclusive)         |                     | dynamics            |
++---------------+--------------------+---------------------+---------------------+
+| **M-DyNeMo**  | Continuous         | Non-Markovian       | Separate power      |
+|               | (linear mixture;   | (RNN)               | and connectivity    |
+|               | separate for       |                     | dynamics            |
+|               | power and FC)      |                     |                     |
++---------------+--------------------+---------------------+---------------------+
+| **HIVE**      | Discrete           | Markovian           | Modelling inter-    |
+|               | (mutually          | (transition         | session variability |
+|               | exclusive)         | probability matrix) | (e.g. subjects,     |
+|               |                    |                     | scanners, sites)    |
++---------------+--------------------+---------------------+---------------------+
 
-See the model description pages for more details: :doc:`HMM <models/hmm>`, :doc:`DyNeMo <models/dynemo>`, :doc:`DyNeSte <models/dyneste>`.
+See the model description pages for more details: :doc:`HMM <models/hmm>`, :doc:`DyNeMo <models/dynemo>`, :doc:`DyNeSte <models/dyneste>`, :doc:`M-DyNeMo <models/mdynemo>`, :doc:`HIVE <models/hive>`.
 
 Also see the :doc:`FAQ <faq>` for guidance on choosing hyperparameters and other common questions.
 

@@ -129,14 +129,26 @@ What is Dynamic Network States (DyNeSte)?
 
 See the model description page :doc:`here <models/dyneste>`.
 
+What is Multi-Dynamic Network Modes (M-DyNeMo)?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+See the model description page :doc:`here <models/mdynemo>`.
+
+What is HIVE (HMM with Integrated Variability Estimation)?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+See the model description page :doc:`here <models/hive>`.
+
 What model should I use?
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unfortunately, there is no clear cut answer to this question. The three main models in this package are the Hidden Markov Model (HMM), Dynamic Network Modes (DyNeMo), and Dynamic Network States (DyNeSte). All are valid options. The pros and cons of each are:
+Unfortunately, there is no clear cut answer to this question. The main models in this package are the Hidden Markov Model (HMM), Dynamic Network Modes (DyNeMo), Dynamic Network States (DyNeSte), Multi-Dynamic Network Modes (M-DyNeMo), and HIVE. All are valid options. The pros and cons of each are:
 
 - The **HMM** uses mutually exclusive states with a Markovian temporal model. For resting-state data, the access to interpretable summary statistics such as state fractional occupancies, lifetimes, etc. might be worth the compromised description of the data using mutually exclusive states. Practically, the HMM is the quickest to train and does not require a GPU.
 - **DyNeMo** describes the data as a linear mixture of networks and uses an RNN for the temporal model, which can capture long-range dependencies. The lack of mutual exclusivity can complicate interpretation. With task data, DyNeMo may provide a cleaner description of how the brain responds to a task.
 - **DyNeSte** combines the discrete states of the HMM with the non-Markovian temporal model of DyNeMo. This gives you interpretable summary statistics while also capturing long-range temporal dependencies. Like DyNeMo, DyNeSte benefits from a GPU for training.
+- **M-DyNeMo** extends DyNeMo by allowing separate dynamics for power and functional connectivity. Use this when you suspect power and connectivity may evolve independently.
+- **HIVE** extends the HMM to model inter-session variability using embedding vectors. Use this when you have data from multiple sessions/subjects and want to capture how sessions differ from the group average (e.g. due to demographics, scanner type, or site).
 
 What is the difference between training on amplitude envelope (AE) and time-delay embedded (TDE) data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
