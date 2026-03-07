@@ -1,13 +1,19 @@
 """Functions to perform statistical significance testing."""
 
+from typing import Dict, Optional, Tuple
+
 import numpy as np
 
 from osl_dynamics.glm import DesignConfig, MaxStatPermutation
 
 
 def evoked_response_max_stat_perm(
-    data, n_perm, covariates=None, metric="copes", n_jobs=1
-):
+    data: np.ndarray,
+    n_perm: int,
+    covariates: Optional[Dict[str, np.ndarray]] = None,
+    metric: str = "copes",
+    n_jobs: int = 1,
+) -> np.ndarray:
     """Statistical significance testing for evoked responses.
 
     This function fits a General Linear Model (GLM) with ordinary least
@@ -65,8 +71,13 @@ def evoked_response_max_stat_perm(
 
 
 def group_diff_max_stat_perm(
-    data, assignments, n_perm, covariates=None, metric="tstats", n_jobs=1
-):
+    data: np.ndarray,
+    assignments: np.ndarray,
+    n_perm: int,
+    covariates: Optional[Dict[str, np.ndarray]] = None,
+    metric: str = "tstats",
+    n_jobs: int = 1,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Statistical significance testing for difference between two groups.
 
     This function fits a General Linear Model (GLM) with ordinary least
@@ -144,7 +155,12 @@ def group_diff_max_stat_perm(
     return group_diff, pvalues
 
 
-def paired_diff_max_stat_perm(data, n_perm, metric="copes", n_jobs=1):
+def paired_diff_max_stat_perm(
+    data: np.ndarray,
+    n_perm: int,
+    metric: str = "copes",
+    n_jobs: int = 1,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Statistical significance testing for paired difference.
 
     This function fits a General Linear Model (GLM) with ordinary least

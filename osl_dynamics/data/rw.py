@@ -2,6 +2,7 @@
 
 import os
 import logging
+from typing import Dict, List, Optional, Union
 
 import mne
 import numpy as np
@@ -12,7 +13,9 @@ _logger = logging.getLogger("osl-dynamics")
 _allowed_ext = [".npy", ".mat", ".txt", ".fif"]
 
 
-def validate_inputs(inputs):
+def validate_inputs(
+    inputs: Union[List[str], str, np.ndarray],
+) -> Union[List[str], List[np.ndarray]]:
     """Validates inputs.
 
     Parameters
@@ -60,7 +63,7 @@ def validate_inputs(inputs):
     return validated_inputs
 
 
-def file_ext(filename):
+def file_ext(filename: str) -> Optional[str]:
     """Returns the extension of a file.
 
     Parameters
@@ -74,7 +77,7 @@ def file_ext(filename):
     return ext
 
 
-def list_dir(path, keep_ext=None):
+def list_dir(path: str, keep_ext: Optional[Union[str, List[str]]] = None) -> List[str]:
     """Lists a directory.
 
     Parameters
@@ -104,13 +107,13 @@ def list_dir(path, keep_ext=None):
 
 
 def load_data(
-    data,
-    data_field="X",
-    picks=None,
-    reject_by_annotation=None,
-    mmap_location=None,
-    mmap_mode="c",
-):
+    data: Union[np.ndarray, str],
+    data_field: str = "X",
+    picks: Optional[Union[str, List[str]]] = None,
+    reject_by_annotation: Optional[str] = None,
+    mmap_location: Optional[str] = None,
+    mmap_mode: str = "c",
+) -> Union[np.ndarray, np.memmap]:
     """Loads time series data.
 
     Checks the data shape is time by channels and that the data is
@@ -214,7 +217,11 @@ def load_data(
     return data
 
 
-def load_fif(filename, picks=None, reject_by_annotation=None):
+def load_fif(
+    filename: str,
+    picks: Optional[Union[str, List[str]]] = None,
+    reject_by_annotation: Optional[str] = None,
+) -> np.ndarray:
     """Load a fif file.
 
     Parameters
@@ -253,13 +260,13 @@ def load_fif(filename, picks=None, reject_by_annotation=None):
 
 
 def save_fif(
-    data,
-    filename,
-    sampling_frequency=None,
-    bad_samples=None,
-    original_fif=None,
-    verbose=True,
-):
+    data: np.ndarray,
+    filename: str,
+    sampling_frequency: Optional[float] = None,
+    bad_samples: Optional[np.ndarray] = None,
+    original_fif: Optional[str] = None,
+    verbose: bool = True,
+) -> None:
     """Save a fif file.
 
     Parameters
@@ -338,7 +345,7 @@ def save_fif(
     raw.save(filename, overwrite=True, verbose=verbose)
 
 
-def load_matlab(filename, field):
+def load_matlab(filename: str, field: str) -> np.ndarray:
     """Loads a MATLAB file.
 
     Parameters
@@ -359,7 +366,7 @@ def load_matlab(filename, field):
     return mat[field]
 
 
-def loadmat(filename, return_dict=False):
+def loadmat(filename: str, return_dict: bool = False) -> Union[Dict, np.ndarray]:
     """Wrapper for scipy.io.loadmat
 
     Parameters

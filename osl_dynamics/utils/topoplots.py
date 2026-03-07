@@ -1,7 +1,10 @@
 """Classes and functions to make topoplots."""
 
+from typing import List, Optional, Union
+
 import numpy as np
 import pandas as pd
+import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.interpolate import griddata
@@ -9,12 +12,12 @@ from scipy.interpolate import griddata
 from osl_dynamics.files.scanner import layouts
 
 
-def available_layouts():
+def available_layouts() -> List[str]:
     layout_names = [file.stem for file in sorted(layouts.glob("*.lay"))]
     return layout_names
 
 
-def get_layout(layout_name):
+def get_layout(layout_name: str) -> str:
     layout_names = available_layouts()
 
     if layout_name not in layout_names:
@@ -24,12 +27,12 @@ def get_layout(layout_name):
     return str(layout)
 
 
-def available_outlines():
+def available_outlines() -> List[str]:
     outline_names = [file.stem for file in sorted(layouts.glob("*.outline"))]
     return outline_names
 
 
-def get_outline(outline_name):
+def get_outline(outline_name: str) -> str:
     outline_names = available_outlines()
 
     if outline_name not in outline_names:
@@ -48,7 +51,7 @@ class Topology:
         Path to layout file.
     """
 
-    def __init__(self, layout):
+    def __init__(self, layout: str) -> None:
         self.layout = None
         self.outline = None
 
@@ -103,7 +106,7 @@ class Topology:
     def channel_ids(self):
         return self.layout.loc[self.layout["present"], "channel_id"].to_numpy()
 
-    def read_lay(self, filename):
+    def read_lay(self, filename: str) -> None:
         """Read .lay topology files
 
         Every line in a .lay file represents a sensor. The data is delimited
@@ -122,7 +125,7 @@ class Topology:
 
         self.layout = layout
 
-    def read_outline(self, filename):
+    def read_outline(self, filename: str) -> None:
         with open(filename) as f:
             self.outline = [
                 np.array(
@@ -131,7 +134,7 @@ class Topology:
                 for outline in f.read().split("-" * 10)
             ]
 
-    def keep_channels(self, channel_names):
+    def keep_channels(self, channel_names: List[str]) -> None:
         """Remove channels which aren't present in channel_names
 
         Remove any channels which don't correspond to on in the names provided.
@@ -149,16 +152,16 @@ class Topology:
 
     def plot_data(
         self,
-        data,
-        plot_boxes=False,
-        show_names=False,
-        title=None,
-        show_deleted_sensors=False,
-        colorbar=True,
-        axis=None,
-        cmap="plasma",
-        n_contours=10,
-    ):
+        data: Union[np.ndarray, list],
+        plot_boxes: bool = False,
+        show_names: bool = False,
+        title: Optional[str] = None,
+        show_deleted_sensors: bool = False,
+        colorbar: bool = True,
+        axis: Optional[plt.Axes] = None,
+        cmap: Union[str, matplotlib.colors.ListedColormap] = "plasma",
+        n_contours: int = 10,
+    ) -> plt.Figure:
         """Interpolate the data in sensor-space and plot it.
 
         Given a data vector which corresponds to each sensor in the topology,

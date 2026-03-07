@@ -1,5 +1,7 @@
 """Initializers for TensorFlow layers."""
 
+from typing import List, Optional, Tuple
+
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -20,10 +22,12 @@ class WeightInitializer(Initializer):
         Value to initialise weights to. Note, the shape is not checked.
     """
 
-    def __init__(self, initial_value):
+    def __init__(self, initial_value: np.ndarray) -> None:
         self.initial_value = initial_value
 
-    def __call__(self, shape, dtype=None):
+    def __call__(
+        self, shape: Tuple[int, ...], dtype: Optional[tf.DType] = None
+    ) -> np.ndarray:
         return self.initial_value
 
 
@@ -38,11 +42,13 @@ class RandomWeightInitializer(Initializer):
         Standard deviation of the noise to add.
     """
 
-    def __init__(self, initial_value, std):
+    def __init__(self, initial_value: np.ndarray, std: float) -> None:
         self.initial_value = tf.cast(initial_value, tf.float32)
         self.std = std
 
-    def __call__(self, shape, dtype=None):
+    def __call__(
+        self, shape: Tuple[int, ...], dtype: Optional[tf.DType] = None
+    ) -> tf.Tensor:
         e = initializers.TruncatedNormal(mean=0.0, stddev=self.std).__call__(
             shape=shape, dtype=tf.float32
         )
@@ -52,11 +58,13 @@ class RandomWeightInitializer(Initializer):
 class IdentityCholeskyInitializer(Initializer):
     """Initialize weights to a flattened cholesky factor of identity matrices."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Bijector used to transform learnable vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
-    def __call__(self, shape, dtype=None):
+    def __call__(
+        self, shape: Tuple[int, ...], dtype: Optional[tf.DType] = None
+    ) -> tf.Tensor:
         n = shape[0]  # n_modes
         m = int(np.sqrt(1 + 8 * shape[1]) / 2 - 0.5)  # n_channels
         diagonals = np.ones([n, m])
@@ -76,13 +84,15 @@ class NormalIdentityCholeskyInitializer(Initializer):
         Standard deviation of the error to add.
     """
 
-    def __init__(self, std):
+    def __init__(self, std: float) -> None:
         self.std = std
 
         # Bijector used to transform learnable vectors to covariance matrices
         self.bijector = tfb.Chain([tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()])
 
-    def __call__(self, shape, dtype=None):
+    def __call__(
+        self, shape: Tuple[int, ...], dtype: Optional[tf.DType] = None
+    ) -> tf.Tensor:
         n = shape[0]  # n_modes
         m = int(np.sqrt(1 + 8 * shape[1]) / 2 - 0.5)  # n_channels
         diagonals = initializers.TruncatedNormal(mean=1, stddev=self.std).__call__(
@@ -106,7 +116,7 @@ class NormalCorrelationCholeskyInitializer(Initializer):
         Standard deviation of the error to add.
     """
 
-    def __init__(self, std):
+    def __init__(self, std: float) -> None:
         self.std = std
 
         # Bijector used to transform learnable vectors to covariance matrices
@@ -114,7 +124,9 @@ class NormalCorrelationCholeskyInitializer(Initializer):
             [tfb.CholeskyOuterProduct(), tfb.CorrelationCholesky()]
         )
 
-    def __call__(self, shape, dtype=None):
+    def __call__(
+        self, shape: Tuple[int, ...], dtype: Optional[tf.DType] = None
+    ) -> tf.Tensor:
         n = shape[0]  # n_modes
         m = int(np.sqrt(1 + 8 * shape[1]) / 2 + 0.5)  # n_channels
         diagonals = np.ones([n, m])
@@ -135,13 +147,15 @@ class NormalDiagonalInitializer(Initializer):
         Standard deviation of the error to add.
     """
 
-    def __init__(self, std):
+    def __init__(self, std: float) -> None:
         self.std = std
 
         # Softplus transformation to ensure diagonal is positive
         self.bijector = tfb.Softplus()
 
-    def __call__(self, shape, dtype=None):
+    def __call__(
+        self, shape: Tuple[int, ...], dtype: Optional[tf.DType] = None
+    ) -> tf.Tensor:
         n = shape[0]  # n_modes
         m = shape[1]  # n_channels
         diagonals = initializers.TruncatedNormal(mean=1, stddev=self.std).__call__(
@@ -159,14 +173,16 @@ class CopyTensorInitializer(Initializer):
         Tensor to copy.
     """
 
-    def __init__(self, tensor):
+    def __init__(self, tensor: tf.Tensor) -> None:
         self.tensor = tensor
 
-    def __call__(self, shape, dtype=None):
+    def __call__(
+        self, shape: Tuple[int, ...], dtype: Optional[tf.DType] = None
+    ) -> tf.Tensor:
         return self.tensor.read_value()
 
 
-def reinitialize_layer_weights(layer):
+def reinitialize_layer_weights(layer: tf.keras.layers.Layer) -> None:
     """Re-initializes the weights in a particular layer.
 
     Parameters
@@ -224,7 +240,9 @@ def reinitialize_layer_weights(layer):
             var.assign(new_initializer(var.shape, var.dtype))
 
 
-def reinitialize_model_weights(model, keep=None):
+def reinitialize_model_weights(
+    model: tf.keras.Model, keep: Optional[List[str]] = None
+) -> None:
     """Re-initialize the weights in a model.
 
     Parameters

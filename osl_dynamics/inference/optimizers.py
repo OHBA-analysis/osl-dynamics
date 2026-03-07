@@ -1,5 +1,7 @@
 """Custom TensorFlow optimizers."""
 
+from typing import List, Tuple
+
 from packaging import version
 
 import tensorflow as tf
@@ -22,11 +24,13 @@ class ExponentialMovingAverage(Optimizer):
         calculated as :code:`(1-decay) * old + decay * new`.
     """
 
-    def __init__(self, learning_rate, decay=0.1):
+    def __init__(self, learning_rate: float, decay: float = 0.1) -> None:
         super().__init__(learning_rate, name="EMAOptimizer")
         self.decay = tf.Variable(decay, trainable=False, name="ema_decay")
 
-    def update_step(self, gradient, variable, learning_rate):
+    def update_step(
+        self, gradient: tf.Tensor, variable: tf.Variable, learning_rate: float
+    ) -> None:
         value = (1.0 - self.decay) * variable + self.decay * gradient
         self.assign(variable, value)
 
@@ -46,13 +50,21 @@ class MarkovStateModelOptimizer(Optimizer):
         Learning rate for the base optimizer.
     """
 
-    def __init__(self, base_optimizer, ema_optimizer, ema_variables, learning_rate):
+    def __init__(
+        self,
+        base_optimizer: tf.keras.optimizers.Optimizer,
+        ema_optimizer: "ExponentialMovingAverage",
+        ema_variables: List[tf.Variable],
+        learning_rate: float,
+    ) -> None:
         super().__init__(learning_rate, name="MarkovStateModelOptimizer")
         self.base_optimizer = base_optimizer
         self.ema_optimizer = ema_optimizer
         self.ema_variable_ids = [id(v) for v in ema_variables]
 
-    def apply_gradients(self, grads_and_vars, **kwargs):
+    def apply_gradients(
+        self, grads_and_vars: List[Tuple[tf.Tensor, tf.Variable]], **kwargs
+    ) -> None:
         # Update base optimizer learning rate
         self.base_optimizer.learning_rate.assign(self.learning_rate)
 

@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -115,13 +116,13 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     n_init_epochs: int = 1
     init_take: float = 1.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.validate_observation_model_parameters()
         self.validate_hmm_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 
-    def validate_observation_model_parameters(self):
+    def validate_observation_model_parameters(self) -> None:
         if self.learn_log_rates is None:
             raise ValueError("learn_log_rates must be passed.")
 
@@ -136,7 +137,7 @@ class Model(MarkovStateInferenceModelBase):
 
     config_type = Config
 
-    def build_model(self):
+    def build_model(self) -> None:
         """Builds a keras model."""
 
         config = self.config
@@ -186,7 +187,7 @@ class Model(MarkovStateInferenceModelBase):
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
-    def get_log_rates(self):
+    def get_log_rates(self) -> np.ndarray:
         """Get the state :code:`log_rates`.
 
         Returns
@@ -196,7 +197,7 @@ class Model(MarkovStateInferenceModelBase):
         """
         return obs_mod.get_observation_model_parameter(self.model, "log_rates")
 
-    def get_rates(self):
+    def get_rates(self) -> np.ndarray:
         """Get the state rates.
 
         Returns
@@ -206,11 +207,11 @@ class Model(MarkovStateInferenceModelBase):
         """
         return np.exp(self.get_log_rates())
 
-    def get_observation_model_parameters(self):
+    def get_observation_model_parameters(self) -> np.ndarray:
         """Wrapper for :code:`get_log_rates`."""
         return self.get_log_rates()
 
-    def get_log_likelihood(self, x):
+    def get_log_likelihood(self, x: Union[np.ndarray, tf.Tensor]) -> np.ndarray:
         """Get log-likelihood.
 
         Parameters
@@ -228,7 +229,9 @@ class Model(MarkovStateInferenceModelBase):
         ll_layer = self.model.get_layer("ll")
         return ll_layer([x, [log_rate]]).numpy()
 
-    def set_log_rates(self, log_rates, update_initializer=True):
+    def set_log_rates(
+        self, log_rates: np.ndarray, update_initializer: bool = True
+    ) -> None:
         """Set the state :code:`log_rates`.
 
         Parameters
@@ -246,7 +249,12 @@ class Model(MarkovStateInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_rates(self, log_rates, epsilon=1e-6, update_initializer=True):
+    def set_rates(
+        self,
+        log_rates: np.ndarray,
+        epsilon: float = 1e-6,
+        update_initializer: bool = True,
+    ) -> None:
         """Set the state rates.
 
         Parameters
@@ -261,19 +269,23 @@ class Model(MarkovStateInferenceModelBase):
         self.set_log_rates(log_rates, update_initializer=update_initializer)
 
     def set_observation_model_parameters(
-        self, observation_model_parameters, update_initializer=True
-    ):
+        self, observation_model_parameters: np.ndarray, update_initializer: bool = True
+    ) -> None:
         """Wrapper for :code:`set_log_rates`."""
         self.set_log_rates(
             observation_model_parameters,
             update_initializer=update_initializer,
         )
 
-    def set_regularizers(self, training_dataset):
+    def set_regularizers(
+        self, training_dataset: Union[tf.data.Dataset, "data.Data"]
+    ) -> None:
         """Set regularizers."""
         raise NotImplementedError
 
-    def set_random_state_time_course_initialization(self, training_dataset):
+    def set_random_state_time_course_initialization(
+        self, training_dataset: tf.data.Dataset
+    ) -> None:
         """Sets the initial :code:`log_rates` based on a random state time course.
 
         Parameters

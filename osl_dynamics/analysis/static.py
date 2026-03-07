@@ -1,6 +1,7 @@
 """Functions to calculate static properties of time series data."""
 
 import logging
+from typing import Callable, List, Optional, Union
 
 import numpy as np
 from sklearn.covariance import LedoitWolf
@@ -14,8 +15,12 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def functional_connectivity(
-    data, conn_type="corr", demean=True, window_length=None, n_jobs=1
-):
+    data: Union[np.ndarray, List[np.ndarray]],
+    conn_type: Union[str, Callable] = "corr",
+    demean: bool = True,
+    window_length: Optional[int] = None,
+    n_jobs: int = 1,
+) -> np.ndarray:
     """Calculate functional connectivity networks.
 
     This function uses the `LedoitWolf <https://scikit-learn.org/stable\
@@ -151,18 +156,18 @@ def functional_connectivity(
 
 
 def welch_spectra(
-    data,
-    sampling_frequency,
-    window_length=None,
-    step_size=None,
-    frequency_range=None,
-    standardize=True,
-    averaging="mean",
-    calc_cpsd=False,
-    calc_coh=False,
-    return_weights=False,
-    keepdims=False,
-    n_jobs=1,
+    data: Union[np.ndarray, list],
+    sampling_frequency: float,
+    window_length: Optional[int] = None,
+    step_size: Optional[int] = None,
+    frequency_range: Optional[List[float]] = None,
+    standardize: bool = True,
+    averaging: str = "mean",
+    calc_cpsd: bool = False,
+    calc_coh: bool = False,
+    return_weights: bool = False,
+    keepdims: bool = False,
+    n_jobs: int = 1,
 ):
     """Calculate spectra using Welch's method.
 
@@ -240,19 +245,19 @@ def welch_spectra(
 
 
 def multitaper_spectra(
-    data,
-    sampling_frequency,
-    window_length=None,
-    time_half_bandwidth=4,
-    n_tapers=7,
-    frequency_range=None,
-    standardize=True,
-    averaging="mean",
-    calc_cpsd=False,
-    calc_coh=False,
-    return_weights=False,
-    keepdims=False,
-    n_jobs=1,
+    data: Union[np.ndarray, list],
+    sampling_frequency: float,
+    window_length: Optional[int] = None,
+    time_half_bandwidth: float = 4,
+    n_tapers: int = 7,
+    frequency_range: Optional[List[float]] = None,
+    standardize: bool = True,
+    averaging: str = "mean",
+    calc_cpsd: bool = False,
+    calc_coh: bool = False,
+    return_weights: bool = False,
+    keepdims: bool = False,
+    n_jobs: int = 1,
 ):
     """Calculate multitaper spectra.
 

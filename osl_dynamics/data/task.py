@@ -3,7 +3,9 @@
 import numpy as np
 
 
-def epoch(data, time_index, pre, post, pad=False):
+def epoch(
+    data: np.ndarray, time_index: np.ndarray, pre: int, post: int, pad: bool = False
+) -> np.ndarray:
     """Transform (time, channels) data to (epochs, time, channels) data.
 
     Given a series of triggers given by :code:`time_index`, spit a continuous
@@ -46,7 +48,9 @@ def epoch(data, time_index, pre, post, pad=False):
     return epoched
 
 
-def epoch_mean(data, time_index, pre, post, pad=False):
+def epoch_mean(
+    data: np.ndarray, time_index: np.ndarray, pre: int, post: int, pad: bool = False
+) -> np.ndarray:
     """Get the mean over epochs of a (time, channels) dataset.
 
     Calls :code:`epoch_mean`, and takes a mean over epochs, returning data

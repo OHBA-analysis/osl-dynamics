@@ -1,5 +1,7 @@
 """Classes for simulating a soft mixture of modes."""
 
+from typing import List, Optional, Union
+
 import numpy as np
 from scipy.special import softmax
 
@@ -29,12 +31,12 @@ class MixedSine:
 
     def __init__(
         self,
-        n_modes,
-        relative_activation,
-        amplitudes,
-        frequencies,
-        sampling_frequency,
-    ):
+        n_modes: int,
+        relative_activation: Union[np.ndarray, List[float]],
+        amplitudes: Union[np.ndarray, List[float]],
+        frequencies: Union[np.ndarray, List[float]],
+        sampling_frequency: float,
+    ) -> None:
         if len(relative_activation) != n_modes:
             raise ValueError("len(relative_activation) does not match len(n_modes).")
 
@@ -50,7 +52,7 @@ class MixedSine:
         self.frequencies = frequencies
         self.sampling_frequency = sampling_frequency
 
-    def generate_modes(self, n_samples):
+    def generate_modes(self, n_samples: int) -> np.ndarray:
         # Simulate a random initial phase for each sinusoid
         self.phases = np.random.uniform(0, 2 * np.pi, self.n_modes)
 
@@ -108,18 +110,18 @@ class MixedSine_MVN(Simulation):
 
     def __init__(
         self,
-        n_samples,
-        relative_activation,
-        amplitudes,
-        frequencies,
-        sampling_frequency,
-        means,
-        covariances,
-        n_covariances_act=1,
-        n_modes=None,
-        n_channels=None,
-        observation_error=0.0,
-    ):
+        n_samples: int,
+        relative_activation: Union[np.ndarray, List[float]],
+        amplitudes: Union[np.ndarray, List[float]],
+        frequencies: Union[np.ndarray, List[float]],
+        sampling_frequency: float,
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        n_covariances_act: int = 1,
+        n_modes: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        observation_error: float = 0.0,
+    ) -> None:
         # Observation model
         self.obs_mod = MVN(
             means=means,
@@ -148,7 +150,7 @@ class MixedSine_MVN(Simulation):
         self.mode_time_course = self.generate_modes(self.n_samples)
         self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.sm):
@@ -156,7 +158,7 @@ class MixedSine_MVN(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
-    def standardize(self):
+    def standardize(self) -> None:
         mu = np.mean(self.time_series, axis=0).astype(np.float64)
         sigma = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
@@ -217,24 +219,24 @@ class MSess_MixedSine_MVN(Simulation):
 
     def __init__(
         self,
-        n_samples,
-        relative_activation,
-        amplitudes,
-        frequencies,
-        sampling_frequency,
-        session_means,
-        session_covariances,
-        n_covariances_act=1,
-        n_modes=None,
-        n_channels=None,
-        n_sessions=None,
-        embeddings_dim=None,
-        spatial_embeddings_dim=None,
-        embeddings_scale=None,
-        n_groups=None,
-        between_group_scale=None,
-        observation_error=0.0,
-    ):
+        n_samples: int,
+        relative_activation: Union[np.ndarray, List[float]],
+        amplitudes: Union[np.ndarray, List[float]],
+        frequencies: Union[np.ndarray, List[float]],
+        sampling_frequency: float,
+        session_means: Union[np.ndarray, str],
+        session_covariances: Union[np.ndarray, str],
+        n_covariances_act: int = 1,
+        n_modes: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        n_sessions: Optional[int] = None,
+        embeddings_dim: Optional[int] = None,
+        spatial_embeddings_dim: Optional[int] = None,
+        embeddings_scale: Optional[float] = None,
+        n_groups: Optional[int] = None,
+        between_group_scale: Optional[float] = None,
+        observation_error: float = 0.0,
+    ) -> None:
         # Observation model
         self.obs_mod = MSess_MVN(
             session_means=session_means,
@@ -278,13 +280,13 @@ class MSess_MixedSine_MVN(Simulation):
             self.mode_time_course
         )
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
-    def standardize(self):
+    def standardize(self) -> None:
         means = np.mean(self.time_series, axis=1).astype(np.float64)
         standard_deviations = np.std(self.time_series, axis=1).astype(np.float64)
         super().standardize(axis=1)

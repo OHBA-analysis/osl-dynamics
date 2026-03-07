@@ -6,7 +6,7 @@ from sklearn.metrics import confusion_matrix as sklearn_confusion_matrix
 from tqdm.auto import trange
 
 
-def alpha_correlation(alpha_1, alpha_2):
+def alpha_correlation(alpha_1: np.ndarray, alpha_2: np.ndarray) -> np.ndarray:
     """Calculates the correlation between mixing coefficient time series.
 
     Parameters
@@ -33,7 +33,9 @@ def alpha_correlation(alpha_1, alpha_2):
     return corr
 
 
-def confusion_matrix(state_time_course_1, state_time_course_2):
+def confusion_matrix(
+    state_time_course_1: np.ndarray, state_time_course_2: np.ndarray
+) -> np.ndarray:
     """Calculate the `confusion_matrix \
     <https://scikit-learn.org/stable/modules/generated/\
     sklearn.metrics.confusion_matrix.html>`_ of two state time courses.
@@ -65,7 +67,7 @@ def confusion_matrix(state_time_course_1, state_time_course_2):
     return sklearn_confusion_matrix(state_time_course_1, state_time_course_2)
 
 
-def dice_coefficient(sequence_1, sequence_2):
+def dice_coefficient(sequence_1: np.ndarray, sequence_2: np.ndarray) -> float:
     """Calculates the Dice coefficient.
 
     The Dice coefficient is 2 times the number of equal elements (equivalent to
@@ -94,7 +96,7 @@ def dice_coefficient(sequence_1, sequence_2):
     return 2 * ((sequence_1 == sequence_2).sum()) / (len(sequence_1) + len(sequence_2))
 
 
-def frobenius_norm(A, B):
+def frobenius_norm(A: np.ndarray, B: np.ndarray) -> float:
     r"""Calculates the Frobenius norm of the difference of two matrices.
 
     The Frobenius norm is calculated as
@@ -128,7 +130,7 @@ def frobenius_norm(A, B):
     return norm
 
 
-def pairwise_frobenius_distance(matrices):
+def pairwise_frobenius_distance(matrices: np.ndarray) -> np.ndarray:
     """Calculates the pairwise Frobenius distance of a set of matrices.
 
     Parameters
@@ -156,7 +158,9 @@ def pairwise_frobenius_distance(matrices):
     )
 
 
-def pairwise_matrix_correlations(matrices, remove_diagonal=False):
+def pairwise_matrix_correlations(
+    matrices: np.ndarray, remove_diagonal: bool = False
+) -> np.ndarray:
     """Calculate the correlation between (flattened) covariance matrices.
 
     Parameters
@@ -180,7 +184,9 @@ def pairwise_matrix_correlations(matrices, remove_diagonal=False):
     return correlations
 
 
-def riemannian_distance(M1, M2, threshold=1e-3):
+def riemannian_distance(
+    M1: np.ndarray, M2: np.ndarray, threshold: float = 1e-3
+) -> float:
     r"""Calculate the Riemannian distance between two matrices.
 
     The Riemannian distance is defined as
@@ -209,7 +215,9 @@ def riemannian_distance(M1, M2, threshold=1e-3):
     return d
 
 
-def pairwise_riemannian_distances(matrices, threshold=1e-3):
+def pairwise_riemannian_distances(
+    matrices: np.ndarray, threshold: float = 1e-3
+) -> np.ndarray:
     """Calculate the Riemannian distance between matrices.
 
     Parameters
@@ -246,7 +254,9 @@ def pairwise_riemannian_distances(matrices, threshold=1e-3):
     return riemannian_distances
 
 
-def pairwise_rv_coefficient(matrices, remove_diagonal=False):
+def pairwise_rv_coefficient(
+    matrices: np.ndarray, remove_diagonal: bool = False
+) -> np.ndarray:
     """Calculate the RV coefficient for two matrices.
 
     Parameters
@@ -299,7 +309,9 @@ def pairwise_rv_coefficient(matrices, remove_diagonal=False):
     return rv_coefficients
 
 
-def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
+def pairwise_congruence_coefficient(
+    matrices: np.ndarray, remove_diagonal: bool = False
+) -> np.ndarray:
     """Computes the congruence coefficient between matrices.
 
     Parameters
@@ -336,7 +348,7 @@ def pairwise_congruence_coefficient(matrices, remove_diagonal=False):
     return congruence_coefficient
 
 
-def pairwise_l2_distance(arrays, batch_dims=0):
+def pairwise_l2_distance(arrays: np.ndarray, batch_dims: int = 0) -> np.ndarray:
     """Pairwise L2 distance.
 
     Calculate the pairwise L2 distance along the first axis after :code:`batch_dims`.

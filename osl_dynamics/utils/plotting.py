@@ -2,6 +2,7 @@
 
 import logging
 from itertools import zip_longest
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -26,7 +27,7 @@ _logger = logging.getLogger("osl-dynamics")
 logging.getLogger("matplotlib.category").setLevel(logging.ERROR)
 
 
-def set_style(params):
+def set_style(params: dict) -> None:
     """Sets matplotlib's style.
 
     Wrapper for `plt.rcParams.update
@@ -75,7 +76,7 @@ def create_figure(*args, **kwargs):
     return fig, ax
 
 
-def show(tight_layout=False):
+def show(tight_layout: bool = False) -> None:
     """Displays all figures in memory.
 
     Wrapper for `plt.show <https://matplotlib.org/stable/api/_as_gen/\
@@ -91,7 +92,7 @@ def show(tight_layout=False):
     plt.show()
 
 
-def save(fig, filename, tight_layout=False):
+def save(fig: plt.Figure, filename: str, tight_layout: bool = False) -> None:
     """Save and close a figure.
 
     Parameters
@@ -110,7 +111,7 @@ def save(fig, filename, tight_layout=False):
     close(fig)
 
 
-def close(fig=None):
+def close(fig: Optional[plt.Figure] = None) -> None:
     """Close a figure.
 
     Parameters
@@ -123,7 +124,7 @@ def close(fig=None):
     plt.close(fig)
 
 
-def rough_square_axes(n_plots):
+def rough_square_axes(n_plots: int) -> Tuple[int, int, int]:
     """Get the most square axis layout for n_plots.
 
     Given :code:`n_plots`, find the side lengths of the rectangle which gives
@@ -151,7 +152,7 @@ def rough_square_axes(n_plots):
     return short, long, empty
 
 
-def get_colors(n, colormap="magma"):
+def get_colors(n: int, colormap: str = "magma") -> List[Tuple[float, ...]]:
     """Produce equidistant colors from a matplotlib colormap.
 
     Given a matplotlib colormap, produce a series of RGBA colors which are
@@ -181,20 +182,20 @@ def get_colors(n, colormap="magma"):
 
 
 def plot_line(
-    x,
-    y,
-    labels=None,
-    legend_loc=1,
-    errors=None,
-    x_range=None,
-    y_range=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+    x: List[np.ndarray],
+    y: List[np.ndarray],
+    labels: Optional[List[str]] = None,
+    legend_loc: int = 1,
+    errors: Optional[list] = None,
+    x_range: Optional[list] = None,
+    y_range: Optional[list] = None,
+    x_label: Optional[str] = None,
+    y_label: Optional[str] = None,
+    title: Optional[str] = None,
+    plot_kwargs: Optional[dict] = None,
+    fig_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Basic line plot.
 
@@ -325,22 +326,22 @@ def plot_line(
 
 
 def plot_scatter(
-    x,
-    y,
-    labels=None,
-    legend_loc=1,
-    errors=None,
-    x_range=None,
-    y_range=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    markers=None,
-    annotate=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+    x: List[np.ndarray],
+    y: List[np.ndarray],
+    labels: Optional[List[str]] = None,
+    legend_loc: int = 1,
+    errors: Optional[list] = None,
+    x_range: Optional[list] = None,
+    y_range: Optional[list] = None,
+    x_label: Optional[str] = None,
+    y_label: Optional[str] = None,
+    title: Optional[str] = None,
+    markers: Optional[List[str]] = None,
+    annotate: Optional[list] = None,
+    plot_kwargs: Optional[dict] = None,
+    fig_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Basic scatter plot.
 
@@ -490,19 +491,19 @@ def plot_scatter(
 
 
 def plot_hist(
-    data,
-    bins,
-    labels=None,
-    legend_loc=1,
-    x_range=None,
-    y_range=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+    data: List[np.ndarray],
+    bins: List[int],
+    labels: Optional[List[str]] = None,
+    legend_loc: int = 1,
+    x_range: Optional[list] = None,
+    y_range: Optional[list] = None,
+    x_label: Optional[str] = None,
+    y_label: Optional[str] = None,
+    title: Optional[str] = None,
+    plot_kwargs: Optional[dict] = None,
+    fig_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Basic histogram plot.
 
@@ -617,17 +618,17 @@ def plot_hist(
 
 
 def plot_bar_chart(
-    counts,
-    x=None,
-    x_range=None,
-    y_range=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+    counts: List[np.ndarray],
+    x: Optional[Union[list, np.ndarray]] = None,
+    x_range: Optional[list] = None,
+    y_range: Optional[list] = None,
+    x_label: Optional[str] = None,
+    y_label: Optional[str] = None,
+    title: Optional[str] = None,
+    plot_kwargs: Optional[dict] = None,
+    fig_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Bar chart plot.
 
@@ -723,20 +724,20 @@ def plot_bar_chart(
 
 
 def plot_gmm(
-    data,
-    amplitudes,
-    means,
-    stddevs,
-    bins=50,
-    legend_loc=1,
-    x_range=None,
-    y_range=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+    data: np.ndarray,
+    amplitudes: np.ndarray,
+    means: np.ndarray,
+    stddevs: np.ndarray,
+    bins: int = 50,
+    legend_loc: Optional[int] = 1,
+    x_range: Optional[list] = None,
+    y_range: Optional[list] = None,
+    x_label: Optional[str] = None,
+    y_label: Optional[str] = None,
+    title: Optional[str] = None,
+    fig_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Plot a two component Gaussian mixture model.
 
@@ -842,15 +843,15 @@ def plot_gmm(
 
 
 def plot_violin(
-    data,
-    x=None,
-    x_label=None,
-    y_label=None,
-    title=None,
-    fig_kwargs=None,
-    sns_kwargs=None,
-    ax=None,
-    filename=None,
+    data: List[np.ndarray],
+    x: Optional[Union[list, np.ndarray]] = None,
+    x_label: Optional[str] = None,
+    y_label: Optional[str] = None,
+    title: Optional[str] = None,
+    fig_kwargs: Optional[dict] = None,
+    sns_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Violin plot.
 
@@ -933,13 +934,13 @@ def plot_violin(
 
 
 def plot_time_series(
-    time_series,
-    n_samples=None,
-    y_tick_values=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+    time_series: np.ndarray,
+    n_samples: Optional[int] = None,
+    y_tick_values: Optional[list] = None,
+    plot_kwargs: Optional[dict] = None,
+    fig_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Plot a time series with channel separation.
 
@@ -1030,11 +1031,11 @@ def plot_time_series(
 
 def plot_separate_time_series(
     *time_series,
-    n_samples=None,
-    sampling_frequency=None,
-    fig_kwargs=None,
-    plot_kwargs=None,
-    filename=None,
+    n_samples: Optional[int] = None,
+    sampling_frequency: Optional[float] = None,
+    fig_kwargs: Optional[dict] = None,
+    plot_kwargs: Optional[dict] = None,
+    filename: Optional[str] = None,
 ):
     """Plot time series as separate subplots.
 
@@ -1109,19 +1110,19 @@ def plot_separate_time_series(
 
 
 def plot_epoched_time_series(
-    data,
-    time_index,
-    sampling_frequency=None,
-    pre=125,
-    post=1000,
-    baseline_correct=False,
-    legend=True,
-    legend_loc=1,
-    title=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+    data: np.ndarray,
+    time_index: np.ndarray,
+    sampling_frequency: Optional[float] = None,
+    pre: int = 125,
+    post: int = 1000,
+    baseline_correct: bool = False,
+    legend: bool = True,
+    legend_loc: int = 1,
+    title: Optional[str] = None,
+    plot_kwargs: Optional[dict] = None,
+    fig_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Plot continuous data, epoched and meant over epochs.
 
@@ -1224,14 +1225,14 @@ def plot_epoched_time_series(
 
 
 def plot_matrices(
-    matrix,
-    group_color_scale=True,
-    titles=None,
-    main_title=None,
-    cmap="viridis",
-    nan_color="white",
-    log_norm=False,
-    filename=None,
+    matrix: Union[list, np.ndarray],
+    group_color_scale: bool = True,
+    titles: Optional[List[str]] = None,
+    main_title: Optional[str] = None,
+    cmap: Union[str, matplotlib.colors.ListedColormap] = "viridis",
+    nan_color: str = "white",
+    log_norm: bool = False,
+    filename: Optional[str] = None,
 ):
     """Plot a collection of matrices.
 
@@ -1332,12 +1333,12 @@ def plot_matrices(
 
 
 def plot_connections(
-    weights,
-    labels=None,
-    ax=None,
-    cmap="hot",
-    text_color=None,
-    filename=None,
+    weights: np.ndarray,
+    labels: Optional[List[str]] = None,
+    ax: Optional[plt.Axes] = None,
+    cmap: Union[str, matplotlib.colors.ListedColormap] = "hot",
+    text_color: Optional[str] = None,
+    filename: Optional[str] = None,
 ):
     """Create a chord diagram representing the values of a matrix.
 
@@ -1507,18 +1508,18 @@ def plot_connections(
 
 
 def topoplot(
-    layout,
-    data,
-    channel_names=None,
-    plot_boxes=False,
-    show_deleted_sensors=False,
-    show_names=False,
-    title=None,
-    colorbar=True,
-    axis=None,
-    cmap="cold_hot",
-    n_contours=10,
-    filename=None,
+    layout: str,
+    data: np.ndarray,
+    channel_names: Optional[List[str]] = None,
+    plot_boxes: bool = False,
+    show_deleted_sensors: bool = False,
+    show_names: bool = False,
+    title: Optional[str] = None,
+    colorbar: bool = True,
+    axis: Optional[plt.Axes] = None,
+    cmap: Union[str, matplotlib.colors.ListedColormap] = "cold_hot",
+    n_contours: int = 10,
+    filename: Optional[str] = None,
 ):
     """Make a contour plot in sensor space.
 
@@ -1586,25 +1587,25 @@ def topoplot(
 
 
 def plot_brain_surface(
-    values,
-    mask_file,
-    parcellation_file,
-    title=None,
-    cmap="cold_hot",
-    colorbar=True,
-    symmetric_cbar=True,
-    cbar_tick_format="%.2g",
-    cbar_fontsize=24,
-    cbar_label=None,
-    vmin=None,
-    vmax=None,
-    hemispheres=None,
-    views=None,
-    bg_on_data=False,
-    threshold=None,
-    remove_subcortical_voxels=False,
-    filename=None,
-    show_plot=None,
+    values: np.ndarray,
+    mask_file: str,
+    parcellation_file: str,
+    title: Optional[str] = None,
+    cmap: Union[str, matplotlib.colors.ListedColormap] = "cold_hot",
+    colorbar: bool = True,
+    symmetric_cbar: bool = True,
+    cbar_tick_format: str = "%.2g",
+    cbar_fontsize: int = 24,
+    cbar_label: Optional[str] = None,
+    vmin: Optional[float] = None,
+    vmax: Optional[float] = None,
+    hemispheres: Optional[list] = None,
+    views: Optional[list] = None,
+    bg_on_data: bool = False,
+    threshold: Optional[float] = None,
+    remove_subcortical_voxels: bool = False,
+    filename: Optional[str] = None,
+    show_plot: Optional[bool] = None,
 ):
     """Plot a 2D heat map on the surface of the brain.
 
@@ -1782,15 +1783,15 @@ def plot_brain_surface(
 
 def plot_alpha(
     *alpha,
-    n_samples=None,
-    cmap="tab10",
-    sampling_frequency=None,
-    y_labels=None,
-    title=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    filename=None,
-    axes=None,
+    n_samples: Optional[int] = None,
+    cmap: Union[str, matplotlib.colors.ListedColormap] = "tab10",
+    sampling_frequency: Optional[float] = None,
+    y_labels: Optional[Union[str, List[str]]] = None,
+    title: Optional[str] = None,
+    plot_kwargs: Optional[dict] = None,
+    fig_kwargs: Optional[dict] = None,
+    filename: Optional[str] = None,
+    axes: Optional[List[plt.Axes]] = None,
 ):
     """Plot alpha.
 
@@ -1922,17 +1923,17 @@ def plot_alpha(
 
 
 def plot_state_lifetimes(
-    state_time_course,
-    bins="auto",
-    density=False,
-    match_scale_x=False,
-    match_scale_y=False,
-    x_range=None,
-    x_label=None,
-    y_label=None,
-    plot_kwargs=None,
-    fig_kwargs=None,
-    filename=None,
+    state_time_course: np.ndarray,
+    bins: Union[int, str] = "auto",
+    density: bool = False,
+    match_scale_x: bool = False,
+    match_scale_y: bool = False,
+    x_range: Optional[list] = None,
+    x_label: Optional[str] = None,
+    y_label: Optional[str] = None,
+    plot_kwargs: Optional[dict] = None,
+    fig_kwargs: Optional[dict] = None,
+    filename: Optional[str] = None,
 ):
     """Create a histogram of state lifetimes.
 
@@ -2059,16 +2060,16 @@ def plot_state_lifetimes(
 
 
 def plot_psd_topo(
-    f,
-    psd,
-    only_show=None,
-    parcellation_file=None,
-    frequency_range=None,
-    topomap_pos=None,
-    cmap="viridis",
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+    f: np.ndarray,
+    psd: np.ndarray,
+    only_show: Optional[list] = None,
+    parcellation_file: Optional[str] = None,
+    frequency_range: Optional[list] = None,
+    topomap_pos: Optional[list] = None,
+    cmap: str = "viridis",
+    fig_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Plot PSDs for parcels and a topomap.
 
@@ -2170,14 +2171,14 @@ def plot_psd_topo(
 
 
 def plot_hmm_summary_stats(
-    fo,
-    lt,
-    intv,
-    sr,
-    filename=None,
-    cmap="tab10",
-    fig_kwargs=None,
-    sns_kwargs=None,
+    fo: np.ndarray,
+    lt: np.ndarray,
+    intv: np.ndarray,
+    sr: np.ndarray,
+    filename: Optional[str] = None,
+    cmap: str = "tab10",
+    fig_kwargs: Optional[dict] = None,
+    sns_kwargs: Optional[dict] = None,
 ):
     """Plot summary statistics (FO, LT, INTV, SR).
 
@@ -2266,13 +2267,13 @@ def plot_hmm_summary_stats(
 
 
 def plot_summary_stats_group_diff(
-    name,
-    summary_stats,
-    pvalues,
-    assignments,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+    name: str,
+    summary_stats: np.ndarray,
+    pvalues: np.ndarray,
+    assignments: np.ndarray,
+    fig_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Plot summary statistics for two groups as violin plots.
 
@@ -2367,19 +2368,19 @@ def plot_summary_stats_group_diff(
 
 
 def plot_evoked_response(
-    t,
-    epochs,
-    pvalues,
-    significance_level=0.05,
-    offset_between_bars=0.01,
-    labels=None,
-    legend_loc=1,
-    x_label=None,
-    y_label=None,
-    title=None,
-    fig_kwargs=None,
-    ax=None,
-    filename=None,
+    t: np.ndarray,
+    epochs: np.ndarray,
+    pvalues: np.ndarray,
+    significance_level: float = 0.05,
+    offset_between_bars: float = 0.01,
+    labels: Optional[list] = None,
+    legend_loc: int = 1,
+    x_label: Optional[str] = None,
+    y_label: Optional[str] = None,
+    title: Optional[str] = None,
+    fig_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Plot an evoked responses with significant time points highlighted.
 
@@ -2501,18 +2502,18 @@ def plot_evoked_response(
 
 
 def plot_wavelet(
-    data,
-    sampling_frequency,
-    w=5,
-    standardize=True,
-    time_range=None,
-    frequency_range=None,
-    title=None,
-    add_colorbar=True,
-    fig_kwargs=None,
-    plot_kwargs=None,
-    ax=None,
-    filename=None,
+    data: np.ndarray,
+    sampling_frequency: float,
+    w: float = 5,
+    standardize: bool = True,
+    time_range: Optional[list] = None,
+    frequency_range: Optional[list] = None,
+    title: Optional[str] = None,
+    add_colorbar: bool = True,
+    fig_kwargs: Optional[dict] = None,
+    plot_kwargs: Optional[dict] = None,
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
 ):
     """Plot a wavelet transform.
 

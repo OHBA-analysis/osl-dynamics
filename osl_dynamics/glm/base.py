@@ -1,6 +1,6 @@
 """GLM base class."""
 
-from typing import List, Dict
+from typing import Dict, List, Optional, Union
 from dataclasses import dataclass
 import numpy as np
 
@@ -8,13 +8,13 @@ from osl_dynamics.glm.ols import osl_fit, get_degree_of_freedom
 
 
 # Helper functions for validation
-def _validate_name(name):
+def _validate_name(name: str) -> str:
     if not isinstance(name, str):
         raise TypeError(f"name must be a string, got {type(name)}")
     return name
 
 
-def _validate_values(values):
+def _validate_values(values: Union[np.ndarray, list]) -> np.ndarray:
     if isinstance(values, list):
         values = np.array(values)
 
@@ -27,7 +27,7 @@ def _validate_values(values):
     return values
 
 
-def _validate_type(feature_type):
+def _validate_type(feature_type: str) -> str:
     if feature_type not in ["constant", "continuous", "categorical"]:
         raise ValueError(
             f"type must be 'constant' or 'continuous' or 'categorical', "
@@ -68,7 +68,7 @@ class DesignConfig:
     contrasts: List[Dict] = None
     standardize_features: bool = True
 
-    def create_design(self):
+    def create_design(self) -> "Design":
         """Create a Design object from the configuration.
 
         Returns
@@ -101,13 +101,15 @@ class Feature:
         Feature type. Must be 'constant', 'continuous', or 'categorical'.
     """
 
-    def __init__(self, name, values, feature_type):
+    def __init__(
+        self, name: str, values: Union[np.ndarray, list], feature_type: str
+    ) -> None:
         self.name = _validate_name(name)
         self.values = _validate_values(values)
         self.feature_type = _validate_type(feature_type)
         self.n_samples = len(self.values)
 
-    def summary(self):
+    def summary(self) -> Dict:
         return {
             "name": self.name,
             "n_samples": self.n_samples,
@@ -126,19 +128,19 @@ class Contrast:
         Contrast name.
     """
 
-    def __init__(self, name, values):
+    def __init__(self, name: str, values: Union[np.ndarray, list]) -> None:
         self.name = _validate_name(name)
         self.values = _validate_values(values)
         self.n_features = len(self.values)
         self.contrast_type = self._get_contrast_type()
 
-    def _get_contrast_type(self):
+    def _get_contrast_type(self) -> str:
         if self.values.sum() == 0:
             return "differential"
         else:
             return "main_effect"
 
-    def summary(self):
+    def summary(self) -> Dict:
         return {
             "name": self.name,
             "n_features": self.n_features,
@@ -159,14 +161,21 @@ class Design:
         Whether to standardize continuous features. Default is True.
     """
 
-    def __init__(self, features=None, contrasts=None, standardize_features=True):
+    def __init__(
+        self,
+        features: Optional[List[Feature]] = None,
+        contrasts: Optional[List[Contrast]] = None,
+        standardize_features: bool = True,
+    ) -> None:
         self.features = [] if features is None else features
         self.contrasts = [] if contrasts is None else contrasts
         self.n_samples = None
         self.n_features = None
         self.standardize_features = standardize_features
 
-    def add_feature(self, name, values, feature_type):
+    def add_feature(
+        self, name: str, values: Union[np.ndarray, list], feature_type: str
+    ) -> None:
         """Add a feature to the design.
 
         Parameters
@@ -181,7 +190,7 @@ class Design:
         feature = Feature(name, values, feature_type)
         self.features.append(feature)
 
-    def add_contrast(self, name, values):
+    def add_contrast(self, name: str, values: Union[np.ndarray, list]) -> None:
         """Add a contrast to the design.
 
         Parameters
@@ -194,7 +203,7 @@ class Design:
         contrast = Contrast(name, values)
         self.contrasts.append(contrast)
 
-    def validate(self):
+    def validate(self) -> None:
         """Validate the design."""
         self._validate_features()
         self._validate_contrasts()
@@ -206,7 +215,7 @@ class Design:
                 f"length of the contrasts {self.n_features}."
             )
 
-    def build_X(self):
+    def build_X(self) -> np.ndarray:
         """Build the design matrix.
 
         Returns
@@ -222,7 +231,7 @@ class Design:
             X = self._standardize_features(X)
         return X
 
-    def build_contrast_array(self):
+    def build_contrast_array(self) -> np.ndarray:
         """Build the contrast array.
 
         Returns
@@ -236,7 +245,7 @@ class Design:
             contrast_array[i] = contrast.values
         return contrast_array
 
-    def _standardize_features(self, X):
+    def _standardize_features(self, X: np.ndarray) -> np.ndarray:
         """Standardize continuous features.
 
         Parameters
@@ -257,7 +266,7 @@ class Design:
             X_copy[:, cts_indx] = (X_copy[:, cts_indx] - X_mean) / X_std
         return X_copy
 
-    def _validate_features(self):
+    def _validate_features(self) -> None:
         if self.features is None:
             raise ValueError("No features found.")
 
@@ -276,7 +285,7 @@ class Design:
                     f"{self.n_samples} samples in the first feature."
                 )
 
-    def _validate_contrasts(self):
+    def _validate_contrasts(self) -> None:
         if self.contrasts is None:
             raise ValueError("No contrasts found.")
 
@@ -297,30 +306,30 @@ class Design:
                 )
 
     @property
-    def n_contrasts(self):
+    def n_contrasts(self) -> int:
         return len(self.contrasts)
 
     @property
-    def feature_names(self):
+    def feature_names(self) -> List[str]:
         return [f.name for f in self.features]
 
     @property
-    def feature_types(self):
+    def feature_types(self) -> List[str]:
         return [f.feature_type for f in self.features]
 
     @property
-    def contrast_names(self):
+    def contrast_names(self) -> List[str]:
         return [c.name for c in self.contrasts]
 
     @property
-    def contrast_types(self):
+    def contrast_types(self) -> List[str]:
         return [c.contrast_type for c in self.contrasts]
 
     @property
-    def dof(self):
+    def dof(self) -> int:
         return get_degree_of_freedom(self.build_X())
 
-    def summary(self):
+    def summary(self) -> Dict:
         """Get a summary of the design."""
         return {
             "n_samples": self.n_samples,
@@ -343,14 +352,14 @@ class GLM:
         Design object.
     """
 
-    def __init__(self, design):
+    def __init__(self, design: Design) -> None:
         self.design = design
         self.X = self.design.build_X()
         self.c = self.design.build_contrast_array()
         self.n_targets = None
         self.target_dims = None
 
-    def fit(self, y):
+    def fit(self, y: Union[np.ndarray, list]) -> None:
         """Fit the GLM model.
 
         Parameters
@@ -364,7 +373,7 @@ class GLM:
         self.copes = copes.reshape((self.n_contrasts, *self.target_dims))
         self.varcopes = varcopes.reshape((self.n_contrasts, *self.target_dims))
 
-    def _validate_y(self, y):
+    def _validate_y(self, y: Union[np.ndarray, list]) -> np.ndarray:
         """Validate the target values and flatten the target dimensions."""
         if isinstance(y, list):
             y = np.array(y).copy()
@@ -390,7 +399,9 @@ class GLM:
         self.n_targets = y_copy.shape[1]
         return y_copy
 
-    def get_tstats(self, copes=None, varcopes=None):
+    def get_tstats(
+        self, copes: Optional[np.ndarray] = None, varcopes: Optional[np.ndarray] = None
+    ) -> np.ndarray:
         """Get t-statistics.
 
         Parameters
@@ -414,42 +425,42 @@ class GLM:
         return copes / np.sqrt(varcopes)
 
     @property
-    def n_samples(self):
+    def n_samples(self) -> Optional[int]:
         return self.design.n_samples
 
     @property
-    def n_features(self):
+    def n_features(self) -> Optional[int]:
         return self.design.n_features
 
     @property
-    def feature_names(self):
+    def feature_names(self) -> List[str]:
         return self.design.feature_names
 
     @property
-    def feature_types(self):
+    def feature_types(self) -> List[str]:
         return self.design.feature_types
 
     @property
-    def n_contrasts(self):
+    def n_contrasts(self) -> int:
         return self.design.n_contrasts
 
     @property
-    def contrast_names(self):
+    def contrast_names(self) -> List[str]:
         return self.design.contrast_names
 
     @property
-    def contrast_types(self):
+    def contrast_types(self) -> List[str]:
         return self.design.contrast_types
 
     @property
-    def dof(self):
+    def dof(self) -> int:
         return self.design.dof
 
     @property
-    def tstats(self):
+    def tstats(self) -> np.ndarray:
         return self.get_tstats(self.copes, self.varcopes)
 
-    def summary(self):
+    def summary(self) -> Dict:
         """Get a summary of the GLM."""
         sum = self.design.summary()
         sum["n_targets"] = self.n_targets

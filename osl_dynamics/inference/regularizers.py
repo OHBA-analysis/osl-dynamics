@@ -26,7 +26,9 @@ class InverseWishart(regularizers.Regularizer):
         The regularization will be multiplied by the strength.
     """
 
-    def __init__(self, nu, psi, epsilon, strength, **kwargs):
+    def __init__(
+        self, nu: int, psi: np.ndarray, epsilon: float, strength: float, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.nu = nu
         self.psi = psi
@@ -53,7 +55,7 @@ class InverseWishart(regularizers.Regularizer):
                 "Cholesky decomposition of psi failed. psi must be positive definite."
             )
 
-    def __call__(self, flattened_cholesky_factors):
+    def __call__(self, flattened_cholesky_factors: tf.Tensor) -> tf.Tensor:
         covariances = add_epsilon(
             self.bijector(flattened_cholesky_factors), self.epsilon, diag=True
         )
@@ -80,7 +82,9 @@ class MultivariateNormal(regularizers.Regularizer):
         The regularization will be multiplied by the strength.
     """
 
-    def __init__(self, mu, sigma, strength, **kwargs):
+    def __init__(
+        self, mu: np.ndarray, sigma: np.ndarray, strength: float, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
@@ -105,7 +109,7 @@ class MultivariateNormal(regularizers.Regularizer):
 
         self.inv_sigma = tf.linalg.inv(self.sigma)
 
-    def __call__(self, vectors):
+    def __call__(self, vectors: tf.Tensor) -> tf.Tensor:
         vectors = vectors - tf.expand_dims(self.mu, 0)
 
         reg = (1 / 2) * tf.reduce_sum(
@@ -141,7 +145,9 @@ class MarginalInverseWishart(regularizers.Regularizer):
     independent of the scale matrix.
     """
 
-    def __init__(self, nu, epsilon, n_channels, strength, **kwargs):
+    def __init__(
+        self, nu: int, epsilon: float, n_channels: int, strength: float, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.nu = nu
         self.epsilon = epsilon
@@ -154,7 +160,7 @@ class MarginalInverseWishart(regularizers.Regularizer):
         if not self.nu > self.n_channels - 1:
             raise ValueError("nu must be greater than (n_channels - 1).")
 
-    def __call__(self, flattened_cholesky_factor):
+    def __call__(self, flattened_cholesky_factor: tf.Tensor) -> tf.Tensor:
         correlations = add_epsilon(
             self.bijector(flattened_cholesky_factor), self.epsilon, diag=True
         )
@@ -182,7 +188,14 @@ class LogNormal(regularizers.Regularizer):
         The regularization will be multiplied by the strength.
     """
 
-    def __init__(self, mu, sigma, epsilon, strength, **kwargs):
+    def __init__(
+        self,
+        mu: np.ndarray,
+        sigma: np.ndarray,
+        epsilon: float,
+        strength: float,
+        **kwargs,
+    ) -> None:
         super().__init__(**kwargs)
         self.mu = mu
         self.sigma = sigma
@@ -202,7 +215,7 @@ class LogNormal(regularizers.Regularizer):
         if np.any(self.sigma < 0):
             raise ValueError("Entries of sigma must be positive.")
 
-    def __call__(self, diagonals):
+    def __call__(self, diagonals: tf.Tensor) -> tf.Tensor:
         std = add_epsilon(self.bijector(diagonals), self.epsilon)
         log_std = tf.math.log(std)
         reg = tf.reduce_sum(

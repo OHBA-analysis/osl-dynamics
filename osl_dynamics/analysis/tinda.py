@@ -13,13 +13,15 @@ See Also
 """
 
 import logging
+from typing import Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import matplotlib.pyplot as plt
 
 _logger = logging.getLogger("osl-dynamics")
 
 
-def find_intervals(tc_hot):
+def find_intervals(tc_hot: np.ndarray) -> Tuple[List[Tuple[int, int]], np.ndarray]:
     """Find intervals (periods where :code:`tc_hot` is zero) in a hot vector.
 
     Parameters
@@ -46,7 +48,9 @@ def find_intervals(tc_hot):
     return intervals, durations
 
 
-def split_intervals(intervals, n_bins=2):
+def split_intervals(
+    intervals: List[Tuple[int, int]], n_bins: int = 2
+) -> Tuple[List, List, np.ndarray]:
     """Splits each interval into :code:`nbin` equally sized bins.
 
     Parameters
@@ -97,8 +101,11 @@ def split_intervals(intervals, n_bins=2):
 
 
 def split_interval_duration(
-    durations, interval_range=None, mode="sample", sampling_frequency=None
-):
+    durations: np.ndarray,
+    interval_range: Optional[np.ndarray] = None,
+    mode: str = "sample",
+    sampling_frequency: Optional[float] = None,
+) -> Tuple[List, Optional[np.ndarray]]:
     """Split interval durations into bins based on their duration.
 
     Parameters
@@ -152,8 +159,11 @@ def split_interval_duration(
 
 
 def compute_fo_stats(
-    tc_sec, divided_intervals, interval_mask=None, return_all_intervals=False
-):
+    tc_sec: np.ndarray,
+    divided_intervals: List,
+    interval_mask: Optional[np.ndarray] = None,
+    return_all_intervals: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, Optional[List], Optional[List]]:
     """Compute sums and weighted averages of time courses in each interval.
 
     Parameters
@@ -306,7 +316,12 @@ def compute_fo_stats(
         return interval_weighted_avg, interval_sum, None, None
 
 
-def collate_stats(stats, field, all_to_all=False, ignore_elements=None):
+def collate_stats(
+    stats: List[Dict],
+    field: str,
+    all_to_all: bool = False,
+    ignore_elements: Optional[List[int]] = None,
+) -> np.ndarray:
     """Collate list of stats (e.g., of different states) into a single array.
 
     Parameters
@@ -362,14 +377,14 @@ def collate_stats(stats, field, all_to_all=False, ignore_elements=None):
 
 
 def tinda(
-    tc,
-    density_of=None,
-    n_bins=2,
-    interval_mode=None,
-    interval_range=None,
-    sampling_frequency=None,
-    return_all_intervals=False,
-):
+    tc: Union[np.ndarray, List[np.ndarray]],
+    density_of: Optional[Union[np.ndarray, List[np.ndarray]]] = None,
+    n_bins: int = 2,
+    interval_mode: Optional[str] = None,
+    interval_range: Optional[np.ndarray] = None,
+    sampling_frequency: Optional[float] = None,
+    return_all_intervals: bool = False,
+) -> Tuple[np.ndarray, np.ndarray, Union[List[Dict], Dict]]:
     """Compute time-in-state density and sum for each interval.
 
     Parameters
@@ -569,7 +584,7 @@ def tinda(
     return fo_density, fo_sum, stats
 
 
-def circle_angles(order):
+def circle_angles(order: List[int]) -> np.ndarray:
     """Compute the phase differences between states in a circular plot.
 
     Parameters
@@ -599,7 +614,9 @@ def circle_angles(order):
     return angleplot
 
 
-def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
+def optimise_sequence(
+    fo_density: np.ndarray, metric_to_use: int = 0, n_perms: int = 10**6
+) -> np.ndarray:
     """Optimise the sequence to maximal circularity.
 
     This function reads in the mean pattern of differential fractional
@@ -669,7 +686,12 @@ def optimise_sequence(fo_density, metric_to_use=0, n_perms=10**6):
     return best_sequence[metric_to_use]
 
 
-def compute_cycle_strength(angleplot, asym, relative=True, whichstate=None):
+def compute_cycle_strength(
+    angleplot: np.ndarray,
+    asym: np.ndarray,
+    relative: bool = True,
+    whichstate: Optional[int] = None,
+) -> np.ndarray:
     """Compute cycle strength."""
     if len(asym.shape) == 3:
         tmp = np.stack(
@@ -708,12 +730,12 @@ def compute_cycle_strength(angleplot, asym, relative=True, whichstate=None):
 
 
 def plot_cycle(
-    ordering,
-    fo_density,
-    edges,
-    new_figure=False,
-    color_scheme=None,
-):
+    ordering: List[int],
+    fo_density: np.ndarray,
+    edges: np.ndarray,
+    new_figure: bool = False,
+    color_scheme: Optional[np.ndarray] = None,
+) -> None:
     """Plot state network as circular diagram with arrows.
 
     Parameters

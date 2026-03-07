@@ -3,10 +3,12 @@
 
 """
 
+from typing import Callable, List, Optional, Tuple, Union
+
 import numpy as np
 
 
-def get_one_hot(values, n_states=None):
+def get_one_hot(values: np.ndarray, n_states: Optional[int] = None) -> np.ndarray:
     """Expand a categorical variable to a series of boolean columns (one-hot encoding).
 
     +----------------------+
@@ -60,7 +62,7 @@ def get_one_hot(values, n_states=None):
     return res.reshape([*list(values.shape), n_states]).astype(int)
 
 
-def cov2corr(cov):
+def cov2corr(cov: np.ndarray) -> np.ndarray:
     """Covariance to correlation.
 
     Converts batches of covariance matrices into batches of correlation
@@ -87,7 +89,7 @@ def cov2corr(cov):
     return cov / normalisation
 
 
-def cov2std(cov):
+def cov2std(cov: np.ndarray) -> np.ndarray:
     """Get the standard deviation of batches of covariance matrices.
 
     Parameters
@@ -106,7 +108,7 @@ def cov2std(cov):
     return np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
 
 
-def cov2partialcorr(cov):
+def cov2partialcorr(cov: np.ndarray) -> np.ndarray:
     """Covariance to partial correlation.
 
     Converts batches of covariance matrices into batches of partial correlation
@@ -134,7 +136,7 @@ def cov2partialcorr(cov):
     return partial_corr
 
 
-def cov2partialcov(cov, use_pinv=False):
+def cov2partialcov(cov: np.ndarray, use_pinv: bool = False) -> np.ndarray:
     """Covariance to partial covariance.
 
     Converts batches of covariance matrices into batches of partial covariance
@@ -191,7 +193,7 @@ def cov2partialcov(cov, use_pinv=False):
     return partial
 
 
-def ensure_pos_def(cov, eps=1e-5):
+def ensure_pos_def(cov: np.ndarray, eps: float = 1e-5) -> np.ndarray:
     """Ensure a covariance (or batch of covariances) is positive definite.
 
     Parameters
@@ -212,13 +214,13 @@ def ensure_pos_def(cov, eps=1e-5):
 
 
 def sliding_window_view(
-    x,
-    window_shape,
-    axis=None,
+    x: np.ndarray,
+    window_shape: Union[int, Tuple[int, ...]],
+    axis: Optional[Union[int, Tuple[int, ...]]] = None,
     *,
-    subok=False,
-    writeable=False,
-):
+    subok: bool = False,
+    writeable: bool = False,
+) -> np.ndarray:
     """Create a sliding window over an array in arbitrary dimensions.
 
     Unceremoniously ripped from numpy 1.20,
@@ -279,7 +281,12 @@ def sliding_window_view(
     )
 
 
-def validate(array, correct_dimensionality, allow_dimensions, error_message):
+def validate(
+    array: np.ndarray,
+    correct_dimensionality: int,
+    allow_dimensions: int,
+    error_message: str,
+) -> np.ndarray:
     """Checks if the dimensionality of an array is correct.
 
     Parameters
@@ -314,7 +321,9 @@ def validate(array, correct_dimensionality, allow_dimensions, error_message):
     return array
 
 
-def check_symmetry(mat, precision=1e-6):
+def check_symmetry(
+    mat: Union[np.ndarray, List[np.ndarray]], precision: float = 1e-6
+) -> np.ndarray:
     """Checks if one or more matrices are symmetric.
 
     Parameters
@@ -348,7 +357,7 @@ def check_symmetry(mat, precision=1e-6):
     return symmetry
 
 
-def ezclump(binary_array):
+def ezclump(binary_array: np.ndarray) -> List[slice]:
     """Find the clumps (groups of data with the same values) for a 1D bool array.
 
     Taken wholesale from :code:`numpy.ma.extras.ezclump`.
@@ -376,7 +385,7 @@ def ezclump(binary_array):
     return r
 
 
-def slice_length(slice_):
+def slice_length(slice_: slice) -> int:
     """Return the length of a slice.
 
     Parameters
@@ -392,7 +401,9 @@ def slice_length(slice_):
     return slice_.stop - slice_.start
 
 
-def apply_to_lists(list_of_lists, func, check_empty=True):
+def apply_to_lists(
+    list_of_lists: List[list], func: Callable, check_empty: bool = True
+) -> np.ndarray:
     """Apply a function to each list in a list of lists.
 
     Parameters
@@ -429,7 +440,7 @@ def apply_to_lists(list_of_lists, func, check_empty=True):
     )
 
 
-def list_means(list_of_lists):
+def list_means(list_of_lists: List[list]) -> np.ndarray:
     """Calculate the mean of each list in a list of lists.
 
     Parameters
@@ -445,7 +456,7 @@ def list_means(list_of_lists):
     return apply_to_lists(list_of_lists, func=np.mean)
 
 
-def list_stds(list_of_lists):
+def list_stds(list_of_lists: List[list]) -> np.ndarray:
     """Calculate the standard deviation of each list in a list of lists.
 
     Parameters

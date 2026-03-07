@@ -3,6 +3,8 @@ Classes/functions for building machine learning pipelines,
 performing hyperparameter tuning, and evaluating model performance.
 """
 
+from typing import Dict, List, Optional, Tuple, Union
+
 import numpy as np
 from tqdm.auto import tqdm
 
@@ -74,18 +76,20 @@ class PipelineBuilder:
         }
 
     @property
-    def available_scalers(self):
+    def available_scalers(self) -> List[str]:
         return list(self.scaler_dict.keys())
 
     @property
-    def available_dim_reductions(self):
+    def available_dim_reductions(self) -> List[str]:
         return list(self.dim_reduction_dict.keys())
 
     @property
-    def available_predictors(self):
+    def available_predictors(self) -> List[str]:
         return list(self.predictor_dict.keys())
 
-    def _check_model(self, model_type, model_dict, model_name):
+    def _check_model(
+        self, model_type: Optional[str], model_dict: Dict, model_name: str
+    ) -> None:
         """Checks if the provided model type exists in the given model dictionary.
 
         Parameters
@@ -107,7 +111,12 @@ class PipelineBuilder:
                 f"Invalid {model_name} type. Must be one of: {list(model_dict.keys())}"
             )
 
-    def validate_model(self, scaler=None, dim_reduction=None, predictor=None):
+    def validate_model(
+        self,
+        scaler: Optional[str] = None,
+        dim_reduction: Optional[str] = None,
+        predictor: Optional[str] = None,
+    ) -> None:
         """Validates the provided model components (scaler, dimensionality reduction, and predictor).
 
         Parameters
@@ -128,7 +137,12 @@ class PipelineBuilder:
         self._check_model(dim_reduction, self.dim_reduction_dict, "dim_reduction")
         self._check_model(predictor, self.predictor_dict, "predictor")
 
-    def build_model(self, scaler=None, dim_reduction=None, predictor=None):
+    def build_model(
+        self,
+        scaler: Optional[str] = None,
+        dim_reduction: Optional[str] = None,
+        predictor: Optional[str] = None,
+    ) -> Pipeline:
         """Constructs and returns a scikit-learn pipeline with the specified components.
 
         Parameters
@@ -162,8 +176,11 @@ class PipelineBuilder:
         return Pipeline(steps)
 
     def get_params_grid(
-        self, scalar_params=None, dim_reduction_params=None, predictor_params=None
-    ):
+        self,
+        scalar_params: Optional[Dict] = None,
+        dim_reduction_params: Optional[Dict] = None,
+        predictor_params: Optional[Dict] = None,
+    ) -> Dict:
         """Returns a combined parameter grid for use in hyperparameter optimization (e.g., GridSearchCV).
 
         Parameters
@@ -224,15 +241,15 @@ class ModelSelection:
     def __init__(
         self,
         model,
-        params_grid=None,
-        search_type="grid",
-        cv=5,
-        scoring=None,
-        n_iter=10,
-        random_state=None,
-        n_jobs=1,
-        verbose=0,
-    ):
+        params_grid: Optional[Dict] = None,
+        search_type: str = "grid",
+        cv: int = 5,
+        scoring: Optional[str] = None,
+        n_iter: int = 10,
+        random_state: Optional[int] = None,
+        n_jobs: int = 1,
+        verbose: int = 0,
+    ) -> None:
         """Initializes the pipeline with model selection and cross-validation settings."""
         self.model = model
         self.params_grid = params_grid
@@ -246,7 +263,7 @@ class ModelSelection:
         self.best_model = None
         self.best_params = None
 
-    def set_params_grid(self, params_grid):
+    def set_params_grid(self, params_grid: Dict) -> None:
         """
         Sets the hyperparameter grid for tuning.
 
@@ -259,7 +276,7 @@ class ModelSelection:
             raise TypeError("params_grid must be a dictionary.")
         self.params_grid = params_grid
 
-    def set_cv(self, cv):
+    def set_cv(self, cv: int) -> None:
         """Sets the number of cross-validation folds.
 
         Parameters
@@ -271,7 +288,7 @@ class ModelSelection:
             raise ValueError("cv must be an integer greater than or equal to 2.")
         self.cv = cv
 
-    def set_scoring(self, scoring):
+    def set_scoring(self, scoring: Optional[str]) -> None:
         """Sets the scoring metric.
 
         Parameters
@@ -283,7 +300,7 @@ class ModelSelection:
             raise ValueError("scoring must be a string representing a valid metric.")
         self.scoring = scoring
 
-    def set_n_iter(self, n_iter):
+    def set_n_iter(self, n_iter: int) -> None:
         """Sets the number of iterations for RandomizedSearchCV.
 
         Parameters
@@ -295,7 +312,9 @@ class ModelSelection:
             raise ValueError("n_iter must be a positive integer.")
         self.n_iter = n_iter
 
-    def validate_data(self, X, y):
+    def validate_data(
+        self, X: Union[np.ndarray, list], y: Union[np.ndarray, list]
+    ) -> None:
         if isinstance(X, list):
             X = np.array(X)
         if isinstance(y, list):
@@ -308,7 +327,12 @@ class ModelSelection:
         if X.shape[0] != y.shape[0]:
             raise ValueError("X and y must have the same number of samples.")
 
-    def model_selection(self, X, y, override_best_model=True):
+    def model_selection(
+        self,
+        X: Union[np.ndarray, list],
+        y: Union[np.ndarray, list],
+        override_best_model: bool = True,
+    ):
         """Performs hyperparameter tuning using cross-validation.
 
         Parameters
@@ -361,8 +385,13 @@ class ModelSelection:
         return search.best_estimator_
 
     def nested_cross_validation(
-        self, X, y, split_type="kfold", outer_cv=5, shuffle=True
-    ):
+        self,
+        X: Union[np.ndarray, list],
+        y: Union[np.ndarray, list],
+        split_type: str = "kfold",
+        outer_cv: int = 5,
+        shuffle: bool = True,
+    ) -> np.ndarray:
         """Performs nested cross-validation to evaluate model performance.
 
         Parameters
@@ -414,7 +443,13 @@ class ModelSelection:
 
         return np.array(outer_scores)
 
-    def cross_validation_scores(self, X, y, cv=None, scoring=None):
+    def cross_validation_scores(
+        self,
+        X: Union[np.ndarray, list],
+        y: Union[np.ndarray, list],
+        cv: Optional[int] = None,
+        scoring: Optional[str] = None,
+    ) -> np.ndarray:
         """Computes cross-validation scores for the best model.
 
         Parameters

@@ -3,6 +3,7 @@
 import os
 import logging
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import nibabel as nib
@@ -18,8 +19,13 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def sliding_window_power(
-    data, window_length, step_size=None, power_type="mean", concatenate=False, n_jobs=1
-):
+    data: Union[List[np.ndarray], np.ndarray],
+    window_length: int,
+    step_size: Optional[int] = None,
+    power_type: str = "mean",
+    concatenate: bool = False,
+    n_jobs: int = 1,
+) -> Union[List[np.ndarray], np.ndarray]:
     """Calculate sliding window power.
 
     Parameters
@@ -104,12 +110,12 @@ def sliding_window_power(
 
 
 def variance_from_spectra(
-    frequencies,
-    power_spectra,
-    components=None,
-    frequency_range=None,
-    method="mean",
-):
+    frequencies: np.ndarray,
+    power_spectra: np.ndarray,
+    components: Optional[np.ndarray] = None,
+    frequency_range: Optional[List[float]] = None,
+    method: str = "mean",
+) -> np.ndarray:
     """Calculates variance from power spectra.
 
     Parameters
@@ -251,18 +257,18 @@ def variance_from_spectra(
 
 
 def save(
-    power_map,
-    mask_file,
-    parcellation_file,
-    filename=None,
-    component=0,
-    subtract_mean=False,
-    mean_weights=None,
-    plot_kwargs=None,
-    combined=False,
-    titles=None,
-    n_rows=1,
-):
+    power_map: np.ndarray,
+    mask_file: str,
+    parcellation_file: str,
+    filename: Optional[str] = None,
+    component: int = 0,
+    subtract_mean: bool = False,
+    mean_weights: Optional[np.ndarray] = None,
+    plot_kwargs: Optional[Dict] = None,
+    combined: bool = False,
+    titles: Optional[List[str]] = None,
+    n_rows: int = 1,
+) -> Optional[Tuple[List, List]]:
     """Saves power maps.
 
     Parameters
@@ -438,16 +444,16 @@ def save(
 
 
 def multi_save(
-    group_power_map,
-    session_power_map,
-    mask_file,
-    parcellation_file,
-    filename=None,
-    sessions=None,
-    subtract_mean=False,
-    mean_weights=None,
-    plot_kwargs=None,
-):
+    group_power_map: np.ndarray,
+    session_power_map: np.ndarray,
+    mask_file: str,
+    parcellation_file: str,
+    filename: Optional[str] = None,
+    sessions: Optional[List[int]] = None,
+    subtract_mean: bool = False,
+    mean_weights: Optional[np.ndarray] = None,
+    plot_kwargs: Optional[Dict] = None,
+) -> None:
     """Saves group level and array level power maps.
 
     When training session-specific models we want to plot the group-level map
@@ -576,10 +582,10 @@ def multi_save(
 
 
 def independent_components_to_volumetric_maps(
-    ica_spatial_maps,
-    ic_values,
-    output_file=None,
-):
+    ica_spatial_maps: Union[str, nib.nifti1.Nifti1Image],
+    ic_values: np.ndarray,
+    output_file: Optional[str] = None,
+) -> nib.nifti1.Nifti1Image:
     """Independent components to volumetric spatial map.
 
     Project the ic_values map to a brain map according to spatial
@@ -639,8 +645,10 @@ def independent_components_to_volumetric_maps(
 
 
 def independent_components_to_surface_maps(
-    ica_spatial_maps, ic_values, output_file=None
-):
+    ica_spatial_maps: Union[str, nib.cifti2.cifti2.Cifti2Image],
+    ic_values: np.ndarray,
+    output_file: Optional[str] = None,
+) -> nib.cifti2.cifti2.Cifti2Image:
     """Independent components to surface spatial map.
 
     Project the ic_values map to a surface map according to spatial maps

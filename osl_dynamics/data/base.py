@@ -10,6 +10,7 @@ import random
 from contextlib import contextmanager
 from shutil import rmtree
 from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from pqdm.threads import pqdm
@@ -98,22 +99,22 @@ class Data:
 
     def __init__(
         self,
-        inputs,
-        data_field="X",
-        picks=None,
-        reject_by_annotation=None,
-        sampling_frequency=None,
-        mask_file=None,
-        parcellation_file=None,
-        time_axis_first=True,
-        load_memmaps=False,
-        store_dir="tmp",
-        buffer_size=4000,
-        use_tfrecord=False,
-        session_labels=None,
-        extra_channels=None,
-        n_jobs=1,
-    ):
+        inputs: Union[List[str], str, np.ndarray, List[np.ndarray]],
+        data_field: str = "X",
+        picks: Optional[Union[str, List[str]]] = None,
+        reject_by_annotation: Optional[str] = None,
+        sampling_frequency: Optional[float] = None,
+        mask_file: Optional[str] = None,
+        parcellation_file: Optional[str] = None,
+        time_axis_first: bool = True,
+        load_memmaps: bool = False,
+        store_dir: str = "tmp",
+        buffer_size: int = 4000,
+        use_tfrecord: bool = False,
+        session_labels: Optional[List["SessionLabels"]] = None,
+        extra_channels: Optional[Dict] = None,
+        n_jobs: int = 1,
+    ) -> None:
         self._identifier = id(self)
         self.data_field = data_field
         self.picks = picks
@@ -177,10 +178,10 @@ class Data:
     def __iter__(self):
         return iter(self.arrays)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: int) -> np.ndarray:
         return self.arrays[item]
 
-    def __str__(self):
+    def __str__(self) -> str:
         info = [
             f"{self.__class__.__name__}",
             f"id: {self._identifier}",
@@ -191,27 +192,27 @@ class Data:
         return "\n ".join(info)
 
     @property
-    def raw_data(self):
+    def raw_data(self) -> List[np.ndarray]:
         """Return raw data as a list of arrays."""
         return self.raw_data_arrays
 
     @property
-    def n_channels(self):
+    def n_channels(self) -> int:
         """Number of channels in the data files."""
         return self.arrays[0].shape[-1]
 
     @property
-    def n_samples(self):
+    def n_samples(self) -> int:
         """Number of samples across all arrays."""
         return sum([array.shape[-2] for array in self.arrays])
 
     @property
-    def n_sessions(self):
+    def n_sessions(self) -> int:
         """Number of arrays."""
         return len(self.arrays)
 
     @property
-    def input_shapes(self):
+    def input_shapes(self) -> Dict:
         """Get the input shapes for the model.
 
         Returns
@@ -238,7 +239,7 @@ class Data:
         return input_shapes
 
     @contextmanager
-    def set_keep(self, keep):
+    def set_keep(self, keep: Union[int, List[int]]):
         """Context manager to temporarily set the kept arrays.
 
         Parameters
@@ -260,7 +261,7 @@ class Data:
         finally:
             self.keep = current_keep
 
-    def set_sampling_frequency(self, sampling_frequency):
+    def set_sampling_frequency(self, sampling_frequency: float) -> None:
         """Sets the :code:`sampling_frequency` attribute.
 
         Parameters
@@ -271,7 +272,7 @@ class Data:
         self.original_sampling_frequency = sampling_frequency
         self.sampling_frequency = sampling_frequency
 
-    def set_buffer_size(self, buffer_size):
+    def set_buffer_size(self, buffer_size: int) -> None:
         """Set the :code:`buffer_size` attribute.
 
         Parameters
@@ -282,7 +283,9 @@ class Data:
         """
         self.buffer_size = buffer_size
 
-    def time_series(self, prepared=True, concatenate=False):
+    def time_series(
+        self, prepared: bool = True, concatenate: bool = False
+    ) -> Union[List[np.ndarray], np.ndarray]:
         """Time series data for all arrays.
 
         Parameters
@@ -310,7 +313,7 @@ class Data:
         else:
             return arrays
 
-    def load_raw_data(self):
+    def load_raw_data(self) -> Tuple[List[np.ndarray], List[str]]:
         """Import data into a list of memory maps.
 
         Returns
@@ -358,13 +361,15 @@ class Data:
 
         return memmaps, raw_data_filenames
 
-    def validate_data(self):
+    def validate_data(self) -> None:
         """Validate data files."""
         n_channels = [array.shape[-1] for array in self.raw_data_arrays]
         if not np.equal(n_channels, n_channels[0]).all():
             raise ValueError("All inputs should have the same number of channels.")
 
-    def validate_extra_channels(self, data, extra_channels):
+    def validate_extra_channels(
+        self, data: List[np.ndarray], extra_channels: Dict
+    ) -> Dict:
         """Validate extra channels."""
         n_sessions = len(data)
 
@@ -402,12 +407,12 @@ class Data:
 
     def _validate_batching(
         self,
-        sequence_length,
-        batch_size,
-        step_size=None,
-        drop_last_batch=False,
-        concatenate=True,
-    ):
+        sequence_length: int,
+        batch_size: int,
+        step_size: Optional[int] = None,
+        drop_last_batch: bool = False,
+        concatenate: bool = True,
+    ) -> None:
         """Validate the batching process.
 
         Parameters
@@ -455,7 +460,12 @@ class Data:
                 "Please adjust your sequence length and batch size."
             )
 
-    def select(self, channels=None, sessions=None, use_raw=False):
+    def select(
+        self,
+        channels: Optional[Union[int, List[int]]] = None,
+        sessions: Optional[Union[int, List[int]]] = None,
+        use_raw: bool = False,
+    ) -> "Data":
         """Select channels.
 
         This is an in-place operation.
@@ -523,7 +533,13 @@ class Data:
 
         return self
 
-    def filter(self, low_freq=None, high_freq=None, order=5, use_raw=False):
+    def filter(
+        self,
+        low_freq: Optional[float] = None,
+        high_freq: Optional[float] = None,
+        order: int = 5,
+        use_raw: bool = False,
+    ) -> "Data":
         """Filter the data.
 
         This is an in-place operation.
@@ -590,7 +606,7 @@ class Data:
 
         return self
 
-    def downsample(self, freq, use_raw=False):
+    def downsample(self, freq: float, use_raw: bool = False) -> "Data":
         """Downsample the data.
 
         This is an in-place operation.
@@ -652,11 +668,11 @@ class Data:
 
     def pca(
         self,
-        n_pca_components=None,
-        pca_components=None,
-        whiten=False,
-        use_raw=False,
-    ):
+        n_pca_components: Optional[int] = None,
+        pca_components: Optional[np.ndarray] = None,
+        whiten: bool = False,
+        use_raw: bool = False,
+    ) -> "Data":
         """Principal component analysis (PCA).
 
         This function will first standardize the data then perform PCA.
@@ -741,7 +757,7 @@ class Data:
 
         return self
 
-    def tde(self, n_embeddings, use_raw=False):
+    def tde(self, n_embeddings: int, use_raw: bool = False) -> "Data":
         """Time-delay embedding (TDE).
 
         This is an in-place operation.
@@ -790,12 +806,12 @@ class Data:
 
     def tde_pca(
         self,
-        n_embeddings,
-        n_pca_components=None,
-        pca_components=None,
-        whiten=False,
-        use_raw=False,
-    ):
+        n_embeddings: int,
+        n_pca_components: Optional[int] = None,
+        pca_components: Optional[np.ndarray] = None,
+        whiten: bool = False,
+        use_raw: bool = False,
+    ) -> "Data":
         """Time-delay embedding (TDE) and principal component analysis (PCA).
 
         This function will first standardize the data, then perform TDE then
@@ -887,7 +903,7 @@ class Data:
 
         return self
 
-    def amplitude_envelope(self, use_raw=False):
+    def amplitude_envelope(self, use_raw: bool = False) -> "Data":
         """Calculate the amplitude envelope.
 
         This is an in-place operation.
@@ -927,7 +943,7 @@ class Data:
 
         return self
 
-    def moving_average(self, n_window, use_raw=False):
+    def moving_average(self, n_window: int, use_raw: bool = False) -> "Data":
         """Calculate a moving average.
 
         This is an in-place operation.
@@ -973,7 +989,7 @@ class Data:
 
         return self
 
-    def standardize(self, use_raw=False):
+    def standardize(self, use_raw: bool = False) -> "Data":
         """Standardize (z-score) the data.
 
         This is an in-place operation.
@@ -1011,15 +1027,15 @@ class Data:
 
     def align_channel_signs(
         self,
-        template_data=None,
-        template_cov=None,
-        n_init=3,
-        n_iter=2500,
-        max_flips=20,
-        n_embeddings=1,
-        standardize=True,
-        use_raw=False,
-    ):
+        template_data: Optional[Union[np.ndarray, str]] = None,
+        template_cov: Optional[Union[np.ndarray, str]] = None,
+        n_init: int = 3,
+        n_iter: int = 2500,
+        max_flips: int = 20,
+        n_embeddings: int = 1,
+        standardize: bool = True,
+        use_raw: bool = False,
+    ) -> "Data":
         """Align the sign of each channel across sessions.
 
         If no template data/covariance is passed, we use the median session.
@@ -1194,13 +1210,13 @@ class Data:
 
     def remove_bad_segments(
         self,
-        window_length=None,
-        mode=None,
-        metric="std",
-        significance_level=0.05,
-        maximum_fraction=0.1,
-        use_raw=False,
-    ):
+        window_length: Optional[int] = None,
+        mode: Optional[str] = None,
+        metric: str = "std",
+        significance_level: float = 0.05,
+        maximum_fraction: float = 0.1,
+        use_raw: bool = False,
+    ) -> "Data":
         """Automated bad segment removal using the G-ESD algorithm.
 
         Parameters
@@ -1287,7 +1303,7 @@ class Data:
 
         return self
 
-    def prepare(self, methods):
+    def prepare(self, methods: Dict) -> "Data":
         """Prepare data.
 
         Wrapper for calling a series of data preparation methods. Any method
@@ -1341,13 +1357,13 @@ class Data:
 
     def trim_time_series(
         self,
-        sequence_length=None,
-        n_embeddings=None,
-        n_window=None,
-        prepared=True,
-        concatenate=False,
-        verbose=False,
-    ):
+        sequence_length: Optional[int] = None,
+        n_embeddings: Optional[int] = None,
+        n_window: Optional[int] = None,
+        prepared: bool = True,
+        concatenate: bool = False,
+        verbose: bool = False,
+    ) -> Union[List[np.ndarray], np.ndarray]:
         """Trims the data time series.
 
         Removes the data points that are lost when the data is prepared,
@@ -1427,7 +1443,9 @@ class Data:
 
         return trimmed_time_series
 
-    def count_sequences(self, sequence_length, step_size=None):
+    def count_sequences(
+        self, sequence_length: int, step_size: Optional[int] = None
+    ) -> np.ndarray:
         """Count sequences.
 
         Parameters
@@ -1450,7 +1468,9 @@ class Data:
             ]
         )
 
-    def _create_data_dict(self, i, array, extra_channels):
+    def _create_data_dict(
+        self, i: int, array: np.ndarray, extra_channels: Dict
+    ) -> Dict:
         """Create a dictionary of data for a single session.
 
         Parameters
@@ -1484,14 +1504,18 @@ class Data:
 
         return data
 
-    def _trim_data(self, data, sequence_length, n_sequences):
+    def _trim_data(
+        self, data: List[np.ndarray], sequence_length: int, n_sequences: np.ndarray
+    ) -> List[np.ndarray]:
         """Trim data to be an integer multiple of the sequence length."""
         X = []
         for i in range(self.n_sessions):
             X.append(data[i][: n_sequences[i] * sequence_length])
         return X
 
-    def _validation_split(self, X, extra_channels, validation_split):
+    def _validation_split(
+        self, X: List[np.ndarray], extra_channels: Dict, validation_split: float
+    ) -> Tuple[List[np.ndarray], List[np.ndarray], Dict, Dict]:
         """Split the data into training and validation sets."""
 
         def _split_data(d, val_indx, train_indx):
@@ -1540,13 +1564,13 @@ class Data:
 
     def dataset(
         self,
-        sequence_length,
-        batch_size,
-        shuffle=True,
-        validation_split=None,
-        concatenate=True,
-        step_size=None,
-        drop_last_batch=False,
+        sequence_length: int,
+        batch_size: int,
+        shuffle: bool = True,
+        validation_split: Optional[float] = None,
+        concatenate: bool = True,
+        step_size: Optional[int] = None,
+        drop_last_batch: bool = False,
     ):
         """Create a Tensorflow Dataset for training or evaluation.
 
@@ -1684,12 +1708,12 @@ class Data:
 
     def save_tfrecord_dataset(
         self,
-        tfrecord_dir,
-        sequence_length,
-        step_size=None,
-        validation_split=None,
-        overwrite=False,
-    ):
+        tfrecord_dir: str,
+        sequence_length: int,
+        step_size: Optional[int] = None,
+        validation_split: Optional[float] = None,
+        overwrite: bool = False,
+    ) -> None:
         """Save the data as TFRecord files.
 
         Parameters
@@ -1859,15 +1883,15 @@ class Data:
 
     def tfrecord_dataset(
         self,
-        sequence_length,
-        batch_size,
-        shuffle=True,
-        validation_split=None,
-        concatenate=True,
-        step_size=None,
-        drop_last_batch=False,
-        tfrecord_dir=None,
-        overwrite=False,
+        sequence_length: int,
+        batch_size: int,
+        shuffle: bool = True,
+        validation_split: Optional[float] = None,
+        concatenate: bool = True,
+        step_size: Optional[int] = None,
+        drop_last_batch: bool = False,
+        tfrecord_dir: Optional[str] = None,
+        overwrite: bool = False,
     ):
         """Create a TFRecord Dataset for training or evaluation.
 
@@ -1929,7 +1953,9 @@ class Data:
             keep=self.keep,
         )
 
-    def add_session_labels(self, label_name, label_values, label_type):
+    def add_session_labels(
+        self, label_name: str, label_values: np.ndarray, label_type: str
+    ) -> None:
         """Add session labels as a new channel to the data.
 
         Parameters
@@ -1948,7 +1974,9 @@ class Data:
 
         self.session_labels.append(SessionLabels(label_name, label_values, label_type))
 
-    def add_extra_channel(self, channel_name, channel_values):
+    def add_extra_channel(
+        self, channel_name: str, channel_values: List[np.ndarray]
+    ) -> None:
         """Add an extra channel to the data."""
         if len(channel_values) != self.n_sessions:
             raise ValueError(
@@ -1959,7 +1987,7 @@ class Data:
 
         self.extra_channels[channel_name] = channel_values
 
-    def get_session_labels(self):
+    def get_session_labels(self) -> List["SessionLabels"]:
         """Get the session labels.
 
         Returns
@@ -1969,7 +1997,7 @@ class Data:
         """
         return self.session_labels
 
-    def recommend_model_config(self):
+    def recommend_model_config(self) -> None:
         """Recommends arguments for a model config based on the data."""
 
         # Initial recommendations
@@ -2029,7 +2057,7 @@ class Data:
         print(f"Total number of sequences: {n_sequences}")
         print(f"Total number of batches/parameter updates: {n_batches}")
 
-    def save_preparation(self, output_dir="."):
+    def save_preparation(self, output_dir: str = ".") -> None:
         """Save a pickle file containing preparation settings.
 
         Parameters
@@ -2070,7 +2098,7 @@ class Data:
         preparation = {a: getattr(self, a) for a in attributes}
         pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
 
-    def load_preparation(self, inputs):
+    def load_preparation(self, inputs: str) -> None:
         """Loads a pickle file containing preparation settings.
 
         Parameters
@@ -2087,7 +2115,12 @@ class Data:
                         setattr(self, attr, value)
                     break
 
-    def save(self, output_dir=".", as_fif=False, outnames=None):
+    def save(
+        self,
+        output_dir: str = ".",
+        as_fif: bool = False,
+        outnames: Optional[List[str]] = None,
+    ) -> None:
         """Saves (prepared) data.
 
         The ordering of the saved files matches the order of the input files.
@@ -2166,7 +2199,7 @@ class Data:
         # Save preparation settings
         self.save_preparation(output_dir)
 
-    def delete_dir(self):
+    def delete_dir(self) -> None:
         """Deletes :code:`store_dir`."""
         if self.store_dir.exists():
             rmtree(self.store_dir)

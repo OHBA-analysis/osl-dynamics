@@ -4,6 +4,7 @@ time courses.
 """
 
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
 
 import mne
 import numpy as np
@@ -18,7 +19,11 @@ from osl_dynamics.utils import array_ops, sklearn_wrappers, plotting
 from osl_dynamics.utils.misc import override_dict_defaults
 
 
-def argmax_time_courses(alpha, concatenate=False, n_modes=None):
+def argmax_time_courses(
+    alpha: Union[List[np.ndarray], np.ndarray],
+    concatenate: bool = False,
+    n_modes: Optional[int] = None,
+) -> Union[List[np.ndarray], np.ndarray]:
     """Hard classifies a time course using an argmax operation.
 
     Parameters
@@ -68,14 +73,14 @@ def argmax_time_courses(alpha, concatenate=False, n_modes=None):
 
 
 def gmm_time_courses(
-    alpha,
-    logit_transform=True,
-    standardize=True,
-    p_value=None,
-    filename=None,
-    sklearn_kwargs=None,
-    plot_kwargs=None,
-):
+    alpha: Union[List[np.ndarray], np.ndarray],
+    logit_transform: bool = True,
+    standardize: bool = True,
+    p_value: Optional[float] = None,
+    filename: Optional[str] = None,
+    sklearn_kwargs: Optional[Dict] = None,
+    plot_kwargs: Optional[Dict] = None,
+) -> List[np.ndarray]:
     """Fit a two-component GMM to time courses to get a binary time course.
 
     Parameters
@@ -190,7 +195,9 @@ def gmm_time_courses(
     return gmm_tcs
 
 
-def correlate_modes(mode_time_course_1, mode_time_course_2):
+def correlate_modes(
+    mode_time_course_1: np.ndarray, mode_time_course_2: np.ndarray
+) -> np.ndarray:
     """Calculate the correlation matrix between modes in two mode time courses.
 
     Given two mode time courses, calculate the correlation between each pair of
@@ -220,10 +227,10 @@ def correlate_modes(mode_time_course_1, mode_time_course_2):
 
 
 def match_covariances(
-    *covariances,
-    comparison="rv_coefficient",
-    return_order=False,
-):
+    *covariances: np.ndarray,
+    comparison: str = "rv_coefficient",
+    return_order: bool = False,
+) -> Union[Tuple[np.ndarray, ...], List[np.ndarray]]:
     """Matches covariances.
 
     Parameters
@@ -302,7 +309,11 @@ def match_covariances(
         return tuple(matched_covariances)
 
 
-def match_vectors(*vectors, comparison="correlation", return_order=False):
+def match_vectors(
+    *vectors: np.ndarray,
+    comparison: str = "correlation",
+    return_order: bool = False,
+) -> Union[Tuple[np.ndarray, ...], List[np.ndarray]]:
     """Matches vectors.
 
     Parameters
@@ -371,7 +382,10 @@ def match_vectors(*vectors, comparison="correlation", return_order=False):
         return tuple(matched_vectors)
 
 
-def match_modes(*mode_time_courses, return_order=False):
+def match_modes(
+    *mode_time_courses: np.ndarray,
+    return_order: bool = False,
+) -> Union[List[np.ndarray], List[np.ndarray]]:
     """Find correlated modes between mode time courses.
 
     Given N mode time courses and using the first given mode time course as a
@@ -431,7 +445,7 @@ def match_modes(*mode_time_courses, return_order=False):
         return matched_mode_time_courses
 
 
-def reduce_state_time_course(state_time_course):
+def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
     """Remove states that don't activate from a state time course.
 
     Parameters
@@ -447,50 +461,60 @@ def reduce_state_time_course(state_time_course):
     return state_time_course[:, ~np.all(state_time_course == 0, axis=0)]
 
 
-def fractional_occupancies(state_time_course):
+def fractional_occupancies(state_time_course: np.ndarray):
     """Wrapper for :func:`osl_dynamics.analysis.post_hoc.fractional_occupancies`."""
     return post_hoc.fractional_occupancies(state_time_course)
 
 
-def mean_lifetimes(state_time_course, sampling_frequency=None):
+def mean_lifetimes(
+    state_time_course: np.ndarray, sampling_frequency: Optional[float] = None
+):
     """Wrapper for :func:`osl_dynamics.analysis.post_hoc.mean_lifetimes`."""
     return post_hoc.mean_lifetimes(state_time_course, sampling_frequency)
 
 
-def mean_intervals(state_time_course, sampling_frequency=None):
+def mean_intervals(
+    state_time_course: np.ndarray, sampling_frequency: Optional[float] = None
+):
     """Wrapper for :func:`osl_dynamics.analysis.post_hoc.mean_intervals`."""
     return post_hoc.mean_intervals(state_time_course, sampling_frequency)
 
 
-def switching_rates(state_time_course, sampling_frequency=None):
+def switching_rates(
+    state_time_course: np.ndarray, sampling_frequency: Optional[float] = None
+):
     """Wrapper for :func:`osl_dynamics.analysis.post_hoc.switching_rates`."""
     return post_hoc.switching_rates(state_time_course, sampling_frequency)
 
 
-def mean_amplitudes(state_time_course, data):
+def mean_amplitudes(state_time_course: np.ndarray, data: np.ndarray):
     """Wrapper for :func:`osl_dynamics.analysis.post_hoc.mean_amplitudes`."""
     return post_hoc.mean_amplitudes(state_time_course, data)
 
 
-def lifetime_statistics(state_time_course, sampling_frequency=None):
+def lifetime_statistics(
+    state_time_course: np.ndarray, sampling_frequency: Optional[float] = None
+):
     """Wrapper for :func:`osl_dynamics.analysis.post_hoc.lifetime_statistics`."""
     return post_hoc.lifetime_statistics(state_time_course, sampling_frequency)
 
 
-def fano_factor(state_time_course, window_length, sampling_frequency=1.0):
+def fano_factor(
+    state_time_course: np.ndarray, window_length: int, sampling_frequency: float = 1.0
+):
     """Wrapper for :func:`osl_dynamics.analysis.post_hoc.fano_factor`."""
     return post_hoc.fano_factor(state_time_course, window_length, sampling_frequency)
 
 
 def convert_to_mne_raw(
-    alpha,
-    raw,
-    ch_names=None,
-    n_embeddings=None,
-    n_window=None,
-    extra_chans="stim",
-    verbose=False,
-):
+    alpha: np.ndarray,
+    raw: Union[mne.io.Raw, str],
+    ch_names: Optional[List[str]] = None,
+    n_embeddings: Optional[int] = None,
+    n_window: Optional[int] = None,
+    extra_chans: Union[str, List[str], None] = "stim",
+    verbose: bool = False,
+) -> mne.io.Raw:
     """Convert a time series to an `MNE Raw \
     <https://mne.tools/stable/generated/mne.io.Raw.html>`_ object.
 
@@ -595,7 +619,10 @@ def convert_to_mne_raw(
     return alpha_raw
 
 
-def reweight_alphas(alpha, covs):
+def reweight_alphas(
+    alpha: Union[List[np.ndarray], np.ndarray],
+    covs: np.ndarray,
+) -> Union[List[np.ndarray], np.ndarray]:
     """Re-weight mixing coefficients to account for the magnitude of the mode covariances.
 
     Parameters
@@ -614,7 +641,11 @@ def reweight_alphas(alpha, covs):
     return reweight_mtc(alpha, covs, "covariance")
 
 
-def reweight_mtc(mtc, params, params_type):
+def reweight_mtc(
+    mtc: Union[List[np.ndarray], np.ndarray],
+    params: np.ndarray,
+    params_type: str,
+) -> Union[List[np.ndarray], np.ndarray]:
     """Reweight mode time courses.
 
     Re-weight mixing coefficients to account for the magnitude of
@@ -656,7 +687,11 @@ def reweight_mtc(mtc, params, params_type):
     return reweighted_mtc
 
 
-def average_runs(alpha, n_clusters=None, return_cluster_info=False):
+def average_runs(
+    alpha: Union[List[List[np.ndarray]], List[np.ndarray]],
+    n_clusters: Optional[int] = None,
+    return_cluster_info: bool = False,
+) -> Union[List[np.ndarray], Tuple[List[np.ndarray], Dict]]:
     """Average the state probabilities from different runs using hierarchical clustering.
 
     Parameters

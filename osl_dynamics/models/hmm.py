@@ -16,6 +16,7 @@ See Also
 import os
 import logging
 from dataclasses import dataclass
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -155,13 +156,13 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     n_init_epochs: int = 1
     init_take: float = 1.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.validate_observation_model_parameters()
         self.validate_hmm_parameters()
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 
-    def validate_observation_model_parameters(self):
+    def validate_observation_model_parameters(self) -> None:
         if self.learn_means is None or self.learn_covariances is None:
             raise ValueError("learn_means and learn_covariances must be passed.")
 
@@ -182,7 +183,7 @@ class Model(MarkovStateInferenceModelBase):
 
     config_type = Config
 
-    def build_model(self):
+    def build_model(self) -> None:
         """Builds a keras model."""
 
         config = self.config
@@ -254,7 +255,7 @@ class Model(MarkovStateInferenceModelBase):
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
-    def get_means(self):
+    def get_means(self) -> np.ndarray:
         """Get the state means.
 
         Returns
@@ -264,7 +265,7 @@ class Model(MarkovStateInferenceModelBase):
         """
         return obs_mod.get_observation_model_parameter(self.model, "means")
 
-    def get_covariances(self):
+    def get_covariances(self) -> np.ndarray:
         """Get the state covariances.
 
         Returns
@@ -274,7 +275,7 @@ class Model(MarkovStateInferenceModelBase):
         """
         return obs_mod.get_observation_model_parameter(self.model, "covs")
 
-    def get_means_covariances(self):
+    def get_means_covariances(self) -> Tuple[np.ndarray, np.ndarray]:
         """Get the state means and covariances.
 
         This is a wrapper for :code:`get_means` and :code:`get_covariances`.
@@ -288,11 +289,11 @@ class Model(MarkovStateInferenceModelBase):
         """
         return self.get_means(), self.get_covariances()
 
-    def get_observation_model_parameters(self):
+    def get_observation_model_parameters(self) -> Tuple[np.ndarray, np.ndarray]:
         """Wrapper for :code:`get_means_covariances`."""
         return self.get_means_covariances()
 
-    def set_means(self, means, update_initializer=True):
+    def set_means(self, means: np.ndarray, update_initializer: bool = True) -> None:
         """Set the state means.
 
         Parameters
@@ -309,7 +310,9 @@ class Model(MarkovStateInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_covariances(self, covariances, update_initializer=True):
+    def set_covariances(
+        self, covariances: np.ndarray, update_initializer: bool = True
+    ) -> None:
         """Set the state covariances.
 
         Parameters
@@ -330,17 +333,17 @@ class Model(MarkovStateInferenceModelBase):
 
     def set_means_covariances(
         self,
-        means,
-        covariances,
-        update_initializer=True,
-    ):
+        means: np.ndarray,
+        covariances: np.ndarray,
+        update_initializer: bool = True,
+    ) -> None:
         """This is a wrapper for :code:`set_means` and :code:`set_covariances`."""
         self.set_means(means, update_initializer=update_initializer)
         self.set_covariances(covariances, update_initializer=update_initializer)
 
     def set_observation_model_parameters(
-        self, observation_model_parameters, update_initializer=True
-    ):
+        self, observation_model_parameters: tuple, update_initializer: bool = True
+    ) -> None:
         """Wrapper for :code:`set_means_covariances`."""
         self.set_means_covariances(
             observation_model_parameters[0],
@@ -348,7 +351,7 @@ class Model(MarkovStateInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_regularizers(self, training_dataset):
+    def set_regularizers(self, training_dataset) -> None:
         """Set the means and covariances regularizer based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with
@@ -384,7 +387,13 @@ class Model(MarkovStateInferenceModelBase):
                 self.config.diagonal_covariances,
             )
 
-    def dual_estimation(self, training_data, alpha=None, concatenate=False, n_jobs=1):
+    def dual_estimation(
+        self,
+        training_data,
+        alpha: Optional[Union[List[np.ndarray], np.ndarray]] = None,
+        concatenate: bool = False,
+        n_jobs: int = 1,
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Dual estimation to get session-specific observation model parameters.
 
         This function is the wrapper for the :code:`hmm_dual_estimation` function.
@@ -453,10 +462,10 @@ class Model(MarkovStateInferenceModelBase):
     def fine_tuning(
         self,
         training_data,
-        n_epochs=None,
-        learning_rate=None,
-        store_dir="tmp",
-    ):
+        n_epochs: Optional[int] = None,
+        learning_rate: Optional[float] = None,
+        store_dir: str = "tmp",
+    ) -> Tuple[List[np.ndarray], np.ndarray, np.ndarray]:
         """Fine tuning the model for each session.
 
         Here, we estimate the posterior distribution (state probabilities)

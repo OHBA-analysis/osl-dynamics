@@ -1,5 +1,7 @@
 """Helpful functions related to observation models."""
 
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -12,7 +14,9 @@ from osl_dynamics.inference.initializers import (
 )
 
 
-def get_observation_model_parameter(model, layer_name):
+def get_observation_model_parameter(
+    model: tf.keras.Model, layer_name: str
+) -> np.ndarray:
     """Get the parameter of an observation model layer.
 
     Parameters
@@ -46,12 +50,12 @@ def get_observation_model_parameter(model, layer_name):
 
 
 def set_observation_model_parameter(
-    model,
-    obs_parameter,
-    layer_name,
-    update_initializer=True,
-    diagonal_covariances=False,
-):
+    model: tf.keras.Model,
+    obs_parameter: np.ndarray,
+    layer_name: str,
+    update_initializer: bool = True,
+    diagonal_covariances: bool = False,
+) -> None:
     """Set the value of an observation model parameter.
 
     Parameters
@@ -102,8 +106,11 @@ def set_observation_model_parameter(
 
 
 def set_dev_parameters_initializer(
-    model, training_dataset, learn_means, learn_covariances
-):
+    model: tf.keras.Model,
+    training_dataset: tf.data.Dataset,
+    learn_means: bool,
+    learn_covariances: bool,
+) -> None:
     """Set the deviance parameters initializer based on training data.
 
     Parameters
@@ -171,7 +178,7 @@ def set_dev_parameters_initializer(
         covs_beta_layer.tensor_initializer = RandomWeightInitializer(covs_beta, 0.1)
 
 
-def set_embeddings_initializer(model, initial_embeddings):
+def set_embeddings_initializer(model: tf.keras.Model, initial_embeddings: dict) -> None:
     """Set the embeddings initializer.
 
     Parameters
@@ -193,7 +200,12 @@ def set_embeddings_initializer(model, initial_embeddings):
         _set_embeddings_initializer(f"{k}_embeddings", v)
 
 
-def set_means_regularizer(model, range_, scale_factor, layer_name="means"):
+def set_means_regularizer(
+    model: tf.keras.Model,
+    range_: np.ndarray,
+    scale_factor: float,
+    layer_name: str = "means",
+) -> None:
     """Set the means regularizer based on training data.
 
     A multivariate normal prior is applied to the mean vectors with
@@ -223,13 +235,13 @@ def set_means_regularizer(model, range_, scale_factor, layer_name="means"):
 
 
 def set_covariances_regularizer(
-    model,
-    range_,
-    epsilon,
-    scale_factor,
-    diagonal=False,
-    layer_name="covs",
-):
+    model: tf.keras.Model,
+    range_: np.ndarray,
+    epsilon: float,
+    scale_factor: float,
+    diagonal: bool = False,
+    layer_name: str = "covs",
+) -> None:
     """Set the covariances regularizer based on training data.
 
     If config.diagonal_covariances is True, a log-normal prior is applied to
@@ -273,7 +285,13 @@ def set_covariances_regularizer(
         )
 
 
-def set_stds_regularizer(model, range_, epsilon, scale_factor, layer_name="stds"):
+def set_stds_regularizer(
+    model: tf.keras.Model,
+    range_: np.ndarray,
+    epsilon: float,
+    scale_factor: float,
+    layer_name: str = "stds",
+) -> None:
     """Set the standard deviations regularizer based on training data.
 
     A log-normal prior is applied to the standard deviations with :code:`mu=0`,
@@ -303,7 +321,13 @@ def set_stds_regularizer(model, range_, epsilon, scale_factor, layer_name="stds"
     )
 
 
-def set_corrs_regularizer(model, n_channels, epsilon, scale_factor, layer_name="corrs"):
+def set_corrs_regularizer(
+    model: tf.keras.Model,
+    n_channels: int,
+    epsilon: float,
+    scale_factor: float,
+    layer_name: str = "corrs",
+) -> None:
     """Set the correlations regularizer based on training data.
 
     A marginal inverse Wishart prior is applied to the correlations
@@ -331,7 +355,7 @@ def set_corrs_regularizer(model, n_channels, epsilon, scale_factor, layer_name="
     )
 
 
-def get_embedding_weights(model, session_labels):
+def get_embedding_weights(model: tf.keras.Model, session_labels: list) -> dict:
     """Get the weights of the embedding layers.
 
     Parameters
@@ -362,7 +386,7 @@ def get_embedding_weights(model, session_labels):
     return embedding_weights
 
 
-def get_session_embeddings(model, session_labels):
+def get_session_embeddings(model: tf.keras.Model, session_labels: list) -> dict:
     """Get the embeddings for each session.
 
     Parameters
@@ -387,7 +411,7 @@ def get_session_embeddings(model, session_labels):
     return embeddings
 
 
-def get_summed_embeddings(model, session_labels):
+def get_summed_embeddings(model: tf.keras.Model, session_labels: list) -> np.ndarray:
     """Get the summed embeddings for each session.
 
     Parameters
@@ -409,7 +433,7 @@ def get_summed_embeddings(model, session_labels):
     return summed_embeddings.numpy()
 
 
-def get_means_spatial_embeddings(model):
+def get_means_spatial_embeddings(model: tf.keras.Model) -> np.ndarray:
     """Get the means spatial embeddings.
 
     Parameters
@@ -428,7 +452,7 @@ def get_means_spatial_embeddings(model):
     return means_spatial_embeddings.numpy()
 
 
-def get_covs_spatial_embeddings(model):
+def get_covs_spatial_embeddings(model: tf.keras.Model) -> np.ndarray:
     """Get the covariances spatial embeddings.
 
     Parameters
@@ -451,7 +475,7 @@ def get_covs_spatial_embeddings(model):
     return covs_spatial_embeddings.numpy()
 
 
-def get_spatial_embeddings(model, param):
+def get_spatial_embeddings(model: tf.keras.Model, param: str) -> np.ndarray:
     """Wrapper for getting the spatial embeddings for the means and covariances."""
     if param == "means":
         return get_means_spatial_embeddings(model)
@@ -461,7 +485,9 @@ def get_spatial_embeddings(model, param):
         raise ValueError("param must be either 'means' or 'covs'")
 
 
-def get_concatenated_embeddings(model, param, session_labels):
+def get_concatenated_embeddings(
+    model: tf.keras.Model, param: str, session_labels: list
+) -> np.ndarray:
     """Get the concatenated embeddings.
 
     Parameters
@@ -493,7 +519,9 @@ def get_concatenated_embeddings(model, param, session_labels):
     return concat_embeddings.numpy()
 
 
-def get_means_dev_mag_parameters(model):
+def get_means_dev_mag_parameters(
+    model: tf.keras.Model,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Get the means deviation magnitude parameters.
 
     Parameters
@@ -527,7 +555,7 @@ def get_means_dev_mag_parameters(model):
     return means_dev_mag_inf_alpha.numpy(), means_dev_mag_inf_beta.numpy()
 
 
-def get_covs_dev_mag_parameters(model):
+def get_covs_dev_mag_parameters(model: tf.keras.Model) -> Tuple[np.ndarray, np.ndarray]:
     """Get the covariances deviation magnitude parameters.
 
     Parameters
@@ -557,7 +585,9 @@ def get_covs_dev_mag_parameters(model):
     return covs_dev_mag_inf_alpha.numpy(), covs_dev_mag_inf_beta.numpy()
 
 
-def get_dev_mag_parameters(model, param):
+def get_dev_mag_parameters(
+    model: tf.keras.Model, param: str
+) -> Tuple[np.ndarray, np.ndarray]:
     """Wrapper for getting the deviance magnitude parameters for the means
     and covariances."""
     if param == "means":
@@ -568,7 +598,7 @@ def get_dev_mag_parameters(model, param):
         raise ValueError("param must be either 'means' or 'covs'")
 
 
-def get_dev_mag(model, param):
+def get_dev_mag(model: tf.keras.Model, param: str) -> np.ndarray:
     """Getting the deviance magnitude.
 
     Parameters
@@ -597,7 +627,7 @@ def get_dev_mag(model, param):
     return dev_mag.numpy()
 
 
-def get_dev_map(model, param, session_labels):
+def get_dev_map(model: tf.keras.Model, param: str, session_labels: list) -> np.ndarray:
     """Get the deviance map.
 
     Parameters
@@ -636,11 +666,11 @@ def get_dev_map(model, param, session_labels):
 
 
 def get_session_dev(
-    model,
-    learn_means,
-    learn_covariances,
-    session_labels,
-):
+    model: tf.keras.Model,
+    learn_means: bool,
+    learn_covariances: bool,
+    session_labels: list,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Get the session deviation.
 
     Parameters
@@ -683,11 +713,11 @@ def get_session_dev(
 
 
 def get_session_means_covariances(
-    model,
-    learn_means,
-    learn_covariances,
-    session_labels,
-):
+    model: tf.keras.Model,
+    learn_means: bool,
+    learn_covariances: bool,
+    session_labels: list,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Get the session means and covariances.
 
     Parameters
@@ -723,7 +753,7 @@ def get_session_means_covariances(
     return mu.numpy(), D.numpy()
 
 
-def generate_covariances(model, session_labels):
+def generate_covariances(model: tf.keras.Model, session_labels: list) -> np.ndarray:
     """Generate covariances from the generative model.
 
     Parameters

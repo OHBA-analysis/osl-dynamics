@@ -17,6 +17,7 @@ where:
 import os
 import logging
 from pathlib import Path
+from typing import Optional, Union
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,7 +28,9 @@ from osl_dynamics.utils.misc import load, override_dict_defaults, save
 _logger = logging.getLogger("osl-dynamics")
 
 
-def load_data(inputs, kwargs=None, prepare=None):
+def load_data(
+    inputs: str, kwargs: Optional[dict] = None, prepare: Optional[dict] = None
+):
     """Load and prepare data.
 
     Parameters
@@ -59,12 +62,12 @@ def load_data(inputs, kwargs=None, prepare=None):
 
 def train_hmm(
     data,
-    output_dir,
-    config_kwargs,
-    init_kwargs=None,
-    fit_kwargs=None,
-    save_inf_params=True,
-):
+    output_dir: str,
+    config_kwargs: dict,
+    init_kwargs: Optional[dict] = None,
+    fit_kwargs: Optional[dict] = None,
+    save_inf_params: bool = True,
+) -> None:
     """Train a :mod:`Hidden Markov Model <osl_dynamics.models.hmm>`.
 
     This function will:
@@ -174,12 +177,12 @@ def train_hmm(
 
 def train_dynemo(
     data,
-    output_dir,
-    config_kwargs,
-    init_kwargs=None,
-    fit_kwargs=None,
-    save_inf_params=True,
-):
+    output_dir: str,
+    config_kwargs: dict,
+    init_kwargs: Optional[dict] = None,
+    fit_kwargs: Optional[dict] = None,
+    save_inf_params: bool = True,
+) -> None:
     """Train :mod:`DyNeMo <osl_dynamics.models.dynemo>`.
 
     This function will:
@@ -312,15 +315,15 @@ def train_dynemo(
 
 def train_mdynemo(
     data,
-    output_dir,
-    config_kwargs,
-    init_kwargs=None,
-    fit_kwargs=None,
-    corrs_init_kwargs=None,
-    save_inf_params=True,
-):
+    output_dir: str,
+    config_kwargs: dict,
+    init_kwargs: Optional[dict] = None,
+    fit_kwargs: Optional[dict] = None,
+    corrs_init_kwargs: Optional[dict] = None,
+    save_inf_params: bool = True,
+) -> None:
     """Train :mod:`M-DyNeMo <osl_dynamics.models.mdynemo>`. This function will:
-    
+
     1. Build an :code:`mdynemo.Model` object.
     2. Initialize the mode correlations using sliding window and KMeans.
     3. Initialize the parameters of the model using
@@ -497,14 +500,14 @@ def train_mdynemo(
 
 def train_hive(
     data,
-    output_dir,
-    config_kwargs,
-    init_kwargs=None,
-    fit_kwargs=None,
-    save_inf_params=True,
-):
+    output_dir: str,
+    config_kwargs: dict,
+    init_kwargs: Optional[dict] = None,
+    fit_kwargs: Optional[dict] = None,
+    save_inf_params: bool = True,
+) -> None:
     """Train a :mod:`HIVE Model <osl_dynamics.models.hive>`.
-    
+
     This function will:
 
     1. Build an :code:`hive.Model` object.
@@ -513,7 +516,7 @@ def train_hive(
     3. Perform full training.
     4. Save the inferred parameters (state probabilities, means,
        covariances and embeddings) if :code:`save_inf_params=True`.
-    
+
     This function will create two directories:
 
     - :code:`<output_dir>/model`, which contains the trained model.
@@ -659,7 +662,7 @@ def train_hive(
         save(f"{inf_params_dir}/embedding_weights.pkl", embedding_weights)
 
 
-def get_inf_params(data, output_dir, observation_model_only=False):
+def get_inf_params(data, output_dir: str, observation_model_only: bool = False) -> None:
     """Get inferred alphas.
 
     This function expects a model has already been trained and the following
@@ -733,11 +736,11 @@ def get_inf_params(data, output_dir, observation_model_only=False):
 
 def plot_power_maps_from_covariances(
     data,
-    output_dir,
-    mask_file=None,
-    parcellation_file=None,
-    power_save_kwargs=None,
-):
+    output_dir: str,
+    mask_file: Optional[str] = None,
+    parcellation_file: Optional[str] = None,
+    power_save_kwargs: Optional[dict] = None,
+) -> None:
     """Plot power maps calculated directly from the inferred covariances.
 
     This function expects a model has already been trained and the following
@@ -835,7 +838,7 @@ def plot_power_maps_from_covariances(
     power.save(covs, **power_save_kwargs)
 
 
-def plot_tde_covariances(data, output_dir):
+def plot_tde_covariances(data, output_dir: str) -> None:
     """Plot inferred covariance of the time-delay embedded data.
 
     This function expects a model has already been trained and the following
@@ -868,7 +871,7 @@ def plot_tde_covariances(data, output_dir):
     plotting.plot_matrices(covs, filename=f"{inf_params_dir}/tde_covs.png")
 
 
-def plot_state_psds(data, output_dir):
+def plot_state_psds(data, output_dir: str) -> None:
     """Plot state PSDs.
 
     This function expects multitaper spectra to have already been calculated
@@ -906,7 +909,7 @@ def plot_state_psds(data, output_dir):
     )
 
 
-def dual_estimation(data, output_dir, n_jobs=1):
+def dual_estimation(data, output_dir: str, n_jobs: int = 1) -> None:
     """Dual estimation for session-specific observation model parameters.
 
     This function expects a model has already been trained and the following
@@ -954,7 +957,9 @@ def dual_estimation(data, output_dir, n_jobs=1):
     save(f"{dual_estimates_dir}/covs.npy", covs)
 
 
-def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
+def multitaper_spectra(
+    data, output_dir: str, kwargs: dict, nnmf_components: Optional[int] = None
+) -> None:
     """Calculate multitaper spectra.
 
     This function expects a model has already been trained and the following
@@ -1047,7 +1052,7 @@ def multitaper_spectra(data, output_dir, kwargs, nnmf_components=None):
         save(f"{spectra_dir}/nnmf_{nnmf_components}.npy", nnmf)
 
 
-def nnmf(data, output_dir, n_components):
+def nnmf(data, output_dir: str, n_components: int) -> None:
     """Calculate non-negative matrix factorization (NNMF).
 
     This function expects spectra have already been calculated and are in:
@@ -1071,7 +1076,7 @@ def nnmf(data, output_dir, n_components):
     save(f"{spectra_dir}/nnmf_{n_components}.npy", nnmf)
 
 
-def regression_spectra(data, output_dir, kwargs):
+def regression_spectra(data, output_dir: str, kwargs: dict) -> None:
     """Calculate regression spectra.
 
     This function expects a model has already been trained and the following
@@ -1166,13 +1171,13 @@ def regression_spectra(data, output_dir, kwargs):
 
 def plot_group_ae_networks(
     data,
-    output_dir,
-    mask_file=None,
-    parcellation_file=None,
-    aec_abs=True,
-    power_save_kwargs=None,
-    conn_save_kwargs=None,
-):
+    output_dir: str,
+    mask_file: Optional[str] = None,
+    parcellation_file: Optional[str] = None,
+    aec_abs: bool = True,
+    power_save_kwargs: Optional[dict] = None,
+    conn_save_kwargs: Optional[dict] = None,
+) -> None:
     """Plot group-level amplitude envelope networks.
 
     This function expects a model has been trained and the following directory
@@ -1283,14 +1288,14 @@ def plot_group_ae_networks(
 
 def plot_group_tde_hmm_networks(
     data,
-    output_dir,
-    mask_file=None,
-    parcellation_file=None,
-    frequency_range=None,
-    percentile=97,
-    power_save_kwargs=None,
-    conn_save_kwargs=None,
-):
+    output_dir: str,
+    mask_file: Optional[str] = None,
+    parcellation_file: Optional[str] = None,
+    frequency_range: Optional[list] = None,
+    percentile: float = 97,
+    power_save_kwargs: Optional[dict] = None,
+    conn_save_kwargs: Optional[dict] = None,
+) -> None:
     """Plot group-level TDE-HMM networks for a specified frequency band.
 
     This function will:
@@ -1452,15 +1457,15 @@ def plot_group_tde_hmm_networks(
 
 def plot_group_nnmf_tde_hmm_networks(
     data,
-    output_dir,
-    nnmf_file,
-    mask_file=None,
-    parcellation_file=None,
-    component=0,
-    percentile=97,
-    power_save_kwargs=None,
-    conn_save_kwargs=None,
-):
+    output_dir: str,
+    nnmf_file: str,
+    mask_file: Optional[str] = None,
+    parcellation_file: Optional[str] = None,
+    component: int = 0,
+    percentile: float = 97,
+    power_save_kwargs: Optional[dict] = None,
+    conn_save_kwargs: Optional[dict] = None,
+) -> None:
     """Plot group-level TDE-HMM networks using a NNMF component to integrate the spectra.
 
     This function will:
@@ -1647,14 +1652,14 @@ def plot_group_nnmf_tde_hmm_networks(
 
 def plot_group_tde_dynemo_networks(
     data,
-    output_dir,
-    mask_file=None,
-    parcellation_file=None,
-    frequency_range=None,
-    percentile=97,
-    power_save_kwargs=None,
-    conn_save_kwargs=None,
-):
+    output_dir: str,
+    mask_file: Optional[str] = None,
+    parcellation_file: Optional[str] = None,
+    frequency_range: Optional[list] = None,
+    percentile: float = 97,
+    power_save_kwargs: Optional[dict] = None,
+    conn_save_kwargs: Optional[dict] = None,
+) -> None:
     """Plot group-level TDE-DyNeMo networks for a specified frequency band.
 
     This function will:
@@ -1823,12 +1828,12 @@ def plot_group_tde_dynemo_networks(
 
 def plot_alpha(
     data,
-    output_dir,
-    session=0,
-    normalize=False,
-    sampling_frequency=None,
-    kwargs=None,
-):
+    output_dir: str,
+    session: Union[int, str] = 0,
+    normalize: bool = False,
+    sampling_frequency: Optional[float] = None,
+    kwargs: Optional[dict] = None,
+) -> None:
     """Plot inferred alphas.
 
     This is a wrapper for :func:`osl_dynamics.utils.plotting.plot_alpha`.
@@ -1913,7 +1918,7 @@ def plot_alpha(
             plotting.plot_alpha(norm_alp[session], **kwargs)
 
 
-def calc_gmm_alpha(data, output_dir, kwargs=None):
+def calc_gmm_alpha(data, output_dir: str, kwargs: Optional[dict] = None) -> None:
     """Binarize inferred alphas using a two-component GMM.
 
     This function expects a model has been trained and the following directory
@@ -1955,11 +1960,11 @@ def calc_gmm_alpha(data, output_dir, kwargs=None):
 
 def plot_hmm_network_summary_stats(
     data,
-    output_dir,
-    use_gmm_alpha=False,
-    sampling_frequency=None,
-    sns_kwargs=None,
-):
+    output_dir: str,
+    use_gmm_alpha: bool = False,
+    sampling_frequency: Optional[float] = None,
+    sns_kwargs: Optional[dict] = None,
+) -> None:
     """Plot HMM summary statistics for networks as violin plots.
 
     This function will plot the distribution over sessions for the following
@@ -2083,7 +2088,7 @@ def plot_hmm_network_summary_stats(
     )
 
 
-def plot_dynemo_network_summary_stats(data, output_dir):
+def plot_dynemo_network_summary_stats(data, output_dir: str) -> None:
     """Plot DyNeMo summary statistics for networks as violin plots.
 
     This function will plot the distribution over sessions for the following
@@ -2177,14 +2182,14 @@ def plot_dynemo_network_summary_stats(data, output_dir):
 
 def compare_groups_hmm_summary_stats(
     data,
-    output_dir,
-    group2_indices,
-    separate_tests=False,
-    covariates=None,
-    n_perm=1000,
-    n_jobs=1,
-    sampling_frequency=None,
-):
+    output_dir: str,
+    group2_indices: Union[np.ndarray, list],
+    separate_tests: bool = False,
+    covariates: Optional[str] = None,
+    n_perm: int = 1000,
+    n_jobs: int = 1,
+    sampling_frequency: Optional[float] = None,
+) -> None:
     """Compare HMM summary statistics between two groups.
 
     This function expects a model has been trained and the following directory
@@ -2323,7 +2328,9 @@ def compare_groups_hmm_summary_stats(
         )
 
 
-def plot_burst_summary_stats(data, output_dir, sampling_frequency=None):
+def plot_burst_summary_stats(
+    data, output_dir: str, sampling_frequency: Optional[float] = None
+) -> None:
     """Plot burst summary statistics as violin plots.
 
     This function will plot the distribution over sessions for the following
