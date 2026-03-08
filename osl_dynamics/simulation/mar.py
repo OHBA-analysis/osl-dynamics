@@ -29,7 +29,7 @@ class MAR:
     This model is also known as VAR or MVAR.
     """
 
-    def __init__(self, coeffs, covs):
+    def __init__(self, coeffs: np.ndarray, covs: np.ndarray) -> None:
         # Validation
         if coeffs.ndim != 4:
             raise ValueError(
@@ -54,7 +54,7 @@ class MAR:
         self.n_states = coeffs.shape[0]
         self.n_channels = coeffs.shape[2]
 
-    def simulate_data(self, state_time_course):
+    def simulate_data(self, state_time_course: np.ndarray) -> np.ndarray:
         """Simulate time series data.
 
         We simulate MAR data based on the hidden state at each time point.

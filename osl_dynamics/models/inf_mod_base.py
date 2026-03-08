@@ -3,7 +3,7 @@
 import sys
 import logging
 from dataclasses import dataclass
-from typing import Literal
+from typing import List, Literal, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -36,14 +36,14 @@ class VariationalInferenceModelConfig:
     kl_annealing_sharpness: float = None
     n_kl_annealing_epochs: int = None
 
-    def validate_alpha_parameters(self):
+    def validate_alpha_parameters(self) -> None:
         if self.initial_alpha_temperature is None:
             self.initial_alpha_temperature = 1.0
 
         if self.initial_alpha_temperature <= 0:
             raise ValueError("initial_alpha_temperature must be greater than zero.")
 
-    def validate_kl_annealing_parameters(self):
+    def validate_kl_annealing_parameters(self) -> None:
         if self.do_kl_annealing:
             if self.kl_annealing_curve is None:
                 raise ValueError(
@@ -79,7 +79,13 @@ class VariationalInferenceModelConfig:
 class VariationalInferenceModelBase(ModelBase):
     """Base class for a variational inference model."""
 
-    def fit(self, *args, kl_annealing_callback=None, lr_decay=None, **kwargs):
+    def fit(
+        self,
+        *args,
+        kl_annealing_callback: Optional[bool] = None,
+        lr_decay: Optional[float] = None,
+        **kwargs,
+    ) -> dict:
         """Wrapper for the standard keras fit method.
 
         Parameters
@@ -153,12 +159,12 @@ class VariationalInferenceModelBase(ModelBase):
     def random_subset_initialization(
         self,
         training_data,
-        n_epochs=None,
-        n_init=None,
-        take=None,
-        n_kl_annealing_epochs=None,
+        n_epochs: Optional[int] = None,
+        n_init: Optional[int] = None,
+        take: Optional[float] = None,
+        n_kl_annealing_epochs: Optional[int] = None,
         **kwargs,
-    ):
+    ) -> Optional[dict]:
         """Random subset initialization.
 
         The model is trained for a few epochs with different random subsets
@@ -264,11 +270,11 @@ class VariationalInferenceModelBase(ModelBase):
     def single_subject_initialization(
         self,
         training_data,
-        n_epochs=None,
-        n_init=None,
-        n_kl_annealing_epochs=None,
+        n_epochs: Optional[int] = None,
+        n_init: Optional[int] = None,
+        n_kl_annealing_epochs: Optional[int] = None,
         **kwargs,
-    ):
+    ) -> None:
         """Initialization for the mode means/covariances.
 
         Pick a subject at random, train a model, repeat a few times. Use
@@ -360,11 +366,11 @@ class VariationalInferenceModelBase(ModelBase):
     def multistart_initialization(
         self,
         training_data,
-        n_epochs=None,
-        n_init=None,
-        n_kl_annealing_epochs=None,
+        n_epochs: Optional[int] = None,
+        n_init: Optional[int] = None,
+        n_kl_annealing_epochs: Optional[int] = None,
         **kwargs,
-    ):
+    ) -> Optional[dict]:
         """Multi-start initialization.
 
         Wrapper for :code:`random_subset_initialization` with :code:`take=1`.
@@ -387,12 +393,12 @@ class VariationalInferenceModelBase(ModelBase):
     def random_state_time_course_initialization(
         self,
         training_data,
-        n_epochs=None,
-        n_init=None,
-        take=None,
-        stay_prob=0.9,
+        n_epochs: Optional[int] = None,
+        n_init: Optional[int] = None,
+        take: Optional[float] = None,
+        stay_prob: float = 0.9,
         **kwargs,
-    ):
+    ) -> Optional[dict]:
         """Random state time course initialization.
 
         The model is trained for a few epochs with a sampled state time course
@@ -483,8 +489,8 @@ class VariationalInferenceModelBase(ModelBase):
         return best_history
 
     def set_random_state_time_course_initialization(
-        self, training_dataset, stay_prob=0.9
-    ):
+        self, training_dataset: tf.data.Dataset, stay_prob: float = 0.9
+    ) -> None:
         """Sets the initial means/covariances based on a random state time course.
 
         Parameters
@@ -580,7 +586,7 @@ class VariationalInferenceModelBase(ModelBase):
             # Set initial covariances
             self.set_covariances(covariances, update_initializer=True)
 
-    def reset_kl_annealing_factor(self):
+    def reset_kl_annealing_factor(self) -> None:
         """Sets the KL annealing factor to zero.
 
         This method assumes there is a keras layer named :code:`'kl_loss'`
@@ -590,7 +596,7 @@ class VariationalInferenceModelBase(ModelBase):
             kl_loss_layer = self.model.get_layer("kl_loss")
             kl_loss_layer.annealing_factor.assign(0.0)
 
-    def reset_weights(self, keep=None):
+    def reset_weights(self, keep: Optional[List[str]] = None) -> None:
         """Reset the model as if you've built a new model.
 
         Parameters
@@ -602,8 +608,14 @@ class VariationalInferenceModelBase(ModelBase):
         self.reset_kl_annealing_factor()
 
     def get_theta(
-        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
-    ):
+        self,
+        dataset,
+        concatenate: bool = False,
+        remove_edge_effects: bool = False,
+        **kwargs,
+    ) -> Union[
+        list, np.ndarray, Tuple[Union[list, np.ndarray], Union[list, np.ndarray]]
+    ]:
         """Mode mixing logits, :code:`theta`.
 
         Parameters
@@ -677,8 +689,12 @@ class VariationalInferenceModelBase(ModelBase):
         return theta
 
     def get_mode_logits(
-        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
-    ):
+        self,
+        dataset,
+        concatenate: bool = False,
+        remove_edge_effects: bool = False,
+        **kwargs,
+    ) -> Tuple[Union[list, np.ndarray], Union[list, np.ndarray]]:
         """Get logits (:code:`theta`) for a multi-time-scale model.
 
         Parameters
@@ -757,8 +773,14 @@ class VariationalInferenceModelBase(ModelBase):
         return power_theta, fc_theta
 
     def get_alpha(
-        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
-    ):
+        self,
+        dataset,
+        concatenate: bool = False,
+        remove_edge_effects: bool = False,
+        **kwargs,
+    ) -> Union[
+        list, np.ndarray, Tuple[Union[list, np.ndarray], Union[list, np.ndarray]]
+    ]:
         """Get mode mixing coefficients, :code:`alpha`.
 
         Parameters
@@ -831,8 +853,12 @@ class VariationalInferenceModelBase(ModelBase):
         return alpha
 
     def get_mode_time_courses(
-        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
-    ):
+        self,
+        dataset,
+        concatenate: bool = False,
+        remove_edge_effects: bool = False,
+        **kwargs,
+    ) -> Tuple[Union[list, np.ndarray], Union[list, np.ndarray]]:
         """Get mode time courses (:code:`alpha`) for a multi-time-scale model.
 
         Parameters
@@ -914,7 +940,7 @@ class VariationalInferenceModelBase(ModelBase):
 
         return alpha, beta
 
-    def losses(self, dataset, **kwargs):
+    def losses(self, dataset, **kwargs) -> Tuple[float, float]:
         """Calculates the log-likelihood and KL loss for a dataset.
 
         Parameters
@@ -943,7 +969,7 @@ class VariationalInferenceModelBase(ModelBase):
         kl_loss = np.mean(predictions["kl_loss"])
         return ll_loss, kl_loss
 
-    def free_energy(self, dataset, **kwargs):
+    def free_energy(self, dataset, **kwargs) -> float:
         """Calculates the variational free energy of a dataset.
 
         Note, this method returns a free energy which may have a significantly
@@ -983,7 +1009,7 @@ class MarkovStateInferenceModelConfig:
 
     baum_welch_implementation: str = "log"
 
-    def validate_hmm_parameters(self):
+    def validate_hmm_parameters(self) -> None:
         if self.initial_trans_prob is not None:
             if (
                 not isinstance(self.initial_trans_prob, np.ndarray)
@@ -1018,7 +1044,7 @@ class MarkovStateInferenceModelConfig:
 class MarkovStateInferenceModelBase(ModelBase):
     """Base class for a Markov chain hidden state inference model."""
 
-    def fit(self, *args, lr_decay=None, **kwargs):
+    def fit(self, *args, lr_decay: Optional[float] = None, **kwargs) -> dict:
         """Wrapper for the standard keras fit method.
 
         Parameters
@@ -1064,7 +1090,11 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return super().fit(*args, **kwargs)
 
-    def compile(self, optimizer=None, **kwargs):
+    def compile(
+        self,
+        optimizer: Optional[Union[str, tf.keras.optimizers.Optimizer]] = None,
+        **kwargs,
+    ) -> None:
         """Compile the model.
 
         Parameters
@@ -1104,8 +1134,12 @@ class MarkovStateInferenceModelBase(ModelBase):
         super().compile(optimizer, **kwargs)
 
     def get_alpha(
-        self, dataset, concatenate=False, remove_edge_effects=False, **kwargs
-    ):
+        self,
+        dataset,
+        concatenate: bool = False,
+        remove_edge_effects: bool = False,
+        **kwargs,
+    ) -> Union[list, np.ndarray]:
         """Get state probabilities.
 
         Parameters
@@ -1171,7 +1205,9 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return alpha
 
-    def get_viterbi_path(self, dataset, concatenate=False):
+    def get_viterbi_path(
+        self, dataset, concatenate: bool = False
+    ) -> Union[list, np.ndarray]:
         """Get the Viterbi path with the Viterbi algorithm.
 
         Parameters
@@ -1247,7 +1283,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return viterbi_path
 
-    def get_trans_prob(self):
+    def get_trans_prob(self) -> np.ndarray:
         """Get the transition probability matrix.
 
         Returns
@@ -1258,7 +1294,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         layer = self.model.get_layer("hid_state_inf")
         return layer.get_trans_prob().numpy()
 
-    def get_initial_state_probs(self):
+    def get_initial_state_probs(self) -> np.ndarray:
         """Get the initial state probability distribution.
 
         Returns
@@ -1269,7 +1305,9 @@ class MarkovStateInferenceModelBase(ModelBase):
         layer = self.model.get_layer("hid_state_inf")
         return layer.get_initial_state_probs().numpy()
 
-    def set_trans_prob(self, trans_prob, update_initializer=True):
+    def set_trans_prob(
+        self, trans_prob: np.ndarray, update_initializer: bool = True
+    ) -> None:
         """Set the transition probability matrix.
 
         Parameters
@@ -1297,11 +1335,11 @@ class MarkovStateInferenceModelBase(ModelBase):
     def random_subset_initialization(
         self,
         training_data,
-        n_epochs=None,
-        n_init=None,
-        take=None,
+        n_epochs: Optional[int] = None,
+        n_init: Optional[int] = None,
+        take: Optional[float] = None,
         **kwargs,
-    ):
+    ) -> Optional[dict]:
         """Random subset initialization.
 
         The model is trained for a few epochs with different random subsets
@@ -1391,11 +1429,11 @@ class MarkovStateInferenceModelBase(ModelBase):
     def random_state_time_course_initialization(
         self,
         training_data,
-        n_epochs=None,
-        n_init=None,
-        take=None,
+        n_epochs: Optional[int] = None,
+        n_init: Optional[int] = None,
+        take: Optional[float] = None,
         **kwargs,
-    ):
+    ) -> Optional[dict]:
         """Random state time course initialization.
 
         The model is trained for a few epochs with a sampled state time course
@@ -1480,7 +1518,9 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return best_history
 
-    def set_random_state_time_course_initialization(self, training_dataset):
+    def set_random_state_time_course_initialization(
+        self, training_dataset: tf.data.Dataset
+    ) -> None:
         """Sets the initial means/covariances based on a random state time course.
 
         Parameters
@@ -1564,7 +1604,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             # Set initial covariances
             self.set_covariances(covariances, update_initializer=True)
 
-    def sample_state_time_course(self, n_samples):
+    def sample_state_time_course(self, n_samples: int) -> np.ndarray:
         """Sample a state time course.
 
         Parameters
@@ -1586,7 +1626,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         sim = HMM(trans_prob)
         return sim.generate_states(n_samples)
 
-    def get_log_likelihood(self, x):
+    def get_log_likelihood(self, x: Union[np.ndarray, tf.Tensor]) -> np.ndarray:
         """Log-likelihood.
 
         Parameters
@@ -1614,7 +1654,7 @@ class MarkovStateInferenceModelBase(ModelBase):
         ll_layer = self.model.get_layer("ll")
         return ll_layer(args).numpy()
 
-    def get_posterior_entropy(self, gamma, xi):
+    def get_posterior_entropy(self, gamma: np.ndarray, xi: np.ndarray) -> float:
         r"""Posterior entropy.
 
         Calculate the entropy of the posterior distribution:
@@ -1661,7 +1701,9 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return entropy
 
-    def get_posterior_expected_log_likelihood(self, x, gamma):
+    def get_posterior_expected_log_likelihood(
+        self, x: np.ndarray, gamma: np.ndarray
+    ) -> float:
         r"""Posterior expected log-likelihood.
 
         Calculates the expected log-likelihood with respect to the posterior
@@ -1700,7 +1742,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return expected_log_likelihood
 
-    def get_posterior_expected_prior(self, gamma, xi):
+    def get_posterior_expected_prior(self, gamma: np.ndarray, xi: np.ndarray) -> float:
         r"""Posterior expected prior.
 
         Calculates the expected prior probability of states with respect to the
@@ -1748,7 +1790,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return prior
 
-    def free_energy(self, dataset):
+    def free_energy(self, dataset) -> float:
         r"""Get the variational free energy of HMM-based models.
 
         This calculates:
@@ -1797,7 +1839,7 @@ class MarkovStateInferenceModelBase(ModelBase):
 
         return np.average(free_energy, weights=weights)
 
-    def evidence(self, dataset):
+    def evidence(self, dataset) -> float:
         """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
 
         Parameters

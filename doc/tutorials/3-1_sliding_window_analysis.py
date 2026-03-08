@@ -39,7 +39,7 @@ get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
 #%%
 # Load the data
 # *************
-# We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+# We now load the data into osl-dynamics using the Data class. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
 
 from osl_dynamics.data import Data
 
@@ -72,7 +72,7 @@ ts = data.time_series()
 #
 # Sliding window connectivity using the Pearson correlation
 # *********************************************************
-# Now that we have loaded the data we want to study, let's estimate sliding window networks. The first thing we need to do is choose the the metric for connectivity we will use. In this tutorial we're use the absolute value of the Pearson correlation of the source space time series. osl-dynamics has a function for calculating sliding window networks: `analysis.connectivity.sliding_window_connectivity <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.sliding_window_connectivity>`_. Let's use this function to calculate dynamics networks.
+# Now that we have loaded the data we want to study, let's estimate sliding window networks. The first thing we need to do is choose the the metric for connectivity we will use. In this tutorial we're use the absolute value of the Pearson correlation of the source space time series. osl-dynamics has a function for calculating sliding window networks: :func:`analysis.connectivity.sliding_window_connectivity <osl_dynamics.analysis.connectivity.sliding_window_connectivity>`. Let's use this function to calculate dynamics networks.
 
 from osl_dynamics.analysis import connectivity
 
@@ -90,7 +90,7 @@ swc_concat = np.abs(swc_concat)
 print(swc_concat.shape)
 
 #%%
-# We can see there are a total of 14,520 windows we calculated networks for. Let's plot the first few networks. We can use the `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ function to do this.
+# We can see there are a total of 14,520 windows we calculated networks for. Let's plot the first few networks. We can use the :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>` function to do this.
 
 connectivity.save(
     swc_concat[:5],

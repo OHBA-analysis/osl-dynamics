@@ -36,7 +36,7 @@ This tutorial covers how to train a DyNeMo model. We will use MEG data in this t
 #%%
 # Load the data
 # *************
-# We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+# We now load the data into osl-dynamics using the Data class. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
 #
 # .. code-block:: python
 #
@@ -53,7 +53,7 @@ This tutorial covers how to train a DyNeMo model. We will use MEG data in this t
 #
 # The Config object
 # *****************
-# Now we have prepared the data, let's build a model to train. To do this we first need to specify the `Config object <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/dynemo/index.html#osl_dynamics.models.dynemo.Config>`_ for DyNeMo. This is a class that acts as a container for all hyperparameters of a model. The API reference guide lists all the arguments for a Config object. There are a lot of arguments that can be passed to this class, however, a lot of them have good default values you don't need to change.
+# Now we have prepared the data, let's build a model to train. To do this we first need to specify the :class:`Config object <osl_dynamics.models.dynemo.Config>` for DyNeMo. This is a class that acts as a container for all hyperparameters of a model. The API reference guide lists all the arguments for a Config object. There are a lot of arguments that can be passed to this class, however, a lot of them have good default values you don't need to change.
 #
 # The important hyperparameters to specify are:
 #
@@ -88,7 +88,7 @@ config = Config(
     kl_annealing_curve="tanh",
     kl_annealing_sharpness=5,
     n_kl_annealing_epochs=10,
-    batch_size=32,
+    batch_size=256,
     learning_rate=0.01,
     n_epochs=20,
 )
@@ -110,7 +110,7 @@ model.summary()
 #
 # **Initialization**
 #
-# When training a model it often helps to start with a good initialization. In particular, starting with a good initial value for the mode means/covariances helps find a good solution. The `dynemo.Model <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/models/dynemo/index.html#osl_dynamics.models.dynemo.Model>`_ class has the `random_subset_initialization` method that can be used for this. This method train the model for a short period on a small random subset of the data. Let's use this method to initialize the model.
+# When training a model it often helps to start with a good initialization. In particular, starting with a good initial value for the mode means/covariances helps find a good solution. The :class:`dynemo.Model <osl_dynamics.models.dynemo.Model>` class has the `random_subset_initialization` method that can be used for this. This method train the model for a short period on a small random subset of the data. Let's use this method to initialize the model.
 #
 # .. code-block:: python
 #

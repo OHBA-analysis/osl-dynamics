@@ -1,5 +1,7 @@
 """Custom Tensorflow layers."""
 
+from typing import List, Optional, Tuple, Union
+
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
@@ -17,7 +19,7 @@ tfb = tfp.bijectors
 
 
 @tf.function
-def add_epsilon(A, epsilon, diag=False):
+def add_epsilon(A: tf.Tensor, epsilon: float, diag: bool = False) -> tf.Tensor:
     """Add epsilon.
 
     Adds epsilon the the diagonal of batches of square matrices
@@ -56,11 +58,11 @@ class TFConcatLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, axis, **kwargs):
+    def __init__(self, axis: int, **kwargs) -> None:
         super().__init__(**kwargs)
         self.axis = axis
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         return tf.concat(inputs, axis=self.axis)
 
 
@@ -69,7 +71,7 @@ class TFMatMulLayer(layers.Layer):
     <https://www.tensorflow.org/api_docs/python/tf/linalg/matmul>`_.
     """
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         # If [A, B, C] is passed, we return matmul(A, matmul(B, C))
         out = inputs[-1]
         for tensor in inputs[len(inputs) - 2 :: -1]:
@@ -89,11 +91,11 @@ class TFRangeLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, limit, **kwargs):
+    def __init__(self, limit: int, **kwargs) -> None:
         super().__init__(**kwargs)
         self.limit = limit
 
-    def call(self, inputs):
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return tf.range(self.limit)
 
 
@@ -109,11 +111,11 @@ class TFZerosLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, shape, **kwargs):
+    def __init__(self, shape: tuple, **kwargs) -> None:
         super().__init__(**kwargs)
         self.shape = shape
 
-    def call(self, inputs):
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
         """
         Note
         ----
@@ -127,12 +129,12 @@ class TFBroadcastToLayer(layers.Layer):
     <https://www.tensorflow.org/api_docs/python/tf/broadcast_to>`_.
     """
 
-    def __init__(self, n_modes, n_channels, **kwargs):
+    def __init__(self, n_modes: int, n_channels: int, **kwargs) -> None:
         super().__init__(**kwargs)
         self.n_modes = n_modes
         self.n_channels = n_channels
 
-    def call(self, inputs):
+    def call(self, inputs: List[tf.Tensor]) -> tf.Tensor:
         data, batch_size = inputs
         return tf.broadcast_to(data, (batch_size, self.n_modes, self.n_channels))
 
@@ -142,12 +144,12 @@ class TFGatherLayer(layers.Layer):
     <https://www.tensorflow.org/api_docs/python/tf/gather>`_.
     """
 
-    def __init__(self, axis, batch_dims=0, **kwargs):
+    def __init__(self, axis: int, batch_dims: int = 0, **kwargs) -> None:
         super().__init__(**kwargs)
         self.axis = axis
         self.batch_dims = batch_dims
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         return tf.gather(
             inputs[0], inputs[1], axis=self.axis, batch_dims=self.batch_dims
         )
@@ -158,7 +160,7 @@ class TFAddLayer(layers.Layer):
     <https://www.tensorflow.org/api_docs/python/tf/math/add>`_.
     """
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         out = inputs[0]
         for tensor in inputs[1:]:
             out = tf.add(out, tensor)
@@ -170,15 +172,15 @@ class TFConstantLayer(layers.Layer):
     <https://www.tensorflow.org/api_docs/python/tf/constant>`_.
     """
 
-    def __init__(self, values, **kwargs):
+    def __init__(self, values: np.ndarray, **kwargs) -> None:
         super().__init__(**kwargs)
         self.values = values
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         return tf.constant(self.values)
 
 
-def NormalizationLayer(norm_type, *args, **kwargs):
+def NormalizationLayer(norm_type: Optional[str], *args, **kwargs) -> layers.Layer:
     """Returns a normalization layer.
 
     Parameters
@@ -201,7 +203,7 @@ def NormalizationLayer(norm_type, *args, **kwargs):
         raise NotImplementedError(norm_type)
 
 
-def RNNLayer(rnn_type, *args, **kwargs):
+def RNNLayer(rnn_type: str, *args, **kwargs) -> layers.Layer:
     """Returns a Recurrent Neural Network (RNN) layer.
 
     Parameters
@@ -224,7 +226,7 @@ def RNNLayer(rnn_type, *args, **kwargs):
 class DummyLayer(layers.Layer):
     """Returns the inputs without modification."""
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         return inputs
 
 
@@ -239,14 +241,14 @@ class InverseCholeskyLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, **kwargs):
+    def __init__(self, epsilon: float, **kwargs) -> None:
         super().__init__(**kwargs)
         self.epsilon = epsilon
         self.bijector = tfb.Chain(
             [tfb.CholeskyOuterProduct(), tfb.FillScaleTriL()],
         )
 
-    def call(self, inputs):
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
         inputs = add_epsilon(inputs, self.epsilon, diag=True)
         return self.bijector.inverse(inputs)
 
@@ -260,7 +262,7 @@ class BatchSizeLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def call(self, inputs):
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
         """
         Note
         ----
@@ -284,7 +286,7 @@ class SampleGammaDistributionLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, do_annealing, **kwargs):
+    def __init__(self, epsilon: float, do_annealing: bool, **kwargs) -> None:
         super().__init__(**kwargs)
         self.epsilon = epsilon
         if do_annealing:
@@ -296,7 +298,9 @@ class SampleGammaDistributionLayer(layers.Layer):
                 1.0, trainable=False, name="gamma_anneal_factor"
             )
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(
+        self, inputs: List[tf.Tensor], training: Optional[bool] = None, **kwargs
+    ) -> tf.Tensor:
         """This method accepts the shape and rate and outputs the samples."""
         alpha, beta, session_id = inputs
         # alpha.shape = (n_sessions, n_states, 1)
@@ -331,11 +335,13 @@ class SampleNormalDistributionLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, **kwargs):
+    def __init__(self, epsilon: float, **kwargs) -> None:
         super().__init__(**kwargs)
         self.epsilon = epsilon
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(
+        self, inputs: List[tf.Tensor], training: Optional[bool] = None, **kwargs
+    ) -> tf.Tensor:
         """
         This method accepts the mean and the standard deviation and outputs
         the samples.
@@ -364,13 +370,15 @@ class SampleGumbelSoftmaxDistributionLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, temperature, **kwargs):
+    def __init__(self, temperature: float, **kwargs) -> None:
         super().__init__(**kwargs)
         self.temperature = tf.keras.Variable(
             temperature, trainable=False, dtype=tf.float32, name="gs_temperature"
         )
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(
+        self, inputs: tf.Tensor, training: Optional[bool] = None, **kwargs
+    ) -> tf.Tensor:
         """This method accepts logits and outputs samples."""
         if training:
             gs = tfp.distributions.RelaxedOneHotCategorical(
@@ -390,7 +398,7 @@ class SampleOneHotCategoricalDistributionLayer(layers.Layer):
     /OneHotCategorical>`_.
     """
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         """The method accepts logits and outputs samples."""
         cat = tfp.distributions.OneHotCategorical(
             logits=inputs,
@@ -412,7 +420,9 @@ class SoftmaxLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, initial_temperature, learn_temperature, **kwargs):
+    def __init__(
+        self, initial_temperature: float, learn_temperature: bool, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.layers = [
             LearnableTensorLayer(
@@ -423,12 +433,12 @@ class SoftmaxLayer(layers.Layer):
             )
         ]
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         temperature = self.layers[0](inputs)
         return activations.softmax(inputs / temperature, axis=-1)
 
@@ -447,9 +457,8 @@ class LearnableTensorLayer(layers.Layer):
     initial_value : float, optional
         Initial value for the tensor if initializer is not passed.
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     constraint : tf.keras.constraints.Constraint, optional
         Constraint for the tensor. Limits the values the weights can take.
     kwargs : keyword arguments, optional
@@ -458,14 +467,14 @@ class LearnableTensorLayer(layers.Layer):
 
     def __init__(
         self,
-        shape,
-        learn=True,
-        initializer=None,
-        initial_value=None,
+        shape: tuple,
+        learn: bool = True,
+        initializer: Optional[tf.keras.initializers.Initializer] = None,
+        initial_value: Optional[float] = None,
         regularizer=None,
-        constraint=None,
+        constraint: Optional[tf.keras.constraints.Constraint] = None,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
 
         # Bool for if we're learning the tensor
@@ -505,11 +514,11 @@ class LearnableTensorLayer(layers.Layer):
         # Constraint for the tensor
         self.constraint = constraint
 
-    def add_regularization(self, tensor):
+    def add_regularization(self, tensor: tf.Tensor) -> None:
         reg = self.regularizer(tensor)
         self.add_loss(reg)
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         # Create a weight for the tensor
         self.tensor = self.add_weight(
             name="tensor",
@@ -521,7 +530,9 @@ class LearnableTensorLayer(layers.Layer):
         )
         self.built = True
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(
+        self, inputs: tf.Tensor, training: Optional[bool] = None, **kwargs
+    ) -> tf.Tensor:
         if self.regularizer is not None and training:
             self.add_regularization(self.tensor)
         return self.tensor
@@ -541,22 +552,21 @@ class VectorsLayer(layers.Layer):
     initial_value : np.ndarray
         Initial value for the vectors. Shape must be (n, m).
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers \
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
     def __init__(
         self,
-        n,
-        m,
-        learn,
-        initial_value,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: Optional[Union[np.ndarray, str]],
         regularizer=None,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
 
         if initial_value is not None:
@@ -591,12 +601,12 @@ class VectorsLayer(layers.Layer):
             )
         ]
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         """
         Note
         ----
@@ -628,23 +638,22 @@ class CovarianceMatricesLayer(layers.Layer):
         Error added to the diagonal of covariances matrices for numerical
         stability.
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
     def __init__(
         self,
-        n,
-        m,
-        learn,
-        initial_value,
-        epsilon,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: Optional[Union[np.ndarray, str]],
+        epsilon: float,
         regularizer=None,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.epsilon = epsilon
 
@@ -698,12 +707,12 @@ class CovarianceMatricesLayer(layers.Layer):
             )
         ]
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         """
         Note
         ----
@@ -736,23 +745,22 @@ class CorrelationMatricesLayer(layers.Layer):
         Error added to the diagonal of correlation matrices for numerical
         stability.
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
     def __init__(
         self,
-        n,
-        m,
-        learn,
-        initial_value,
-        epsilon,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: Optional[Union[np.ndarray, str]],
+        epsilon: float,
         regularizer=None,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.epsilon = epsilon
 
@@ -806,12 +814,12 @@ class CorrelationMatricesLayer(layers.Layer):
             )
         ]
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         """
         Note
         ----
@@ -842,23 +850,22 @@ class DiagonalMatricesLayer(layers.Layer):
     epsilon : float
         Error added to the diagonal matrices for numerical stability.
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
     def __init__(
         self,
-        n,
-        m,
-        learn,
-        initial_value,
-        epsilon,
+        n: int,
+        m: int,
+        learn: bool,
+        initial_value: Optional[Union[np.ndarray, str]],
+        epsilon: float,
         regularizer=None,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.epsilon = epsilon
 
@@ -913,12 +920,12 @@ class DiagonalMatricesLayer(layers.Layer):
             )
         ]
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         """
         Note
         ----
@@ -955,14 +962,14 @@ class OscillatorCovarianceMatricesLayer(layers.Layer):
 
     def __init__(
         self,
-        n,
-        m,
-        sampling_frequency,
-        frequency_range,
-        learn,
-        epsilon,
+        n: int,
+        m: int,
+        sampling_frequency: float,
+        frequency_range: Tuple[float, float],
+        learn: bool,
+        epsilon: float,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.m = m
         self.n = n
@@ -995,12 +1002,12 @@ class OscillatorCovarianceMatricesLayer(layers.Layer):
         )
         self.layers = [self.frequency, self.amplitude, self.variance]
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         """Retrieve the covariance matrices.
 
         Note
@@ -1039,23 +1046,22 @@ class MatrixLayer(layers.Layer):
     epsilon : float
         Error added to the matrices for numerical stability.
     regularizer : osl-dynamics regularizer, optional
-        Regularizer for the tensor. Must be from `inference.regularizers 
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /inference/regularizers/index.html>`_.
+        Regularizer for the tensor. Must be from
+        :mod:`osl_dynamics.inference.regularizers`.
     kwargs : keyword arguments, optional
         Keyword arguments to pass to the base class.
     """
 
     def __init__(
         self,
-        m,
-        constraint,
-        learn,
-        initial_value,
-        epsilon,
+        m: int,
+        constraint: str,
+        learn: bool,
+        initial_value: Optional[Union[np.ndarray, str]],
+        epsilon: float,
         regularizer=None,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.constraint = constraint
 
@@ -1083,12 +1089,12 @@ class MatrixLayer(layers.Layer):
 
         self.layers = [self.matrix_layer]
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         """
         Note
         ----
@@ -1105,7 +1111,7 @@ class MixVectorsLayer(layers.Layer):
     :math:`\alpha_{jt}` are mixing coefficients.
     """
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         # Unpack the inputs:
         # - alpha.shape = (None, sequence_length, n_modes)
         # - mu.shape    = (n_modes, n_channels)
@@ -1126,7 +1132,7 @@ class MixMatricesLayer(layers.Layer):
     :math:`\alpha_{jt}` are mixing coefficients.
     """
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         # Unpack the inputs:
         # - alpha.shape = (None, sequence_length, n_modes)
         # - D.shape     = (n_modes, n_channels, n_channels)
@@ -1153,11 +1159,11 @@ class LogLikelihoodLossLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, calculation, **kwargs):
+    def __init__(self, calculation: str, **kwargs) -> None:
         super().__init__(**kwargs)
         self.calculation = calculation
 
-    def call(self, inputs):
+    def call(self, inputs: List[tf.Tensor]) -> tf.Tensor:
         """
         The method takes the data, mean vector and covariance matrix.
         """
@@ -1204,13 +1210,15 @@ class KLDivergenceLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, calculation, clip_start=0, **kwargs):
+    def __init__(
+        self, epsilon: float, calculation: str, clip_start: int = 0, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         self.clip_start = clip_start
         self.epsilon = epsilon
         self.calculation = calculation
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         inference_mu, inference_sigma, model_mu, model_sigma = inputs
 
         # Add a small error for numerical stability
@@ -1263,7 +1271,7 @@ class KLLossLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, do_annealing, **kwargs):
+    def __init__(self, do_annealing: bool, **kwargs) -> None:
         super().__init__(**kwargs)
         if do_annealing:
             self.annealing_factor = tf.keras.Variable(
@@ -1274,7 +1282,12 @@ class KLLossLayer(layers.Layer):
                 1.0, trainable=False, name="kl_factor"
             )
 
-    def call(self, inputs, training=False, **kwargs):
+    def call(
+        self,
+        inputs: Union[tf.Tensor, List[tf.Tensor]],
+        training: bool = False,
+        **kwargs,
+    ) -> tf.Tensor:
         kl_loss = inputs
 
         if isinstance(inputs, list):
@@ -1316,15 +1329,15 @@ class InferenceRNNLayer(layers.Layer):
 
     def __init__(
         self,
-        rnn_type,
-        norm_type,
-        act_type,
-        n_layers,
-        n_units,
-        drop_rate,
-        reg,
+        rnn_type: str,
+        norm_type: Optional[str],
+        act_type: str,
+        n_layers: int,
+        n_units: int,
+        drop_rate: float,
+        reg: Optional[str],
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.layers = []
         for n in range(n_layers):
@@ -1346,13 +1359,13 @@ class InferenceRNNLayer(layers.Layer):
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
             input_shape = layer.compute_output_shape(input_shape)
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
         return inputs
@@ -1383,15 +1396,15 @@ class ModelRNNLayer(layers.Layer):
 
     def __init__(
         self,
-        rnn_type,
-        norm_type,
-        act_type,
-        n_layers,
-        n_units,
-        drop_rate,
-        reg,
+        rnn_type: str,
+        norm_type: Optional[str],
+        act_type: str,
+        n_layers: int,
+        n_units: int,
+        drop_rate: float,
+        reg: Optional[str],
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.layers = []
         for n in range(n_layers):
@@ -1411,13 +1424,13 @@ class ModelRNNLayer(layers.Layer):
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
             input_shape = layer.compute_output_shape(input_shape)
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
         return inputs
@@ -1437,12 +1450,12 @@ class CategoricalKLDivergenceLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, calculation, clip_start=0, **kwargs):
+    def __init__(self, calculation: str, clip_start: int = 0, **kwargs) -> None:
         super().__init__(**kwargs)
         self.calculation = calculation
         self.clip_start = clip_start
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         inference_logits, model_logits = inputs
 
         # The model network predicts one time step into the future compared to
@@ -1482,12 +1495,12 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, n_states, calculation, **kwargs):
+    def __init__(self, n_states: int, calculation: str, **kwargs) -> None:
         super().__init__(**kwargs)
         self.n_states = n_states
         self.calculation = calculation
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         x, mu, sigma, probs = inputs
 
         # Log-likelihood for each state
@@ -1523,7 +1536,7 @@ class ConcatEmbeddingsLayer(layers.Layer):
     and spatial embeddings.
     """
 
-    def call(self, inputs):
+    def call(self, inputs: List[tf.Tensor]) -> tf.Tensor:
         embeddings, spatial_embeddings = inputs
         batch_size, embeddings_dim = embeddings.shape
         n_states, spatial_embeddings_dim = spatial_embeddings.shape
@@ -1559,7 +1572,7 @@ class SessionParamLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, param, epsilon, **kwargs):
+    def __init__(self, param: str, epsilon: float, **kwargs) -> None:
         super().__init__(**kwargs)
         self.param = param
         self.epsilon = epsilon
@@ -1572,7 +1585,7 @@ class SessionParamLayer(layers.Layer):
         else:
             raise ValueError("param must be one of 'means' and 'covariances'.")
 
-    def call(self, inputs):
+    def call(self, inputs: List[tf.Tensor]) -> tf.Tensor:
         group_param, dev = inputs
         group_param = self.bijector.inverse(group_param)
 
@@ -1598,7 +1611,7 @@ class MixSessionSpecificParametersLayer(layers.Layer):
     where :math:`s_t` is the array at time :math:`t`.
     """
 
-    def call(self, inputs):
+    def call(self, inputs: List[tf.Tensor]) -> Tuple[tf.Tensor, tf.Tensor]:
         # Unpack inputs:
         # - alpha.shape   = (None, sequence_length, n_modes)
         # - mu.shape      = (None, n_modes, n_channels)
@@ -1633,12 +1646,14 @@ class GammaExponentialKLDivergenceLayer(layers.Layer):
         Keyword arguments to pass to the base class.
     """
 
-    def __init__(self, epsilon, **kwargs):
+    def __init__(self, epsilon: float, **kwargs) -> None:
         super().__init__(**kwargs)
         self.epsilon = epsilon
         self.scale_factor = -1
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(
+        self, inputs: List[tf.Tensor], training: Optional[bool] = None, **kwargs
+    ) -> tf.Tensor:
         # inference_alpha.shape = (n_sessions, n_states, 1)
         # inference_beta.shape  = (n_sessions, n_states, 1)
         # model_beta.shape      = (n_sessions, n_states, 1)
@@ -1695,15 +1710,15 @@ class MultiLayerPerceptronLayer(layers.Layer):
 
     def __init__(
         self,
-        n_layers,
-        n_units,
-        norm_type,
-        act_type,
-        drop_rate,
-        regularizer=None,
-        regularizer_strength=1,
+        n_layers: int,
+        n_units: int,
+        norm_type: Optional[str],
+        act_type: str,
+        drop_rate: float,
+        regularizer: Optional[str] = None,
+        regularizer_strength: float = 1,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.regularizer = regularizers.get(regularizer)
         self.regularizer_strength = regularizer_strength
@@ -1714,13 +1729,15 @@ class MultiLayerPerceptronLayer(layers.Layer):
             self.layers.append(layers.Activation(act_type))
             self.layers.append(layers.Dropout(drop_rate))
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
             input_shape = layer.compute_output_shape(input_shape)
         self.built = True
 
-    def call(self, inputs, training=None, **kwargs):
+    def call(
+        self, inputs: tf.Tensor, training: Optional[bool] = None, **kwargs
+    ) -> tf.Tensor:
         reg = 0.0
         for layer in self.layers:
             inputs = layer(inputs, **kwargs)
@@ -1768,17 +1785,17 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
     def __init__(
         self,
-        n_states,
-        sequence_length,
-        initial_trans_prob,
-        trans_prob_prior,
-        initial_state_probs,
-        learn_trans_prob,
-        learn_initial_state_probs,
-        implementation="rescale",
-        use_stationary_distribution=False,
+        n_states: int,
+        sequence_length: int,
+        initial_trans_prob: Optional[Union[np.ndarray, str]],
+        trans_prob_prior: Optional[Union[np.ndarray, str]],
+        initial_state_probs: Optional[Union[np.ndarray, str]],
+        learn_trans_prob: bool,
+        learn_initial_state_probs: bool,
+        implementation: str = "rescale",
+        use_stationary_distribution: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(**kwargs)
         self.n_states = n_states
         if self.n_states != 1:
@@ -1868,13 +1885,13 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             # initializers.reinitialize_model_weights
             self.layers = [initial_state_probs_layer, trans_prob_layer]
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         if self.n_states != 1:
             for layer in self.layers:
                 layer.build(input_shape)
             self.built = True
 
-    def get_stationary_distribution(self):
+    def get_stationary_distribution(self) -> tf.Tensor:
         if self.n_states == 1:
             return tf.constant([1.0], dtype=tf.float32)
         else:
@@ -1887,7 +1904,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             stationary_distribution /= tf.reduce_sum(stationary_distribution)
             return stationary_distribution
 
-    def get_initial_state_probs(self):
+    def get_initial_state_probs(self) -> tf.Tensor:
         if self.n_states == 1:
             return tf.constant([1.0], dtype=tf.float32)
         else:
@@ -1897,7 +1914,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 learnable_tensors_layer = self.layers[0]
                 return learnable_tensors_layer(tf.constant(1))
 
-    def get_trans_prob(self):
+    def get_trans_prob(self) -> tf.Tensor:
         if self.n_states == 1:
             return tf.constant([[1.0]], dtype=tf.float32)
         else:
@@ -1905,7 +1922,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             return learnable_tensors_layer(tf.constant(1))
 
     @tf.function
-    def _baum_welch(self, log_B):
+    def _baum_welch(self, log_B: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         def _get_indices(time, batch_size):
             return tf.concat(
                 [
@@ -2102,7 +2119,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
         return gamma, xi
 
-    def _trans_prob_update(self, gamma, xi):
+    def _trans_prob_update(self, gamma: tf.Tensor, xi: tf.Tensor) -> tf.Tensor:
         if self.n_states == 1:
             return tf.constant([[1.0]], dtype=tf.float32)
         else:
@@ -2115,7 +2132,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             )
             return numerator / denominator
 
-    def call(self, log_B, **kwargs):
+    def call(self, log_B: tf.Tensor, **kwargs) -> Tuple[tf.Tensor, tf.Tensor]:
         if self.n_states == 1:
             batch_size = tf.shape(log_B)[0]
             sequence_length = tf.shape(log_B)[1]
@@ -2165,7 +2182,9 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
             return posterior(log_B)
 
-    def compute_output_shape(self, input_shape):
+    def compute_output_shape(
+        self, input_shape: tf.TensorShape
+    ) -> Tuple[tf.TensorShape, tuple]:
         output_shape_0 = input_shape
         output_shape_1 = [input_shape[0], input_shape[1], self.n_states, self.n_states]
         return (output_shape_0, tuple(output_shape_1))
@@ -2182,11 +2201,11 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         Keyword arguments to pass to the keras.layers.Layer.
     """
 
-    def __init__(self, n_states, **kwargs):
+    def __init__(self, n_states: int, **kwargs) -> None:
         super().__init__(**kwargs)
         self.n_states = n_states
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         x, mu, sigma = inputs
         # x.shape = (None, sequence_length, n_channels)
         # mu.shape = (None, n_states, n_channels)
@@ -2209,7 +2228,7 @@ class SeparateLogLikelihoodLayer(layers.Layer):
 
         return log_likelihood  # shape = (None, sequence_length, n_states)
 
-    def compute_output_shape(self, input_shape):
+    def compute_output_shape(self, input_shape: tf.TensorShape) -> tf.TensorShape:
         output_shape = input_shape[0]
         return output_shape
 
@@ -2225,11 +2244,11 @@ class SeparatePoissonLogLikelihoodLayer(layers.Layer):
         Keyword arguments to pass to the keras.layers.Layer.
     """
 
-    def __init__(self, n_states, **kwargs):
+    def __init__(self, n_states: int, **kwargs) -> None:
         super().__init__(**kwargs)
         self.n_states = n_states
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         x, log_rate = inputs
 
         # Add the sequence length dimension
@@ -2256,11 +2275,11 @@ class SumLogLikelihoodLossLayer(layers.Layer):
         Keyword arguments to pass to the keras.layers.Layer.
     """
 
-    def __init__(self, calculation, **kwargs):
+    def __init__(self, calculation: str, **kwargs) -> None:
         super().__init__(**kwargs)
         self.calculation = calculation
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         ll, gamma = inputs
         ll_loss = tf.reduce_sum(gamma * ll, axis=-1)
 
@@ -2292,7 +2311,9 @@ class EmbeddingLayer(layers.Layer):
         Should the embeddings be unit norm?
     """
 
-    def __init__(self, input_dim, output_dim, unit_norm, **kwargs):
+    def __init__(
+        self, input_dim: int, output_dim: int, unit_norm: bool, **kwargs
+    ) -> None:
         super().__init__(**kwargs)
         if unit_norm:
             output_dim = output_dim - 1
@@ -2304,12 +2325,12 @@ class EmbeddingLayer(layers.Layer):
         self.layers = [self.embedding_layer]
         self.unit_norm = unit_norm
 
-    def build(self, input_shape):
+    def build(self, input_shape: tf.TensorShape) -> None:
         for layer in self.layers:
             layer.build(input_shape)
         self.built = True
 
-    def call(self, inputs, **kwargs):
+    def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         output = self.embedding_layer(inputs)
 
         # Add the last element to ensure the embeddings are unit norm
@@ -2319,7 +2340,7 @@ class EmbeddingLayer(layers.Layer):
         return output
 
     @property
-    def embeddings(self):
+    def embeddings(self) -> tf.Tensor:
         output = self.embedding_layer.embeddings
         if self.unit_norm:
             norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)

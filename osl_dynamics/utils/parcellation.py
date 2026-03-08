@@ -2,6 +2,8 @@
 
 import logging
 import warnings
+from typing import List, Optional, Union
+
 import numpy as np
 import nibabel as nib
 from pathlib import Path
@@ -21,7 +23,7 @@ class Parcellation:
         Path to parcellation file.
     """
 
-    def __init__(self, file):
+    def __init__(self, file: Union[str, "Parcellation"]) -> None:
         if isinstance(file, Parcellation):
             self.__dict__.update(file.__dict__)
             return
@@ -46,16 +48,16 @@ class Parcellation:
         self.dims = self.parcellation.shape[:3]
         self.n_parcels = self.parcellation.shape[3]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.__class__.__name__}({repr(self.file)})"
 
-    def data(self):
+    def data(self) -> np.ndarray:
         return self.parcellation.get_fdata()
 
-    def nonzero(self):
+    def nonzero(self) -> list:
         return [np.nonzero(self.data()[..., i]) for i in range(self.n_parcels)]
 
-    def nonzero_coords(self):
+    def nonzero_coords(self) -> list:
         return [
             nib.affines.apply_affine(
                 self.parcellation.affine,
@@ -64,12 +66,12 @@ class Parcellation:
             for nonzero in self.nonzero()
         ]
 
-    def weights(self):
+    def weights(self) -> list:
         return [
             self.data()[..., i][nonzero] for i, nonzero in enumerate(self.nonzero())
         ]
 
-    def roi_centers(self):
+    def roi_centers(self) -> np.ndarray:
         """Centroid of each parcel."""
         return np.array(
             [
@@ -82,13 +84,13 @@ class Parcellation:
         return plot_parcellation(self, **kwargs)
 
     @staticmethod
-    def find_files():
+    def find_files() -> List[str]:
         paths = Path(files.parcellation.directory).glob("*")
         paths = [path.name for path in paths if not path.name.startswith("__")]
         return sorted(paths)
 
 
-def plot_parcellation(parcellation, **kwargs):
+def plot_parcellation(parcellation: Union[str, "Parcellation"], **kwargs):
     """Plot a parcellation.
 
     Parameters
@@ -111,8 +113,11 @@ def plot_parcellation(parcellation, **kwargs):
 
 
 def parcel_vector_to_voxel_grid(
-    mask_file, parcellation_file, vector, remove_subcortical_voxels=False
-):
+    mask_file: str,
+    parcellation_file: str,
+    vector: np.ndarray,
+    remove_subcortical_voxels: bool = False,
+) -> np.ndarray:
     """Takes a vector of parcel values and return a 3D voxel grid.
 
     Parameters

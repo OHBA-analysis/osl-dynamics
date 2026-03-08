@@ -1,12 +1,12 @@
 """Dynamic Network Modes (DyNeMo).
 
-See the `documentation <https://osl-dynamics.readthedocs.io/en/latest/models\
-/dynemo.html>`_ for a description of this model.
+See the :doc:`documentation </models/dynemo>` for a description of this model.
 """
 
 import os
 import logging
 from dataclasses import dataclass
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -193,7 +193,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_init_epochs: int = 2
     init_take: float = 1.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.validate_rnn_parameters()
         self.validate_observation_model_parameters()
         self.validate_alpha_parameters()
@@ -201,14 +201,14 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 
-    def validate_rnn_parameters(self):
+    def validate_rnn_parameters(self) -> None:
         if self.inference_n_units is None:
             raise ValueError("Please pass inference_n_units.")
 
         if self.model_n_units is None:
             raise ValueError("Please pass model_n_units.")
 
-    def validate_observation_model_parameters(self):
+    def validate_observation_model_parameters(self) -> None:
         if self.learn_means is None or self.learn_covariances is None:
             raise ValueError("learn_means and learn_covariances must be passed.")
 
@@ -229,7 +229,7 @@ class Model(VariationalInferenceModelBase):
 
     config_type = Config
 
-    def build_model(self):
+    def build_model(self) -> None:
         """Builds a keras model."""
 
         config = self.config
@@ -349,7 +349,7 @@ class Model(VariationalInferenceModelBase):
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
-    def get_means(self):
+    def get_means(self) -> np.ndarray:
         """Get the mode means.
 
         Returns
@@ -359,7 +359,7 @@ class Model(VariationalInferenceModelBase):
         """
         return obs_mod.get_observation_model_parameter(self.model, "means")
 
-    def get_covariances(self):
+    def get_covariances(self) -> np.ndarray:
         """Get the mode covariances.
 
         Returns
@@ -369,7 +369,7 @@ class Model(VariationalInferenceModelBase):
         """
         return obs_mod.get_observation_model_parameter(self.model, "covs")
 
-    def get_means_covariances(self):
+    def get_means_covariances(self) -> Tuple[np.ndarray, np.ndarray]:
         """Get the mode means and covariances.
 
         This is a wrapper for :code:`get_means` and :code:`get_covariances`.
@@ -383,11 +383,11 @@ class Model(VariationalInferenceModelBase):
         """
         return self.get_means(), self.get_covariances()
 
-    def get_observation_model_parameters(self):
+    def get_observation_model_parameters(self) -> Tuple[np.ndarray, np.ndarray]:
         """Wrapper for :code:`get_means_covariances`."""
         return self.get_means_covariances()
 
-    def set_means(self, means, update_initializer=True):
+    def set_means(self, means: np.ndarray, update_initializer: bool = True) -> None:
         """Set the mode means.
 
         Parameters
@@ -405,7 +405,9 @@ class Model(VariationalInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_covariances(self, covariances, update_initializer=True):
+    def set_covariances(
+        self, covariances: np.ndarray, update_initializer: bool = True
+    ) -> None:
         """Set the mode covariances.
 
         Parameters
@@ -426,10 +428,10 @@ class Model(VariationalInferenceModelBase):
 
     def set_means_covariances(
         self,
-        means,
-        covariances,
-        update_initializer=True,
-    ):
+        means: np.ndarray,
+        covariances: np.ndarray,
+        update_initializer: bool = True,
+    ) -> None:
         """This is a wrapper for :code:`set_means` and :code:`set_covariances`."""
         self.set_means(
             means,
@@ -441,8 +443,8 @@ class Model(VariationalInferenceModelBase):
         )
 
     def set_observation_model_parameters(
-        self, observation_model_parameters, update_initializer=True
-    ):
+        self, observation_model_parameters: tuple, update_initializer: bool = True
+    ) -> None:
         """Wrapper for :code:`set_means_covariances`."""
         self.set_means_covariances(
             observation_model_parameters[0],
@@ -450,7 +452,7 @@ class Model(VariationalInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_regularizers(self, training_dataset):
+    def set_regularizers(self, training_dataset) -> None:
         """Set the means and covariances regularizer based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with
@@ -486,7 +488,9 @@ class Model(VariationalInferenceModelBase):
                 self.config.diagonal_covariances,
             )
 
-    def sample_alpha(self, n_samples, theta=None):
+    def sample_alpha(
+        self, n_samples: int, theta: Optional[np.ndarray] = None
+    ) -> np.ndarray:
         """Uses the model RNN to sample mode mixing factors, :code:`alpha`.
 
         Parameters
@@ -548,8 +552,12 @@ class Model(VariationalInferenceModelBase):
         return alpha
 
     def fine_tuning(
-        self, training_data, n_epochs=None, learning_rate=None, store_dir="tmp"
-    ):
+        self,
+        training_data,
+        n_epochs: Optional[int] = None,
+        learning_rate: Optional[float] = None,
+        store_dir: str = "tmp",
+    ) -> Tuple[List[np.ndarray], np.ndarray, np.ndarray]:
         """Fine tuning the model for each session.
 
         Here, we train the inference RNN and observation model with the model
@@ -631,10 +639,10 @@ class Model(VariationalInferenceModelBase):
     def dual_estimation(
         self,
         training_data,
-        n_epochs=None,
-        learning_rate=None,
-        store_dir="tmp",
-    ):
+        n_epochs: Optional[int] = None,
+        learning_rate: Optional[float] = None,
+        store_dir: str = "tmp",
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Dual estimation to get the session-specific observation model parameters.
 
         Here, we train the observation model parameters (mode means and

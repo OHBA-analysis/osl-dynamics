@@ -75,7 +75,7 @@ fig, ax = plotting.plot_line(
 #%%
 # Power maps
 # ^^^^^^^^^^
-# The `psd` array contains the spectrum for each channel (for each subject/state). This is a function of frequency. To calculate power we need to integrate over a frequency range. osl-dynamics has the `analysis.power.variance_from_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/power/index.html#osl_dynamics.analysis.power.variance_from_spectra>`_ function to help us do this. Let's look at the power across all frequencies for a given state.
+# The `psd` array contains the spectrum for each channel (for each subject/state). This is a function of frequency. To calculate power we need to integrate over a frequency range. osl-dynamics has the :func:`analysis.power.variance_from_spectra <osl_dynamics.analysis.power.variance_from_spectra>` function to help us do this. Let's look at the power across all frequencies for a given state.
 
 from osl_dynamics.analysis import power
 
@@ -137,7 +137,7 @@ print(mean_c.shape)
 #%%
 # We now see `c_mean` is a (states, channels, channels) array.
 #
-# Let's have a look at the coherence networks. The `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ function can be used to display a connectivity matrix (or set of connectivity matrices). Note, we display them relative to the mean across states.
+# Let's have a look at the coherence networks. The :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>` function can be used to display a connectivity matrix (or set of connectivity matrices). Note, we display them relative to the mean across states.
 
 mean_c -= np.mean(mean_c, axis=0)
 connectivity.save(
@@ -146,7 +146,7 @@ connectivity.save(
 )
 
 #%%
-# We can see there are a lot of connections. We want to select the most extreme edeges. osl-dynamics has a function called `connectivity.threshold <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.threshold>`_ that makes this easy.
+# We can see there are a lot of connections. We want to select the most extreme edeges. osl-dynamics has a function called :func:`connectivity.threshold <osl_dynamics.analysis.connectivity.threshold>` that makes this easy.
 
 thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True)
 print(thres_mean_c.shape)
@@ -162,7 +162,7 @@ connectivity.save(
 #%%
 # Non-negative matrix factorization (NNMF)
 # ****************************************
-# In the above code, we integrated over all frequencies to calculate the power maps and coherence networks. We expect brain activity to occur with phase-locking networks with oscillations at different frequencies. A data-driven approach for finding the frequency bands (referred to as 'spectral components') for phase-locked networks is to apply non-negative matrix factorization (NNMF) to the coherence spectra for each subject. osl-dynamics has a function that can do this: `analysis.spectral.decompose_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.decompose_spectra>`_. Let's use this function to separate our coherence spectra (`coh`) into two frequency bands.
+# In the above code, we integrated over all frequencies to calculate the power maps and coherence networks. We expect brain activity to occur with phase-locking networks with oscillations at different frequencies. A data-driven approach for finding the frequency bands (referred to as 'spectral components') for phase-locked networks is to apply non-negative matrix factorization (NNMF) to the coherence spectra for each subject. osl-dynamics has a function that can do this: :func:`analysis.spectral.decompose_spectra <osl_dynamics.analysis.spectral.decompose_spectra>`. Let's use this function to separate our coherence spectra (`coh`) into two frequency bands.
 
 from osl_dynamics.analysis import spectral
 
@@ -201,7 +201,7 @@ thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True
 print(thres_mean_c.shape)
 
 #%%
-# We can see the `c_mean` and `c_mean_thres` array here is (components, states, channels, channels). We're only interested in the first spectral component. We can plot this by passing a `component=0` argument to `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_.
+# We can see the `c_mean` and `c_mean_thres` array here is (components, states, channels, channels). We're only interested in the first spectral component. We can plot this by passing a `component=0` argument to :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>`.
 
 connectivity.save(
     thres_mean_c,
@@ -258,7 +258,7 @@ print(mean_p.shape)
 print(mean_c.shape)
 
 #%%
-# We have a `(n_channels,)` array for each state for the power, but a `(n_channels, n_channels)` array for each state for the coherence. To reduce the coherence down to a 1D array for each state, we can calculate the average pairwise coherence for each channels. We can do this with the `connectivity.mean_connections <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.mean_connections>`_ function.
+# We have a `(n_channels,)` array for each state for the power, but a `(n_channels, n_channels)` array for each state for the coherence. To reduce the coherence down to a 1D array for each state, we can calculate the average pairwise coherence for each channels. We can do this with the :func:`connectivity.mean_connections <osl_dynamics.analysis.connectivity.mean_connections>` function.
 
 mean_c = connectivity.mean_connections(mean_c)
 print(mean_c.shape)

@@ -1,7 +1,6 @@
 """Implementation of the Fisher kernel for prediction studies.
 
-See the `HMM description <https://osl-dynamics.readthedocs.io/en/latest/models\
-/hmm.html>`_ for further details.
+See the :doc:`HMM description </models/hmm>` for further details.
 
 See Also
 --------
@@ -11,7 +10,7 @@ to simulated HMM data.
 """
 
 import logging
-
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 from tqdm.auto import trange
@@ -38,7 +37,7 @@ class FisherKernel:
             )
         self.model = model
 
-    def get_features(self, dataset, batch_size=None):
+    def get_features(self, dataset, batch_size: Optional[int] = None) -> np.ndarray:
         """Get the Fisher features.
 
         Parameters
@@ -121,7 +120,9 @@ class FisherKernel:
         features /= features_l2_norm
         return features
 
-    def get_kernel_matrix(self, dataset, batch_size=None):
+    def get_kernel_matrix(
+        self, dataset, batch_size: Optional[int] = None
+    ) -> np.ndarray:
         """Get the Fisher kernel matrix.
 
         Parameters
@@ -145,7 +146,9 @@ class FisherKernel:
 
         return kernel_matrix
 
-    def _d_HMM(self, gamma, xi):
+    def _d_HMM(
+        self, gamma: np.ndarray, xi: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """Get the derivative of free energy with respect to
         transition probability, initial distribution of HMM.
 
@@ -181,7 +184,7 @@ class FisherKernel:
 
         return d_initial_distribution, d_trans_prob
 
-    def _get_tf_gradients(self, inputs):
+    def _get_tf_gradients(self, inputs) -> Dict:
         """Get the gradient with respect to means and covariances.
 
         Parameters

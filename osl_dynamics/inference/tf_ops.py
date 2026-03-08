@@ -2,11 +2,12 @@
 
 import logging
 import os
+from typing import List, Union
 
 _logger = logging.getLogger("osl-dynamics")
 
 
-def gpu_growth():
+def gpu_growth() -> None:
     """Only allocate the amount of memory required on the GPU."""
     import tensorflow as tf  # moved here to avoid slow imports
 
@@ -23,7 +24,7 @@ def gpu_growth():
             _logger.error(e)
 
 
-def select_gpu(gpu_numbers):
+def select_gpu(gpu_numbers: Union[List[int], int]) -> None:
     """Allows the user to pick a GPU to use.
 
     Parameters
@@ -39,14 +40,11 @@ def select_gpu(gpu_numbers):
     _logger.info(f"Using GPU {gpu_numbers}")
 
 
-def suppress_messages(level=3):
+def suppress_messages(level: int = 3) -> None:
     """Suppress messages from TensorFlow.
 
-    Must be called before `gpu_growth <https://osl-dynamics.readthedocs.io\
-    /en/latest/autoapi/osl_dynamics/inference/tf_ops/index.html#osl_dynamics\
-    .inference.tf_ops.gpu_growth>`_ and `select_gpu <https://osl-dynamics\
-    .readthedocs.io/en/latest/autoapi/osl_dynamics/inference/tf_ops/index.html\
-    #osl_dynamics.inference.tf_ops.gpu_growth>`_.
+    Must be called before :func:`osl_dynamics.inference.tf_ops.gpu_growth`
+    and :func:`osl_dynamics.inference.tf_ops.select_gpu`.
 
     Parameters
     ----------

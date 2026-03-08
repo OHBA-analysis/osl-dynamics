@@ -1,9 +1,12 @@
 """Utility classes and functions related to the models."""
 
 import re
+from typing import Any, List, Optional
+
+import numpy as np
 
 
-def tex_escape(text):
+def tex_escape(text: str) -> str:
     """Escape characters which require control sequences in text for use in LaTeX.
 
     Parameters
@@ -49,11 +52,11 @@ class Table:
         List of strings for the table headers.
     """
 
-    def __init__(self, headers):
+    def __init__(self, headers: List[str]) -> None:
         self.headers = headers
         self.rows = []
 
-    def __iadd__(self, other):
+    def __iadd__(self, other: list) -> "Table":
         """Add a row to the table.
 
         Parameters
@@ -90,7 +93,7 @@ class HTMLTable(Table):
     th = "<th>{}</th>"
     td = '<td style="white-space:pre-wrap; word-wrap:break-word">{}</td>'
 
-    def append_last(self, item):
+    def append_last(self, item: str) -> None:
         """Append an item to the last cell in the last row.
 
         Parameters
@@ -100,7 +103,7 @@ class HTMLTable(Table):
         """
         self.rows[-1][-1] = "\n".join([self.rows[-1][-1], item])
 
-    def html_row(self, items):
+    def html_row(self, items: List[str]) -> str:
         """Format a list of strings as an HTML table row.
 
         Parameters
@@ -116,7 +119,7 @@ class HTMLTable(Table):
         data = "".join([self.td.format(item) for item in items])
         return self.tr.format(data)
 
-    def html_headers(self):
+    def html_headers(self) -> str:
         """Generate HTML table headers from self.headers
 
         Returns
@@ -127,7 +130,7 @@ class HTMLTable(Table):
         headers = "".join([self.th.format(header) for header in self.headers])
         return self.tr.format(headers)
 
-    def output(self):
+    def output(self) -> str:
         """Create the full HTML for the table.
 
         Returns
@@ -139,7 +142,7 @@ class HTMLTable(Table):
         rows = "\n".join([self.html_row(row) for row in self.rows])
         return self.outer.format(headers=headers, content=rows)
 
-    def _repr_html_(self):
+    def _repr_html_(self) -> str:
         """Return HTML representation of the current object.
 
         This function is for use by the Jupyter backend.
@@ -183,22 +186,22 @@ class LatexTable(Table):
 
     def __init__(
         self,
-        headers,
+        headers: List[str],
         *,
-        vertical_lines=True,
-        horizontal_lines=True,
-        header_lines=True,
-    ):
+        vertical_lines: bool = True,
+        horizontal_lines: bool = True,
+        header_lines: bool = True,
+    ) -> None:
         super().__init__(headers)
         self.vertical_lines = vertical_lines
         self.horizontal_lines = horizontal_lines
 
-    def escape(self):
+    def escape(self) -> None:
         """Escape special characters in headers and rows."""
         self.headers = [tex_escape(header) for header in self.headers]
         self.rows = [[tex_escape(item) for item in row] for row in self.rows]
 
-    def append_last(self, item):
+    def append_last(self, item: Any) -> None:
         """Append an item on the last row of the table.
 
         Parameters
@@ -209,7 +212,7 @@ class LatexTable(Table):
         self.rows.append(["", "", "", item])
 
     @staticmethod
-    def latex_row(items):
+    def latex_row(items: List[str]) -> str:
         """Create a latex row from a list of strings.
 
         Parameters
@@ -224,7 +227,7 @@ class LatexTable(Table):
         """
         return " & ".join(items)
 
-    def output(self):
+    def output(self) -> str:
         """Format the table into LaTeX code.
 
         Returns
@@ -251,7 +254,7 @@ class LatexTable(Table):
             headers=headers, rows=rows, header_alignments=header_alignments
         )
 
-    def _repr_latex_(self):
+    def _repr_latex_(self) -> str:
         """Returns the LaTeX representation of the object.
 
         Returns

@@ -33,7 +33,7 @@ os.listdir("example_loading_data")
 #%%
 # Loading the data
 # ****************
-# Now, let's load the example data into osl-dynamics. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+# Now, let's load the example data into osl-dynamics. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
 
 from osl_dynamics.data import Data
 
@@ -45,7 +45,7 @@ print(data)
 #
 # The prepare method
 # ^^^^^^^^^^^^^^^^^^
-# The `Data <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_ class has many methods available for manipulating the data. See the docs for a full list. We will describe two common approaches for preparing the data:
+# The :class:`osl_dynamics.data.base.Data` class has many methods available for manipulating the data. See the docs for a full list. We will describe two common approaches for preparing the data:
 #
 # - TDE-PCA
 # - Amplitude Envelope.
@@ -56,7 +56,7 @@ print(data)
 # *******
 # Time-delay embedding (TDE) is a process of augmenting a time series with extra channels. These extra channels are time-lagged versions of the original channels. We do this to add extra entries to the covariance matrix of the data which are sensitive to the frequency of oscillations in the data.
 #
-# Here, we demonstrate how to apply this process to data. For further details, including the impact of different parameters, see the `TDE tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_time_delay_embedding.html>`_. 
+# Here, we demonstrate how to apply this process to data. For further details, including the impact of different parameters, see the :doc:`TDE tutorial <../tutorials_build/1-4_data_time_delay_embedding>`. 
 #
 # Performing TDE often results in a very large number of channels. Consequently, Principal Component Analysis (PCA) is often used to reduce the number of channels. Both TDE and PCA can be done in one step using the `tde_pca` method. We often also want to standardize (z-transform) the data before training a model. Both of these steps can be done with the `prepare` method.
 

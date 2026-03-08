@@ -85,7 +85,7 @@ print("Contents of example_loading_data:")
 os.listdir("example_loading_data")
 
 #%%
-# Now, let's load the example data into osl-dynamics. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+# Now, let's load the example data into osl-dynamics. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
 
 from osl_dynamics.data import Data
 
@@ -145,5 +145,5 @@ print(data)
 # ^^^^^^^^^^
 # Once you have loaded and prepared your fMRI data, the next step is to train a dynamic network model. See:
 #
-# - `HMM: Training <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/3-2_hmm_training.html>`_
-# - `DyNeMo: Training <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/3-3_dynemo_training.html>`_
+# - :doc:`HMM: Training <../tutorials_build/3-2_hmm_training>`
+# - :doc:`DyNeMo: Training <../tutorials_build/3-3_dynemo_training>`

@@ -59,7 +59,7 @@ print(data)
 data.tde(n_embeddings=5)
 
 #%%
-# See the `Data loading tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details regarding how to load data using the `Data <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_ class. In the above code we chose `n_embeddings=5`. This means for every original channel, we add `n_embeddings - 1 = 4` extra channels. In our three channel example, the operation we do is:
+# See the :doc:`Data loading tutorial <../tutorials_build/1-1_data_loading>` for further details regarding how to load data using the :class:`osl_dynamics.data.base.Data` class. In the above code we chose `n_embeddings=5`. This means for every original channel, we add `n_embeddings - 1 = 4` extra channels. In our three channel example, the operation we do is:
 #
 # :math:`\begin{pmatrix} x(t) \\ y(t) \\ z(t) \end{pmatrix} \rightarrow \begin{pmatrix} x(t-2) \\ x(t-1) \\ x(t) \\ x(t+1) \\ x(t+2) \\ y(t-2) \\ y(t-1) \\ y(t) \\ y(t+1) \\ y(t+2) \\ z(t-2) \\ z(t-1) \\ z(t) \\ z(t+1) \\ z(t+2) \end{pmatrix}`
 #
@@ -80,7 +80,7 @@ plt.colorbar()
 #%%
 # This covariance matrix is 15x15 because we have 15 channels. The blocks on the diagonal of the above matrix represents the covariance of a channel with a time-lagged version of itself - this quantity is known as the **auto**-correlation function. Blocks on the off-diagonal represent the covariance of a channel with a time-lagged version of **another** channel - this quantity is known as the **cross**-correlation function.
 #
-# We can extract an estimate of the auto/cross-correlation function (A/CCF) by taking values from this covariance matrix. osl-dynamics has a function we can use for this: `analysis.post_hoc.autocorr_from_tde_cov <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/post_hoc/index.html#osl_dynamics.analysis.post_hoc.autocorr_from_tde_cov>`_. This function will extract both ACFs and CCFs from a TDE covariance matrix.
+# We can extract an estimate of the auto/cross-correlation function (A/CCF) by taking values from this covariance matrix. osl-dynamics has a function we can use for this: :func:`osl_dynamics.analysis.post_hoc.autocorr_from_tde_cov`. This function will extract both ACFs and CCFs from a TDE covariance matrix.
 
 from osl_dynamics.analysis import post_hoc, spectral
 
@@ -100,7 +100,7 @@ plt.tight_layout()
 #%%
 # The diagonal of `acf` represents the ACF, e.g. `acf[0,0]` is the ACF for for channel 1 (indexed by 0). The off-diagonal of `acf` represent the CCF, e.g. `acf[0,1]` is the CCF for channel 1 and 2.
 #
-# The ACF and power spectral density (PSD) form a Fourier pair. This means we can calculate an estimate of the PSD of each channel by Fourier transforming the ACF. Let's do this using the `analysis.spectral.autocorr_to_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.autocorr_to_spectra>`_ function in osl-dynamics. Note, this function will also calculate cross PSD using the CCFs.
+# The ACF and power spectral density (PSD) form a Fourier pair. This means we can calculate an estimate of the PSD of each channel by Fourier transforming the ACF. Let's do this using the :func:`osl_dynamics.analysis.spectral.autocorr_to_spectra` function in osl-dynamics. Note, this function will also calculate cross PSD using the CCFs.
 
 # Calculate PSD by Fourier transforming the ACF
 f, psd, _ = spectral.autocorr_to_spectra(acf, sampling_frequency=200)
@@ -117,7 +117,7 @@ plt.legend()
 #%%
 # We can see the 20 Hz peak in the channel 2, which corresponds well to what we simulated. We also see a smaller 20 Hz peak for channel 3. However, we aren't able to resolve the 10 Hz peak we simulated for channel 1. This was because we didn't use enough lags to resolve the 10 Hz peak.
 #
-# Note, we can see some ringing, this is due to padding the ACF with zeros (to obtain an integer multiple of 2) before calculating the Fourier transform, we can change the padding via the `nfft` argument to `analysis.spectral.autocorr_to_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.autocorr_to_spectra>`_.
+# Note, we can see some ringing, this is due to padding the ACF with zeros (to obtain an integer multiple of 2) before calculating the Fourier transform, we can change the padding via the `nfft` argument to :func:`osl_dynamics.analysis.spectral.autocorr_to_spectra`.
 #
 # Let's try again with more lags - this will mean we evaluate the ACF for a greater window of time lags, this will result in a higher resolution PSD.
 
@@ -299,7 +299,7 @@ print("Contents of example_loading_data:")
 os.listdir("example_loading_data")
 
 #%%
-# Let's load the data in numpy format. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+# Let's load the data in numpy format. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
 
 from osl_dynamics.data import Data
 

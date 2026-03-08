@@ -1,13 +1,14 @@
 """GLM Permutations base class."""
 
 import logging
+from typing import Dict, Optional
 
 import numpy as np
 from scipy import stats
 from pqdm.processes import pqdm
 from tqdm.auto import trange
 
-from osl_dynamics.glm.base import GLM
+from osl_dynamics.glm.base import Design, GLM
 from osl_dynamics.glm.ols import osl_fit
 
 _logger = logging.getLogger("osl-dynamics")
@@ -31,7 +32,14 @@ class Permutation:
         Number of jobs to run in parallel.
     """
 
-    def __init__(self, design, contrast_indx, n_perm, perm_type=None, n_jobs=1):
+    def __init__(
+        self,
+        design: Design,
+        contrast_indx: int,
+        n_perm: int,
+        perm_type: Optional[str] = None,
+        n_jobs: int = 1,
+    ) -> None:
         self.glm = GLM(design)
         self.contrast_indx = contrast_indx
         self.c = self.glm.c[self.contrast_indx][None, :]
@@ -39,7 +47,7 @@ class Permutation:
         self.n_jobs = n_jobs
         self.perm_type = self._validate_perm_type(perm_type)
 
-    def permute_X(self):
+    def permute_X(self) -> np.ndarray:
         """Permute the design matrix based on the perm_type.
 
         Returns
@@ -60,7 +68,7 @@ class Permutation:
 
         return X_copy
 
-    def fit(self, y):
+    def fit(self, y: np.ndarray) -> None:
         """Fit the GLM with unpermuted data and run permutations.
 
         Parameters
@@ -119,11 +127,11 @@ class Permutation:
         self.null_copes = np.reshape(null_copes, (self.n_perm, *self.glm.target_dims))
         self.null_tstats = np.reshape(null_tstats, (self.n_perm, *self.glm.target_dims))
 
-    def _get_permute_feature_indx(self):
+    def _get_permute_feature_indx(self) -> np.ndarray:
         """Get the indices of the features to permute."""
         return np.where(self.glm.c[self.contrast_indx] != 0.0)[0]
 
-    def _validate_perm_type(self, perm_type):
+    def _validate_perm_type(self, perm_type: Optional[str]) -> str:
         if perm_type is not None:
             if perm_type not in ["sign_flip", "row_shuffle"]:
                 raise ValueError(
@@ -153,16 +161,16 @@ class Permutation:
         return "row_shuffle"
 
     @property
-    def copes(self):
+    def copes(self) -> np.ndarray:
         """Contrast Of Parameter Estimates."""
         return self.glm.copes[self.contrast_indx]
 
     @property
-    def tstats(self):
+    def tstats(self) -> np.ndarray:
         """T-stats of the contrast of interest."""
         return self.glm.tstats[self.contrast_indx]
 
-    def summary(self):
+    def summary(self) -> Dict:
         """Print summary of the permutation test."""
         sum = self.glm.summary()
         sum["n_perm"] = self.n_perm
@@ -191,7 +199,7 @@ class MaxStatPermutation(Permutation):
         Number of jobs to run in parallel.
     """
 
-    def fit(self, y):
+    def fit(self, y: np.ndarray) -> None:
         """Fit the GLM with unpermuted data and run permutations.
 
         Parameters
@@ -204,7 +212,7 @@ class MaxStatPermutation(Permutation):
         self.null_max_copes = np.nanmax(np.abs(self.null_copes), axis=pool_axis)
         self.null_max_tstats = np.nanmax(np.abs(self.null_tstats), axis=pool_axis)
 
-    def get_pvalues(self, metric="copes"):
+    def get_pvalues(self, metric: str = "copes") -> np.ndarray:
         """Get p-values.
 
         Parameters

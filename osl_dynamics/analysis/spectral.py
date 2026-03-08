@@ -1,6 +1,7 @@
 """Functions to perform spectral analysis."""
 
 import logging
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from scipy import signal
@@ -17,14 +18,14 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def wavelet(
-    data,
-    sampling_frequency,
-    w=5,
-    standardize=True,
-    time_range=None,
-    frequency_range=None,
-    df=0.5,
-):
+    data: np.ndarray,
+    sampling_frequency: float,
+    w: float = 5,
+    standardize: bool = True,
+    time_range: Optional[List] = None,
+    frequency_range: Optional[List] = None,
+    df: float = 0.5,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate a wavelet transform.
 
     This function uses a Morlet2 window to calculate a wavelet transform.
@@ -118,19 +119,19 @@ def wavelet(
 
 
 def welch_spectra(
-    data,
-    sampling_frequency,
-    alpha=None,
-    window_length=None,
-    step_size=None,
-    frequency_range=None,
-    standardize=True,
-    averaging="mean",
-    calc_cpsd=False,
-    calc_coh=True,
-    return_weights=False,
-    keepdims=False,
-    n_jobs=1,
+    data: Union[np.ndarray, list],
+    sampling_frequency: float,
+    alpha: Optional[Union[np.ndarray, list]] = None,
+    window_length: Optional[int] = None,
+    step_size: Optional[int] = None,
+    frequency_range: Optional[List] = None,
+    standardize: bool = True,
+    averaging: str = "mean",
+    calc_cpsd: bool = False,
+    calc_coh: bool = True,
+    return_weights: bool = False,
+    keepdims: bool = False,
+    n_jobs: int = 1,
 ):
     """Calculates spectra for inferred states using Welch's method.
 
@@ -320,21 +321,21 @@ def welch_spectra(
 
 
 def multitaper_spectra(
-    data,
-    sampling_frequency,
-    alpha=None,
-    window_length=None,
-    step_size=None,
-    time_half_bandwidth=4,
-    n_tapers=7,
-    frequency_range=None,
-    standardize=True,
-    averaging="mean",
-    calc_cpsd=False,
-    calc_coh=True,
-    return_weights=False,
-    keepdims=False,
-    n_jobs=1,
+    data: Union[np.ndarray, list],
+    sampling_frequency: float,
+    alpha: Optional[Union[np.ndarray, list]] = None,
+    window_length: Optional[int] = None,
+    step_size: Optional[int] = None,
+    time_half_bandwidth: float = 4,
+    n_tapers: int = 7,
+    frequency_range: Optional[List] = None,
+    standardize: bool = True,
+    averaging: str = "mean",
+    calc_cpsd: bool = False,
+    calc_coh: bool = True,
+    return_weights: bool = False,
+    keepdims: bool = False,
+    n_jobs: int = 1,
 ):
     """Calculates spectra for inferred states using a multitaper.
 
@@ -531,25 +532,24 @@ def multitaper_spectra(
 
 
 def regression_spectra(
-    data,
-    alpha,
-    sampling_frequency,
-    window_length,
-    step_size,
-    n_sub_windows=1,
-    frequency_range=None,
-    standardize=True,
-    calc_coh=True,
-    return_weights=False,
-    return_coef_int=False,
-    keepdims=False,
-    n_jobs=1,
+    data: Union[np.ndarray, list],
+    alpha: Union[np.ndarray, list],
+    sampling_frequency: float,
+    window_length: int,
+    step_size: int,
+    n_sub_windows: int = 1,
+    frequency_range: Optional[List] = None,
+    standardize: bool = True,
+    calc_coh: bool = True,
+    return_weights: bool = False,
+    return_coef_int: bool = False,
+    keepdims: bool = False,
+    n_jobs: int = 1,
 ):
     """Calculates mode-specific spectra by regressing a spectrogram with alpha.
 
-    We use `_welch_spectrogram <https://osl-dynamics.readthedocs.io/en\
-    /latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics\
-    .analysis.spectral._welch_spectrogram>`_ to calculate the spectrogram.
+    We use :func:`osl_dynamics.analysis.spectral._welch_spectrogram`
+    to calculate the spectrogram.
 
     Parameters
     ----------
@@ -774,12 +774,12 @@ def regression_spectra(
 
 
 def rescale_regression_coefs(
-    psd,
-    alpha,
-    window_length,
-    step_size,
-    n_sub_windows=1,
-):
+    psd: np.ndarray,
+    alpha: Union[np.ndarray, list],
+    window_length: int,
+    step_size: int,
+    n_sub_windows: int = 1,
+) -> np.ndarray:
     """Rescales regression coefficients with maximum regressor values.
 
     Parameters
@@ -856,7 +856,7 @@ def rescale_regression_coefs(
     return psd
 
 
-def coherence_spectra(cpsd, keepdims=False):
+def coherence_spectra(cpsd: np.ndarray, keepdims: bool = False) -> np.ndarray:
     r"""Calculate coherence from cross power spectral densities.
 
     We calculate the coherence as:
@@ -900,7 +900,7 @@ def coherence_spectra(cpsd, keepdims=False):
     return coh
 
 
-def partial_coherence_spectra(cpsd, keepdims=False):
+def partial_coherence_spectra(cpsd: np.ndarray, keepdims: bool = False) -> np.ndarray:
     r"""Calculate partial coherence from cross power spectral densities.
 
     We calculate the partial coherence as:
@@ -939,13 +939,13 @@ def partial_coherence_spectra(cpsd, keepdims=False):
 
 
 def partial_directed_coherence_spectra(
-    f,
-    cpsd,
-    sampling_frequency,
-    n_iterations=50,
-    tol=1e-7,
-    keepdims=False,
-):
+    f: np.ndarray,
+    cpsd: np.ndarray,
+    sampling_frequency: float,
+    n_iterations: int = 50,
+    tol: float = 1e-7,
+    keepdims: bool = False,
+) -> np.ndarray:
     r"""Calculate partial directed coherence from cross power spectra.
 
     We calculate the partial directed coherence as:
@@ -1067,12 +1067,12 @@ def partial_directed_coherence_spectra(
 
 
 def decompose_spectra(
-    coherences,
-    n_components,
-    max_iter=50000,
-    random_state=None,
-    verbose=0,
-):
+    coherences: np.ndarray,
+    n_components: int,
+    max_iter: int = 50000,
+    random_state: Optional[int] = None,
+    verbose: int = 0,
+) -> np.ndarray:
     """Uses non-negative matrix factorization to decompose spectra.
 
     Parameters
@@ -1141,7 +1141,9 @@ def decompose_spectra(
     return components
 
 
-def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
+def mar_spectra(
+    coeffs: np.ndarray, covs: np.ndarray, sampling_frequency: float, n_freq: int = 512
+) -> Tuple[np.ndarray, np.ndarray]:
     """Calculates cross power spectral densities from MAR model parameters.
 
     Parameters
@@ -1221,11 +1223,11 @@ def mar_spectra(coeffs, covs, sampling_frequency, n_freq=512):
 
 
 def autocorr_to_spectra(
-    autocorr_func,
-    sampling_frequency,
-    nfft=64,
-    frequency_range=None,
-):
+    autocorr_func: np.ndarray,
+    sampling_frequency: float,
+    nfft: int = 64,
+    frequency_range: Optional[List] = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculates spectra from the autocorrelation function.
 
     The power spectrum of each mode is calculated as the Fourier transform of
@@ -1300,7 +1302,9 @@ def autocorr_to_spectra(
     return f, np.squeeze(psd), np.squeeze(coh)
 
 
-def get_frequency_args_range(frequencies, frequency_range):
+def get_frequency_args_range(
+    frequencies: np.ndarray, frequency_range: List
+) -> List[int]:
     """Get min/max indices of a range in a frequency axis.
 
     Parameters
@@ -1323,14 +1327,14 @@ def get_frequency_args_range(frequencies, frequency_range):
 
 
 def _welch_spectrogram(
-    data,
-    sampling_frequency,
-    window_length=None,
-    step_size=None,
-    frequency_range=None,
-    calc_cpsd=True,
-    n_sub_windows=1,
-):
+    data: np.ndarray,
+    sampling_frequency: float,
+    window_length: Optional[int] = None,
+    step_size: Optional[int] = None,
+    frequency_range: Optional[List] = None,
+    calc_cpsd: bool = True,
+    n_sub_windows: int = 1,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculates a spectogram (time-varying power spectral density)
     using Welch's method.
 
@@ -1496,24 +1500,23 @@ def _welch_spectrogram(
 
 
 def _welch(
-    data,
-    sampling_frequency,
-    alpha=None,
-    window_length=None,
-    step_size=None,
-    frequency_range=None,
-    standardize=True,
-    averaging="mean",
-    calc_cpsd=False,
-    calc_coh=False,
-    keepdims=False,
+    data: np.ndarray,
+    sampling_frequency: float,
+    alpha: Optional[np.ndarray] = None,
+    window_length: Optional[int] = None,
+    step_size: Optional[int] = None,
+    frequency_range: Optional[List] = None,
+    standardize: bool = True,
+    averaging: str = "mean",
+    calc_cpsd: bool = False,
+    calc_coh: bool = False,
+    keepdims: bool = False,
 ):
     """Calculate a (cross) power spectrum using Welch's method.
 
     This function first calculates a spectrogram using
-    `_welch_spectrogram <https://osl-dynamics.readthedocs.io/en/latest\
-    /autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis\
-    .spectral._welch_spectrogram>`_ then takes the time average.
+    :func:`osl_dynamics.analysis.spectral._welch_spectrogram`
+    then takes the time average.
 
     The scaling for the power spectra calculated by this function
     matches SciPy (:code:`scipy.signal.welch`).
@@ -1655,16 +1658,16 @@ def _welch(
 
 
 def _multitaper_spectrogram(
-    data,
-    sampling_frequency,
-    window_length=None,
-    step_size=None,
-    frequency_range=None,
-    calc_cpsd=True,
-    n_sub_windows=1,
-    time_half_bandwidth=4,
-    n_tapers=7,
-):
+    data: np.ndarray,
+    sampling_frequency: float,
+    window_length: Optional[int] = None,
+    step_size: Optional[int] = None,
+    frequency_range: Optional[List] = None,
+    calc_cpsd: bool = True,
+    n_sub_windows: int = 1,
+    time_half_bandwidth: float = 4,
+    n_tapers: int = 7,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculates a spectogram (time-varying power spectral density) using a multitaper.
 
     Steps:
@@ -1841,26 +1844,25 @@ def _multitaper_spectrogram(
 
 
 def _multitaper(
-    data,
-    sampling_frequency,
-    alpha=None,
-    window_length=None,
-    step_size=None,
-    time_half_bandwidth=4,
-    n_tapers=7,
-    frequency_range=None,
-    standardize=True,
-    averaging="mean",
-    calc_cpsd=False,
-    calc_coh=True,
-    keepdims=False,
+    data: np.ndarray,
+    sampling_frequency: float,
+    alpha: Optional[np.ndarray] = None,
+    window_length: Optional[int] = None,
+    step_size: Optional[int] = None,
+    time_half_bandwidth: float = 4,
+    n_tapers: int = 7,
+    frequency_range: Optional[List] = None,
+    standardize: bool = True,
+    averaging: str = "mean",
+    calc_cpsd: bool = False,
+    calc_coh: bool = True,
+    keepdims: bool = False,
 ):
     """Calculate a multitaper.
 
     This function first calculates a spectrogram using
-    `_multitaper_spectrogram <https://osl-dynamics.readthedocs.io/en/latest\
-    /autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis\
-    .spectral._multitaper_spectrogram>`_ then takes the time average.
+    :func:`osl_dynamics.analysis.spectral._multitaper_spectrogram`
+    then takes the time average.
 
     Parameters
     ----------
@@ -2005,15 +2007,15 @@ def _multitaper(
 
 
 def _regress_welch_spectrogram(
-    data,
-    alpha,
-    sampling_frequency,
-    window_length,
-    step_size,
-    n_sub_windows,
-    frequency_range,
-    calc_cpsd,
-):
+    data: np.ndarray,
+    alpha: np.ndarray,
+    sampling_frequency: float,
+    window_length: int,
+    step_size: int,
+    n_sub_windows: int,
+    frequency_range: List,
+    calc_cpsd: bool,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate regression spectra for a single array.
 
     Parameters
@@ -2071,7 +2073,13 @@ def _regress_welch_spectrogram(
     return f, coefs, intercept
 
 
-def _window_mean(alpha, window, window_length, step_size, n_sub_windows):
+def _window_mean(
+    alpha: np.ndarray,
+    window: str,
+    window_length: int,
+    step_size: int,
+    n_sub_windows: int,
+) -> np.ndarray:
     """Applies a windowing function to a time series and takes the mean.
 
     Parameters

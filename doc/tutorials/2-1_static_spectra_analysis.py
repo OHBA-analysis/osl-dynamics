@@ -36,7 +36,7 @@ get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
 #%%
 # Load the data
 # *************
-# We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+# We now load the data into osl-dynamics using the Data class. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
 
 from osl_dynamics.data import Data
 
@@ -57,7 +57,7 @@ ts = data.time_series()
 #
 # Calculate power spectra
 # ***********************
-# Using the data we just loaded, we want to calculate the power spectra for each channel (ROI) for each subject. We will use the `osl-dynamics.analysis.static.welch_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/static/index.html#osl_dynamics.analysis.static.welch_spectra>`_ function to do this. This function implements Welch's methods for calculating power spectra.
+# Using the data we just loaded, we want to calculate the power spectra for each channel (ROI) for each subject. We will use the :func:`osl_dynamics.analysis.static.welch_spectra` function to do this. This function implements Welch's methods for calculating power spectra.
 #
 # To use this function we need to specify at least two arguments:
 #
@@ -105,7 +105,7 @@ print(psd.shape)
 #%%
 # We can see `f` is a 1D numpy array of length 256. This is the frequency axis of the power spectra. We can see `psd` is a subjects by channels (ROIs) by frequency array. E.g. `psd[0]` is a `(38, 256)` shaped array containing the power spectra for each of the 38 ROIs.
 #
-# Let's plot the power spectrum for each ROI for the first subject. We will use the `osl_dynamics.utils.plotting <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html>`_ module to do the basic plotting. See the Plotting tutorial for further info.
+# Let's plot the power spectrum for each ROI for the first subject. We will use the :mod:`osl_dynamics.utils.plotting` module to do the basic plotting. See the Plotting tutorial for further info.
 
 from osl_dynamics.utils import plotting
 
@@ -128,7 +128,7 @@ fig, ax = plotting.plot_line(
 )
 
 #%%
-# Note, if you wanted to save this as an image you could pass a `filename="<filename>.png"` argument to this function. All functions in `osl_dynamics.utils.plotting <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html>`_ have this argument.
+# Note, if you wanted to save this as an image you could pass a `filename="<filename>.png"` argument to this function. All functions in :mod:`osl_dynamics.utils.plotting` have this argument.
 #
 # Rather than plotting the power spectrum for each ROI, let's average over channels to give a single line for each subject.
 

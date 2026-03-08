@@ -3,6 +3,7 @@
 import os
 import logging
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from nilearn import plotting
@@ -21,13 +22,13 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def sliding_window_connectivity(
-    data,
-    window_length,
-    step_size=None,
-    conn_type="corr",
-    concatenate=False,
-    n_jobs=1,
-):
+    data: Union[List[np.ndarray], np.ndarray],
+    window_length: int,
+    step_size: Optional[int] = None,
+    conn_type: str = "corr",
+    concatenate: bool = False,
+    n_jobs: int = 1,
+) -> Union[List[np.ndarray], np.ndarray]:
     """Calculate sliding window connectivity.
 
     Parameters
@@ -116,11 +117,11 @@ def sliding_window_connectivity(
 
 
 def covariance_from_spectra(
-    f,
-    cpsd,
-    components=None,
-    frequency_range=None,
-):
+    f: np.ndarray,
+    cpsd: np.ndarray,
+    components: Optional[np.ndarray] = None,
+    frequency_range: Optional[List[float]] = None,
+) -> np.ndarray:
     """Calculates covariance from cross power spectra.
 
     Parameters
@@ -208,11 +209,11 @@ def covariance_from_spectra(
 
 
 def mean_coherence_from_spectra(
-    f,
-    coh,
-    components=None,
-    frequency_range=None,
-):
+    f: np.ndarray,
+    coh: np.ndarray,
+    components: Optional[np.ndarray] = None,
+    frequency_range: Optional[List[float]] = None,
+) -> np.ndarray:
     """Calculates mean coherence from spectra.
 
     Parameters
@@ -292,7 +293,7 @@ def mean_coherence_from_spectra(
     return np.squeeze(mean_coh)
 
 
-def mean_connections(conn_map):
+def mean_connections(conn_map: np.ndarray) -> np.ndarray:
     """Average the edges for each node.
 
     Parameters
@@ -309,11 +310,11 @@ def mean_connections(conn_map):
 
 
 def eigenvectors(
-    conn_map,
-    n_eigenvectors=1,
-    absolute_value=False,
-    as_network=False,
-):
+    conn_map: np.ndarray,
+    n_eigenvectors: int = 1,
+    absolute_value: bool = False,
+    as_network: bool = False,
+) -> np.ndarray:
     """Calculate eigenvectors of a connectivity matrix.
 
     Parameters
@@ -360,27 +361,25 @@ def eigenvectors(
 
 
 def gmm_threshold(
-    conn_map,
-    subtract_mean=False,
-    mean_weights=None,
-    standardize=False,
-    p_value=None,
-    keep_positive_only=False,
-    one_component_percentile=0,
-    n_sigma=0,
-    sklearn_kwargs=None,
-    show=False,
-    filename=None,
-    plot_kwargs=None,
-):
+    conn_map: np.ndarray,
+    subtract_mean: bool = False,
+    mean_weights: Optional[np.ndarray] = None,
+    standardize: bool = False,
+    p_value: Optional[float] = None,
+    keep_positive_only: bool = False,
+    one_component_percentile: float = 0,
+    n_sigma: float = 0,
+    sklearn_kwargs: Optional[Dict] = None,
+    show: bool = False,
+    filename: Optional[str] = None,
+    plot_kwargs: Optional[Dict] = None,
+) -> np.ndarray:
     """Threshold a connectivity matrix using the GMM method.
 
-    Wrapper for combining `connectivity.fit_gmm <https://osl-dynamics\
-    .readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity\
-    /index.html#osl_dynamics.analysis.connectivity.fit_gmm>`_ and
-    `connectivity.threshold <https://osl-dynamics.readthedocs.io/en/latest\
-    /autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics\
-    .analysis.connectivity.threshold>`_.
+    Wrapper for combining
+    :func:`connectivity.fit_gmm <osl_dynamics.analysis.connectivity.fit_gmm>`
+    and
+    :func:`connectivity.threshold <osl_dynamics.analysis.connectivity.threshold>`.
 
     Parameters
     ----------
@@ -418,9 +417,8 @@ def gmm_threshold(
     filename : str, optional
         Filename to save fit to.
     plot_kwargs : dict, optional
-        Dictionary of keyword arguments to pass to `utils.plotting.plot_gmm
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
+        Dictionary of keyword arguments to pass to
+        :func:`utils.plotting.plot_gmm <osl_dynamics.utils.plotting.plot_gmm>`.
 
     Returns
     -------
@@ -447,19 +445,19 @@ def gmm_threshold(
 
 
 def fit_gmm(
-    conn_map,
-    subtract_mean=False,
-    mean_weights=None,
-    standardize=False,
-    p_value=None,
-    keep_positive_only=False,
-    one_component_percentile=0,
-    n_sigma=0,
-    sklearn_kwargs=None,
-    show=False,
-    filename=None,
-    plot_kwargs=None,
-):
+    conn_map: np.ndarray,
+    subtract_mean: bool = False,
+    mean_weights: Optional[np.ndarray] = None,
+    standardize: bool = False,
+    p_value: Optional[float] = None,
+    keep_positive_only: bool = False,
+    one_component_percentile: float = 0,
+    n_sigma: float = 0,
+    sklearn_kwargs: Optional[Dict] = None,
+    show: bool = False,
+    filename: Optional[str] = None,
+    plot_kwargs: Optional[Dict] = None,
+) -> np.ndarray:
     """Fit a two component GMM to connections to identify a threshold.
 
     Parameters
@@ -499,9 +497,8 @@ def fit_gmm(
     filename : str, optional
         Filename to save fit to.
     plot_kwargs : dict, optional
-        Dictionary of keyword arguments to pass to `utils.plotting.plot_gmm
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_.
+        Dictionary of keyword arguments to pass to
+        :func:`utils.plotting.plot_gmm <osl_dynamics.utils.plotting.plot_gmm>`.
 
     Returns
     -------
@@ -588,13 +585,13 @@ def fit_gmm(
 
 
 def threshold(
-    conn_map,
-    percentile,
-    subtract_mean=False,
-    mean_weights=None,
-    absolute_value=False,
-    return_edges=False,
-):
+    conn_map: np.ndarray,
+    percentile: Union[float, np.ndarray],
+    subtract_mean: bool = False,
+    mean_weights: Optional[np.ndarray] = None,
+    absolute_value: bool = False,
+    return_edges: bool = False,
+) -> np.ndarray:
     """Return edges that exceed a threshold.
 
     Parameters
@@ -707,7 +704,7 @@ def threshold(
     return np.squeeze(conn_map)
 
 
-def separate_edges(conn_map):
+def separate_edges(conn_map: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Separate positive and negative edges in a connectivity map.
 
     Parameters
@@ -731,7 +728,7 @@ def separate_edges(conn_map):
     return pos_conn_map, neg_conn_map
 
 
-def spectral_reordering(corr_mat):
+def spectral_reordering(corr_mat: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Spectral re-ordering for correlation matrices.
 
     Parameters
@@ -777,17 +774,17 @@ def spectral_reordering(corr_mat):
 
 
 def save(
-    connectivity_map,
-    parcellation_file,
-    filename=None,
-    component=None,
-    threshold=0,
-    plot_kwargs=None,
-    axes=None,
-    combined=False,
-    titles=None,
-    n_rows=1,
-):
+    connectivity_map: np.ndarray,
+    parcellation_file: str,
+    filename: Optional[str] = None,
+    component: Optional[int] = None,
+    threshold: Union[float, np.ndarray] = 0,
+    plot_kwargs: Optional[Dict] = None,
+    axes: Optional[List] = None,
+    combined: bool = False,
+    titles: Optional[List[str]] = None,
+    n_rows: int = 1,
+) -> None:
     """Save connectivity maps as image files.
 
     This function is a wrapper for `nilearn.plotting.plot_connectome \
@@ -931,12 +928,12 @@ def save(
 
 
 def save_interactive(
-    connectivity_map,
-    parcellation_file,
-    filename=None,
-    component=None,
-    threshold=0,
-    plot_kwargs=None,
+    connectivity_map: np.ndarray,
+    parcellation_file: str,
+    filename: Optional[str] = None,
+    component: Optional[int] = None,
+    threshold: Union[float, np.ndarray] = 0,
+    plot_kwargs: Optional[Dict] = None,
 ):
     """Save connectivity maps as interactive HTML plots.
 

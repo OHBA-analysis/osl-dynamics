@@ -9,6 +9,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from io import StringIO
 from contextlib import contextmanager
+from typing import Dict, Generator, List, Optional, Tuple, Union
 from packaging import version
 
 import yaml
@@ -67,7 +68,7 @@ class BaseModelConfig:
     n_channels: int = None
     sequence_length: int = None
 
-    def validate_training_parameters(self):
+    def validate_training_parameters(self) -> None:
         if self.batch_size is None:
             raise ValueError("batch_size must be passed.")
         elif self.batch_size < 1:
@@ -95,7 +96,7 @@ class BaseModelConfig:
         elif self.strategy is None:
             self.strategy = get_strategy()
 
-    def validate_dimension_parameters(self):
+    def validate_dimension_parameters(self) -> None:
         if self.n_modes is None and self.n_states is None:
             raise ValueError("Either n_modes or n_states must be passed.")
 
@@ -127,7 +128,7 @@ class ModelBase:
     osld_version = None
     config_type = None
 
-    def __init__(self, config):
+    def __init__(self, config: BaseModelConfig) -> None:
         self._identifier = np.random.randint(100000)
         self.config = config
 
@@ -138,15 +139,19 @@ class ModelBase:
             self.compile()
 
     # Allow access to the keras model attributes
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         return getattr(self.model, attr)
 
     @abstractmethod
-    def build_model(self):
+    def build_model(self) -> None:
         """Build a keras model."""
         pass
 
-    def compile(self, optimizer=None, **kwargs):
+    def compile(
+        self,
+        optimizer: Optional[Union[str, tf.keras.optimizers.Optimizer]] = None,
+        **kwargs,
+    ) -> None:
         """Compile the model.
 
         Parameters
@@ -173,7 +178,7 @@ class ModelBase:
         # Add losses to metrics to print during training
         self.add_metrics_for_loss()
 
-    def add_metrics_for_loss(self):
+    def add_metrics_for_loss(self) -> None:
         """Add a metric for each model output loss."""
 
         # Create metric for each model output that is a loss
@@ -199,7 +204,9 @@ class ModelBase:
         # Override the original Keras method
         self.model.compute_metrics = compute_metrics
 
-    def initialization(self, *args, method=None, **kwargs):
+    def initialization(
+        self, *args, method: Optional[str] = None, **kwargs
+    ) -> Optional[dict]:
         """Wrapper for an initialization method.
 
         Parameters
@@ -233,13 +240,13 @@ class ModelBase:
     def fit(
         self,
         *args,
-        use_tqdm=False,
+        use_tqdm: bool = False,
         tqdm_class=None,
-        save_best_after=None,
-        checkpoint_freq=None,
-        save_filepath=None,
+        save_best_after: Optional[int] = None,
+        checkpoint_freq: Optional[int] = None,
+        save_filepath: Optional[str] = None,
         **kwargs,
-    ):
+    ) -> dict:
         """Wrapper for the standard keras fit method.
 
         Adds callbacks and then trains the model.
@@ -358,7 +365,13 @@ class ModelBase:
 
         return history
 
-    def train(self, *args, best_of=None, save_dir=None, **kwargs):
+    def train(
+        self,
+        *args,
+        best_of: Optional[int] = None,
+        save_dir: Optional[str] = None,
+        **kwargs,
+    ) -> None:
         """Wrapper for initializing and fitting the model.
 
         Parameters
@@ -416,7 +429,7 @@ class ModelBase:
         self.reset()
         self.set_weights(best_weights)
 
-    def load_weights(self, filepath):
+    def load_weights(self, filepath: str) -> None:
         """Load weights of the model from a file.
 
         Parameters
@@ -431,11 +444,11 @@ class ModelBase:
                 )
                 self.model.load_weights(filepath)
 
-    def reset_weights(self, keep=None):
+    def reset_weights(self, keep: Optional[List[str]] = None) -> None:
         """Resets trainable variables in the model to their initial value."""
         initializers.reinitialize_model_weights(self.model, keep=keep)
 
-    def reset(self):
+    def reset(self) -> None:
         """Reset the model as if you've built a new model."""
         with self.config.strategy.scope():
             self.reset_weights()
@@ -443,12 +456,12 @@ class ModelBase:
 
     def make_dataset(
         self,
-        inputs,
-        shuffle=False,
-        concatenate=False,
-        step_size=None,
-        drop_last_batch=False,
-    ):
+        inputs: Union["data.Data", str, np.ndarray, Dataset],
+        shuffle: bool = False,
+        concatenate: bool = False,
+        step_size: Optional[int] = None,
+        drop_last_batch: bool = False,
+    ) -> Union[Dataset, List[Dataset]]:
         """Converts a Data object into a TensorFlow Dataset.
 
         Parameters
@@ -521,10 +534,10 @@ class ModelBase:
 
     def get_training_time_series(
         self,
-        training_data,
-        prepared=True,
-        concatenate=False,
-    ):
+        training_data: "data.Data",
+        prepared: bool = True,
+        concatenate: bool = False,
+    ) -> Union[np.ndarray, list]:
         """Get the time series used for training from a Data object.
 
         Parameters
@@ -547,7 +560,7 @@ class ModelBase:
             concatenate=concatenate,
         )
 
-    def get_static_loss_scaling_factor(self, n_sequences):
+    def get_static_loss_scaling_factor(self, n_sequences: int) -> float:
         """Get scaling factor for static losses.
 
         When calculating loss, we want to approximate the effect of the
@@ -570,7 +583,7 @@ class ModelBase:
             scale_factor /= self.config.sequence_length
         return scale_factor
 
-    def summary_string(self):
+    def summary_string(self) -> str:
         """Return a summary of the model as a string.
 
         This is a modified version of the :code:`keras.Model.summary()` method
@@ -580,7 +593,7 @@ class ModelBase:
         self.model.summary(print_fn=lambda s: stringio.write(s + "\n"))
         return stringio.getvalue()
 
-    def summary_table(self, renderer):
+    def summary_table(self, renderer: str) -> str:
         """Return a summary of the model as a table (HTML or LaTeX).
 
         Parameters
@@ -619,15 +632,15 @@ class ModelBase:
 
         return table.output()
 
-    def html_summary(self):
+    def html_summary(self) -> str:
         """Return a summary of the model as an HTML table."""
         return self.summary_table(renderer="html")
 
-    def latex_summary(self):
+    def latex_summary(self) -> str:
         """Return a summary of the model as a LaTeX table."""
         return self.summary_table(renderer="latex")
 
-    def _repr_html_(self):
+    def _repr_html_(self) -> str:
         """Display the model as an HTML table in Jupyter notebooks.
 
         This is called when you type the variable name of the model in a
@@ -635,7 +648,7 @@ class ModelBase:
         """
         return self.html_summary()
 
-    def save_config(self, dirname):
+    def save_config(self, dirname: str) -> None:
         """Saves config object as a .yml file.
 
         Parameters
@@ -654,7 +667,7 @@ class ModelBase:
             file.write(f"# osl-dynamics version: {osl_dynamics.__version__}\n")
             yaml.dump(config_dict, file)
 
-    def save(self, dirname):
+    def save(self, dirname: str) -> None:
         """Saves config object and weights of the model.
 
         This is a wrapper for :code:`self.save_config` and
@@ -670,7 +683,9 @@ class ModelBase:
         self.model.save_weights(f"{dirname}/model.weights.h5")
 
     @contextmanager
-    def set_trainable(self, layers, values):
+    def set_trainable(
+        self, layers: Union[str, List[str]], values: Union[bool, List[bool]]
+    ) -> Generator:
         """Context manager to temporarily set the :code:`trainable`
         attribute of layers.
 
@@ -721,7 +736,7 @@ class ModelBase:
             self.compile()
 
     @staticmethod
-    def load_config(dirname):
+    def load_config(dirname: str) -> Tuple[dict, str]:
         """Load a :code:`config` object from a :code:`.yml` file.
 
         Parameters
@@ -761,7 +776,9 @@ class ModelBase:
         return config_dict, version
 
     @classmethod
-    def load(cls, dirname, from_checkpoint=False, single_gpu=True):
+    def load(
+        cls, dirname: str, from_checkpoint: bool = False, single_gpu: bool = True
+    ) -> "ModelBase":
         """Load model from :code:`dirname`.
 
         Parameters
@@ -805,6 +822,6 @@ class ModelBase:
         return model
 
     @property
-    def is_multi_gpu(self):
+    def is_multi_gpu(self) -> bool:
         """Returns True if the model's strategy is MirroredStrategy."""
         return isinstance(self.config.strategy, MirroredStrategy)

@@ -1,13 +1,13 @@
 """Functions for running full pipelines via the config API.
 
-See the documentation `here <https://osl-dynamics.readthedocs.io/en/latest\
-/autoapi/osl_dynamics/config_api/index.html>`_ for example usage.
+See the documentation for :mod:`osl_dynamics.config_api` for example usage.
 """
 
 import argparse
 import logging
 import pprint
 from pathlib import Path
+from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 import yaml
@@ -18,7 +18,7 @@ from osl_dynamics.utils.misc import override_dict_defaults
 _logger = logging.getLogger("osl-dynamics")
 
 
-def load_config(config):
+def load_config(config: Union[str, dict]) -> dict:
     """Load config.
 
     Parameters
@@ -47,7 +47,9 @@ def load_config(config):
     return config
 
 
-def find_function(name, extra_funcs=None):
+def find_function(
+    name: str, extra_funcs: Optional[List[Callable]] = None
+) -> Optional[Callable]:
     """Find a function to execute via the config API.
 
     Parameters
@@ -82,7 +84,13 @@ def find_function(name, extra_funcs=None):
     return func
 
 
-def run_pipeline(config, output_dir, restrict=None, data=None, extra_funcs=None):
+def run_pipeline(
+    config: Union[str, dict],
+    output_dir: str,
+    restrict: Optional[Union[int, str]] = None,
+    data=None,
+    extra_funcs: Optional[List[Callable]] = None,
+) -> None:
     """Run a full pipeline.
 
     Parameters
@@ -142,7 +150,9 @@ def run_pipeline(config, output_dir, restrict=None, data=None, extra_funcs=None)
         data.delete_dir()
 
 
-def run_pipeline_from_file(config_file, output_directory, restrict=None):
+def run_pipeline_from_file(
+    config_file: str, output_directory: str, restrict: Optional[Union[int, str]] = None
+) -> None:
     """Run a pipeline from a config file.
 
     Parameters
@@ -166,7 +176,7 @@ def run_pipeline_from_file(config_file, output_directory, restrict=None):
     run_pipeline(config, output_directory)
 
 
-def osl_dynamics_cli():
+def osl_dynamics_cli() -> None:
     """Command line interface function for running a pipeline from a config file."""
 
     # Arguments

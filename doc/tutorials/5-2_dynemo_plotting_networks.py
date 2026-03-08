@@ -49,7 +49,7 @@ print(f.shape)
 print(psd.shape)
 
 #%%
-# We can see: `f` is the frequency axis and `psd` is a (subjects, 2, modes, channels, frequencies) array. The second axis in `psd` corresponds to the regression coefficients and intercept when we calculated the mode spectra using `analysis.spectral.regression_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.regression_spectra>`_. The intercept term corresponds to the time average (static) spectra and the regression coefficients describe the variation about the average. We're not interested in the static spectra, so we just want to retain the regression coefficients.
+# We can see: `f` is the frequency axis and `psd` is a (subjects, 2, modes, channels, frequencies) array. The second axis in `psd` corresponds to the regression coefficients and intercept when we calculated the mode spectra using :func:`analysis.spectral.regression_spectra <osl_dynamics.analysis.spectral.regression_spectra>`. The intercept term corresponds to the time average (static) spectra and the regression coefficients describe the variation about the average. We're not interested in the static spectra, so we just want to retain the regression coefficients.
 
 psd_coefs = psd[:, 0]
 print(psd_coefs.shape)

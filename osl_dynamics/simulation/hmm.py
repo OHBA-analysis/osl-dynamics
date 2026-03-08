@@ -1,6 +1,8 @@
 """Classes for simulating Hidden Markov Models (HMMs)."""
 
 import warnings
+from typing import List, Optional, Union
+
 import numpy as np
 
 from osl_dynamics.simulation.mar import MAR
@@ -32,10 +34,10 @@ class HMM:
 
     def __init__(
         self,
-        trans_prob,
-        stay_prob=None,
-        n_states=None,
-    ):
+        trans_prob: Union[np.ndarray, str, None],
+        stay_prob: Optional[float] = None,
+        n_states: Optional[int] = None,
+    ) -> None:
         if isinstance(trans_prob, list):
             trans_prob = np.ndarray(trans_prob)
 
@@ -108,7 +110,7 @@ class HMM:
         self.n_states = self.trans_prob.shape[0]
 
     @staticmethod
-    def construct_sequence_trans_prob(stay_prob, n_states):
+    def construct_sequence_trans_prob(stay_prob: float, n_states: int) -> np.ndarray:
         trans_prob = np.zeros([n_states, n_states])
         np.fill_diagonal(trans_prob, stay_prob)
         np.fill_diagonal(trans_prob[:, 1:], 1 - stay_prob)
@@ -116,13 +118,13 @@ class HMM:
         return trans_prob
 
     @staticmethod
-    def construct_uniform_trans_prob(stay_prob, n_states):
+    def construct_uniform_trans_prob(stay_prob: float, n_states: int) -> np.ndarray:
         single_trans_prob = (1 - stay_prob) / (n_states - 1)
         trans_prob = np.ones((n_states, n_states)) * single_trans_prob
         trans_prob[np.diag_indices(n_states)] = stay_prob
         return trans_prob
 
-    def generate_states(self, n_samples):
+    def generate_states(self, n_samples: int) -> np.ndarray:
         # Here the time course always start from state 0
         rands = [
             iter(np.random.choice(self.n_states, size=n_samples, p=self.trans_prob[i]))
@@ -149,10 +151,8 @@ class HMM_MAR(Simulation):
         Array of MAR coefficients. Shape must be (n_states, n_lags, n_channels,
         n_channels).
     covs : np.ndarray
-        Variance of :math:`\epsilon_t`. See `simulation.MAR \
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/\
-        simulation/mar/index.html#osl_dynamics.simulation.mar.MAR>`_ for further
-        details. Shape must be (n_states, n_channels).
+        Variance of :math:`\epsilon_t`. See :class:`osl_dynamics.simulation.mar.MAR`
+        for further details. Shape must be (n_states, n_channels).
     stay_prob : float, optional
         Used to generate the transition probability matrix is
         :code:`trans_prob` is a :code:`str`. Must be between 0 and 1.
@@ -160,12 +160,12 @@ class HMM_MAR(Simulation):
 
     def __init__(
         self,
-        n_samples,
-        trans_prob,
-        coeffs,
-        covs,
-        stay_prob=None,
-    ):
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str],
+        coeffs: np.ndarray,
+        covs: np.ndarray,
+        stay_prob: Optional[float] = None,
+    ) -> None:
         # Observation model
         self.obs_mod = MAR(coeffs=coeffs, covs=covs)
 
@@ -188,14 +188,14 @@ class HMM_MAR(Simulation):
         self.time_series = self.obs_mod.simulate_data(self.state_time_course)
 
     @property
-    def n_modes(self):
+    def n_modes(self) -> int:
         return self.n_states
 
     @property
-    def mode_time_course(self):
+    def mode_time_course(self) -> np.ndarray:
         return self.state_time_course
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hmm):
@@ -237,17 +237,17 @@ class HMM_MVN(Simulation):
 
     def __init__(
         self,
-        n_samples,
-        trans_prob,
-        means,
-        covariances,
-        n_states=None,
-        n_modes=None,
-        n_channels=None,
-        n_covariances_act=1,
-        stay_prob=None,
-        observation_error=0.0,
-    ):
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str],
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        n_states: Optional[int] = None,
+        n_modes: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        n_covariances_act: int = 1,
+        stay_prob: Optional[float] = None,
+        observation_error: float = 0.0,
+    ) -> None:
         if n_states is None:
             n_states = n_modes
 
@@ -280,14 +280,14 @@ class HMM_MVN(Simulation):
         self.time_series = self.obs_mod.simulate_data(self.state_time_course)
 
     @property
-    def n_modes(self):
+    def n_modes(self) -> int:
         return self.n_states
 
     @property
-    def mode_time_course(self):
+    def mode_time_course(self) -> np.ndarray:
         return self.state_time_course
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hmm):
@@ -295,7 +295,7 @@ class HMM_MVN(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
-    def get_instantaneous_covariances(self):
+    def get_instantaneous_covariances(self) -> np.ndarray:
         """Get the ground truth covariances at each time point.
 
         Returns
@@ -306,7 +306,7 @@ class HMM_MVN(Simulation):
         """
         return self.obs_mod.get_instantaneous_covariances(self.state_time_course)
 
-    def standardize(self):
+    def standardize(self) -> None:
         mu = np.mean(self.time_series, axis=0).astype(np.float64)
         sigma = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
@@ -351,17 +351,17 @@ class MDyn_HMM_MVN(Simulation):
 
     def __init__(
         self,
-        n_samples,
-        trans_prob,
-        means,
-        covariances,
-        n_states=None,
-        n_modes=None,
-        n_channels=None,
-        n_covariances_act=1,
-        stay_prob=None,
-        observation_error=0.0,
-    ):
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str],
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        n_states: Optional[int] = None,
+        n_modes: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        n_covariances_act: int = 1,
+        stay_prob: Optional[float] = None,
+        observation_error: float = 0.0,
+    ) -> None:
         if n_states is None:
             n_states = n_modes
 
@@ -404,20 +404,20 @@ class MDyn_HMM_MVN(Simulation):
         self.time_series = self.obs_mod.simulate_data(self.state_time_course)
 
     @property
-    def n_modes(self):
+    def n_modes(self) -> int:
         return self.n_states
 
     @property
-    def mode_time_course(self):
+    def mode_time_course(self) -> np.ndarray:
         return self.state_time_course
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
-    def get_instantaneous_covariances(self):
+    def get_instantaneous_covariances(self) -> np.ndarray:
         """Get the ground truth covariances at each time point.
 
         Returns
@@ -428,7 +428,7 @@ class MDyn_HMM_MVN(Simulation):
         """
         return self.obs_mod.get_instantaneous_covariances(self.state_time_course)
 
-    def standardize(self):
+    def standardize(self) -> None:
         mu = np.mean(self.time_series, axis=0).astype(np.float64)
         sigma = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
@@ -457,13 +457,13 @@ class HMM_Poi(Simulation):
 
     def __init__(
         self,
-        n_samples,
-        trans_prob,
-        rates,
-        n_states=None,
-        n_channels=None,
-        stay_prob=None,
-    ):
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str],
+        rates: np.ndarray,
+        n_states: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        stay_prob: Optional[float] = None,
+    ) -> None:
         # Observation model
         self.obs_mod = Poisson(
             rates=rates,
@@ -490,14 +490,14 @@ class HMM_Poi(Simulation):
         self.time_series = self.obs_mod.simulate_data(self.state_time_course)
 
     @property
-    def n_modes(self):
+    def n_modes(self) -> int:
         return self.n_states
 
     @property
-    def mode_time_course(self):
+    def mode_time_course(self) -> np.ndarray:
         return self.state_time_course
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hmm):
@@ -561,25 +561,25 @@ class MSess_HMM_MVN(Simulation):
 
     def __init__(
         self,
-        n_samples,
-        trans_prob,
-        session_means,
-        session_covariances,
-        n_states=None,
-        n_modes=None,
-        n_channels=None,
-        n_covariances_act=1,
-        embedding_vectors=None,
-        n_sessions=None,
-        embeddings_dim=None,
-        spatial_embeddings_dim=None,
-        embeddings_scale=None,
-        n_groups=None,
-        between_group_scale=None,
-        tc_std=0.0,
-        stay_prob=None,
-        observation_error=0.0,
-    ):
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str, None],
+        session_means: Union[np.ndarray, str],
+        session_covariances: Union[np.ndarray, str],
+        n_states: Optional[int] = None,
+        n_modes: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        n_covariances_act: int = 1,
+        embedding_vectors: Optional[np.ndarray] = None,
+        n_sessions: Optional[int] = None,
+        embeddings_dim: Optional[int] = None,
+        spatial_embeddings_dim: Optional[int] = None,
+        embeddings_scale: Optional[float] = None,
+        n_groups: Optional[int] = None,
+        between_group_scale: Optional[float] = None,
+        tc_std: float = 0.0,
+        stay_prob: Optional[float] = None,
+        observation_error: float = 0.0,
+    ) -> None:
         if n_states is None:
             n_states = n_modes
 
@@ -645,20 +645,20 @@ class MSess_HMM_MVN(Simulation):
         )
 
     @property
-    def n_modes(self):
+    def n_modes(self) -> int:
         return self.n_states
 
     @property
-    def mode_time_course(self):
+    def mode_time_course(self) -> np.ndarray:
         return self.state_time_course
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
-    def get_instantaneous_covariances(self):
+    def get_instantaneous_covariances(self) -> np.ndarray:
         """Get the ground truth covariances at each time point.
 
         Returns
@@ -669,7 +669,7 @@ class MSess_HMM_MVN(Simulation):
         """
         return self.obs_mod.get_instantaneous_covariances(self.state_time_course)
 
-    def standardize(self):
+    def standardize(self) -> None:
         mu = np.mean(self.time_series, axis=1).astype(np.float64)
         sigma = np.std(self.time_series, axis=1).astype(np.float64)
         super().standardize(axis=1)
@@ -734,22 +734,22 @@ class HierarchicalHMM_MVN(Simulation):
 
     def __init__(
         self,
-        n_samples,
-        top_level_trans_prob,
-        bottom_level_trans_probs,
-        means=None,
-        covariances=None,
-        n_states=None,
-        n_modes=None,
-        n_channels=None,
-        n_covariances_act=1,
-        observation_error=0.0,
-        top_level_stay_prob=None,
-        bottom_level_stay_probs=None,
-        top_level_hmm_type="hmm",
-        top_level_gamma_shape=None,
-        top_level_gamma_scale=None,
-    ):
+        n_samples: int,
+        top_level_trans_prob: Union[np.ndarray, str],
+        bottom_level_trans_probs: List[Union[np.ndarray, str]],
+        means: Optional[Union[np.ndarray, str]] = None,
+        covariances: Optional[Union[np.ndarray, str]] = None,
+        n_states: Optional[int] = None,
+        n_modes: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        n_covariances_act: int = 1,
+        observation_error: float = 0.0,
+        top_level_stay_prob: Optional[float] = None,
+        bottom_level_stay_probs: Optional[List[float]] = None,
+        top_level_hmm_type: str = "hmm",
+        top_level_gamma_shape: Optional[float] = None,
+        top_level_gamma_scale: Optional[float] = None,
+    ) -> None:
         if n_states is None:
             n_states = n_modes
 
@@ -806,14 +806,14 @@ class HierarchicalHMM_MVN(Simulation):
         self.time_series = self.obs_mod.simulate_data(self.state_time_course)
 
     @property
-    def n_modes(self):
+    def n_modes(self) -> int:
         return self.n_states
 
     @property
-    def mode_time_course(self):
+    def mode_time_course(self) -> np.ndarray:
         return self.state_time_course
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hmm):
@@ -821,7 +821,7 @@ class HierarchicalHMM_MVN(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
-    def generate_states(self, n_samples):
+    def generate_states(self, n_samples: int) -> np.ndarray:
         stc = np.empty([n_samples, self.n_states])
 
         # Top level HMM to select the bottom level HMM at each time point
@@ -836,7 +836,7 @@ class HierarchicalHMM_MVN(Simulation):
 
         return stc
 
-    def standardize(self):
+    def standardize(self) -> None:
         sigma = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
         self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]

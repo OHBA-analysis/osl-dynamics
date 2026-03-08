@@ -1,7 +1,9 @@
 """Single-channel Dynamic Network Modes (SC-DyNeMo)."""
 
 from dataclasses import dataclass
+from typing import Dict
 
+import numpy as np
 import tensorflow as tf
 
 from osl_dynamics.models.dynemo import Config as DynemoConfig
@@ -39,7 +41,7 @@ class Config(DynemoConfig):
     sampling_frequency: float = None
     frequency_range: list = None
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__post_init__()
 
 
@@ -67,7 +69,7 @@ class Model(DynemoModel):
 
     config_type = Config
 
-    def build_model(self):
+    def build_model(self) -> None:
         """Builds a keras model."""
 
         config = self.config
@@ -176,7 +178,7 @@ class Model(DynemoModel):
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
-    def get_amplitude(self):
+    def get_amplitude(self) -> np.ndarray:
         """Get the amplitude of the oscillators.
 
         Returns
@@ -187,7 +189,7 @@ class Model(DynemoModel):
         covs = self.model.get_layer("covs")
         return covs.amplitude(tf.constant(1)).numpy()
 
-    def get_frequency(self):
+    def get_frequency(self) -> np.ndarray:
         """Get the frequencies of the oscillators.
 
         Returns
@@ -198,7 +200,7 @@ class Model(DynemoModel):
         covs = self.model.get_layer("covs")
         return covs.frequency(tf.constant(1)).numpy()
 
-    def get_variance(self):
+    def get_variance(self) -> np.ndarray:
         """Get the variances of the oscillators.
 
         Returns
@@ -209,7 +211,7 @@ class Model(DynemoModel):
         covs = self.model.get_layer("covs")
         return tf.nn.softplus(covs.variance(tf.constant(1)).numpy())
 
-    def get_oscillator_parameters(self):
+    def get_oscillator_parameters(self) -> Dict[str, np.ndarray]:
         """Get the parameters of the oscillators.
 
         Returns

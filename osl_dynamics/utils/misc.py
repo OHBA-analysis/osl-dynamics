@@ -7,6 +7,7 @@ import sys
 from copy import copy
 from pathlib import Path
 from contextlib import contextmanager
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import yaml
@@ -15,7 +16,7 @@ from yaml.constructor import ConstructorError
 _logger = logging.getLogger("osl-dynamics")
 
 
-def nextpow2(x):
+def nextpow2(x: int) -> int:
     """Next power of 2.
 
     Parameters
@@ -35,7 +36,7 @@ def nextpow2(x):
     return res.astype("int")
 
 
-def leading_zeros(number, largest_number):
+def leading_zeros(number: int, largest_number: int) -> str:
     """Pad a number with leading zeros.
 
     This is useful for creating a consistent naming scheme for files.
@@ -57,7 +58,9 @@ def leading_zeros(number, largest_number):
     return padded_number
 
 
-def override_dict_defaults(default_dict, override_dict=None):
+def override_dict_defaults(
+    default_dict: dict, override_dict: Optional[dict] = None
+) -> dict:
     """Helper function to update default dictionary values with user values.
 
     Parameters
@@ -77,7 +80,7 @@ def override_dict_defaults(default_dict, override_dict=None):
     return {**default_dict, **override_dict}
 
 
-def listify(obj):
+def listify(obj: Any) -> list:
     """Create a list from any input.
 
     If :code:`None` is passed, return an empty list.
@@ -104,7 +107,9 @@ def listify(obj):
         return [obj]
 
 
-def replace_argument(func, name, item, args, kwargs, append=False):
+def replace_argument(
+    func: Callable, name: str, item: Any, args: dict, kwargs: dict, append: bool = False
+) -> Tuple[list, dict]:
     """Replace arguments in function calls.
 
     Parameters
@@ -148,7 +153,7 @@ def replace_argument(func, name, item, args, kwargs, append=False):
     return args, kwargs
 
 
-def get_argument(func, name, args, kwargs):
+def get_argument(func: Callable, name: str, args: dict, kwargs: dict) -> Any:
     """Get argument.
 
     Get an argument passed to a function call whether it is a normal
@@ -183,7 +188,9 @@ def get_argument(func, name, args, kwargs):
     return arg
 
 
-def check_arguments(args, kwargs, index, name, value, comparison_op):
+def check_arguments(
+    args: list, kwargs: dict, index: int, name: str, value: Any, comparison_op: Callable
+) -> bool:
     """Checks the arguments passed to a function.
 
     Parameters
@@ -221,7 +228,7 @@ def check_arguments(args, kwargs, index, name, value, comparison_op):
         return False
 
 
-def array_to_memmap(filename, array):
+def array_to_memmap(filename: str, array: np.ndarray) -> np.memmap:
     """Save an array and reopen it as a np.memmap.
 
     Parameters
@@ -259,7 +266,7 @@ class MockFlags:
         Is the array C contiguous or F contiguous?
     """
 
-    def __init__(self, shape, c_contiguous=True):
+    def __init__(self, shape: List[int], c_contiguous: bool = True) -> None:
         self.c_contiguous = c_contiguous
         self.f_contiguous = (not c_contiguous) or (c_contiguous and len(shape) == 1)
 
@@ -277,14 +284,16 @@ class MockArray:
         Is the array C contiguous or F contiguous?
     """
 
-    def __init__(self, shape, dtype=np.float64, c_contiguous=True):
+    def __init__(
+        self, shape: List[int], dtype: type = np.float64, c_contiguous: bool = True
+    ) -> None:
         self.shape = shape
         self.dtype = np.dtype(dtype)
         self.flags = MockFlags(shape, c_contiguous)
 
         self.filename = None
 
-    def save(self, filename):
+    def save(self, filename: str) -> None:
         if filename[-4:] != ".npy":
             filename = f"{filename}.npy"
         self.filename = filename
@@ -307,18 +316,30 @@ class MockArray:
                 f.write(b"\x00" * buffer_size)
             f.write(b"\x00" * remainder)
 
-    def memmap(self):
+    def memmap(self) -> np.memmap:
         if self.filename is None:
             raise ValueError("filename has not been provided.")
         return np.load(self.filename, mmap_mode="r+")
 
     @classmethod
-    def to_disk(cls, filename, shape, dtype=np.float64, c_contiguous=True):
+    def to_disk(
+        cls,
+        filename: str,
+        shape: List[int],
+        dtype: type = np.float64,
+        c_contiguous: bool = True,
+    ) -> None:
         mock_array = cls(shape, dtype, c_contiguous)
         mock_array.save(filename)
 
     @classmethod
-    def get_memmap(cls, filename, shape, dtype=np.float64, c_contiguous=True):
+    def get_memmap(
+        cls,
+        filename: str,
+        shape: List[int],
+        dtype: type = np.float64,
+        c_contiguous: bool = True,
+    ) -> np.memmap:
         cls.to_disk(filename, shape, dtype, c_contiguous)
         return np.load(filename, mmap_mode="r+")
 
@@ -365,7 +386,7 @@ class NumpyLoader(yaml.UnsafeLoader):
         return getattr(module, object_name)
 
 
-def save(filename, array):
+def save(filename: str, array: Union[np.ndarray, list]) -> None:
     """Save a file.
 
     Parameters
@@ -388,7 +409,7 @@ def save(filename, array):
         np.save(filename, array)
 
 
-def load(filename, **kwargs):
+def load(filename: str, **kwargs) -> Union[np.ndarray, list]:
     """Load a file.
 
     Parameters
@@ -416,7 +437,7 @@ def load(filename, **kwargs):
     return array
 
 
-def set_random_seed(seed, op_determinism=False):
+def set_random_seed(seed: int, op_determinism: bool = False) -> None:
     """Set all random seeds.
 
     This includes Python's random module, NumPy and TensorFlow.
@@ -440,7 +461,7 @@ def set_random_seed(seed, op_determinism=False):
 
 
 @contextmanager
-def set_logging_level(logger, level):
+def set_logging_level(logger: logging.Logger, level: int) -> None:
     current_level = logger.getEffectiveLevel()
     try:
         logger.setLevel(level)

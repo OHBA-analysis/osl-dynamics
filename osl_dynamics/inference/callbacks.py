@@ -1,6 +1,8 @@
 """Custom Tensorflow callbacks."""
 
 import os
+from typing import Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import tensorflow as tf
 from tensorflow import tanh
@@ -26,10 +28,10 @@ class DiceCoefficientCallback(callbacks.Callback):
 
     def __init__(
         self,
-        prediction_dataset,
-        ground_truth_time_course,
-        names=None,
-    ):
+        prediction_dataset: tf.data.Dataset,
+        ground_truth_time_course: np.ndarray,
+        names: Optional[List[str]] = None,
+    ) -> None:
         super().__init__()
         self.prediction_dataset = prediction_dataset
         if ground_truth_time_course.ndim == 2:
@@ -52,7 +54,7 @@ class DiceCoefficientCallback(callbacks.Callback):
         self.names = names
         self.n_modes = ground_truth_time_course.shape[-1]
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         """Action to perform at the end of an epoch.
 
         Parameters
@@ -134,13 +136,13 @@ class GumbelSoftmaxAnnealingCallback(tf.keras.callbacks.Callback):
 
     def __init__(
         self,
-        curve,
-        layer_name,
-        n_epochs,
-        start_temperature=1.0,
-        end_temperature=0.01,
-        slope=0.014,
-    ):
+        curve: str,
+        layer_name: str,
+        n_epochs: int,
+        start_temperature: float = 1.0,
+        end_temperature: float = 0.01,
+        slope: float = 0.014,
+    ) -> None:
         self.curve = curve
         self.layer_name = layer_name
         self.n_epochs = n_epochs
@@ -154,12 +156,12 @@ class GumbelSoftmaxAnnealingCallback(tf.keras.callbacks.Callback):
                 start_temperature, end_temperature, n_epochs
             )
 
-    def set_model(self, model):
+    def set_model(self, model: tf.keras.Model) -> None:
         # Cache the Gumbel-Softmax layer when the model is set
         super().set_model(model)
         self.gumbel_softmax_layer = model.get_layer(self.layer_name)
 
-    def on_epoch_begin(self, epoch, logs=None):
+    def on_epoch_begin(self, epoch: int, logs: Optional[Dict] = None) -> None:
         if self.curve == "linear":
             temperature = self.temperatures[epoch]
         if self.curve == "exp":
@@ -170,7 +172,7 @@ class GumbelSoftmaxAnnealingCallback(tf.keras.callbacks.Callback):
 
         self.gumbel_softmax_layer.temperature.assign(temperature)
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         logs = logs or {}
         logs["temperature"] = float(self.gumbel_softmax_layer.temperature.numpy())
 
@@ -195,11 +197,11 @@ class KLAnnealingCallback(callbacks.Callback):
 
     def __init__(
         self,
-        curve,
-        annealing_sharpness,
-        n_annealing_epochs,
-        n_cycles=1,
-    ):
+        curve: str,
+        annealing_sharpness: float,
+        n_annealing_epochs: int,
+        n_cycles: int = 1,
+    ) -> None:
         if curve not in ["linear", "tanh"]:
             raise NotImplementedError(curve)
 
@@ -210,7 +212,7 @@ class KLAnnealingCallback(callbacks.Callback):
         self.n_cycles = n_cycles
         self.n_epochs_one_cycle = n_annealing_epochs // n_cycles
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         """Action to perform at the end of an epoch.
 
         Parameters
@@ -268,13 +270,13 @@ class EMADecayCallback(callbacks.Callback):
     forget : float
     """
 
-    def __init__(self, delay, forget, n_epochs):
+    def __init__(self, delay: float, forget: float, n_epochs: int) -> None:
         super().__init__()
         self.delay = delay
         self.forget = forget
         self.n_epochs = n_epochs
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         """Action to perform at the end of an epoch.
 
         Parameters
@@ -309,7 +311,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
         Epoch number after which to save the best model.
     """
 
-    def __init__(self, save_best_after, *args, **kwargs):
+    def __init__(self, save_best_after: int, *args, **kwargs) -> None:
         # Set up necessary properties
         kwargs.update(
             dict(
@@ -325,7 +327,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
         self.save_best_after = save_best_after
         self._activated = False
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         """Action to perform at the end of an epoch.
 
         Parameters
@@ -358,7 +360,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
 
         super().on_epoch_end(epoch, logs)
 
-    def on_train_end(self, logs=None):
+    def on_train_end(self, logs: Optional[Dict] = None) -> None:
         """Action to perform at the end of training.
 
         Parameters
@@ -379,14 +381,14 @@ class CheckpointCallback(callbacks.Callback):
         Frequency (in epochs) at which to save the model.
     """
 
-    def __init__(self, save_freq, checkpoint_dir):
+    def __init__(self, save_freq: int, checkpoint_dir: str) -> None:
         super().__init__()
         self.save_freq = save_freq
         self.checkpoint = None
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_prefix = f"{checkpoint_dir}/ckpt"
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         if self.checkpoint is None:
             self.checkpoint = tf.train.Checkpoint(
                 model=self.model, optimizer=self.model.optimizer
@@ -413,7 +415,13 @@ class TensorBoardCallback(callbacks.TensorBoard):
         Additional arguments to pass to the :code:`tf.keras.callbacks.TensorBoard` callback.
     """
 
-    def __init__(self, log_dir=None, log_initial=True, step_offset=0, **kwargs):
+    def __init__(
+        self,
+        log_dir: Optional[str] = None,
+        log_initial: bool = True,
+        step_offset: int = 0,
+        **kwargs,
+    ) -> None:
         # Create log directory if it does not exist
         self._log_dir = log_dir
         self._make_log_dir()
@@ -425,12 +433,12 @@ class TensorBoardCallback(callbacks.TensorBoard):
 
         super().__init__(log_dir=self._log_dir, **kwargs)
 
-    def _make_log_dir(self):
+    def _make_log_dir(self) -> None:
         if self._log_dir is None:
             self._log_dir = os.path.join(os.getcwd(), "logs")
         os.makedirs(self._log_dir, exist_ok=True)
 
-    def on_train_begin(self, logs=None):
+    def on_train_begin(self, logs: Optional[Dict] = None) -> None:
         # Call the parent method first
         super().on_train_begin(logs)
 
@@ -452,7 +460,7 @@ class TensorBoardCallback(callbacks.TensorBoard):
                 "Initial weights logged. You can launch TensorBoard to view the histograms."
             )
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         # Compute a continuous global step by adding an offset
         global_epoch = epoch + self.step_offset
 
@@ -489,13 +497,13 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
 
     def __init__(
         self,
-        sample_dataset,
-        loss_indices,
-        log_dir=None,
-        log_as_dense=True,
-        step_offset=0,
-        print_stats=False,
-    ):
+        sample_dataset: tf.data.Dataset,
+        loss_indices: Union[int, List[int]],
+        log_dir: Optional[str] = None,
+        log_as_dense: bool = True,
+        step_offset: int = 0,
+        print_stats: bool = False,
+    ) -> None:
         super().__init__()
         self.sample_dataset = sample_dataset
         self.loss_indices = loss_indices
@@ -514,7 +522,7 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
         self.writer = tf.summary.create_file_writer(log_dir)
 
     @tf.function
-    def compute_gradients(self, inputs):
+    def compute_gradients(self, inputs: tf.Tensor):
         """Compute gradients for a given input batch.
 
         If there is more than one loss, losses are summed before computing gradients.
@@ -532,7 +540,9 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
                 loss = outputs[self.loss_indices[0]]
         return tape.gradient(loss, self.model.trainable_variables)
 
-    def _convert_grad_to_dense(self, gradient):
+    def _convert_grad_to_dense(
+        self, gradient: Union[tf.Tensor, tf.IndexedSlices, tf.SparseTensor]
+    ) -> Tuple[tf.Tensor, bool]:
         """Convert a gradient to a dense tensor if necessary.
 
         Parameters
@@ -553,7 +563,7 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
             return tf.sparse.to_dense(gradient), True
         return gradient, False
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         """Action to perform at the end of an epoch.
 
         Parameters
@@ -704,10 +714,10 @@ class SummaryStatsCallback(callbacks.Callback):
 
     def __init__(
         self,
-        prediction_dataset,
-        model,
-        sampling_frequency=1,
-    ):
+        prediction_dataset: tf.data.Dataset,
+        model: tf.keras.Model,
+        sampling_frequency: int = 1,
+    ) -> None:
         super().__init__()
         self.prediction_dataset = prediction_dataset
         self.outer_model = model  # to access the outer model
@@ -715,7 +725,7 @@ class SummaryStatsCallback(callbacks.Callback):
         self.alphas = []
         self.summary_stats = []
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         """Action to perform at the end of an epoch.
 
         Parameters

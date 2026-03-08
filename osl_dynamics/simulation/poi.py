@@ -1,5 +1,7 @@
 """Classes for simulating a Poisson time series."""
 
+from typing import Optional, Union
+
 import numpy as np
 
 
@@ -23,10 +25,10 @@ class Poisson:
 
     def __init__(
         self,
-        rates,
-        n_states=None,
-        n_channels=None,
-    ):
+        rates: Union[np.ndarray, str],
+        n_states: Optional[int] = None,
+        n_channels: Optional[int] = None,
+    ) -> None:
         if isinstance(rates, np.ndarray):
             self.n_states = rates.shape[0]
             self.n_channels = rates.shape[1]
@@ -42,7 +44,7 @@ class Poisson:
             self.n_channels = n_channels
             self.rates = self.create_rates(rates)
 
-    def create_rates(self, option, eps=1e-2):
+    def create_rates(self, option: str, eps: float = 1e-2) -> np.ndarray:
         if option == "random":
             # Randomly sample the rates from a gamma distribution
             rates = np.random.gamma(
@@ -62,7 +64,7 @@ class Poisson:
 
         return rates + eps
 
-    def simulate_data(self, state_time_course):
+    def simulate_data(self, state_time_course: np.ndarray) -> np.ndarray:
         n_samples = state_time_course.shape[0]
         data = np.empty([n_samples, self.n_channels])
 

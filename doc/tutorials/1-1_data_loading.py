@@ -15,7 +15,7 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 #%%
 # The Data class
 # ^^^^^^^^^^^^^^
-# In osl-dynamics we typically load data using the `osl_dynamics.data.Data class <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_. The Data class has a lot of useful methods that can be used to modify the data.
+# In osl-dynamics we typically load data using the :class:`osl_dynamics.data.base.Data`. The Data class has a lot of useful methods that can be used to modify the data.
 #
 # Inputs
 # ******
@@ -38,7 +38,7 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 #
 # Loading data in parallel
 # ************************
-# The Data class has a `n_jobs` argument that can be used to load multiple data files in parallel. Note, if `n_jobs` is passed, the Data class will automatically also prepare data in parallel (see `Preparing M/EEG Data <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/1-2_data_prepare_meg.html>`_ and `Preparing fMRI data <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/1-3_data_prepare_fmri.html>`_ for more information regarding data preparation).
+# The Data class has a `n_jobs` argument that can be used to load multiple data files in parallel. Note, if `n_jobs` is passed, the Data class will automatically also prepare data in parallel (see :doc:`Preparing M/EEG Data <../tutorials_build/1-2_data_prepare_meg>` and :doc:`Preparing fMRI Data <../tutorials_build/1-3_data_prepare_fmri>` for more information regarding data preparation).
 #
 # Getting Example Data
 # ^^^^^^^^^^^^^^^^^^^^

@@ -81,6 +81,7 @@ html_theme_options = {
 # Remove "Section Navigation"
 html_sidebars = {
     "install": [],
+    "getting_started": [],
     "documentation": [],
     "tutorials_build/*": [],
     "faq": [],

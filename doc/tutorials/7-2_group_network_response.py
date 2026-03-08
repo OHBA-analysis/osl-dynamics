@@ -27,7 +27,7 @@ network_response[:, 80:100, 1] += 2
 #%%
 # Statistical significance testing
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# osl-dynamics has the `analysis.statistics.evoked_response_max_stat_perm <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/statistics/index.html#osl_dynamics.analysis.statistics.evoked_response_max_stat_perm>`_ function for doing GLM permutation stats testing see if a value is significantly different from zero. This function uses the maximum test statistic to control for multiple comparisons across the time points and networks.
+# osl-dynamics has the :func:`analysis.statistics.evoked_response_max_stat_perm <osl_dynamics.analysis.statistics.evoked_response_max_stat_perm>` function for doing GLM permutation stats testing see if a value is significantly different from zero. This function uses the maximum test statistic to control for multiple comparisons across the time points and networks.
 
 from osl_dynamics.analysis import statistics
 

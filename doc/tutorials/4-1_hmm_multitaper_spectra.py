@@ -39,7 +39,7 @@ get_inf_params("tde_hmm_notts_mrc_meguk_giles_5_subjects", rename="results/inf_p
 #%%
 # Load the source data
 # ^^^^^^^^^^^^^^^^^^^^
-# We load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+# We load the data into osl-dynamics using the Data class. See the :doc:`Loading Data tutorial <tutorials_build/data_loading>` for further details.
 
 from osl_dynamics.data import Data
 
@@ -82,7 +82,7 @@ for a, x in zip(alpha, trimmed_data):
 #
 # Power spectra and coherences
 # ****************************
-# We want to calculate the power spectrum and coherence of each state. This is done by using standard calculation methods (in our case the multitaper for spectrum estimation) to the time points identified as belonging to a particular state. The `analysis.spectra.multitaper_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.multitaper_spectra>`_ function does this for us. Let's first run this function, then we'll discuss its output.
+# We want to calculate the power spectrum and coherence of each state. This is done by using standard calculation methods (in our case the multitaper for spectrum estimation) to the time points identified as belonging to a particular state. The :func:`analysis.spectral.multitaper_spectra <osl_dynamics.analysis.spectral.multitaper_spectra>` function does this for us. Let's first run this function, then we'll discuss its output.
 
 from osl_dynamics.analysis import spectral
 

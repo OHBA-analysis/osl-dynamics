@@ -1,6 +1,7 @@
 """Ordinary least squares fitting for a GLM."""
 
 import logging
+from typing import Optional, Tuple
 
 import numpy as np
 from sklearn.linear_model import LinearRegression
@@ -8,7 +9,11 @@ from sklearn.linear_model import LinearRegression
 _logger = logging.getLogger("osl-dynamics")
 
 
-def _validate_dimensions(X=None, y=None, contrasts=None):
+def _validate_dimensions(
+    X: Optional[np.ndarray] = None,
+    y: Optional[np.ndarray] = None,
+    contrasts: Optional[np.ndarray] = None,
+) -> None:
     """Validate dimensions of input arrays."""
     # Check X dimensions
     if X is None:
@@ -56,7 +61,9 @@ def _validate_dimensions(X=None, y=None, contrasts=None):
         )
 
 
-def get_residuals(X, y, predictor):
+def get_residuals(
+    X: np.ndarray, y: np.ndarray, predictor: LinearRegression
+) -> np.ndarray:
     """Get residuals from a linear model.
 
     Parameters
@@ -81,7 +88,7 @@ def get_residuals(X, y, predictor):
     return y - predictor.predict(X)
 
 
-def get_degree_of_freedom(X):
+def get_degree_of_freedom(X: np.ndarray) -> int:
     """Get degree of freedom.
 
     Parameters
@@ -98,7 +105,9 @@ def get_degree_of_freedom(X):
     return X.shape[0] - np.linalg.matrix_rank(X)
 
 
-def get_varcopes(X, y, contrasts, predictor):
+def get_varcopes(
+    X: np.ndarray, y: np.ndarray, contrasts: np.ndarray, predictor: LinearRegression
+) -> np.ndarray:
     """Get the variance of the copes.
 
     Parameters
@@ -136,7 +145,9 @@ def get_varcopes(X, y, contrasts, predictor):
     return varcopes
 
 
-def osl_fit(X, y, contrasts):
+def osl_fit(
+    X: np.ndarray, y: np.ndarray, contrasts: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Fit Ordinary Least Squares (OLS) model.
 
     Parameters
@@ -170,7 +181,7 @@ def osl_fit(X, y, contrasts):
     return betas, copes, varcopes
 
 
-def remove_nan_rows(X, y):
+def remove_nan_rows(X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Remove rows with NaN values.
 
     Parameters

@@ -1,5 +1,7 @@
 """Classes for simulating Hidden Semi-Markov Models (HSMMs)."""
 
+from typing import Optional, Union
+
 import numpy as np
 
 from osl_dynamics.simulation.mvn import MVN
@@ -34,13 +36,13 @@ class HSMM:
 
     def __init__(
         self,
-        gamma_shape,
-        gamma_scale,
-        off_diagonal_trans_prob=None,
-        full_trans_prob=None,
-        state_vectors=None,
-        n_states=None,
-    ):
+        gamma_shape: float,
+        gamma_scale: float,
+        off_diagonal_trans_prob: Optional[np.ndarray] = None,
+        full_trans_prob: Optional[np.ndarray] = None,
+        state_vectors: Optional[np.ndarray] = None,
+        n_states: Optional[int] = None,
+    ) -> None:
         # Validation
         if off_diagonal_trans_prob is not None and full_trans_prob is not None:
             raise ValueError(
@@ -82,7 +84,7 @@ class HSMM:
         self.gamma_shape = gamma_shape
         self.gamma_scale = gamma_scale
 
-    def construct_off_diagonal_trans_prob(self):
+    def construct_off_diagonal_trans_prob(self) -> None:
         if (self.off_diagonal_trans_prob is None) and (self.full_trans_prob is None):
             self.off_diagonal_trans_prob = np.ones([self.n_states, self.n_states])
 
@@ -97,7 +99,7 @@ class HSMM:
             / self.off_diagonal_trans_prob.sum(axis=1)[:, None]
         )
 
-    def generate_states(self, n_samples):
+    def generate_states(self, n_samples: int) -> np.ndarray:
         cumsum_off_diagonal_trans_prob = np.cumsum(
             self.off_diagonal_trans_prob,
             axis=1,
@@ -160,18 +162,18 @@ class HSMM_MVN(Simulation):
 
     def __init__(
         self,
-        n_samples,
-        gamma_shape,
-        gamma_scale,
-        off_diagonal_trans_prob=None,
-        full_trans_prob=None,
-        means=None,
-        covariances=None,
-        n_states=None,
-        n_modes=None,
-        n_channels=None,
-        observation_error=0.0,
-    ):
+        n_samples: int,
+        gamma_shape: float,
+        gamma_scale: float,
+        off_diagonal_trans_prob: Optional[np.ndarray] = None,
+        full_trans_prob: Optional[np.ndarray] = None,
+        means: Optional[Union[np.ndarray, str]] = None,
+        covariances: Optional[Union[np.ndarray, str]] = None,
+        n_states: Optional[int] = None,
+        n_modes: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        observation_error: float = 0.0,
+    ) -> None:
         if n_states is None:
             n_states = n_modes
 
@@ -205,14 +207,14 @@ class HSMM_MVN(Simulation):
         self.time_series = self.obs_mod.simulate_data(self.state_time_course)
 
     @property
-    def n_modes(self):
+    def n_modes(self) -> int:
         return self.n_states
 
     @property
-    def mode_time_course(self):
+    def mode_time_course(self) -> np.ndarray:
         return self.state_time_course
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hsmm):
@@ -220,7 +222,7 @@ class HSMM_MVN(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
-    def standardize(self):
+    def standardize(self) -> None:
         sigma = np.std(self.time_series, axis=0)
         super().standardize()
         self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
@@ -267,18 +269,18 @@ class MixedHSMM_MVN(Simulation):
 
     def __init__(
         self,
-        n_samples,
-        gamma_shape,
-        gamma_scale,
-        mixed_state_vectors=None,
-        mixed_mode_vectors=None,
-        off_diagonal_trans_prob=None,
-        full_trans_prob=None,
-        means=None,
-        covariances=None,
-        n_channels=None,
-        observation_error=0.0,
-    ):
+        n_samples: int,
+        gamma_shape: float,
+        gamma_scale: float,
+        mixed_state_vectors: Optional[np.ndarray] = None,
+        mixed_mode_vectors: Optional[np.ndarray] = None,
+        off_diagonal_trans_prob: Optional[np.ndarray] = None,
+        full_trans_prob: Optional[np.ndarray] = None,
+        means: Optional[Union[np.ndarray, str]] = None,
+        covariances: Optional[Union[np.ndarray, str]] = None,
+        n_channels: Optional[int] = None,
+        observation_error: float = 0.0,
+    ) -> None:
         if mixed_state_vectors is None:
             mixed_state_vectors = mixed_mode_vectors
 
@@ -324,14 +326,14 @@ class MixedHSMM_MVN(Simulation):
         self.time_series = self.obs_mod.simulate_data(self.state_time_course)
 
     @property
-    def n_modes(self):
+    def n_modes(self) -> int:
         return self.n_states
 
     @property
-    def mode_time_course(self):
+    def mode_time_course(self) -> np.ndarray:
         return self.state_time_course
 
-    def __getattr__(self, attr):
+    def __getattr__(self, attr: str):
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hsmm):
@@ -339,13 +341,13 @@ class MixedHSMM_MVN(Simulation):
         else:
             raise AttributeError(f"No attribute called {attr}.")
 
-    def construct_state_vectors(self, n_states):
+    def construct_state_vectors(self, n_states: int) -> None:
         non_mixed_state_vectors = array_ops.get_one_hot(np.arange(n_states))
         self.state_vectors = np.append(
             non_mixed_state_vectors, self.mixed_state_vectors, axis=0
         )
 
-    def standardize(self):
+    def standardize(self) -> None:
         sigma = np.std(self.time_series, axis=0)
         super().standardize()
         self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]

@@ -3,17 +3,48 @@ Documentation
 
 Welcome to the osl-dynamics documentation!
 
-The :doc:`API reference <autoapi/index>` provides documentation for the classes, methods and functions in osl-dynamics. New users may find the :doc:`FAQ <faq>` useful.
+New users should start with the :doc:`Getting Started <getting_started>` guide for a quick introduction and then work through the tutorials below. The :doc:`FAQ <faq>` covers common questions about data preparation, model training, and post-hoc analysis.
 
-**New users are encouraged to have a look at the config API interface:** `here <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/config_api/index.html>`_.
+API Reference
+-------------
+
+The :doc:`API reference <autoapi/index>` provides documentation for all classes, methods, and functions in osl-dynamics.
+
+**New users are encouraged to have a look at the config API interface:** :mod:`osl_dynamics.config_api`. The config API provides high-level wrapper functions for common analysis pipelines.
 
 Models
 ------
 
-Descriptions for models implemented in osl-dynamics:
+.. list-table::
+   :header-rows: 1
+   :widths: 15 20 20 20
 
-- :doc:`Hidden Markov Model (HMM) <models/hmm>`.
-- :doc:`Dynamic Network Modes (DyNeMo) <models/dynemo>`.
+   * - Model
+     - State type
+     - Temporal model
+     - Best for
+   * - :doc:`HMM <models/hmm>`
+     - Discrete (mutually exclusive)
+     - Markovian (transition probability matrix)
+     - Resting-state analysis; interpretable summary stats
+   * - :doc:`DyNeMo <models/dynemo>`
+     - Continuous (linear mixture of modes)
+     - Non-Markovian (RNN)
+     - Task data; overlapping network activity
+   * - :doc:`DyNeSte <models/dyneste>`
+     - Discrete (mutually exclusive)
+     - Non-Markovian (RNN)
+     - Discrete states with long-range dynamics
+   * - :doc:`M-DyNeMo <models/mdynemo>`
+     - Continuous (linear mixture; separate for power and FC)
+     - Non-Markovian (RNN)
+     - Separate power and connectivity dynamics
+   * - :doc:`HIVE <models/hive>`
+     - Discrete (mutually exclusive)
+     - Markovian (transition probability matrix)
+     - Modelling inter-session variability (e.g. subjects, scanners, sites)
+
+Also see the :doc:`FAQ <faq>` for guidance on choosing a model and hyperparameters.
 
 Parcellations
 -------------

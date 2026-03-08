@@ -2,6 +2,7 @@
 
 import itertools
 import logging
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from scipy import signal
@@ -13,8 +14,11 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def autocorr_from_tde_cov(
-    covs, n_embeddings, pca_components=None, sampling_frequency=None
-):
+    covs: np.ndarray,
+    n_embeddings: int,
+    pca_components: Optional[np.ndarray] = None,
+    sampling_frequency: Optional[float] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Auto/cross-correlation function from the mode covariance matrices.
 
     Parameters
@@ -91,11 +95,11 @@ def autocorr_from_tde_cov(
 
 
 def raw_covariances(
-    mode_covariances,
-    n_embeddings,
-    pca_components=None,
-    zero_lag=False,
-):
+    mode_covariances: np.ndarray,
+    n_embeddings: int,
+    pca_components: Optional[np.ndarray] = None,
+    zero_lag: bool = False,
+) -> np.ndarray:
     """Covariance matrix of the raw channels.
 
     PCA and time embedding is reversed to give you to the covariance matrix
@@ -170,7 +174,7 @@ def raw_covariances(
     return np.squeeze(raw_covs)
 
 
-def reverse_pca(covariances, pca_components):
+def reverse_pca(covariances: np.ndarray, pca_components: np.ndarray) -> np.ndarray:
     """Reverses the effect of PCA on covariance matrices.
 
     Parameters
@@ -195,7 +199,9 @@ def reverse_pca(covariances, pca_components):
     return pca_components @ covariances @ pca_components.T
 
 
-def state_activations(state_time_course):
+def state_activations(
+    state_time_course: Union[np.ndarray, List[np.ndarray]],
+) -> List[List[List[slice]]]:
     """Calculate state activations from a state time course.
 
     Given a state time course (strictly binary), calculate the beginning and
@@ -259,7 +265,11 @@ def state_activations(state_time_course):
     return slices
 
 
-def lifetimes(state_time_course, sampling_frequency=None, squeeze=True):
+def lifetimes(
+    state_time_course: Union[np.ndarray, List[np.ndarray]],
+    sampling_frequency: Optional[float] = None,
+    squeeze: bool = True,
+) -> Union[List[List[np.ndarray]], List[np.ndarray], np.ndarray]:
     """Calculate state lifetimes from a state time course.
 
     Given a state time course (one-hot encoded), calculate the lifetime of each
@@ -306,7 +316,10 @@ def lifetimes(state_time_course, sampling_frequency=None, squeeze=True):
     return result
 
 
-def lifetime_statistics(state_time_course, sampling_frequency=None):
+def lifetime_statistics(
+    state_time_course: Union[list, np.ndarray],
+    sampling_frequency: Optional[float] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Calculate statistics of the lifetime distribution of each state.
 
     Parameters
@@ -336,7 +349,10 @@ def lifetime_statistics(state_time_course, sampling_frequency=None):
     return means, stds
 
 
-def mean_lifetimes(state_time_course, sampling_frequency=None):
+def mean_lifetimes(
+    state_time_course: Union[list, np.ndarray],
+    sampling_frequency: Optional[float] = None,
+) -> np.ndarray:
     """Calculate the mean lifetime of each state.
 
     Parameters
@@ -356,7 +372,11 @@ def mean_lifetimes(state_time_course, sampling_frequency=None):
     return lifetime_statistics(state_time_course, sampling_frequency)[0]
 
 
-def intervals(state_time_course, sampling_frequency=None, squeeze=True):
+def intervals(
+    state_time_course: Union[list, np.ndarray],
+    sampling_frequency: Optional[float] = None,
+    squeeze: bool = True,
+) -> Union[List[List[np.ndarray]], List[np.ndarray], np.ndarray]:
     """Calculate state intervals from a state time course.
 
     An interval is the duration between successive visits for a particular
@@ -411,7 +431,10 @@ def intervals(state_time_course, sampling_frequency=None, squeeze=True):
     return result
 
 
-def interval_statistics(state_time_course, sampling_frequency=None):
+def interval_statistics(
+    state_time_course: Union[list, np.ndarray],
+    sampling_frequency: Optional[float] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Calculate statistics of the interval distribution of each state.
 
     Parameters
@@ -439,7 +462,10 @@ def interval_statistics(state_time_course, sampling_frequency=None):
     return means, stds
 
 
-def mean_intervals(state_time_course, sampling_frequency=None):
+def mean_intervals(
+    state_time_course: Union[list, np.ndarray],
+    sampling_frequency: Optional[float] = None,
+) -> np.ndarray:
     """Calculate the mean interval of each state.
 
     Parameters
@@ -459,7 +485,9 @@ def mean_intervals(state_time_course, sampling_frequency=None):
     return interval_statistics(state_time_course, sampling_frequency)[0]
 
 
-def fractional_occupancies(state_time_course):
+def fractional_occupancies(
+    state_time_course: Union[list, np.ndarray],
+) -> np.ndarray:
     """Calculate the fractional occupancy.
 
     Parameters
@@ -486,7 +514,10 @@ def fractional_occupancies(state_time_course):
     return np.squeeze(fo)
 
 
-def switching_rates(state_time_course, sampling_frequency=None):
+def switching_rates(
+    state_time_course: Union[list, np.ndarray],
+    sampling_frequency: Optional[float] = None,
+) -> np.ndarray:
     """Calculate the switching rate.
 
     This is defined as the number of state activations per second.
@@ -529,7 +560,10 @@ def switching_rates(state_time_course, sampling_frequency=None):
     return np.squeeze(sr)
 
 
-def mean_amplitudes(state_time_course, data):
+def mean_amplitudes(
+    state_time_course: Union[list, np.ndarray],
+    data: Union[list, np.ndarray],
+) -> np.ndarray:
     """Calculate mean amplitude for bursts.
 
     Parameters
@@ -574,7 +608,11 @@ def mean_amplitudes(state_time_course, data):
     return np.squeeze(amp)
 
 
-def fano_factor(state_time_course, window_lengths, sampling_frequency=1.0):
+def fano_factor(
+    state_time_course: Union[list, np.ndarray],
+    window_lengths: Union[list, np.ndarray],
+    sampling_frequency: float = 1.0,
+) -> np.ndarray:
     """Calculate the Fano factor.
 
     Parameters
@@ -627,7 +665,10 @@ def fano_factor(state_time_course, window_lengths, sampling_frequency=1.0):
     return np.squeeze(F)
 
 
-def calc_trans_prob_matrix(state_time_course, n_states=None):
+def calc_trans_prob_matrix(
+    state_time_course: Union[List[np.ndarray], np.ndarray],
+    n_states: Optional[int] = None,
+) -> np.ndarray:
     """Calculate session-specific transition probability matrices.
 
     Parameters
@@ -664,7 +705,11 @@ def calc_trans_prob_matrix(state_time_course, n_states=None):
     return np.squeeze(trans_prob)
 
 
-def simple_moving_average(data, window_length, step_size):
+def simple_moving_average(
+    data: np.ndarray,
+    window_length: int,
+    step_size: int,
+) -> np.ndarray:
     """Calculate simple moving average.
 
     This function can be used to calculate a sliding window fractional occupancy
@@ -711,7 +756,10 @@ def simple_moving_average(data, window_length, step_size):
     return mov_avg
 
 
-def partial_covariances(data, alpha):
+def partial_covariances(
+    data: Union[np.ndarray, List[np.ndarray]],
+    alpha: Union[np.ndarray, List[np.ndarray]],
+) -> np.ndarray:
     r"""Calculate partial covariances.
 
     Returns the multiple regression parameters estimates of the state/mode time
@@ -779,13 +827,13 @@ def partial_covariances(data, alpha):
 
 
 def hmm_dual_estimation(
-    data,
-    alpha,
-    zero_mean=False,
-    diagonal_covariances=False,
-    eps=1e-5,
-    n_jobs=1,
-):
+    data: Union[np.ndarray, List[np.ndarray]],
+    alpha: Union[np.ndarray, List[np.ndarray]],
+    zero_mean: bool = False,
+    diagonal_covariances: bool = False,
+    eps: float = 1e-5,
+    n_jobs: Optional[int] = 1,
+) -> Tuple[np.ndarray, np.ndarray]:
     """HMM dual estimation of observation model parameters.
 
     Parameters
@@ -935,15 +983,15 @@ def hmm_dual_estimation(
 
 
 def hmm_features(
-    data,
-    alpha,
-    sampling_frequency=None,
-    zero_mean=False,
-    diagonal_covariances=False,
-    eps=1e-5,
-    use_partial=False,
-    n_jobs=1,
-):
+    data: Union[np.ndarray, List[np.ndarray]],
+    alpha: Union[np.ndarray, List[np.ndarray]],
+    sampling_frequency: Optional[float] = None,
+    zero_mean: bool = False,
+    diagonal_covariances: bool = False,
+    eps: float = 1e-5,
+    use_partial: bool = False,
+    n_jobs: int = 1,
+) -> np.ndarray:
     """Dual estimation of HMM features.
 
     Parameters

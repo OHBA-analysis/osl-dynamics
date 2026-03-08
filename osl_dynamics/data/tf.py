@@ -1,6 +1,8 @@
 """Function related to TensorFlow datasets."""
 
 import logging
+from typing import Dict, List, Optional, Tuple, Union
+
 import numpy as np
 
 from osl_dynamics.utils import misc
@@ -8,7 +10,9 @@ from osl_dynamics.utils import misc
 _logger = logging.getLogger("osl-dynamics")
 
 
-def get_n_sequences(arr, sequence_length, step_size=None):
+def get_n_sequences(
+    arr: np.ndarray, sequence_length: int, step_size: Optional[int] = None
+) -> int:
     """Calculate the number of sequences an array will be split into.
 
     Parameters
@@ -38,7 +42,7 @@ def get_n_sequences(arr, sequence_length, step_size=None):
     return n_sequences
 
 
-def concatenate_datasets(datasets):
+def concatenate_datasets(datasets: List):
     """Concatenates a list of TensorFlow datasets.
 
     Parameters
@@ -57,7 +61,7 @@ def concatenate_datasets(datasets):
     return full_dataset
 
 
-def create_dataset(data, sequence_length, step_size):
+def create_dataset(data: Dict, sequence_length: int, step_size: int):
     """Creates a TensorFlow dataset of batched time series data.
 
     Parameters
@@ -109,7 +113,9 @@ def create_dataset(data, sequence_length, step_size):
     return dataset
 
 
-def save_tfrecord(data, sequence_length, step_size, filepath):
+def save_tfrecord(
+    data: Dict, sequence_length: int, step_size: int, filepath: str
+) -> None:
     """Save dataset to a TFRecord file.
 
     Parameters
@@ -153,13 +159,13 @@ def save_tfrecord(data, sequence_length, step_size, filepath):
 
 
 def load_tfrecord_dataset(
-    tfrecord_dir,
-    batch_size,
-    shuffle=True,
-    concatenate=True,
-    drop_last_batch=False,
-    buffer_size=4000,
-    keep=None,
+    tfrecord_dir: str,
+    batch_size: int,
+    shuffle: bool = True,
+    concatenate: bool = True,
+    drop_last_batch: bool = False,
+    buffer_size: int = 4000,
+    keep: Optional[List[int]] = None,
 ):
     """Load a TFRecord dataset.
 
@@ -355,7 +361,7 @@ def _validate_tf_dataset(dataset):
     return dataset
 
 
-def get_range(dataset):
+def get_range(dataset) -> np.ndarray:
     """The range (max-min) of values contained in a batched Tensorflow dataset.
 
     Parameters
@@ -382,7 +388,7 @@ def get_range(dataset):
     return np.amax(amax, axis=0) - np.amin(amin, axis=0)
 
 
-def get_n_channels(dataset):
+def get_n_channels(dataset) -> int:
     """Get the number of channels in a batched TensorFlow dataset.
 
     Parameters
@@ -403,7 +409,7 @@ def get_n_channels(dataset):
         return batch.shape[-1]
 
 
-def get_n_batches(dataset):
+def get_n_batches(dataset) -> int:
     """Get number of batches in a TensorFlow dataset.
 
     Parameters
@@ -430,7 +436,7 @@ def get_n_batches(dataset):
     return cardinality.numpy()
 
 
-def get_n_sequences_and_range(dataset):
+def get_n_sequences_and_range(dataset) -> Tuple[int, np.ndarray]:
     """Get number of sequences and range (max-min) of values.
 
     Parameters

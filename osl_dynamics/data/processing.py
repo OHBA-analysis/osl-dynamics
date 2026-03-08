@@ -1,5 +1,7 @@
 """Functions to process data."""
 
+from typing import Optional, Tuple
+
 import mne
 import numpy as np
 from scipy import signal, stats
@@ -7,7 +9,7 @@ from scipy import signal, stats
 from osl_dynamics.utils import array_ops
 
 
-def standardize(x, axis=0, create_copy=True):
+def standardize(x: np.ndarray, axis: int = 0, create_copy: bool = True) -> np.ndarray:
     """Standardizes a time series.
 
     Returns a time series with zero mean and unit variance.
@@ -34,7 +36,7 @@ def standardize(x, axis=0, create_copy=True):
     return (x - mean) / std
 
 
-def time_embed(x, n_embeddings):
+def time_embed(x: np.ndarray, n_embeddings: int) -> np.ndarray:
     """Performs time embedding.
 
     Parameters
@@ -66,7 +68,13 @@ def time_embed(x, n_embeddings):
     return X
 
 
-def temporal_filter(x, low_freq, high_freq, sampling_frequency, order=5):
+def temporal_filter(
+    x: np.ndarray,
+    low_freq: Optional[float],
+    high_freq: Optional[float],
+    sampling_frequency: float,
+    order: int = 5,
+) -> np.ndarray:
     """Applies temporal filtering.
 
     Parameters
@@ -110,7 +118,7 @@ def temporal_filter(x, low_freq, high_freq, sampling_frequency, order=5):
     return X.astype(x.dtype)
 
 
-def amplitude_envelope(x):
+def amplitude_envelope(x: np.ndarray) -> np.ndarray:
     """Calculates amplitude envelope.
 
     Parameters
@@ -127,7 +135,7 @@ def amplitude_envelope(x):
     return X.astype(x.dtype)
 
 
-def moving_average(x, n_window):
+def moving_average(x: np.ndarray, n_window: int) -> np.ndarray:
     """Calculates a moving average over a sliding window along the time axis.
 
     This function uses a cumulative-sum trick for efficiency and returns only
@@ -160,7 +168,7 @@ def moving_average(x, n_window):
     return X.astype(x.dtype)
 
 
-def downsample(x, new_freq, old_freq):
+def downsample(x: np.ndarray, new_freq: float, old_freq: float) -> np.ndarray:
     """Downsample.
 
     Parameters
@@ -194,13 +202,13 @@ def downsample(x, new_freq, old_freq):
 
 
 def remove_bad_segments(
-    x,
-    window_length,
-    mode=None,
-    metric="std",
-    significance_level=0.05,
-    maximum_fraction=0.1,
-):
+    x: np.ndarray,
+    window_length: int,
+    mode: Optional[str] = None,
+    metric: str = "std",
+    significance_level: float = 0.05,
+    maximum_fraction: float = 0.1,
+) -> Tuple[np.ndarray, np.ndarray]:
     """Automated bad segment removal using the G-ESD algorithm.
 
     Parameters

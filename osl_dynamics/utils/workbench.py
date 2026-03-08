@@ -8,6 +8,7 @@ import pathlib
 import re
 import subprocess
 import warnings
+from typing import Optional
 
 import nibabel as nib
 from tqdm.auto import trange
@@ -21,7 +22,7 @@ surfs = {
 }
 
 
-def setup(path):
+def setup(path: str) -> None:
     """Sets up workbench.
 
     Adds workbench to the PATH environmental variable.
@@ -37,14 +38,14 @@ def setup(path):
 
 
 def render(
-    img,
-    save_dir=None,
-    interptype="trilinear",
-    gui=True,
-    inflation=0,
-    image_name=None,
-    input_is_cifti=False,
-):
+    img: str,
+    save_dir: Optional[str] = None,
+    interptype: str = "trilinear",
+    gui: bool = True,
+    inflation: int = 0,
+    image_name: Optional[str] = None,
+    input_is_cifti: bool = False,
+) -> None:
     """Render map in workbench.
 
     Parameters
@@ -150,7 +151,9 @@ def render(
         )
 
 
-def create_scene(cifti_left, cifti_right, inflation, temp_scene):
+def create_scene(
+    cifti_left: pathlib.Path, cifti_right: pathlib.Path, inflation: int, temp_scene: str
+) -> None:
     scene_file = files.scene.mode_scene
     temp_scene = pathlib.Path(temp_scene)
 
@@ -164,7 +167,12 @@ def create_scene(cifti_left, cifti_right, inflation, temp_scene):
     temp_scene.write_text(scene)
 
 
-def visualise(cifti_left, cifti_right, inflation=0, temp_scene=None):
+def visualise(
+    cifti_left: pathlib.Path,
+    cifti_right: pathlib.Path,
+    inflation: int = 0,
+    temp_scene: Optional[str] = None,
+) -> None:
     surface = surfs.get(inflation, None)
     if surface is None:
         warnings.warn(
@@ -191,7 +199,13 @@ def visualise(cifti_left, cifti_right, inflation=0, temp_scene=None):
     pathlib.Path(temp_scene).unlink()
 
 
-def image(cifti_left, cifti_right, file_name, inflation=0, temp_scene=None):
+def image(
+    cifti_left: pathlib.Path,
+    cifti_right: pathlib.Path,
+    file_name: str,
+    inflation: int = 0,
+    temp_scene: Optional[str] = None,
+) -> None:
     file_path = pathlib.Path(file_name)
     suffix = file_path.suffix or ".png"
     file_path = file_path.with_suffix("")
@@ -227,7 +241,9 @@ def image(cifti_left, cifti_right, file_name, inflation=0, temp_scene=None):
     pathlib.Path(temp_scene).unlink()
 
 
-def volume_to_surface(nii, surf, output, interptype="trilinear"):
+def volume_to_surface(
+    nii: pathlib.Path, surf: str, output: pathlib.Path, interptype: str = "trilinear"
+) -> None:
     subprocess.run(
         [
             "wb_command",
@@ -240,7 +256,9 @@ def volume_to_surface(nii, surf, output, interptype="trilinear"):
     )
 
 
-def dense_timeseries(cifti, output, left_or_right):
+def dense_timeseries(
+    cifti: pathlib.Path, output: pathlib.Path, left_or_right: str
+) -> None:
     subprocess.run(
         [
             "wb_command",

@@ -3,7 +3,7 @@
 from os import path
 
 
-def check_exists(filename, directory):
+def check_exists(filename: str, directory: str) -> str:
     """Looks for a file in the current working directory and in osl-dynamics.
 
     Parameters

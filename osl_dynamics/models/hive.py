@@ -1,7 +1,7 @@
 """HIVE (HMM with Integrated Variability Estimation)."""
 
 import logging
-from typing import List
+from typing import Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass
 
 import numpy as np
@@ -208,7 +208,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     n_init_epochs: int = 1
     init_take: float = 1.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.validate_observation_model_parameters()
         self.validate_hmm_parameters()
         self.validate_dimension_parameters()
@@ -217,7 +217,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         self.validate_kl_annealing_parameters()
         self.validate_session_labels()
 
-    def validate_observation_model_parameters(self):
+    def validate_observation_model_parameters(self) -> None:
         if self.learn_means is None or self.learn_covariances is None:
             raise ValueError("learn_means and learn_covariances must be passed.")
 
@@ -227,7 +227,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
             else:
                 self.covariances_epsilon = 0.0
 
-    def validate_embedding_parameters(self):
+    def validate_embedding_parameters(self) -> None:
         if (
             self.n_sessions is None
             or self.embeddings_dim is None
@@ -240,7 +240,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         if self.dev_n_layers != 0 and self.dev_n_units is None:
             raise ValueError("Please pass dev_inf_n_units.")
 
-    def validate_kl_annealing_parameters(self):
+    def validate_kl_annealing_parameters(self) -> None:
         if self.do_kl_annealing:
             if self.kl_annealing_curve is None:
                 raise ValueError(
@@ -272,7 +272,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
                     "Number of KL annealing epochs must be greater than zero."
                 )
 
-    def validate_session_labels(self):
+    def validate_session_labels(self) -> None:
         if not self.session_labels:
             self.session_labels = [
                 SessionLabels("session_id", np.arange(self.n_sessions), "categorical")
@@ -300,7 +300,7 @@ class Model(MarkovStateInferenceModelBase):
 
     config_type = Config
 
-    def build_model(self):
+    def build_model(self) -> None:
         """Builds a keras model."""
 
         config = self.config
@@ -690,11 +690,13 @@ class Model(MarkovStateInferenceModelBase):
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
-    def compile(self, *args, **kwargs):
+    def compile(self, *args, **kwargs) -> None:
         """Wrapper for the keras model compile method."""
         super().compile(*args, jit_compile=False, **kwargs)
 
-    def fit(self, *args, kl_annealing_callback=None, **kwargs):
+    def fit(
+        self, *args, kl_annealing_callback: Optional[bool] = None, **kwargs
+    ) -> dict:
         """Wrapper for the standard keras fit method.
 
         Parameters
@@ -735,7 +737,7 @@ class Model(MarkovStateInferenceModelBase):
 
         return super().fit(*args, **kwargs)
 
-    def reset_weights(self, keep=None):
+    def reset_weights(self, keep: Optional[List[str]] = None) -> None:
         """Reset the model weights.
 
         Parameters
@@ -746,7 +748,7 @@ class Model(MarkovStateInferenceModelBase):
         super().reset_weights(keep=keep)
         self.reset_kl_annealing_factor()
 
-    def reset_kl_annealing_factor(self):
+    def reset_kl_annealing_factor(self) -> None:
         """Reset the KL annealing factor."""
         if self.config.do_kl_annealing:
             kl_loss_layer = self.model.get_layer("kl_loss")
@@ -760,7 +762,7 @@ class Model(MarkovStateInferenceModelBase):
                 covs_dev_mag_layer = self.model.get_layer("covs_dev_mag")
                 covs_dev_mag_layer.annealing_factor.assign(0.0)
 
-    def get_group_means(self):
+    def get_group_means(self) -> np.ndarray:
         """Get the group level state means.
 
         Returns
@@ -773,11 +775,11 @@ class Model(MarkovStateInferenceModelBase):
             "group_means",
         )
 
-    def get_means(self):
+    def get_means(self) -> np.ndarray:
         """Wrapper for :code:`get_group_means`."""
         return self.get_group_means()
 
-    def get_group_covariances(self):
+    def get_group_covariances(self) -> np.ndarray:
         """Get the group level state covariances.
 
         Returns
@@ -787,11 +789,11 @@ class Model(MarkovStateInferenceModelBase):
         """
         return obs_mod.get_observation_model_parameter(self.model, "group_covs")
 
-    def get_covariances(self):
+    def get_covariances(self) -> np.ndarray:
         """Wrapper for :code:`get_group_covariances`."""
         return self.get_group_covariances()
 
-    def get_group_means_covariances(self):
+    def get_group_means_covariances(self) -> Tuple[np.ndarray, np.ndarray]:
         """Get the group level state means and covariances.
 
         This is a wrapper for :code:`get_group_means` and :code:`get_group_covariances`.
@@ -805,19 +807,19 @@ class Model(MarkovStateInferenceModelBase):
         """
         return self.get_group_means(), self.get_group_covariances()
 
-    def get_means_covariances(self):
+    def get_means_covariances(self) -> Tuple[np.ndarray, np.ndarray]:
         """Wrapper for :code:`get_group_means_covariances`."""
         return self.get_group_means_covariances()
 
-    def get_group_observation_model_parameters(self):
+    def get_group_observation_model_parameters(self) -> Tuple[np.ndarray, np.ndarray]:
         """Wrapper for get_group_means_covariances."""
         return self.get_group_means_covariances()
 
-    def get_observation_model_parameters(self):
+    def get_observation_model_parameters(self) -> Tuple[np.ndarray, np.ndarray]:
         """Wrapper for :code:`get_group_observation_model_parameters`."""
         return self.get_group_observation_model_parameters()
 
-    def get_session_means_covariances(self):
+    def get_session_means_covariances(self) -> Tuple[np.ndarray, np.ndarray]:
         """Get the array means and covariances.
 
         Returns
@@ -835,7 +837,7 @@ class Model(MarkovStateInferenceModelBase):
             self.config.session_labels,
         )
 
-    def get_embedding_weights(self):
+    def get_embedding_weights(self) -> dict:
         """Get the weights of the embedding layers.
 
         Returns
@@ -845,7 +847,7 @@ class Model(MarkovStateInferenceModelBase):
         """
         return obs_mod.get_embedding_weights(self.model, self.config.session_labels)
 
-    def get_session_embeddings(self):
+    def get_session_embeddings(self) -> dict:
         """Get the embedding vectors for sessions for each session label.
 
         Returns
@@ -855,7 +857,7 @@ class Model(MarkovStateInferenceModelBase):
         """
         return obs_mod.get_session_embeddings(self.model, self.config.session_labels)
 
-    def get_summed_embeddings(self):
+    def get_summed_embeddings(self) -> np.ndarray:
         """Get the summed embeddings.
 
         Returns
@@ -865,7 +867,9 @@ class Model(MarkovStateInferenceModelBase):
         """
         return obs_mod.get_summed_embeddings(self.model, self.config.session_labels)
 
-    def set_group_means(self, group_means, update_initializer=True):
+    def set_group_means(
+        self, group_means: np.ndarray, update_initializer: bool = True
+    ) -> None:
         """Set the group means of each state.
 
         Parameters
@@ -883,7 +887,9 @@ class Model(MarkovStateInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_group_covariances(self, group_covariances, update_initializer=True):
+    def set_group_covariances(
+        self, group_covariances: np.ndarray, update_initializer: bool = True
+    ) -> None:
         """Set the group covariances of each state.
 
         Parameters
@@ -903,8 +909,11 @@ class Model(MarkovStateInferenceModelBase):
         )
 
     def set_group_means_covariances(
-        self, group_means, group_covariances, update_initializer=True
-    ):
+        self,
+        group_means: np.ndarray,
+        group_covariances: np.ndarray,
+        update_initializer: bool = True,
+    ) -> None:
         """Wrapper for :code:`set_group_means` and :code:`set_group_covariances`."""
         self.set_group_means(
             group_means,
@@ -916,8 +925,10 @@ class Model(MarkovStateInferenceModelBase):
         )
 
     def set_group_observation_model_parameters(
-        self, group_observation_model_parameters, update_initializer=True
-    ):
+        self,
+        group_observation_model_parameters: Tuple[np.ndarray, np.ndarray],
+        update_initializer: bool = True,
+    ) -> None:
         """Wrapper for :code:`set_group_means_covariances`."""
         self.set_group_means_covariances(
             group_observation_model_parameters[0],
@@ -925,32 +936,38 @@ class Model(MarkovStateInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_means(self, means, update_initializer=True):
+    def set_means(self, means: np.ndarray, update_initializer: bool = True) -> None:
         """Wrapper for :code:`set_group_means`."""
         self.set_group_means(means, update_initializer)
 
-    def set_covariances(self, covariances, update_initializer=True):
+    def set_covariances(
+        self, covariances: np.ndarray, update_initializer: bool = True
+    ) -> None:
         """Wrapper for :code:`set_group_covariances`."""
         self.set_group_covariances(covariances, update_initializer)
 
     def set_means_covariances(
         self,
-        means,
-        covariances,
-        update_initializer=True,
-    ):
+        means: np.ndarray,
+        covariances: np.ndarray,
+        update_initializer: bool = True,
+    ) -> None:
         """Wrapper for :code:`set_group_means_covariances`."""
         self.set_group_means_covariances(means, covariances, update_initializer)
 
     def set_observation_model_parameters(
-        self, observation_model_parameters, update_initializer=True
-    ):
+        self,
+        observation_model_parameters: Tuple[np.ndarray, np.ndarray],
+        update_initializer: bool = True,
+    ) -> None:
         """Wrapper for :code:`set_group_observation_model_parameters`."""
         self.set_group_observation_model_parameters(
             observation_model_parameters, update_initializer
         )
 
-    def set_regularizers(self, training_dataset):
+    def set_regularizers(
+        self, training_dataset: Union[tf.data.Dataset, "data.Data"]
+    ) -> None:
         """Set the means and covariances regularizer based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with
@@ -1006,7 +1023,9 @@ class Model(MarkovStateInferenceModelBase):
             layer = self.model.get_layer("covs_dev_decoder")
             layer.regularizer_strength *= scale_factor
 
-    def set_dev_parameters_initializer(self, training_data):
+    def set_dev_parameters_initializer(
+        self, training_data: Union["data.Data", tf.data.Dataset]
+    ) -> None:
         """Set the deviance parameters initializer based on training data.
 
         Parameters
@@ -1033,7 +1052,7 @@ class Model(MarkovStateInferenceModelBase):
         )
         self.reset()
 
-    def set_embeddings_initializer(self, initial_embeddings):
+    def set_embeddings_initializer(self, initial_embeddings: dict) -> None:
         """Set the embeddings initializer.
 
         Parameters

@@ -9,6 +9,7 @@ data (with multiple dynamics).
 
 import logging
 from dataclasses import dataclass
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -205,7 +206,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     n_init_epochs: int = 2
     init_take: float = 1.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self.validate_rnn_parameters()
         self.validate_observation_model_parameters()
         self.validate_alpha_parameters()
@@ -213,14 +214,14 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
         self.validate_dimension_parameters()
         self.validate_training_parameters()
 
-    def validate_rnn_parameters(self):
+    def validate_rnn_parameters(self) -> None:
         if self.inference_n_units is None:
             raise ValueError("Please pass inference_n_units.")
 
         if self.model_n_units is None:
             raise ValueError("Please pass model_n_units.")
 
-    def validate_observation_model_parameters(self):
+    def validate_observation_model_parameters(self) -> None:
         if (
             self.learn_means is None
             or self.learn_stds is None
@@ -244,7 +245,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
             self.pca_components = np.eye(self.n_channels)
         self.pca_components = self.pca_components.astype(np.float32)
 
-    def validate_dimension_parameters(self):
+    def validate_dimension_parameters(self) -> None:
         super().validate_dimension_parameters()
         if self.n_corr_modes is None:
             self.n_corr_modes = self.n_modes
@@ -261,7 +262,7 @@ class Model(VariationalInferenceModelBase):
 
     config_type = Config
 
-    def build_model(self):
+    def build_model(self) -> None:
         """Builds a keras model."""
 
         config = self.config
@@ -461,7 +462,7 @@ class Model(VariationalInferenceModelBase):
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
-    def get_means(self):
+    def get_means(self) -> np.ndarray:
         """Get the mode means.
 
         Returns
@@ -471,7 +472,7 @@ class Model(VariationalInferenceModelBase):
         """
         return obs_mod.get_observation_model_parameter(self.model, "means")
 
-    def get_stds(self):
+    def get_stds(self) -> np.ndarray:
         """Get the mode standard deviations.
 
         Returns
@@ -481,7 +482,7 @@ class Model(VariationalInferenceModelBase):
         """
         return obs_mod.get_observation_model_parameter(self.model, "stds")
 
-    def get_corrs(self):
+    def get_corrs(self) -> np.ndarray:
         """Get the mode correlations.
 
         Returns
@@ -492,7 +493,7 @@ class Model(VariationalInferenceModelBase):
         """
         return obs_mod.get_observation_model_parameter(self.model, "corrs")
 
-    def get_means_stds_corrs(self):
+    def get_means_stds_corrs(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Get the mode means, standard deviations, correlations.
 
         This is a wrapper for :code:`get_means`, :code:`get_stds`,
@@ -511,11 +512,13 @@ class Model(VariationalInferenceModelBase):
         """
         return self.get_means(), self.get_stds(), self.get_corrs()
 
-    def get_observation_model_parameters(self):
+    def get_observation_model_parameters(
+        self,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Wrapper for :code:`get_means_stds_corrs`."""
         return self.get_means_stds_corrs()
 
-    def set_means(self, means, update_initializer=True):
+    def set_means(self, means: np.ndarray, update_initializer: bool = True) -> None:
         """Set the mode means.
 
         Parameters
@@ -533,7 +536,7 @@ class Model(VariationalInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_stds(self, stds, update_initializer=True):
+    def set_stds(self, stds: np.ndarray, update_initializer: bool = True) -> None:
         """Set the mode standard deviations.
 
         Parameters
@@ -552,7 +555,7 @@ class Model(VariationalInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_corrs(self, corrs, update_initializer=True):
+    def set_corrs(self, corrs: np.ndarray, update_initializer: bool = True) -> None:
         """Set the mode correlations.
 
         Parameters
@@ -571,15 +574,23 @@ class Model(VariationalInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_means_stds_corrs(self, means, stds, corrs, update_initializer=True):
+    def set_means_stds_corrs(
+        self,
+        means: np.ndarray,
+        stds: np.ndarray,
+        corrs: np.ndarray,
+        update_initializer: bool = True,
+    ) -> None:
         """This is a wrapper for set_means, set_stds, set_corrs."""
         self.set_means(means, update_initializer=update_initializer)
         self.set_stds(stds, update_initializer=update_initializer)
         self.set_corrs(corrs, update_initializer=update_initializer)
 
     def set_observation_model_parameters(
-        self, observation_model_parameters, update_initializer=True
-    ):
+        self,
+        observation_model_parameters: Tuple[np.ndarray, np.ndarray, np.ndarray],
+        update_initializer: bool = True,
+    ) -> None:
         """Wrapper for set_means_stds_corrs."""
         self.set_means_stds_corrs(
             observation_model_parameters[0],
@@ -588,7 +599,9 @@ class Model(VariationalInferenceModelBase):
             update_initializer=update_initializer,
         )
 
-    def set_regularizers(self, training_dataset):
+    def set_regularizers(
+        self, training_dataset: Union[tf.data.Dataset, "data.Data"]
+    ) -> None:
         """Set the regularizers of means, stds and corrs based on the training data.
 
         A multivariate normal prior is applied to the mean vectors with
@@ -630,7 +643,7 @@ class Model(VariationalInferenceModelBase):
                 scale_factor,
             )
 
-    def sample_time_courses(self, n_samples):
+    def sample_time_courses(self, n_samples: int) -> Tuple[np.ndarray, np.ndarray]:
         """Uses the model RNN to sample mode mixing factors, :code:`alpha` and :code:`beta`.
 
         Parameters

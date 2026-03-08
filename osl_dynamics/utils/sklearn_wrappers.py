@@ -1,6 +1,7 @@
 """Wrappers for scikit-learn."""
 
 import logging
+from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 from scipy import special, stats
@@ -14,8 +15,13 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 def linear_regression(
-    X, y, fit_intercept, normalize=False, log_message=False, n_jobs=-1
-):
+    X: np.ndarray,
+    y: np.ndarray,
+    fit_intercept: bool,
+    normalize: bool = False,
+    log_message: bool = False,
+    n_jobs: int = -1,
+) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """Wrapper for `sklearn.linear_model.LinearRegression \
     <https://scikit-learn.org/stable/modules/generated/sklearn.linear_model\
     .LinearRegression.html>`_.
@@ -97,20 +103,20 @@ def linear_regression(
 
 
 def fit_gaussian_mixture(
-    X,
-    logit_transform=False,
-    standardize=True,
-    p_value=None,
-    one_component_percentile=None,
-    n_sigma=0,
-    label_order="mean",
-    sklearn_kwargs=None,
-    return_statistics=False,
-    show_plot=False,
-    plot_filename=None,
-    plot_kwargs=None,
-    log_message=True,
-):
+    X: np.ndarray,
+    logit_transform: bool = False,
+    standardize: bool = True,
+    p_value: Optional[float] = None,
+    one_component_percentile: Optional[float] = None,
+    n_sigma: float = 0,
+    label_order: str = "mean",
+    sklearn_kwargs: Optional[dict] = None,
+    return_statistics: bool = False,
+    show_plot: bool = False,
+    plot_filename: Optional[str] = None,
+    plot_kwargs: Optional[dict] = None,
+    log_message: bool = True,
+) -> Union[float, Tuple[float, dict]]:
     """Fits a two-component Gaussian Mixture Model (GMM).
 
     Parameters
@@ -146,9 +152,8 @@ def fit_gaussian_mixture(
     plot_filename : str, optional
         Filename to save a plot of the Gaussian mixture model.
     plot_kwargs : dict, optional
-        Keyword arguments to pass to `utils.plotting.plot_gmm
-        <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics\
-        /utils/plotting/index.html#osl_dynamics.utils.plotting.plot_gmm>`_
+        Keyword arguments to pass to
+        :func:`osl_dynamics.utils.plotting.plot_gmm`
         Only used if :code:`plot_filename` is not :code:`None`.
     log_message : bool
         Should we log a message?

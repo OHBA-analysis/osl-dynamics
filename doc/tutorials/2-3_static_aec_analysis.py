@@ -36,7 +36,7 @@ get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
 #%%
 # Load the data
 # *************
-# We now load the data into osl-dynamics using the Data class. See the `Loading Data tutorial <https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/data_loading.html>`_ for further details.
+# We now load the data into osl-dynamics using the Data class. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
 
 from osl_dynamics.data import Data
 
@@ -57,7 +57,7 @@ ts = data.time_series()
 #
 # Calculate AEC
 # *************
-# AEC can be calculated from the parcellated time series directly. First, we need to prepare the parcellated data. Previously we loaded the data using the `Data class <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/data/base/index.html#osl_dynamics.data.base.Data>`_. Fortunately, the Data class has a `prepare` method that makes this easy. Let's prepare the data for calculate the AEC network for activity in the alpha band (8-12 Hz).
+# AEC can be calculated from the parcellated time series directly. First, we need to prepare the parcellated data. Previously we loaded the data using the :class:`Data class <osl_dynamics.data.base.Data>`. Fortunately, the Data class has a `prepare` method that makes this easy. Let's prepare the data for calculate the AEC network for activity in the alpha band (8-12 Hz).
 
 # Before we can prepare the data we must specify the sampling frequency
 # (this is needed to bandpass filter the data)
@@ -82,7 +82,7 @@ ts = data.time_series()
 # - Beta: 13-30 Hz.
 # - Gamma: 30+ Hz.
 #
-# Next, we want to calculate the correlation between amplitude envelopes. osl-dynamics has the `analysis.static.functional_connectivity <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/static/index.html#osl_dynamics.analysis.static.functional_connectivity>`_ function for this.
+# Next, we want to calculate the correlation between amplitude envelopes. osl-dynamics has the :func:`analysis.static.functional_connectivity <osl_dynamics.analysis.static.functional_connectivity>` function for this.
 
 from osl_dynamics.analysis import static
 
@@ -99,7 +99,7 @@ print(aec.shape)
 #
 # Visualising networks
 # ^^^^^^^^^^^^^^^^^^^^
-# A common approach for plotting a network is as a matrix. We can do this with the `plotting.plot_matrices <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/utils/plotting/index.html#osl_dynamics.utils.plotting.plot_matrices>`_ function in osl-dynamics.
+# A common approach for plotting a network is as a matrix. We can do this with the :func:`plotting.plot_matrices <osl_dynamics.utils.plotting.plot_matrices>` function in osl-dynamics.
 
 from osl_dynamics.utils import plotting
 
@@ -121,7 +121,7 @@ fig, ax = plotting.plot_matrices(mat[:3], titles=[f"Subject {i+1}" for i in rang
 #%%
 # We can now see the off-diagonal structure a bit better. We also see there is a lot of variability between subjects.
 #
-# Another way we can visualise the network is a glass brain plot. We can do this using the `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ function in osl-dynamics. This function is a wrapper for the nilearn function `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_. Let's use `connectivity.save <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save>`_ to plot the first subject's AEC network.
+# Another way we can visualise the network is a glass brain plot. We can do this using the :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>` function in osl-dynamics. This function is a wrapper for the nilearn function `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_. Let's use :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>` to plot the first subject's AEC network.
 
 from osl_dynamics.analysis import connectivity
 
@@ -144,12 +144,12 @@ connectivity.save(
 #
 # Thresholding networks by specifying a percentile
 # ************************************************
-# We can use the `connectivity.threshold <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.threshold>`_ function in osl-dynamics to select the strongest connections. The easiest way to threshold is to pass the `percentile` argument, let's select the top 5% of connections.
+# We can use the :func:`connectivity.threshold <osl_dynamics.analysis.connectivity.threshold>` function in osl-dynamics to select the strongest connections. The easiest way to threshold is to pass the `percentile` argument, let's select the top 5% of connections.
 
 thres_aec = connectivity.threshold(aec, percentile=95)
 
 #%%
-# Note, `connectivity.threshold <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.threshold>`_ acts on the connectivity matrix from each subject separately.
+# Note, :func:`connectivity.threshold <osl_dynamics.analysis.connectivity.threshold>` acts on the connectivity matrix from each subject separately.
 #
 # Subject-specific networks
 # *************************
@@ -186,7 +186,7 @@ connectivity.save(
 )
 
 #%%
-# Note, we can also plot an AEC network as a 3D glass brain plot using `connectivity.save_interactive <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.save_interactive>`_.
+# Note, we can also plot an AEC network as a 3D glass brain plot using :func:`connectivity.save_interactive <osl_dynamics.analysis.connectivity.save_interactive>`.
 
 # Display the network
 connectivity.save_interactive(
@@ -227,7 +227,7 @@ np.fill_diagonal(group_aec, np.nan)
 plot_dist(group_aec)
 
 #%%
-# We can see there is a peak around AEC=0.05 and a long tail for higher values. We want the connections around the AEC=0.05 peak to be captured by a Gaussian and the long tail to be captured by another Gaussian. Let's fit a two component Gaussian to this distribution. Fortunately, osl-dynamics has a function to do this for us: `analysis.connectivity.fit_gmm <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.fit_gmm>`_. This function returns the threshold (as a percentile) that determines the Gaussian component a connection belongs to.
+# We can see there is a peak around AEC=0.05 and a long tail for higher values. We want the connections around the AEC=0.05 peak to be captured by a Gaussian and the long tail to be captured by another Gaussian. Let's fit a two component Gaussian to this distribution. Fortunately, osl-dynamics has a function to do this for us: :func:`analysis.connectivity.fit_gmm <osl_dynamics.analysis.connectivity.fit_gmm>`. This function returns the threshold (as a percentile) that determines the Gaussian component a connection belongs to.
 
 # Fit a two-component Gaussian mixture model to the connectivity matrix
 percentile = connectivity.fit_gmm(group_aec, show=True)
@@ -268,6 +268,6 @@ connectivity.save_interactive(
 )
 
 #%%
-# Note, osl-dynamics has a wrapper function to return the thresholded network directly (so you don't need to threshold yourself): `connectivity.gmm_threshold <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/connectivity/index.html#osl_dynamics.analysis.connectivity.gmm_threshold>`_. Using this function, we can threshold connectivity matrix in one line::
+# Note, osl-dynamics has a wrapper function to return the thresholded network directly (so you don't need to threshold yourself): :func:`connectivity.gmm_threshold <osl_dynamics.analysis.connectivity.gmm_threshold>`. Using this function, we can threshold connectivity matrix in one line::
 #
 #     thres_aec_mean = connectivity.gmm_threshold(aec_mean, p_value=0.01)

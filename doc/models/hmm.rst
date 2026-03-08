@@ -10,7 +10,7 @@ The HMM is a popular model for studying time series data. The HMM has been used 
 
 This model consists of two parts:
 
-- A **hidden state** (also known as latent variable) whose dynamics are govern by a **transition probability matrix**.
+- A **hidden state** (also known as latent variable) whose dynamics are governed by a **transition probability matrix**.
 - An **observation model**, which is the process of generating data given the hidden state.
 
 Generative Model
@@ -19,22 +19,22 @@ Generative Model
 A generative model can be written down mathematically by specifying the joint distribution of observed and latent variables. The joint probability distribution for the HMM generating a sequence of data is
 
 .. math::
-    p(x_{1:T}, \theta_{1:T}) = p(x_1 | \theta_1) p(\theta_1) \prod^T_{t=2} p(x_t | \theta_t) p(\theta_t | \theta_{t-1}),
+    p(x_{1:T}, s_{1:T}) = p(x_1 | s_1) p(s_1) \prod^T_{t=2} p(x_t | s_t) p(s_t | s_{t-1}),
 
-where :math:`x_{1:T}` denotes a sequence of observed data (:math:`x_1, x_2, ..., x_T`) and :math:`\theta_{1:T}` denotes a sequence of hidden states (:math:`\theta_1, \theta_2, ..., \theta_T`).
+where :math:`x_{1:T}` denotes a sequence of observed data (:math:`x_1, x_2, ..., x_T`) and :math:`s_{1:T}` denotes a sequence of hidden states (:math:`s_1, s_2, ..., s_T`).
 
-:math:`p(x_t | \theta_t)` is the probability distribution for the observed data given the hidden state. In this package, we use a multivariate normal distribution to specify this distribution.
+:math:`p(x_t | s_t)` is the probability distribution for the observed data given the hidden state. In this package, we use a multivariate normal distribution to specify this distribution.
 
 .. math::
-    p(x_t | \theta_t = k) = \mathcal{N}(m_k, C_k),
+    p(x_t | s_t = k) = \mathcal{N}(m_k, C_k),
 
 where :math:`m_k` and :math:`C_k` are state means and covariances and :math:`k` indexes the state that is active.
 
-:math:`p(\theta_t | \theta_{t-1})` is the temporal model for the hidden state. Because the probability of the next state only depends on the current state (known as the **Markovian constraint**), this conditional probability distribution can be represented as a matrix.
+:math:`p(s_t | s_{t-1})` is the temporal model for the hidden state. Because the probability of the next state only depends on the current state (known as the **Markovian constraint**), this conditional probability distribution can be represented as a matrix.
 
 The generative model is shown graphically below. The hidden states are the grey nodes and the observed data are white nodes. Arrows connect variables that are conditionally dependent.
 
-.. image:: images/hmm-generative-model.png
+.. image:: images/hmm-generative-model.jpeg
     :class: no-scaled-link
     :width: 400
     :align: center
@@ -44,25 +44,27 @@ Inference
 
 The process of inference is to learn model parameters from observed data. In our case, the model parameters are:
 
-- The transition probability matrix, :math:`p(\theta_t | \theta_{t-1})`.
-- The hidden state at each time point, :math:`\theta_t`.
+- The hidden state at each time point, :math:`s_t`.
+- The transition probability matrix, :math:`A_{ij} = p(s_t = i | s_{t-1} = j)`.
+- The initial state probabilities, :math:`\pi_1 = p(s_1)`.
 - The observation model parameters: state means, :math:`m_k`, and covariances, :math:`C_k`.
 
-In addition, we want to learn the uncertainty in our estimates for the model parameters. We do this with 'Bayesian inference' by learning probability distributions for each model parameter. We use a method of Bayesian inference known as **variational Bayes**, which turns the problem of inference into an optimization task. In short, the way this process works is:
+We use a Bayesian inference method called the **Expectation-Maximization (EM) algorithm** to learn these parameters. In short:
 
-- We randomly initialize approximate distributions for model parameters (known as an **approximate posterior distribution**). I.e. we propose the distribution :math:`q(.)` for the model parameters.
-- We use the generative model to calculate a cost function (**variational free energy**), which capture the likelihood of our current model parameters generating the data we have observed.
-- We tweak the model parameters distributions :math:`q(.)` to minimise the cost function.
-- We take the most likely value from :math:`q(.)` as our estimate for the model parameters (this is known as the **MAP estimate**).
+- We randomly initialize the model parameters.
+- E-step: we use the current value of the model parameters :math:`\{ A_{ij}, \pi_1, m_k, C_k \}` to estimate the state probabilities :math:`q(s_t)` (**posterior**).
+- M-step: we use the state probabilities :math:`q(s_t)` from the E-step to update the model parameters :math:`\{ A_{ij}, \pi_1, m_k, C_k \}`.
 
-We do the above for small subsets of our entire training dataset (batches), which leads to noisy updates to the model parameters. Over time they converge to the best parameters for generating the observed data. This process is known as **stochastic variational Bayes** and allows us to scale to large datasets.
+After we have trained the model, we take the most likely value from :math:`q(s_t)` as our estimate for the model parameters (this is known as the **MAP estimate**).
+
+We do the above for small subsets of our entire training dataset (batches), which leads to noisy updates to the model parameters. Over time they converge to the best parameters for generating the observed data.
 
 The process of inference is also known as 'training the model' or 'fitting a model'.
 
 HMM in osl-dynamics
 -------------------
 
-This package contains a Python implementation of the HMM. In this implementation we perform Bayesian inference on the hidden states, :math:`\theta_t`, but learn point estimates (i.e. not Bayesian) for all the other parameters, this includes the transition probability matrix and state means and covariances. Given the transition probability matrix, state means and covariances are global parameters (the same for all time points), modelling their uncertainty is less valuable, whereas the uncertainty in the hidden state may be different at different time points.
+This package contains a Python implementation of the HMM. In this implementation we perform Bayesian inference on the hidden states, :math:`s_t`, but learn point estimates (i.e. not Bayesian) for all the other parameters, this includes the transition probability matrix and state means and covariances. Given the transition probability matrix, state means and covariances are global parameters (the same for all time points), modelling their uncertainty is less valuable, whereas the uncertainty in the hidden state may be different at different time points.
 
 A derivation of the cost function used to train the HMM in osl-dynamics is :download:`here <images/hmm-cost-function.pdf>`. Note, we use different symbols in this derivation compared to the previous section.
 
@@ -70,6 +72,11 @@ HMM-MAR Toolbox
 ---------------
 
 Our group has previously implemented an HMM in MATLAB: `HMM-MAR <https://github.com/OHBA-analysis/HMM-MAR>`_. The model in HMM-MAR is fully Bayesian, i.e. it learns the uncertainty in all model parameters.
+
+Canonical HMM Networks
+-----------------------
+
+A set of canonical HMM networks trained on a large MEG dataset are available in the `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ repository. These can be used as a reference or starting point for HMM analyses.
 
 Post-hoc Analysis
 -----------------
@@ -81,27 +88,27 @@ Summary Statistics
 
 It is common to look at four summary statistics:
 
-- The **fractional occupancy**, which is the fraction of total that is spent in a particular state.
-- The **mean lifetime**, which is the average duration of a state visit. This is called known as the 'dwell time'.
+- The **fractional occupancy**, which is the fraction of total time that is spent in a particular state.
+- The **mean lifetime**, which is the average duration of a state visit. This is also known as the 'dwell time'.
 - The **mean interval**, which is the average duration between successive state visits.
 - The **switching rate**, which is the average number of visits to a state (i.e. activations) per second.
 
-Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <../tutorials_build/hmm_summary_stats>` for example code of how to calculate these quantities.
+Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <../tutorials_build/4-3_hmm_summary_stats>` for example code of how to calculate these quantities.
 
 Spectral Analysis
 ^^^^^^^^^^^^^^^^^
 
-When we train using the time-delay embedding (see the :doc:`Data Preparation tutorial <../tutorials_build/data_prepare_meg>` for further details) we can learn spectrally distinct states. I.e. states that exhibit oscillatory activity at different frequencies. We can estimate the power spectral density (PSD) of each state using the unprepared training data (i.e. before time-delay emebdding) and the hidden state time course. We normally a **multitaper** approach for this. This involves a few steps:
+When we train using the time-delay embedding (see the :doc:`Data Preparation tutorial <../tutorials_build/1-2_data_prepare_meg>` for further details) we can learn spectrally distinct states. I.e. states that exhibit oscillatory activity at different frequencies. We can estimate the power spectral density (PSD) of each state using the unprepared training data (i.e. before time-delay embedding) and the hidden state time course. We normally use a **multitaper** approach for this. This involves a few steps:
 
-- Multiple the (unprepared) training data by the hidden state time course (or state probability time course). This essentially picks out the time points that corresponds to when the state is activity.
+- Multiply the (unprepared) training data by the hidden state time course (or state probability time course). This essentially picks out the time points that correspond to when the state is active.
 - Split the time series into windows with no overlap. Typically we use twice the sampling frequency for the window length to give us a frequency resolution of 0.5 Hz.
 - Multiply each window by a number of 'tapers' (hence the name 'multitaper') to give a number of tapered windows.
 - For each tapered window, calculate the Fourier transform and square to give a PSD for the tapered window. Next, we average the PSD of each tapered window to give an estimate of the PSD of the window.
 - Then, average over each window's PSD to give an estimate of the PSD of the entire time series.
 
-The above is performed in the `analysis.spectral.multitaper_spectra <https://osl-dynamics.readthedocs.io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html#osl_dynamics.analysis.spectral.multitaper_spectra>`_ function in osl-dynamics.
+The above is performed in the :func:`osl_dynamics.analysis.spectral.multitaper_spectra` function in osl-dynamics.
 
-We find high frequency activity (above ~25 Hz) sometimes leads to noisy estimates for coherence networks. To remove this noise, we often use a non-negative matrix factorization (NNMF) approach to separate different bands of oscillatory activity. These bands are sometimes referred to as 'spectral components'. The :doc:`HMM Plotting MEG Networks tutorial <../tutorials_build/hmm_plotting_meg_networks>` goes into this in more detail.
+We find high frequency activity (above ~25 Hz) sometimes leads to noisy estimates for coherence networks. To remove this noise, we often use a non-negative matrix factorization (NNMF) approach to separate different bands of oscillatory activity. These bands are sometimes referred to as 'spectral components'. The :doc:`HMM Plotting MEG Networks tutorial <../tutorials_build/4-2_hmm_plotting_meg_networks>` goes into this in more detail.
 
 **When calculating power and coherence maps for HMM states the multitaper and NNMF approach is recommended.**
 

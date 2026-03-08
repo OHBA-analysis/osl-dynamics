@@ -1,5 +1,7 @@
 """Multivariate normal observation model."""
 
+from typing import Optional, Union
+
 import numpy as np
 
 from osl_dynamics.utils import array_ops
@@ -28,13 +30,13 @@ class MVN:
 
     def __init__(
         self,
-        means,
-        covariances,
-        n_modes=None,
-        n_channels=None,
-        n_covariances_act=1,
-        observation_error=0.0,
-    ):
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        n_modes: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        n_covariances_act: int = 1,
+        observation_error: float = 0.0,
+    ) -> None:
         self.n_covariances_act = n_covariances_act
         self.observation_error = observation_error
 
@@ -84,7 +86,9 @@ class MVN:
         else:
             raise ValueError("means and covariance arguments not passed correctly.")
 
-    def create_means(self, option, mu=0, sigma=0.2):
+    def create_means(
+        self, option: str, mu: float = 0, sigma: float = 0.2
+    ) -> np.ndarray:
         if option == "zero":
             means = np.zeros([self.n_modes, self.n_channels])
         elif option == "random":
@@ -97,7 +101,9 @@ class MVN:
             raise ValueError("means must be a np.array or 'zero' or 'random'.")
         return means
 
-    def create_covariances(self, option, activation_strength=1, eps=1e-6):
+    def create_covariances(
+        self, option: str, activation_strength: float = 1, eps: float = 1e-6
+    ) -> np.ndarray:
         if option == "random":
             # Randomly sample the elements of W from a normal distribution
             W = np.random.normal(
@@ -134,7 +140,7 @@ class MVN:
 
         return covariances
 
-    def simulate_data(self, state_time_course):
+    def simulate_data(self, state_time_course: np.ndarray) -> np.ndarray:
         """Simulate time series data.
 
         Parameters
@@ -177,7 +183,9 @@ class MVN:
 
         return data.astype(np.float32)
 
-    def get_instantaneous_covariances(self, state_time_course):
+    def get_instantaneous_covariances(
+        self, state_time_course: np.ndarray
+    ) -> np.ndarray:
         """Get the ground truth covariance at each time point.
 
         Parameters
@@ -233,13 +241,13 @@ class MDyn_MVN(MVN):
 
     def __init__(
         self,
-        means,
-        covariances,
-        n_modes=None,
-        n_channels=None,
-        n_covariances_act=1,
-        observation_error=0.0,
-    ):
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        n_modes: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        n_covariances_act: int = 1,
+        observation_error: float = 0.0,
+    ) -> None:
         super().__init__(
             means=means,
             covariances=covariances,
@@ -253,7 +261,7 @@ class MDyn_MVN(MVN):
         self.stds = array_ops.cov2std(self.covariances)
         self.corrs = array_ops.cov2corr(self.covariances)
 
-    def simulate_data(self, state_time_courses):
+    def simulate_data(self, state_time_courses: np.ndarray) -> np.ndarray:
         """Simulates data.
 
         Parameters
@@ -309,7 +317,9 @@ class MDyn_MVN(MVN):
 
         return data.astype(np.float32)
 
-    def get_instantaneous_covariances(self, state_time_courses):
+    def get_instantaneous_covariances(
+        self, state_time_courses: np.ndarray
+    ) -> np.ndarray:
         """Get the ground truth covariance at each time point.
 
         Parameters
@@ -395,20 +405,20 @@ class MSess_MVN(MVN):
 
     def __init__(
         self,
-        session_means,
-        session_covariances,
-        n_modes=None,
-        n_channels=None,
-        n_covariances_act=1,
-        embedding_vectors=None,
-        n_sessions=None,
-        embeddings_dim=None,
-        spatial_embeddings_dim=None,
-        embeddings_scale=None,
-        n_groups=None,
-        between_group_scale=None,
-        observation_error=0.0,
-    ):
+        session_means: Union[np.ndarray, str],
+        session_covariances: Union[np.ndarray, str],
+        n_modes: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        n_covariances_act: int = 1,
+        embedding_vectors: Optional[np.ndarray] = None,
+        n_sessions: Optional[int] = None,
+        embeddings_dim: Optional[int] = None,
+        spatial_embeddings_dim: Optional[int] = None,
+        embeddings_scale: Optional[float] = None,
+        n_groups: Optional[int] = None,
+        between_group_scale: Optional[float] = None,
+        observation_error: float = 0.0,
+    ) -> None:
         self.n_covariances_act = n_covariances_act
         self.observation_error = observation_error
         self.embeddings_dim = embeddings_dim
@@ -525,7 +535,9 @@ class MSess_MVN(MVN):
             self.group_covariances = super().create_covariances(session_covariances)
             self.session_covariances = self.create_session_covariances()
 
-    def validate_embedding_parameters(self, embedding_vectors):
+    def validate_embedding_parameters(
+        self, embedding_vectors: Optional[np.ndarray]
+    ) -> None:
         if embedding_vectors is None:
             if self.embeddings_dim is None:
                 raise ValueError(
@@ -552,7 +564,7 @@ class MSess_MVN(MVN):
                     "'between_group_scale'."
                 )
 
-    def create_embeddings(self, embedding_vectors):
+    def create_embeddings(self, embedding_vectors: Optional[np.ndarray]) -> None:
         if embedding_vectors is None:
             # Assign groups to sessions
             assigned_groups = np.random.choice(self.n_groups, self.n_sessions)
@@ -575,7 +587,9 @@ class MSess_MVN(MVN):
         else:
             self.embeddings = embedding_vectors
 
-    def create_linear_transform(self, input_dim, output_dim, scale=0.1):
+    def create_linear_transform(
+        self, input_dim: int, output_dim: int, scale: float = 0.1
+    ) -> np.ndarray:
         linear_transform = np.random.normal(
             scale=scale,
             size=(output_dim, input_dim),
@@ -584,7 +598,7 @@ class MSess_MVN(MVN):
             np.sum(np.square(linear_transform), axis=-1, keepdims=True)
         )
 
-    def create_session_means_deviations(self):
+    def create_session_means_deviations(self) -> None:
         means_spatial_embeddings_lienar_transform = self.create_linear_transform(
             self.n_channels, self.spatial_embeddings_dim
         )
@@ -621,7 +635,7 @@ class MSess_MVN(MVN):
             @ self.means_concat_embeddings[..., None]
         )
 
-    def create_session_covariances_deviations(self):
+    def create_session_covariances_deviations(self) -> None:
         covariances_spatial_embeddings_linear_transform = self.create_linear_transform(
             self.n_channels * (self.n_channels + 1) // 2, self.spatial_embeddings_dim
         )
@@ -663,7 +677,7 @@ class MSess_MVN(MVN):
             @ self.covariances_concat_embeddings[..., None]
         )
 
-    def create_session_means(self, option):
+    def create_session_means(self, option: str) -> np.ndarray:
         if option == "zero":
             session_means = np.zeros([self.n_sessions, self.n_modes, self.n_channels])
         else:
@@ -671,7 +685,7 @@ class MSess_MVN(MVN):
             session_means = self.group_means[None, ...] + self.means_deviations
         return session_means
 
-    def create_session_covariances(self, eps=1e-6):
+    def create_session_covariances(self, eps: float = 1e-6) -> np.ndarray:
         self.create_session_covariances_deviations()
         group_cholesky_covariances = np.linalg.cholesky(self.group_covariances)
         m, n = np.tril_indices(self.n_channels)
@@ -700,7 +714,9 @@ class MSess_MVN(MVN):
 
         return session_covariances
 
-    def simulate_session_data(self, session, mode_time_course):
+    def simulate_session_data(
+        self, session: int, mode_time_course: np.ndarray
+    ) -> np.ndarray:
         """Simulate single session data.
 
         Parameters
@@ -742,7 +758,9 @@ class MSess_MVN(MVN):
 
         return data.astype(np.float32)
 
-    def get_session_instantaneous_covariances(self, session, mode_time_course):
+    def get_session_instantaneous_covariances(
+        self, session: int, mode_time_course: np.ndarray
+    ) -> np.ndarray:
         """Get ground truth covariances at each time point for a particular session.
 
         Parameters
@@ -772,7 +790,9 @@ class MSess_MVN(MVN):
 
         return inst_covs.astype(np.float32)
 
-    def get_instantaneous_covariances(self, mode_time_courses):
+    def get_instantaneous_covariances(
+        self, mode_time_courses: np.ndarray
+    ) -> np.ndarray:
         """Get ground truth covariance at each time point for each session.
 
         Parameters
@@ -796,7 +816,7 @@ class MSess_MVN(MVN):
             )
         return np.array(inst_covs)
 
-    def simulate_multi_session_data(self, mode_time_courses):
+    def simulate_multi_session_data(self, mode_time_courses: np.ndarray) -> np.ndarray:
         """Simulates data.
 
         Parameters
