@@ -68,7 +68,7 @@ config = Config(
     sequence_length=200,
     learn_means=False,
     learn_covariances=True,
-    batch_size=16,
+    batch_size=256,
     learning_rate=0.01,
     n_epochs=20,
 )
