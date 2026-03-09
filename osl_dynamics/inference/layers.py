@@ -2229,8 +2229,8 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         return log_likelihood  # shape = (None, sequence_length, n_states)
 
     def compute_output_shape(self, input_shape: tf.TensorShape) -> tf.TensorShape:
-        output_shape = input_shape[0]
-        return output_shape
+        x_shape = input_shape[0]  # (None, sequence_length, n_channels)
+        return (x_shape[0], x_shape[1], self.n_states)
 
 
 class SeparatePoissonLogLikelihoodLayer(layers.Layer):
