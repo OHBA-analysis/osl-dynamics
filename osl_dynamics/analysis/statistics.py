@@ -14,7 +14,7 @@ def evoked_response_max_stat_perm(
     metric: str = "copes",
     n_jobs: int = 1,
 ) -> np.ndarray:
-    """Statistical significance testing for evoked responses.
+    r"""Statistical significance testing for evoked responses.
 
     This function fits a General Linear Model (GLM) with ordinary least
     squares and performs a sign-flip permutation to build a null distribution
@@ -78,7 +78,7 @@ def group_diff_max_stat_perm(
     metric: str = "tstats",
     n_jobs: int = 1,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Statistical significance testing for difference between two groups.
+    r"""Statistical significance testing for difference between two groups.
 
     This function fits a General Linear Model (GLM) with ordinary least
     squares and performs a row-shuffle permutation to build a null distribution
@@ -161,7 +161,7 @@ def paired_diff_max_stat_perm(
     metric: str = "copes",
     n_jobs: int = 1,
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """Statistical significance testing for paired difference.
+    r"""Statistical significance testing for paired difference.
 
     This function fits a General Linear Model (GLM) with ordinary least
     squares and performs sign-flip permutations to build a null distribution

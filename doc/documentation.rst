@@ -3,14 +3,12 @@ Documentation
 
 Welcome to the osl-dynamics documentation!
 
-New users should start with the :doc:`Getting Started <getting_started>` guide for a quick introduction and then work through the tutorials below. The :doc:`FAQ <faq>` covers common questions about data preparation, model training, and post-hoc analysis.
+New users can start with the :doc:`Getting Started <getting_started>` guide for a quick introduction and then work through the tutorials below. The :doc:`FAQ <faq>` covers common questions about data preparation, model training, and post-hoc analysis.
 
 API Reference
 -------------
 
 The :doc:`API reference <autoapi/index>` provides documentation for all classes, methods, and functions in osl-dynamics.
-
-**New users are encouraged to have a look at the config API interface:** :mod:`osl_dynamics.config_api`. The config API provides high-level wrapper functions for common analysis pipelines.
 
 Models
 ------

@@ -28,7 +28,40 @@ A typical analysis with osl-dynamics follows these steps:
 Quick Example
 -------------
 
-Here is a minimal example of training an HMM using a YAML config::
+Here is a minimal example of training an HMM using the Data API::
+
+    from osl_dynamics.data import Data
+    from osl_dynamics.models.hmm import Config, Model
+
+    # Load data
+    data = Data(["subject1.npy", "subject2.npy", ...])
+
+    # Prepare data
+    data.prepare({"tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+                   "standardize": {}})
+
+    # Create and train the model
+    config = Config(
+        n_states=8,
+        n_channels=data.n_channels,
+        sequence_length=200,
+        learn_means=False,
+        learn_covariances=True,
+        batch_size=256,
+        learning_rate=0.01,
+        n_epochs=20,
+    )
+    model = Model(config)
+    model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
+    model.fit(data)
+
+    # Get inferred state probabilities
+    alpha = model.get_alpha(data)
+
+Using the Config API
+--------------------
+
+For a more streamlined approach, you can use the Config API with a YAML config::
 
     from osl_dynamics.config_api import run_pipeline
 
@@ -69,39 +102,6 @@ where ``config.yml`` is a YAML file containing the pipeline configuration, e.g.:
 and ``results`` is the output directory.
 
 The YAML config specifies a pipeline of functions to run. Each top-level key (e.g. ``load_data``, ``train_hmm``) corresponds to a function in :mod:`osl_dynamics.config_api.wrappers`. See the :mod:`wrappers API reference <osl_dynamics.config_api.wrappers>` for the full list of available functions and their arguments.
-
-Step-by-Step with the Data API
-------------------------------
-
-For more control, you can use the lower-level API directly::
-
-    from osl_dynamics.data import Data
-    from osl_dynamics.models.hmm import Config, Model
-
-    # Load data
-    data = Data(["subject1.npy", "subject2.npy", ...])
-
-    # Prepare data
-    data.prepare({"tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
-                   "standardize": {}})
-
-    # Create and train the model
-    config = Config(
-        n_states=8,
-        n_channels=data.n_channels,
-        sequence_length=200,
-        learn_means=False,
-        learn_covariances=True,
-        batch_size=256,
-        learning_rate=0.01,
-        n_epochs=20,
-    )
-    model = Model(config)
-    model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
-    model.fit(data)
-
-    # Get inferred state probabilities
-    alpha = model.get_alpha(data)
 
 What Next?
 ----------
