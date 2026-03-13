@@ -183,18 +183,16 @@ print(f"Saved: {preproc_file}")
 #
 #     **No structural MRI?** If you don't have a subject-specific MRI, you can skip this step and use the standard MNI152 brain bundled with osl-dynamics. Set ``surfaces_dir = files.mni152_surfaces.directory`` in Step 3 and pass ``allow_mri_scaling=True`` during coregistration.
 #
-# This step requires `FSL <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki>`_. The example data includes pre-computed surfaces, so we skip extraction here. To run it yourself, uncomment the code below.
-#
 # The output plots overlay each extracted surface (yellow line) on the structural MRI. Check that each surface matches the corresponding anatomical boundary. If they don't, consider using the standard MNI152 brain as a fallback.
 
 surfaces_dir = str(output_dir / "anat_surfaces" / f"sub-{subject}")
 
-# rhino.extract_surfaces(
-#     mri_file=str(mri_file),
-#     outdir=surfaces_dir,
-#     include_nose=False,
-#     do_mri2mniaxes_xform=False,
-# )
+rhino.extract_surfaces(
+    mri_file=str(mri_file),
+    outdir=surfaces_dir,
+    include_nose=False,
+    do_mri2mniaxes_xform=False,
+)
 
 #%%
 # Step 3: Coregistration
