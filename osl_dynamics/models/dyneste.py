@@ -30,7 +30,8 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.utils.misc import set_logging_level, replace_argument
+from osl_dynamics.utils.logger import set_logging_level
+from osl_dynamics.utils.misc import replace_argument
 
 _logger = logging.getLogger("osl-dynamics")
 
