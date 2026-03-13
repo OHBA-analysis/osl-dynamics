@@ -18,6 +18,8 @@ dependencies:
   - scikit-learn
   - seaborn
   - tqdm
+  - fslpy
+  - ipyevents
   - pip:
     - tensorflow==2.16.1
     - tensorflow-probability==0.24

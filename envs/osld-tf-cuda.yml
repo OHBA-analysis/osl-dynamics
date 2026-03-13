@@ -18,6 +18,8 @@ dependencies:
   - scikit-learn
   - seaborn
   - tqdm
+  - fslpy
+  - ipyevents
   - pip:
     - tensorflow[and-cuda]==2.19
     - tensorflow-probability[tf]==0.25
