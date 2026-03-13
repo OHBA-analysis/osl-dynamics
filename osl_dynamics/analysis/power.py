@@ -395,9 +395,7 @@ def save(
         if ".nii" in filename:
             # Convert parcel values to voxel values
             power_map = [
-                parcel_vector_to_voxel_grid(
-                    mask_file, parcellation_file, p
-                )
+                parcel_vector_to_voxel_grid(mask_file, parcellation_file, p)
                 for p in power_map
             ]
             power_map = np.moveaxis(power_map, 0, -1)

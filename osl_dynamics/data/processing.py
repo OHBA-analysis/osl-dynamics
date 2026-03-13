@@ -199,5 +199,3 @@ def downsample(x: np.ndarray, new_freq: float, old_freq: float) -> np.ndarray:
         verbose=False,
     )
     return X.astype(x.dtype)
-
-

@@ -476,6 +476,5 @@ def system_call(cmd: str, verbose: bool = True) -> None:
     os.system(cmd)
 
 
-
 # set_logging_level has moved to osl_dynamics.utils.logger
 from osl_dynamics.utils.logger import set_logging_level

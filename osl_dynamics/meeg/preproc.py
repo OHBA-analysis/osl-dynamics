@@ -542,7 +542,9 @@ def _decimate_headshape(
 
 
 def _rotate_pointcloud(
-    points: np.ndarray, angle_degrees: float, axis: str = "x",
+    points: np.ndarray,
+    angle_degrees: float,
+    axis: str = "x",
 ) -> np.ndarray:
     """
     Rotates the point cloud around a specified axis.
@@ -587,7 +589,8 @@ def _rotate_pointcloud(
 
 
 def _grid_average_decimate(
-    point_cloud: np.ndarray, voxel_size: float,
+    point_cloud: np.ndarray,
+    voxel_size: float,
 ) -> np.ndarray:
     """Decimate a point cloud using grid averaging.
 
@@ -626,7 +629,8 @@ def _grid_average_decimate(
 
 
 def save_qc_plots(
-    raw: mne.io.Raw, output_dir: Union[str, Path],
+    raw: mne.io.Raw,
+    output_dir: Union[str, Path],
 ) -> None:
     """Save preprocessing QC plots and summary.
 
@@ -650,9 +654,7 @@ def save_qc_plots(
     # Save preprocessing summary
     total_duration = raw.times[-1]
     bad_duration = sum(
-        a["duration"]
-        for a in raw.annotations
-        if a["description"].startswith("bad")
+        a["duration"] for a in raw.annotations if a["description"].startswith("bad")
     )
     summary = {
         "total_duration_s": round(total_duration, 1),
@@ -676,7 +678,9 @@ def save_qc_plots(
 
     # Sum-square excluding bads
     plot_sum_square_time_series(raw, exclude_bads=True)
-    plt.savefig(output_dir / "1_sum_square_exclude_bads.png", dpi=150, bbox_inches="tight")
+    plt.savefig(
+        output_dir / "1_sum_square_exclude_bads.png", dpi=150, bbox_inches="tight"
+    )
     plt.close("all")
 
     # Channel standard deviations
@@ -686,7 +690,8 @@ def save_qc_plots(
 
 
 def plot_sum_square_time_series(
-    raw: mne.io.Raw, exclude_bads: bool = False,
+    raw: mne.io.Raw,
+    exclude_bads: bool = False,
 ) -> None:
     """Plot sum-square time series.
 
@@ -788,7 +793,8 @@ def plot_sum_square_time_series(
 
 
 def plot_channel_stds(
-    raw: mne.io.Raw, exclude_bad_segments: bool = True,
+    raw: mne.io.Raw,
+    exclude_bad_segments: bool = True,
 ) -> None:
     """Plot distribution of standard deviations across channels.
 

@@ -79,5 +79,7 @@ def run(
 
     if plots_dir is not None:
         report.generate_report(
-            plots_dir, sessions or items, output_dir=output_dir,
+            plots_dir,
+            sessions or items,
+            output_dir=output_dir,
         )

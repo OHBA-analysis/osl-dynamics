@@ -99,7 +99,6 @@ def extract_surfaces(
 
     # RHINO does everthing in mm
 
-
     print()
     print("Extracting surfaces")
     print("-------------------")
@@ -309,7 +308,7 @@ def extract_surfaces(
         fsl_wrappers.concatxfm(
             flirt_mri2mni_xform_file,
             flirt_mni2mnibigfov_xform_file,
-            flirt_mri2mnibigfov_xform_file
+            flirt_mri2mnibigfov_xform_file,
         )  # Note, the wrapper reverses the order of arguments
 
         # Move MRI to MNI big FOV space and load in
@@ -407,9 +406,13 @@ def extract_surfaces(
         mask[:, :, 50:300] = ndimage.morphology.binary_fill_holes(mask[:, :, 50:300])
 
         for i in range(mask.shape[0]):
-            mask[i, :, 50:300] = ndimage.morphology.binary_fill_holes(mask[i, :, 50:300])
+            mask[i, :, 50:300] = ndimage.morphology.binary_fill_holes(
+                mask[i, :, 50:300]
+            )
         for i in range(mask.shape[1]):
-            mask[:, i, 50:300] = ndimage.morphology.binary_fill_holes(mask[:, i, 50:300])
+            mask[:, i, 50:300] = ndimage.morphology.binary_fill_holes(
+                mask[:, i, 50:300]
+            )
         for i in range(50, 300, 1):
             mask[:, :, i] = ndimage.morphology.binary_fill_holes(mask[:, :, i])
 
@@ -454,7 +457,7 @@ def extract_surfaces(
         # Command: fslcpgeom <src> <dest>
         fsl_wrappers.fslcpgeom(
             f"{flirt_outskin_bigfov_file}.nii.gz",
-            f"{flirt_outskin_bigfov_file}_plus_nose.nii.gz"
+            f"{flirt_outskin_bigfov_file}_plus_nose.nii.gz",
         )
 
         # Transform outskin plus nose nii mesh from MNI big FOV to MRI space
@@ -530,7 +533,9 @@ def extract_surfaces(
 
 
 def plot_surfaces(
-    outdir: str, id: str, include_nose: bool = True,
+    outdir: str,
+    id: str,
+    include_nose: bool = True,
 ) -> None:
     """Plot a structural MRI and extracted surfaces.
 
@@ -729,13 +734,7 @@ def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
     )
 
     # Polhemus headshape points in HEAD space in mm
-    headshape = (
-        data[0:num_headshape_pnts]
-        .iloc[:, 1:4]
-        .to_numpy()
-        .astype("float64")
-        .T
-    )
+    headshape = data[0:num_headshape_pnts].iloc[:, 1:4].to_numpy().astype("float64").T
 
     # Save
     print(f"Saved: {fns.coreg.head_nasion_file}")
@@ -749,7 +748,8 @@ def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
 
 
 def remove_stray_headshape_points(
-    fns: OSLFilenames, nose: bool = True,
+    fns: OSLFilenames,
+    nose: bool = True,
 ) -> None:
     """Remove stray headshape points.
 
@@ -978,7 +978,9 @@ def coregister_head_and_mri(
 
     if use_nose:
         print("The MRI-derived nose is going to be used to aid coregistration.")
-        print("Please ensure that rhino.extract_surfaces was run with include_nose=True.")
+        print(
+            "Please ensure that rhino.extract_surfaces was run with include_nose=True."
+        )
         print("Please ensure that the headshape points include the nose.")
     else:
         print("The MRI-derived nose is not going to be used to aid coregistration.")
@@ -1186,20 +1188,14 @@ def coregister_head_and_mri(
         xform_icp = np.eye(4)
 
     # Create refined xforms using result from ICP
-    xform_scalednative2head_refined = (
-        np.linalg.inv(xform_icp) @ xform_scalednative2head
-    )
+    xform_scalednative2head_refined = np.linalg.inv(xform_icp) @ xform_scalednative2head
 
     # Put MRI-derived fiducials into refined HEAD space
     mri_nasion_head = _xform_points(
         xform_scalednative2head_refined, mri_nasion_scalednative
     )
-    mri_rpa_head = _xform_points(
-        xform_scalednative2head_refined, mri_rpa_scalednative
-    )
-    mri_lpa_head = _xform_points(
-        xform_scalednative2head_refined, mri_lpa_scalednative
-    )
+    mri_rpa_head = _xform_points(xform_scalednative2head_refined, mri_rpa_scalednative)
+    mri_lpa_head = _xform_points(xform_scalednative2head_refined, mri_lpa_scalednative)
 
     # ---------------
     # Save coreg info
@@ -1217,22 +1213,16 @@ def coregister_head_and_mri(
     # we later want to map back into MNI space from head space following
     # source recon, i.e. by combining this xform with sfns.mni_mri_t_file
     xform_native2head_refined = (
-        np.linalg.inv(xform_icp)
-        @ xform_scalednative2head
-        @ xform_native2scalednative
+        np.linalg.inv(xform_icp) @ xform_scalednative2head @ xform_native2scalednative
     )
     xform_native2head_refined_copy = np.copy(xform_native2head_refined)
-    head_mri_t = Transform(
-        "head", "mri", np.linalg.inv(xform_native2head_refined_copy)
-    )
+    head_mri_t = Transform("head", "mri", np.linalg.inv(xform_native2head_refined_copy))
     write_trans(cfns.head_mri_t_file, head_mri_t, overwrite=True)
 
     # Save xform from mrivoxel to mri
     nativeindex_scalednative_t = np.copy(xform_nativeindex2scalednative)
     mrivoxel_scaledmri_t = Transform("mri_voxel", "mri", nativeindex_scalednative_t)
-    write_trans(
-        cfns.mrivoxel_scaledmri_t_file, mrivoxel_scaledmri_t, overwrite=True
-    )
+    write_trans(cfns.mrivoxel_scaledmri_t_file, mrivoxel_scaledmri_t, overwrite=True)
 
     # Save MRI derived fiducials in mm in HEAD space
     np.savetxt(cfns.mri_nasion_file, mri_nasion_head)
@@ -1505,7 +1495,10 @@ def plot_coregistration(
                 polhemus_headshape_megt = polhemus_headshape_meg.T
                 if len(polhemus_headshape_megt) < 200:
                     scale = 0.007
-                elif len(polhemus_headshape_megt) >= 200 and len(polhemus_headshape_megt) < 400:
+                elif (
+                    len(polhemus_headshape_megt) >= 200
+                    and len(polhemus_headshape_megt) < 400
+                ):
                     scale = 0.005
                 elif len(polhemus_headshape_megt) >= 400:
                     scale = 0.003

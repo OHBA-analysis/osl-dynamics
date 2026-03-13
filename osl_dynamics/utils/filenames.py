@@ -60,9 +60,7 @@ class CoregFilenames:
         self.head_scaledmri_t_file = f"{root}/head_scaledmri-trans.fif"
         self.head_mri_t_file = f"{root}/head_mri-trans.fif"
         self.ctf_head_mri_t_file = f"{root}/ctf_head_mri-trans.fif"
-        self.mrivoxel_scaledmri_t_file = (
-            f"{root}/mrivoxel_scaledmri_t_file-trans.fif"
-        )
+        self.mrivoxel_scaledmri_t_file = f"{root}/mrivoxel_scaledmri_t_file-trans.fif"
 
         # Fiducials / headshape points
         self.mri_nasion_file = f"{root}/mri_nasion.txt"
@@ -75,9 +73,7 @@ class CoregFilenames:
 
         # Freesurfer mesh in native space
         self.bet_outskin_surf_file = f"{root}/scaled_outskin.surf"
-        self.bet_outskin_plus_nose_surf_file = (
-            f"{root}/scaled_outskin_plus_nose.surf"
-        )
+        self.bet_outskin_plus_nose_surf_file = f"{root}/scaled_outskin_plus_nose.surf"
         self.bet_inskull_surf_file = f"{root}/scaled_inskull.surf"
         self.bet_outskull_surf_file = f"{root}/scaled_outskull.surf"
 

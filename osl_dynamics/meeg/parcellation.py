@@ -174,9 +174,7 @@ def parcel_vector_to_voxel_grid(
             [(parcellation_grid == value).astype(int) for value in unique_values]
         )
         parcellation_grid = np.rollaxis(parcellation_grid, 0, 4)
-        parc = nib.Nifti1Image(
-            parcellation_grid, parc.affine, parc.header
-        )
+        parc = nib.Nifti1Image(parcellation_grid, parc.affine, parc.header)
 
     # Make sure the parcellation grid matches the mask file
     parc = image.resample_to_img(
@@ -931,7 +929,8 @@ def convert_to_mne_raw(
         indices = raw.time_as_index(times, use_rounding=True)
         indices = indices[: data.shape[1]]
         full_data = np.zeros(
-            [data.shape[0], len(raw.times)], dtype=np.float32,
+            [data.shape[0], len(raw.times)],
+            dtype=np.float32,
         )
         full_data[:, indices] = data
     else:
@@ -941,7 +940,9 @@ def convert_to_mne_raw(
     if ch_names is None:
         ch_names = [f"channel_{i}" for i in range(full_data.shape[0])]
     new_info = mne.create_info(
-        ch_names=ch_names, ch_types="misc", sfreq=raw.info["sfreq"],
+        ch_names=ch_names,
+        ch_types="misc",
+        sfreq=raw.info["sfreq"],
     )
     new_raw = mne.io.RawArray(full_data, new_info)
 

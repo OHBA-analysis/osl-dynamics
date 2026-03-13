@@ -360,13 +360,12 @@ def _build_step_tab(
     parts.append(
         f'<input type="text" id="input-{step_num}" '
         f'value="{session_ids[0] if session_ids else ""}" '
-        f'onkeydown="if(event.key===\'Enter\')jumpToSession({step_num})" '
+        f"onkeydown=\"if(event.key==='Enter')jumpToSession({step_num})\" "
         f'placeholder="Type session ID...">'
     )
     parts.append(f'<button onclick="nextSession({step_num})">&#9654;</button>')
     parts.append(
-        f'<span class="counter" id="counter-{step_num}">'
-        f"1 / {total}</span>"
+        f'<span class="counter" id="counter-{step_num}">' f"1 / {total}</span>"
     )
     parts.append("</div>")
 
@@ -414,7 +413,9 @@ def _build_step_tab(
 
 
 def _copy_surface_plots(
-    plots_dir: Path, sessions: Dict, output_dir: Path,
+    plots_dir: Path,
+    sessions: Dict,
+    output_dir: Path,
 ) -> None:
     """Copy surface extraction PNGs from the derivatives directory.
 
@@ -493,8 +494,7 @@ def generate_report(
             f"</button>"
         )
         tab_contents.append(
-            f'<div class="tab-content{active}" id="tab-{step_num}">'
-            f"{content}</div>"
+            f'<div class="tab-content{active}" id="tab-{step_num}">' f"{content}</div>"
         )
         first = False
 

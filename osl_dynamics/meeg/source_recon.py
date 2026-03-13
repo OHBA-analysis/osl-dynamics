@@ -284,9 +284,7 @@ def apply_lcmv_beamformer(
     # Convert voxel_coords_head to unscaled MRI
     # head_mri_t_file xform is to unscaled MRI
     head_mri_t = mne.transforms.read_trans(fns.coreg.head_mri_t_file)
-    voxel_coords_mri = rhino._xform_points(
-        head_mri_t["trans"], voxel_coords_head.T
-    ).T
+    voxel_coords_mri = rhino._xform_points(head_mri_t["trans"], voxel_coords_head.T).T
 
     # Convert voxel_coords_mri to MNI
     # mni_mri_t_file xform is to unscaled MRI
@@ -315,7 +313,7 @@ def apply_lcmv_beamformer(
     system_call(
         f"flirt -in {reference_brain} -ref {reference_brain} "
         f"-out {reference_brain_resampled} -applyisoxfm {spatial_resolution}",
-        verbose=False
+        verbose=False,
     )
     voxel_coords_mni_resampled, _ = _niimask2mmpointcloud(reference_brain_resampled)
 
@@ -353,7 +351,7 @@ def _make_lcmv(
     """Compute LCMV spatial filter.
 
     Modified version of mne.beamformer.make_lcmv.
-    
+
     Parameters
     ----------
     info : instance of mne.Info
@@ -402,12 +400,12 @@ def _make_lcmv(
         The inversion scheme to compute the weights.
     verbose : bool, str, int, or None
         If not None, override default verbose level (see mne.verbose).
-        
+
     Returns
     -------
     filters : instance of mne.beamformer.Beamformer
         Dictionary containing filter weights from LCMV beamformer. See MNE docs.
-        
+
     """
     # Check number of sensor types present in the data and ensure a noise cov
     info = mne._fiff.meas_info._simplify_info(info)
@@ -431,15 +429,17 @@ def _make_lcmv(
     if inversion == "single":
         depth["combine_xyz"] = False
 
-    is_free_ori, info, proj, vertno, G, whitener, nn, orient_std = _prepare_beamformer_input(
-        info,
-        fwd,
-        label,
-        pick_ori,
-        noise_cov=noise_cov,
-        rank=noise_rank,
-        pca=False,
-        **depth,
+    is_free_ori, info, proj, vertno, G, whitener, nn, orient_std = (
+        _prepare_beamformer_input(
+            info,
+            fwd,
+            label,
+            pick_ori,
+            noise_cov=noise_cov,
+            rank=noise_rank,
+            pca=False,
+            **depth,
+        )
     )
     del noise_rank
 
@@ -614,9 +614,9 @@ def _compute_beamformer(
     mne.utils._check_option("inversion", inversion, ("matrix", "single"))
 
     if (
-        inversion == "single" \
-        and n_orient > 1 \
-        and pick_ori == "vector" \
+        inversion == "single"
+        and n_orient > 1
+        and pick_ori == "vector"
         and weight_norm == "unit-noise-gain-invariant"
     ):
         raise ValueError(
@@ -628,8 +628,8 @@ def _compute_beamformer(
         raise ValueError(
             'reduce_rank cannot be used with inversion="single"; '
             'consider using inversion="matrix" if you have a rank-deficient '
-            'forward model (i.e., from a sphere model with MEG channels), '
-            'otherwise consider using reduce_rank=False'
+            "forward model (i.e., from a sphere model with MEG channels), "
+            "otherwise consider using reduce_rank=False"
         )
     if n_orient > 1:
         _, Gk_s, _ = np.linalg.svd(Gk, full_matrices=False)
@@ -696,7 +696,7 @@ def _compute_beamformer(
 
         # Sort eigenvectors by eigenvalues for picking
         order = np.argsort(np.abs(eig_vals), axis=-1)
-        #eig_vals = np.take_along_axis(eig_vals, order, axis=-1)
+        # eig_vals = np.take_along_axis(eig_vals, order, axis=-1)
         max_power_ori = eig_vecs[np.arange(len(eig_vecs)), :, order[:, -1]]
 
         assert max_power_ori.shape == (n_sources, n_orient)
@@ -769,9 +769,9 @@ def _compute_beamformer(
         # which is not rotation invariant:
         if weight_norm in ("unit-noise-gain", "nai"):
             noise_norm = np.matmul(W, W.swapaxes(-2, -1).conj()).real
-            noise_norm = np.reshape(
-                noise_norm, (n_sources, -1, 1)
-            )[:, :: n_orient + 1] # np.diag operation over last two axes
+            noise_norm = np.reshape(noise_norm, (n_sources, -1, 1))[
+                :, :: n_orient + 1
+            ]  # np.diag operation over last two axes
             np.sqrt(noise_norm, out=noise_norm)
             noise_norm[noise_norm == 0] = np.inf
             assert noise_norm.shape == (n_sources, n_orient, 1)
@@ -835,7 +835,7 @@ def _prepare_beamformer_input(
     """Input preparation common for LCMV, DICS, and RAP-MUSIC.
 
     Modified version of mne.beamformer._prepare_beamformer_input.
-    
+
     Parameters
     ----------
     info : instance of mne.Info
@@ -867,8 +867,8 @@ def _prepare_beamformer_input(
     allow_fixed_depth : bool
         If True, fixed depth weighting is allowed.
     limit_depth_chs : bool
-        If True, use only grad channels for depth weighting. 
-        
+        If True, use only grad channels for depth weighting.
+
     Returns
     -------
     is_free_ori : bool
@@ -881,7 +881,7 @@ def _prepare_beamformer_input(
         The indices of the vertices corresponding to the source space.
     G : array
         The forward operator restricted to selected channels.
-    whitener : array  
+    whitener : array
         The whitener for the selected channels.
     nn : array
         The normals of the source space.
@@ -900,7 +900,7 @@ def _prepare_beamformer_input(
 
     # MWW
     # Restrict forward solution to selected vertices
-    #if label is not None:
+    # if label is not None:
     #    _, src_sel = label_src_vertno_sel(label, forward["src"])
     #    forward = _restrict_forward_to_src_sel(forward, src_sel)
 
@@ -908,25 +908,29 @@ def _prepare_beamformer_input(
         loose = 0.0 if mne.forward.forward.is_fixed_orient(forward) else 1.0
 
     # MWW
-    #if noise_cov is None:
+    # if noise_cov is None:
     #    noise_cov = make_ad_hoc_cov(info, std=1.0)
 
-    forward, info_picked, gain, _, orient_prior, _, trace_GRGT, noise_cov, whitener = _prepare_forward(
-        forward,
-        info,
-        noise_cov,
-        "auto",
-        loose,
-        rank=rank,
-        pca=pca,
-        use_cps=True,
-        exp=exp,
-        limit_depth_chs=limit_depth_chs,
-        combine_xyz=combine_xyz,
-        limit=limit,
-        allow_fixed_depth=allow_fixed_depth,
+    forward, info_picked, gain, _, orient_prior, _, trace_GRGT, noise_cov, whitener = (
+        _prepare_forward(
+            forward,
+            info,
+            noise_cov,
+            "auto",
+            loose,
+            rank=rank,
+            pca=pca,
+            use_cps=True,
+            exp=exp,
+            limit_depth_chs=limit_depth_chs,
+            combine_xyz=combine_xyz,
+            limit=limit,
+            allow_fixed_depth=allow_fixed_depth,
+        )
     )
-    is_free_ori = not mne.forward.forward.is_fixed_orient(forward)  # could have been changed
+    is_free_ori = not mne.forward.forward.is_fixed_orient(
+        forward
+    )  # could have been changed
     nn = forward["source_nn"]
     if is_free_ori:  # take Z coordinate
         nn = nn[2::3]
@@ -964,7 +968,8 @@ def _prepare_beamformer_input(
 
 
 def _niimask2mmpointcloud(
-    nii_mask: str, volindex: Optional[int] = None,
+    nii_mask: str,
+    volindex: Optional[int] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Takes in a nii.gz mask (which equals zero for background and neq zero
     for the mask) and returns the mask as a 3 x npoints point cloud in native
@@ -1000,7 +1005,8 @@ def _niimask2mmpointcloud(
 
 
 def _closest_node(
-    node: np.ndarray, nodes: np.ndarray,
+    node: np.ndarray,
+    nodes: np.ndarray,
 ) -> Tuple[int, float]:
     """Find nearest node in nodes to the passed in node.
 
