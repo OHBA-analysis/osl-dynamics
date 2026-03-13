@@ -379,7 +379,7 @@ def plot_psds(
             psd.append(p)
         psd = np.mean(psd, axis=0)
     else:
-        # Calcualte PSD of continuous data
+        # Calculate PSD of continuous data
         f, psd = scipy.signal.welch(parc_ts, fs=fs, nperseg=fs, nfft=fs * 2)
 
     # Plot
@@ -424,27 +424,29 @@ def save_qc_plots(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    from osl_dynamics.analysis import power
+    from osl_dynamics.utils.plotting import plot_psd_topo, plot_brain_surface
+
+    # Load data and compute PSD once
+    if "epo.fif" in parc_fif:
+        parc_raw = mne.Epochs(parc_fif)
+    else:
+        parc_raw = mne.io.read_raw_fif(parc_fif)
+
+    fs = parc_raw.info["sfreq"]
+    parc_ts = parc_raw.get_data(picks="misc", reject_by_annotation="omit")
+    f, psd = scipy.signal.welch(parc_ts, fs=fs, nperseg=fs, nfft=fs * 2)
+
     # PSD topography
-    plot_psds(
-        parc_fif,
+    plot_psd_topo(
+        f,
+        psd,
         parcellation_file=parcellation_file,
         filename=str(output_dir / "4_psd_topo.png"),
     )
     plt.close("all")
 
     # Band power maps
-    from osl_dynamics.analysis import power, static
-    from osl_dynamics.utils.plotting import plot_brain_surface
-
-    parc_raw = mne.io.read_raw_fif(parc_fif)
-    parc_ts = parc_raw.get_data(picks="misc", reject_by_annotation="omit")
-    fs = parc_raw.info["sfreq"]
-    f, psd = static.welch_spectra(
-        parc_ts.T,
-        sampling_frequency=fs,
-        calc_coh=False,
-    )
-
     mask_file = f"{files.mask.path}/MNI152_T1_8mm_brain.nii.gz"
     bands = {
         "delta": [1, 4],

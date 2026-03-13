@@ -84,6 +84,7 @@ bids_dir = Path("BIDS")
 raw_file = bids_dir / f"sub-{subject}/meg/sub-{subject}_run-{run}_task-{task}_raw_meg.fif"
 mri_file = bids_dir / f"sub-{subject}/anat/sub-{subject}_T1w.nii.gz"
 output_dir = bids_dir / "derivatives"
+plots_dir = Path("plots")
 
 # Preprocessing parameters
 resample_freq = 250  # Hz
@@ -144,11 +145,6 @@ raw = preproc.detect_bad_segments(raw, picks="grad")
 raw = preproc.detect_bad_segments(raw, picks="grad", mode="diff")
 
 #%%
-# **QC: Sum-of-squares plot.** The shaded regions show detected bad segments. Check that genuine artefacts are being caught and that good data is not being removed.
-
-preproc.plot_sum_square_time_series(raw)
-
-#%%
 # Bad channel detection
 # *********************
 #
@@ -158,9 +154,9 @@ raw = preproc.detect_bad_channels(raw, picks="mag")
 raw = preproc.detect_bad_channels(raw, picks="grad")
 
 #%%
-# **QC: Channel standard deviations.** Bad channels are shown in red. The distribution of standard deviations across channels should be unimodal; outliers indicate noisy sensors.
+# **QC:** Save preprocessing QC plots (PSD, sum-of-squares time series, channel standard deviations). Check that bad segments and channels are being correctly identified.
 
-preproc.plot_channel_stds(raw)
+preproc.save_qc_plots(raw, plots_dir / id)
 
 #%%
 # Save preprocessed data
@@ -237,16 +233,26 @@ rhino.coregister_head_and_mri(
     fns,
     use_nose=False,
     allow_mri_scaling=False,  # set True if using MNI152 standard brain
+    plot_type="html",
 )
 
 #%%
-# **QC:** The 3D plot shows the MEG sensors (blue), headshape points (red dots), fiducials, and MRI surfaces. Check that the headshape points sit on the scalp surface and the sensors surround the head correctly.
+# **QC:** Save the coregistration plot. The 3D plot shows the MEG sensors (blue), headshape points (red dots), fiducials, and MRI surfaces. Check that the headshape points sit on the scalp surface and the sensors surround the head correctly.
 #
 # If the coregistration looks off, you can try:
 #
 # - Removing stray headshape points with ``rhino.remove_stray_headshape_points``.
 # - Manually editing the headshape/fiducial text files in ``fns.coreg_dir``.
 # - Setting ``use_nose=True`` if the nose digitisation is good.
+
+import shutil
+
+session_plots_dir = plots_dir / id
+session_plots_dir.mkdir(parents=True, exist_ok=True)
+shutil.copy(
+    Path(fns.coreg_dir) / "coreg.html",
+    session_plots_dir / "3_coreg.html",
+)
 
 #%%
 # Step 4: Forward Model
@@ -320,12 +326,12 @@ parcellation.save_as_fif(
 print(f"Saved: {parc_fif}")
 
 #%%
-# QC: Power spectral density
-# **************************
+# QC: PSD and power maps
+# **********************
 #
-# A good sanity check is to plot the PSD of each parcel. We expect to see an alpha peak (~10 Hz) that is strongest in posterior parcels. If this is absent or the spectra look unusual, something may have gone wrong in the pipeline.
+# A good sanity check is to plot the PSD of each parcel and band-limited power maps. We expect to see an alpha peak (~10 Hz) that is strongest in posterior parcels. If this is absent or the spectra look unusual, something may have gone wrong in the pipeline.
 
-parcellation.plot_psds(parc_fif, parcellation_file=parcellation_file)
+parcellation.save_qc_plots(parc_fif, parcellation_file, plots_dir / id)
 
 #%%
 # Summary and Next Steps

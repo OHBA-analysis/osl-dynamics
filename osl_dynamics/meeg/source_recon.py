@@ -139,7 +139,7 @@ def lcmv_beamformer(
         # data will become (ntpts x (rank_meg + rank_eeg)) and cov will be
         # (rank_meg + rank_eeg) x (rank_meg + rank_eeg) and include correlations
         # between eeg and meg subspaces. The output data_cov is cov projected
-        # back onto the indivdual sensor types mag, grad, eeg.
+        # back onto the individual sensor types mag, grad, eeg.
         #
         # Prior to computing anything, including the subspaces each of mag, grad,
         # eeg are scaled so that they are on comparable scales to aid mixing in
@@ -707,7 +707,7 @@ def _compute_beamformer(
         max_power_ori *= signs
 
         # Compute the lead field for the optimal orientation,
-        # and adjust numer/denom
+        # and adjust number/denom
         Gk = np.matmul(Gk, max_power_ori[..., np.newaxis])
         n_orient = 1
 

@@ -61,7 +61,7 @@ def extract_surfaces(
           headshape points in native MRI space, which can be used in the
           headshape points registration later.
        b) The scalp surface (outer skin), inner skull and brain surface, these
-          can be used for forward modelling later. Note that  due to the unusal
+          can be used for forward modelling later. Note that  due to the unusual
           naming conventions used by BET:
           - bet_inskull_mesh_file is actually the brain surface
           - bet_outskull_mesh_file is actually the inner skull surface
@@ -97,7 +97,7 @@ def extract_surfaces(
     # - MRI (native): mri_mrivoxel_t (native2nativeindex) --> MRI (native) voxel indices
     # - MRI (native): sform (mri2mniaxes) --> MNI axes
 
-    # RHINO does everthing in mm
+    # RHINO does everything in mm
 
     print()
     print("Extracting surfaces")
@@ -269,7 +269,7 @@ def extract_surfaces(
     #    headshape points in native MRI space, which can be used in the
     #    headshape points registration later.
     # b) The scalp surface (outer skin), inner skull and brain surface, these
-    #    can be used for forward modelling later. Note that due to the unusal
+    #    can be used for forward modelling later. Note that due to the unusual
     #    naming conventions used by BET:
     #    - bet_inskull_mesh_file is actually the brain surface
     #    - bet_outskull_mesh_file is actually the inner skull surface
@@ -788,7 +788,7 @@ def remove_stray_headshape_points(
     hs = hs[:, ~remove]
 
     # Overwrite headshape file
-    print(f"Overwritting: {fns.head_headshape_file}")
+    print(f"Overwriting: {fns.head_headshape_file}")
     np.savetxt(fns.head_headshape_file, hs)
 
 
@@ -963,7 +963,7 @@ def coregister_head_and_mri(
     # - HEAD (polhemus): head_mri_t (polhemus2native) --> MRI (native)
     # - MRI (native): mri_mrivoxel_t (native2nativeindex) --> MRI (native) voxel indices
 
-    # RHINO does everthing in mm
+    # RHINO does everything in mm
 
     print()
     print("Running coregistration (HEAD (polhemus) -> MRI)")
@@ -1290,7 +1290,7 @@ def plot_coregistration(
     # HEAD (polhemus): head_mri_t (polhemus2native) --> MRI (native)
     # MRI (native): mri_mrivoxel_t (native2nativeindex) --> MRI (native) voxel indices
 
-    # RHINO does everthing in mm
+    # RHINO does everything in mm
 
     print("Plotting coregistration")
 
@@ -1671,7 +1671,7 @@ def plot_coregistration(
                 plotter.screenshot(outname)
 
         else:
-            raise ValueError("Extention must be png or html.")
+            raise ValueError("Extension must be png or html.")
 
         if show and len(outnames) > 0:
             titles = ["Frontal", "Right", "Top"]
@@ -1811,7 +1811,7 @@ def _setup_volume_source_space(fns, gridstep=5, mindist=5.0, exclude=0.0):
 
     where they are in native MRI space in metres.
     """
-    # Note that due to the unusal naming conventions used by BET and MNE:
+    # Note that due to the unusual naming conventions used by BET and MNE:
     # - bet_inskull_*_file is actually the brain surface
     # - bet_outskull_*_file is actually the inner skull surface
     # - bet_outskin_*_file is the outer skin/scalp surface
@@ -2135,11 +2135,11 @@ def _get_flirtcoords2native_xform(nii_mesh_file):
     See the bet_surf manual:
     https://fsl.fmrib.ox.ac.uk/fsl/fslwiki/BET/UserGuide#betsurf
 
-    If the image has radiological ordering (see fslorient) then the mm co-ordinates
-    are the voxel co-ordinates scaled by the mm voxel sizes.
+    If the image has radiological ordering (see fslorient) then the mm coordinates
+    are the voxel coordinates scaled by the mm voxel sizes.
 
     i.e. (x_mm = x_dim * x) where x_mm are the flirtcoords coords in mm, x is the
-    voxel co-ordinate and x_dim is the voxel size in mm.
+    voxel coordinate and x_dim is the voxel size in mm.
     """
     mri_orient = _get_orient(nii_mesh_file)
     if mri_orient != "RADIOLOGICAL":
@@ -2198,7 +2198,7 @@ def _get_vtk_mesh_native(vtk_mesh_file, nii_mesh_file):
 
 
 def _xform_points(xform, pnts):
-    """Applies homogenous linear transformation to an array of 3D coordinates.
+    """Applies homogeneous linear transformation to an array of 3D coordinates.
 
     Parameters
     ----------

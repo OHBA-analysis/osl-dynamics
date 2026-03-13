@@ -14,6 +14,7 @@ pyyaml
 pqdm
 scipy
 scikit-learn
+scikit-image
 seaborn
 tqdm
 fslpy
