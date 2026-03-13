@@ -29,9 +29,13 @@ STEPS = {
     },
     3: {
         "name": "Coregistration",
-        "files": [
-            "3_coreg.html",
+        "files": [],
+        "row_files": [
+            "3_coreg_frontal.png",
+            "3_coreg_right.png",
+            "3_coreg_top.png",
         ],
+        "row_labels": ["Frontal", "Right", "Top"],
     },
     4: {
         "name": "Source Recon & Parcellation",
@@ -396,10 +400,13 @@ def _build_step_tab(
 
         # Render row files (e.g. power maps in a horizontal row)
         if row_files:
+            row_labels = step_info.get("row_labels", [])
             parts.append('<div class="image-row">')
-            for filename in row_files:
+            for i, filename in enumerate(row_files):
                 filepath = session_dir / filename
                 parts.append('<div class="image-row-item">')
+                if i < len(row_labels):
+                    parts.append(f'<div class="file-label">{row_labels[i]}</div>')
                 if filepath.exists():
                     parts.append(_embed_png(filepath))
                 else:
