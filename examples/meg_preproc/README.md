@@ -31,7 +31,7 @@ Run the scripts **in order**. Each script processes all sessions in parallel.
 
 ## Usage
 
-These scripts can be copied and run from anywhere on your system.
+These scripts can be copied and run from anywhere on your system. The pipeline modules are imported from the `osl_dynamics.meeg` subpackage.
 
 ```bash
 conda activate osld
