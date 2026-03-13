@@ -43,7 +43,6 @@ sphinx_gallery_conf = {
     "examples_dirs": "tutorials",        # Contains source .py files
     "gallery_dirs": "tutorials_build",   # Where to output rendered gallery
     "filename_pattern": r".*\.py",       # Include all .py files, can specific a particular set tutorials, e.g. r"1-.*\.py" for 1-*.py tutorials
-    "ignore_pattern": r"0-1_.*\.py",     # Skip tutorials that require FSL
     "run_stale_examples": True,          # Force re-run when building
     "within_subsection_order": FileNameSortKey,  # Build in alphabetical order of the filenames
 }

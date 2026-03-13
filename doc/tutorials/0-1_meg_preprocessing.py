@@ -20,9 +20,7 @@ Prerequisites
 Input Data
 ^^^^^^^^^^
 
-In this tutorial, we will use data from the `Wakeman-Henson dataset <https://www.nature.com/articles/sdata20151>`_. This is a visual perception task recorded on an Elekta MEG system with a co-registered structural MRI.
-
-We expect data in BIDS format::
+In this tutorial, we will use data from the `Wakeman-Henson dataset <https://www.nature.com/articles/sdata20151>`_. This is a visual perception task recorded on an Elekta MEG system with a co-registered structural MRI. The data in BIDS format::
 
     BIDS/
     ├── sub-01/
@@ -39,65 +37,71 @@ Output is written to ``BIDS/derivatives/``.
 # Download the dataset
 # ^^^^^^^^^^^^^^^^^^^^
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
-
-import os
-
-def get_data(name):
-    os.system(f"osf -p by2tc fetch data/{name}.zip")
-    os.system(f"unzip -o {name}.zip")
-    os.remove(f"{name}.zip")
-    return f"Data downloaded to: {name}"
-
-# Download the dataset
-get_data("wakeman_henson_raw_1_subject")
+#
+# .. code-block:: python
+#
+#     import os
+#
+#     def get_data(name):
+#         os.system(f"osf -p by2tc fetch data/{name}.zip")
+#         os.system(f"unzip -o {name}.zip")
+#         os.remove(f"{name}.zip")
+#         return f"Data downloaded to: {name}"
+#
+#     # Download the dataset
+#     get_data("wakeman_henson_raw_1_subject")
 
 #%%
 # Setup and Configuration
 # ^^^^^^^^^^^^^^^^^^^^^^^
-
-from pathlib import Path
-
-import mne
-import numpy as np
-import matplotlib
-matplotlib.use("Agg")
-
-from osl_dynamics import files
-from osl_dynamics.meeg import preproc, rhino, source_recon, parcellation
-from osl_dynamics.utils.filenames import OSLFilenames
+#
+# .. code-block:: python
+#
+#     from pathlib import Path
+#
+#     import mne
+#     import numpy as np
+#     import matplotlib
+#     matplotlib.use("Agg")
+#
+#     from osl_dynamics import files
+#     from osl_dynamics.meeg import preproc, rhino, source_recon, parcellation
+#     from osl_dynamics.utils.filenames import OSLFilenames
 
 #%%
-# Edit the cell below to match your data. This is the only cell you need to change.
-
-# Session info
-subject = "01"
-run = "01"
-task = "visual"
-id = f"sub-{subject}_run-{run}_task-{task}"
-
-# Paths
-bids_dir = Path("BIDS")
-raw_file = bids_dir / f"sub-{subject}/meg/sub-{subject}_run-{run}_task-{task}_raw_sss.fif"
-mri_file = bids_dir / f"sub-{subject}/anat/sub-{subject}_T1w.nii.gz"
-output_dir = bids_dir / "derivatives"
-plots_dir = Path("plots")
-
-# Preprocessing parameters
-resample_freq = 250  # Hz
-bandpass = (1, 45)  # Hz
-notch_freqs = [50, 100]  # Hz (mains frequency and harmonics)
-
-# Source reconstruction parameters
-gridstep = 8  # dipole grid resolution in mm
-chantypes = ["mag", "grad"]  # Elekta has both magnetometers and gradiometers
-rank = {"meg": 60}  # effective rank after MaxFilter
-
-# Parcellation
-parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
-
-print(f"Session ID: {id}")
-print(f"Raw file: {raw_file}")
-print(f"MRI file: {mri_file}")
+# Edit the cell below to match your data.
+#
+# .. code-block:: python
+#
+#     # Session info
+#     subject = "01"
+#     run = "01"
+#     task = "visual"
+#     id = f"sub-{subject}_run-{run}_task-{task}"
+#
+#     # Paths
+#     bids_dir = Path("BIDS")
+#     raw_file = bids_dir / f"sub-{subject}/meg/sub-{subject}_run-{run}_task-{task}_raw_sss.fif"
+#     mri_file = bids_dir / f"sub-{subject}/anat/sub-{subject}_T1w.nii.gz"
+#     output_dir = bids_dir / "derivatives"
+#     plots_dir = Path("plots")
+#
+#     # Preprocessing parameters
+#     resample_freq = 250  # Hz
+#     bandpass = (1, 45)  # Hz
+#     notch_freqs = [50, 100]  # Hz (mains frequency and harmonics)
+#
+#     # Source reconstruction parameters
+#     gridstep = 8  # dipole grid resolution in mm
+#     chantypes = ["mag", "grad"]  # Elekta has both magnetometers and gradiometers
+#     rank = {"meg": 60}  # effective rank after MaxFilter
+#
+#     # Parcellation
+#     parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
+#
+#     print(f"Session ID: {id}")
+#     print(f"Raw file: {raw_file}")
+#     print(f"MRI file: {mri_file}")
 
 #%%
 # Step 1: Preprocessing
@@ -108,60 +112,72 @@ print(f"MRI file: {mri_file}")
 # - Resampling to reduce data size.
 # - Bandpass filtering to remove slow drifts and high-frequency noise.
 # - Notch filtering to remove mains frequency contamination.
-# - Detecting and annotating bad segments (outlier time windows).
+# - Detecting and annotating bad segments (outlier temporal windows).
 # - Detecting bad channels (outlier sensors).
 #
 # Load raw data
 # *************
-
-raw = mne.io.read_raw_fif(raw_file, preload=True)
+#
+# .. code-block:: python
+#
+#     raw = mne.io.read_raw_fif(raw_file, preload=True)
 
 #%%
 # Resample and filter
 # *******************
-
-raw = raw.resample(sfreq=resample_freq)
-raw = raw.filter(
-    l_freq=bandpass[0],
-    h_freq=bandpass[1],
-    method="iir",
-    iir_params={"order": 5, "ftype": "butter"},
-)
-raw = raw.notch_filter(notch_freqs)
+#
+# .. code-block:: python
+#
+#     raw = raw.resample(sfreq=resample_freq)
+#     raw = raw.filter(
+#         l_freq=bandpass[0],
+#         h_freq=bandpass[1],
+#         method="iir",
+#         iir_params={"order": 5, "ftype": "butter"},
+#     )
+#     raw = raw.notch_filter(notch_freqs)
 
 #%%
 # Bad segment detection
 # *********************
 #
 # We use the Generalized Extreme Studentized Deviate (G-ESD) algorithm to identify windows with outlier standard deviation. We run this separately for magnetometers and gradiometers, in both standard and ``diff`` modes (the latter catches segments where the signal changes abruptly within a window).
-
-raw = preproc.detect_bad_segments(raw, picks="mag")
-raw = preproc.detect_bad_segments(raw, picks="mag", mode="diff")
-raw = preproc.detect_bad_segments(raw, picks="grad")
-raw = preproc.detect_bad_segments(raw, picks="grad", mode="diff")
+#
+# .. code-block:: python
+#
+#     raw = preproc.detect_bad_segments(raw, picks="mag")
+#     raw = preproc.detect_bad_segments(raw, picks="mag", mode="diff")
+#     raw = preproc.detect_bad_segments(raw, picks="grad")
+#     raw = preproc.detect_bad_segments(raw, picks="grad", mode="diff")
 
 #%%
 # Bad channel detection
 # *********************
 #
 # Channels with outlier standard deviations are marked as bad.
-
-raw = preproc.detect_bad_channels(raw, picks="mag")
-raw = preproc.detect_bad_channels(raw, picks="grad")
+#
+# .. code-block:: python
+#
+#     raw = preproc.detect_bad_channels(raw, picks="mag")
+#     raw = preproc.detect_bad_channels(raw, picks="grad")
 
 #%%
-# **QC:** Save preprocessing QC plots (PSD, sum-of-squares time series, channel standard deviations). Check that bad segments and channels are being correctly identified.
-
-preproc.save_qc_plots(raw, plots_dir / id)
+# Save preprocessing QC plots (PSD, sum-of-squares time series, channel standard deviations). Check that bad segments and channels are being correctly identified.
+#
+# .. code-block:: python
+#
+#     preproc.save_qc_plots(raw, plots_dir / id)
 
 #%%
 # Save preprocessed data
 # **********************
-
-preproc_file = output_dir / "preprocessed" / f"{id}_preproc-raw.fif"
-preproc_file.parent.mkdir(parents=True, exist_ok=True)
-raw.save(preproc_file, overwrite=True)
-print(f"Saved: {preproc_file}")
+#
+# .. code-block:: python
+#
+#     preproc_file = output_dir / "preprocessed" / f"{id}_preproc-raw.fif"
+#     preproc_file.parent.mkdir(parents=True, exist_ok=True)
+#     raw.save(preproc_file, overwrite=True)
+#     print(f"Saved: {preproc_file}")
 
 #%%
 # Step 2: Surface Extraction
@@ -181,15 +197,17 @@ print(f"Saved: {preproc_file}")
 #     **No structural MRI?** If you don't have a subject-specific MRI, you can skip this step and use the standard MNI152 brain bundled with osl-dynamics. Set ``surfaces_dir = files.mni152_surfaces.directory`` in Step 3 and pass ``allow_mri_scaling=True`` during coregistration.
 #
 # The output plots overlay each extracted surface (yellow line) on the structural MRI. Check that each surface matches the corresponding anatomical boundary. If they don't, consider using the standard MNI152 brain as a fallback.
-
-surfaces_dir = str(output_dir / "anat_surfaces" / f"sub-{subject}")
-
-rhino.extract_surfaces(
-    mri_file=str(mri_file),
-    outdir=surfaces_dir,
-    include_nose=False,
-    do_mri2mniaxes_xform=False,
-)
+#
+# .. code-block:: python
+#
+#     surfaces_dir = str(output_dir / "anat_surfaces" / f"sub-{subject}")
+#
+#     rhino.extract_surfaces(
+#         mri_file=str(mri_file),
+#         outdir=surfaces_dir,
+#         include_nose=False,
+#         do_mri2mniaxes_xform=False,
+#     )
 
 #%%
 # Step 3: Coregistration
@@ -198,40 +216,46 @@ rhino.extract_surfaces(
 # Coregistration aligns the MEG sensor coordinate system ("head" space) to the MRI coordinate system. We use the Polhemus fiducials (nasion, LPA, RPA) and headshape points recorded during the MEG session, and fit them to the MRI surfaces using the Iterative Closest Point (ICP) algorithm.
 #
 # First, let's create an ``OSLFilenames`` container to keep track of all the pipeline output files.
-
-fns = OSLFilenames(
-    outdir=str(output_dir / "osl"),
-    id=id,
-    preproc_file=str(preproc_file),
-    surfaces_dir=surfaces_dir,
-    # If using standard brain: surfaces_dir=files.mni152_surfaces.directory
-)
-print(fns)
+#
+# .. code-block:: python
+#
+#     fns = OSLFilenames(
+#         outdir=str(output_dir / "osl"),
+#         id=id,
+#         preproc_file=str(preproc_file),
+#         surfaces_dir=surfaces_dir,
+#         # If using standard brain: surfaces_dir=files.mni152_surfaces.directory
+#     )
+#     print(fns)
 
 #%%
 # Extract fiducials and headshape
 # *******************************
 #
 # The Polhemus digitisation points are stored inside the FIF file. We extract them to text files that RHINO uses for coregistration.
-
-rhino.extract_fiducials_and_headshape_from_fif(fns)
+#
+# .. code-block:: python
+#
+#     rhino.extract_fiducials_and_headshape_from_fif(fns)
 
 #%%
 # Fix stray Polhemus headshape points
 # ***********************************
 #
 # Sometimes we want to remove some Polhemus headshape points, we have to do this manually. Note, this step has to be adapted to your specific dataset of interest.
-
-hs = np.loadtxt(fns.coreg.head_headshape_file)
-nas = np.loadtxt(fns.coreg.head_nasion_file)
-lpa = np.loadtxt(fns.coreg.head_lpa_file)
-rpa = np.loadtxt(fns.coreg.head_rpa_file)
-
-remove = np.logical_and(hs[1] > max(lpa[1], rpa[1]), hs[2] < nas[2])
-hs = hs[:, ~remove]
-
-print(f"Overwriting: {fns.coreg.head_headshape_file}")
-np.savetxt(fns.coreg.head_headshape_file, hs)
+#
+# .. code-block:: python
+#
+#     hs = np.loadtxt(fns.coreg.head_headshape_file)
+#     nas = np.loadtxt(fns.coreg.head_nasion_file)
+#     lpa = np.loadtxt(fns.coreg.head_lpa_file)
+#     rpa = np.loadtxt(fns.coreg.head_rpa_file)
+#
+#     remove = np.logical_and(hs[1] > max(lpa[1], rpa[1]), hs[2] < nas[2])
+#     hs = hs[:, ~remove]
+#
+#     print(f"Overwriting: {fns.coreg.head_headshape_file}")
+#     np.savetxt(fns.coreg.head_headshape_file, hs)
 
 #%%
 # Run coregistration
@@ -241,30 +265,34 @@ np.savetxt(fns.coreg.head_headshape_file, hs)
 #
 # - ``use_nose=False`` — Should we use the nose in the coregistration? (the nose is often removed when an MRI is defaced, in this scenario you shouldn't use the nose).
 # - ``allow_mri_scaling=False`` — Don't scale the MRI to fit the headshape. Set ``True`` if using the MNI152 standard brain, which needs to be scaled to match the subject's head size.
-
-rhino.coregister_head_and_mri(
-    fns,
-    use_nose=False,
-    allow_mri_scaling=False,  # set True if using MNI152 standard brain
-)
+#
+# .. code-block:: python
+#
+#     rhino.coregister_head_and_mri(
+#         fns,
+#         use_nose=False,
+#         allow_mri_scaling=False,  # set True if using MNI152 standard brain
+#     )
 
 #%%
-# **QC:** Save the coregistration plot. The 3D plot shows the MEG sensors (blue), headshape points (red dots), fiducials, and MRI surfaces. Check that the headshape points sit on the scalp surface and the sensors surround the head correctly.
+# Save the coregistration plot. The 3D plot shows the MEG sensors (blue), headshape points (red dots), fiducials, and MRI surfaces. Check that the headshape points sit on the scalp surface and the sensors surround the head correctly.
 #
 # If the coregistration looks off, you can try:
 #
 # - Removing stray headshape points with ``rhino.remove_stray_headshape_points``.
 # - Manually editing the headshape/fiducial text files in ``fns.coreg_dir``.
 # - Setting ``use_nose=False`` if the nose is included in the MRI.
-
-import shutil
-
-session_plots_dir = plots_dir / id
-session_plots_dir.mkdir(parents=True, exist_ok=True)
-for view in ["frontal", "right", "top"]:
-    src = Path(fns.coreg_dir) / f"coreg_{view}.png"
-    if src.exists():
-        shutil.copy(src, session_plots_dir / f"3_coreg_{view}.png")
+#
+# .. code-block:: python
+#
+#     import shutil
+#
+#     session_plots_dir = plots_dir / id
+#     session_plots_dir.mkdir(parents=True, exist_ok=True)
+#     for view in ["frontal", "right", "top"]:
+#         src = Path(fns.coreg_dir) / f"coreg_{view}.png"
+#         if src.exists():
+#             shutil.copy(src, session_plots_dir / f"3_coreg_{view}.png")
 
 #%%
 # Step 4: Forward Model
@@ -274,8 +302,10 @@ for view in ["frontal", "right", "top"]:
 #
 # - ``model="Single Layer"`` — Single shell head model (standard for MEG).
 # - ``gridstep=8`` — 8 mm dipole grid spacing. Smaller values give finer resolution but are slower.
-
-rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
+#
+# .. code-block:: python
+#
+#     rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
 
 #%%
 # Step 5: Source Reconstruction
@@ -290,18 +320,22 @@ rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
 #
 # Compute beamformer weights
 # **************************
-
-source_recon.lcmv_beamformer(fns, raw, chantypes=chantypes, rank=rank)
+#
+# .. code-block:: python
+#
+#     source_recon.lcmv_beamformer(fns, raw, chantypes=chantypes, rank=rank)
 
 #%%
 # Apply beamformer
 # ****************
 #
 # This applies the spatial filters to the sensor data to produce voxel time courses in MNI space. Bad segments are automatically excluded.
-
-voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns, raw)
-print(f"Voxel data shape: {voxel_data.shape} (voxels x time)")
-print(f"Voxel coords shape: {voxel_coords.shape} (voxels x 3, in MNI mm)")
+#
+# .. code-block:: python
+#
+#     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns, raw)
+#     print(f"Voxel data shape: {voxel_data.shape} (voxels x time)")
+#     print(f"Voxel coords shape: {voxel_coords.shape} (voxels x 3, in MNI mm)")
 
 #%%
 # Step 6: Parcellation
@@ -311,39 +345,42 @@ print(f"Voxel coords shape: {voxel_coords.shape} (voxels x 3, in MNI mm)")
 #
 # - ``method="spatial_basis"`` — Weight voxels by their loading on each parcel (from the atlas), rather than simple averaging.
 # - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels caused by the beamformer.
-
-parcel_data = parcellation.parcellate(
-    fns,
-    voxel_data,
-    voxel_coords,
-    method="spatial_basis",
-    orthogonalisation="symmetric",
-    parcellation_file=parcellation_file,
-)
-print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
+#
+# .. code-block:: python
+#
+#     parcel_data = parcellation.parcellate(
+#         fns,
+#         voxel_data,
+#         voxel_coords,
+#         method="spatial_basis",
+#         orthogonalisation="symmetric",
+#         parcellation_file=parcellation_file,
+#     )
+#     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
 
 #%%
 # Save parcellated data
 # *********************
 #
 # We save the parcel time courses as a FIF file. The ``extra_chans="stim"`` option preserves any stimulus channels from the original recording.
-
-parc_fif = str(output_dir / "osl" / id / "lcmv-parc-raw.fif")
-parcellation.save_as_fif(
-    parcel_data,
-    raw,
-    extra_chans="stim",
-    filename=parc_fif,
-)
-print(f"Saved: {parc_fif}")
+#
+# .. code-block:: python
+#
+#     parc_fif = str(output_dir / "osl" / id / "lcmv-parc-raw.fif")
+#     parcellation.save_as_fif(
+#         parcel_data,
+#         raw,
+#         extra_chans="stim",
+#         filename=parc_fif,
+#     )
+#     print(f"Saved: {parc_fif}")
 
 #%%
-# QC: PSD and power maps
-# **********************
-#
 # A good sanity check is to plot the PSD of each parcel and band-limited power maps. We expect to see an alpha peak (~10 Hz) that is strongest in posterior parcels. If this is absent or the spectra look unusual, something may have gone wrong in the pipeline.
-
-parcellation.save_qc_plots(parc_fif, parcellation_file, plots_dir / id)
+#
+# .. code-block:: python
+#
+#     parcellation.save_qc_plots(parc_fif, parcellation_file, plots_dir / id)
 
 #%%
 # Summary and Next Steps
@@ -391,7 +428,7 @@ parcellation.save_qc_plots(parc_fif, parcellation_file, plots_dir / id)
 #
 # - **Canonical HMM analysis** — See `here <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ for notebooks applying a canonical HMM to the parcellated data.
 # - **Batch processing** — See the `batch scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for processing many sessions in parallel.
-# - **osl-dynamics documentation** — See the :doc:`documentation <../documentation>` for further analysis tutorials.
+# - **Analysis** — See the :doc:`documentation <../documentation>` for further tutorials for static and dynamic network analysis.
 #
 # Notes on CTF and OPM data
 # *************************
