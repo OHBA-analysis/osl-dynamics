@@ -49,16 +49,15 @@ def process_session(id, info, logger, **kwargs):
         fns,
         use_nose=use_nose,
         allow_mri_scaling=allow_mri_scaling,
-        plot_type="html",
     )
 
-    logger.log("Copying plot...")
+    logger.log("Copying plots...")
     session_plots_dir = plots_dir / id
     session_plots_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy(
-        Path(fns.coreg_dir) / "coreg.html",
-        session_plots_dir / "3_coreg.html",
-    )
+    for view in ["frontal", "right", "top"]:
+        src = Path(fns.coreg_dir) / f"coreg_{view}.png"
+        if src.exists():
+            shutil.copy(src, session_plots_dir / f"3_coreg_{view}.png")
 
     logger.log("Done.")
 
