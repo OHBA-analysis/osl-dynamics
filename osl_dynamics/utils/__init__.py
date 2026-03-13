@@ -11,4 +11,4 @@ from osl_dynamics.utils import (
     topoplots,
     workbench,
 )
-from osl_dynamics.utils.misc import set_random_seed
+from osl_dynamics.utils.misc import set_random_seed, setup_fsl

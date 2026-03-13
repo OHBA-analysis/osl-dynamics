@@ -1,5 +1,6 @@
 """Miscellaneous utility classes and functions."""
 
+import os
 import inspect
 import logging
 import pickle
@@ -476,5 +477,17 @@ def system_call(cmd: str, verbose: bool = True) -> None:
     os.system(cmd)
 
 
-# set_logging_level has moved to osl_dynamics.utils.logger
-from osl_dynamics.utils.logger import set_logging_level
+def setup_fsl(directory):
+    """Setup FSL.
+
+    Parameters
+    ----------
+    directory : str
+        Path to FSL installation.
+    """
+    if "FSLDIR" not in os.environ:
+        os.environ["FSLDIR"] = directory
+    if "{:s}/bin" not in os.getenv("PATH"):
+        os.environ["PATH"] = "{:s}/bin:{:s}".format(directory, os.getenv("PATH"))
+    if "FSLOUTPUTTYPE" not in os.environ:
+        os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"
