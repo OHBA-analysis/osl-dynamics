@@ -442,6 +442,7 @@ def save_qc_plots(
         f,
         psd,
         parcellation_file=parcellation_file,
+        frequency_range=[1, 45],
         filename=str(output_dir / "4_psd_topo.png"),
     )
     plt.close("all")
