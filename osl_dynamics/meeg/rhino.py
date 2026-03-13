@@ -1483,6 +1483,10 @@ def plot_coregistration(
     # --------
     # Do plots
     # --------
+    import pyvista
+    pyvista.OFF_SCREEN = True
+    mne.viz.set_3d_backend("notebook")
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
 
@@ -2180,7 +2184,10 @@ def _transform_vtk_mesh(
     rrs_out = _xform_points(overall_xform, rrs_in.T).T
     data = pd.read_csv(vtk_mesh_file_in, sep=r"\s+")
     num_rrs = int(data.iloc[3, 1])
-    data.iloc[4 : num_rrs + 4, :3] = rrs_out
+    for col_idx in range(3):
+        col = data.columns[col_idx]
+        data[col] = data[col].astype(object)
+        data.iloc[4 : num_rrs + 4, col_idx] = rrs_out[:, col_idx]
     data.to_csv(out_vtk_file, sep=" ", index=False)
 
 

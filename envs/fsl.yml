@@ -6,7 +6,7 @@ dependencies:
   - pip
   - jupyter
   - matplotlib
-  - mne
+  - mne-base
   - nibabel
   - nilearn
   - numpy
@@ -22,6 +22,14 @@ dependencies:
   - fslpy
   - ipyevents
   - numba
+  - vtk=*=*osmesa*
+  - pyvista
+  - pyvistaqt
+  - h5io
+  - nest-asyncio2
+  - trame
+  - trame-vtk
+  - trame-vuetify
   - pip:
     - tensorflow==2.19
     - tensorflow-probability[tf]==0.25
