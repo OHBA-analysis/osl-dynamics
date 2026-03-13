@@ -22,7 +22,7 @@ dependencies:
   - fslpy
   - ipyevents
   - numba
-  - vtk=*=*osmesa
+  - vtk
   - pyvista
   - pyvistaqt
   - h5io
