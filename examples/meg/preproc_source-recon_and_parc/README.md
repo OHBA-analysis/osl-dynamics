@@ -31,7 +31,7 @@ Run the scripts **in order**. Each script processes all sessions in parallel.
 
 ## Usage
 
-These scripts can be copied and run from anywhere on your system. The pipeline modules are imported from the `osl_dynamics.meeg` subpackage.
+These scripts can be copied and run from anywhere on your system — they do not need to live inside the `Canonical-HMM-Networks` repository. The pipeline modules are imported from the `osl_dynamics.meeg` subpackage.
 
 ```bash
 conda activate osld
@@ -129,5 +129,5 @@ Full verbose output (from MNE, osl-dynamics, etc.) is saved to per-session log f
 ## Notes
 
 - Steps must be run sequentially (each depends on the output of the previous step), but within each step all sessions are processed in parallel.
-- If you do not have a structural MRI for a subject, set `use_mni152 = True` and `allow_mri_scaling = True` in `3_coreg.py` (and `4_source_recon_and_parc.py`) to use the standard MNI152 brain. You can skip `2_surfaces.py` in this case.
+- If you do not have a structural MRI for a subject, set `use_mni152 = True` and `allow_mri_scaling = True` in `3_coreg.py` (and `4_source_recon_and_parc.py`) to use the standard MNI152 brain (bundled in osl-dynamics at `osl_dynamics.files.mni152_surfaces`). You can skip `2_surfaces.py` in this case.
 - Set `n_workers` based on the number of CPU cores available. For memory-intensive steps (source reconstruction, parcellation), you may need to reduce this.
