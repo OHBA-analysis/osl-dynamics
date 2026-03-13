@@ -19,7 +19,7 @@ from osl_dynamics import files
 from osl_dynamics.utils.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
-from osl_dynamics.utils.parcellation import Parcellation, parcel_vector_to_voxel_grid
+from osl_dynamics.meeg.parcellation import Parcellation, parcel_vector_to_voxel_grid
 
 _logger = logging.getLogger("osl-dynamics")
 

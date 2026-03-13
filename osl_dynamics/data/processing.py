@@ -1,10 +1,10 @@
 """Functions to process data."""
 
-from typing import Optional, Tuple
+from typing import Optional
 
 import mne
 import numpy as np
-from scipy import signal, stats
+from scipy import signal
 
 from osl_dynamics.utils import array_ops
 
@@ -199,135 +199,3 @@ def downsample(x: np.ndarray, new_freq: float, old_freq: float) -> np.ndarray:
         verbose=False,
     )
     return X.astype(x.dtype)
-
-
-def remove_bad_segments(
-    x: np.ndarray,
-    window_length: int,
-    mode: Optional[str] = None,
-    metric: str = "std",
-    significance_level: float = 0.05,
-    maximum_fraction: float = 0.1,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Automated bad segment removal using the G-ESD algorithm.
-
-    Parameters
-    ----------
-    x : np.ndarray
-        Time series data. Shape must be (n_samples, n_channels).
-    window_length : int, optional
-        Window length to used to calculate statistics.
-        Defaults to twice the sampling frequency.
-    mode : str, optional
-        None or 'diff' to take the difference fo the time series
-        before detecting bad segments.
-    metric : str, optional
-        Either 'std' (for standard deivation) or 'kurtosis'.
-    significance_level : float, optional
-        Significance level (p-value) to consider as an outlier.
-    maximum_fraction : float, optional
-        Maximum fraction of time series to mark as bad.
-
-    Returns
-    -------
-    x : np.ndarray
-        Time series with bad segments removed.
-        Shape is (n_samples - n_bad_samples, n_channels).
-    bad : np.ndarray
-        Times of True (bad) or False (good) to indicate whether
-        a time point is good or bad. This is the full length of
-        the original time series. Shape is (n_samples,).
-    """
-    if metric not in ["std", "kurtosis"]:
-        raise ValueError("metric must be 'std' or 'kurtosis'.")
-
-    def _gesd(X, alpha=significance_level, p_out=maximum_fraction, outlier_side=0):
-        # Detect outliers using Generalized ESD test
-        #
-        # Args:
-        # - X : data to detect outliers within
-        # - alpha : significance level to detect at
-        # - p_out : maximum fraction of time series to set as outliers
-        # - outlier_side {-1,0,1} :
-        #   - -1 -> outliers are all smaller
-        #   -  0 -> outliers could be small/negative or large/positive
-        #   -  1 -> outliers are all larger
-        #
-        # Returns: boolean mask for bad segments
-        #
-        # See: B. Rosner (1983). Percentage Points for a Generalized ESD
-        # Many-Outlier Procedure. Technometrics 25(2), pp. 165-172.
-        if outlier_side == 0:
-            alpha = alpha / 2
-        n_out = int(np.ceil(len(X) * p_out))
-        if np.any(np.isnan(X)):
-            y = np.where(np.isnan(X))[0]
-            idx1, x2 = _gesd(X[np.isfinite(X)], alpha, n_out, outlier_side)
-            idx = np.zeros_like(X).astype(bool)
-            idx[y[idx1]] = True
-        n = len(X)
-        temp = X.copy()
-        R = np.zeros(n_out)
-        rm_idx = np.zeros(n_out, dtype=int)
-        lam = np.zeros(n_out)
-        for j in range(0, int(n_out)):
-            i = j + 1
-            if outlier_side == -1:
-                rm_idx[j] = np.nanargmin(temp)
-                sample = np.nanmin(temp)
-                R[j] = np.nanmean(temp) - sample
-            elif outlier_side == 0:
-                rm_idx[j] = int(np.nanargmax(abs(temp - np.nanmean(temp))))
-                R[j] = np.nanmax(abs(temp - np.nanmean(temp)))
-            elif outlier_side == 1:
-                rm_idx[j] = np.nanargmax(temp)
-                sample = np.nanmax(temp)
-                R[j] = sample - np.nanmean(temp)
-            R[j] = R[j] / np.nanstd(temp)
-            temp[int(rm_idx[j])] = np.nan
-            p = 1 - alpha / (n - i + 1)
-            t = stats.t.ppf(p, n - i - 1)
-            lam[j] = ((n - i) * t) / (np.sqrt((n - i - 1 + t**2) * (n - i + 1)))
-        mask = np.zeros(n).astype(bool)
-        mask[rm_idx[np.where(R > lam)[0]]] = True
-        return mask
-
-    # Data to calculate metrics from
-    if mode == "diff":
-        X = np.diff(x, axis=0, prepend=np.zeros_like(x[:1]))
-    else:
-        X = x
-
-    # Metric to calculate
-    if metric == "kurtosis":
-
-        def _kurtosis(inputs):
-            return stats.kurtosis(inputs, axis=None)
-
-        metric_func = _kurtosis
-    else:
-        metric_func = np.std
-
-    # Calculate metric for each window
-    metrics = []
-    indices = []
-    starts = np.arange(0, X.shape[0], window_length)
-    for i in range(len(starts)):
-        start = starts[i]
-        if i == len(starts) - 1:
-            stop = None
-        else:
-            stop = starts[i] + window_length
-        m = metric_func(X[start:stop])
-        metrics.append(m)
-        indices += [i] * len(X[start:stop])
-
-    # Detect outliers
-    bad_metrics_mask = _gesd(metrics)
-    bad_metrics_indices = np.where(bad_metrics_mask)[0]
-
-    # Look up what indices in the original data are bad
-    bad = np.isin(indices, bad_metrics_indices)
-
-    # Return good data and bad indices
-    return x[~bad], bad

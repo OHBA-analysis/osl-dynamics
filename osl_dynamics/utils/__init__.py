@@ -2,12 +2,13 @@
 
 from osl_dynamics.utils import (
     array_ops,
+    filenames,
+    logger,
     misc,
     model,
-    parcellation,
     plotting,
     sklearn_wrappers,
     topoplots,
     workbench,
 )
-from osl_dynamics.utils.misc import set_random_seed
+from osl_dynamics.utils.misc import set_random_seed, setup_fsl

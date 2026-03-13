@@ -1,12 +1,12 @@
 """Miscellaneous utility classes and functions."""
 
+import os
 import inspect
 import logging
 import pickle
 import sys
 from copy import copy
 from pathlib import Path
-from contextlib import contextmanager
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -460,11 +460,34 @@ def set_random_seed(seed: int, op_determinism: bool = False) -> None:
         tf.config.experimental.enable_op_determinism()
 
 
-@contextmanager
-def set_logging_level(logger: logging.Logger, level: int) -> None:
-    current_level = logger.getEffectiveLevel()
-    try:
-        logger.setLevel(level)
-        yield
-    finally:
-        logger.setLevel(current_level)
+def system_call(cmd: str, verbose: bool = True) -> None:
+    """Run a shell command.
+
+    Parameters
+    ----------
+    cmd : str
+        Command to execute.
+    verbose : bool, optional
+        Print the command before executing.
+    """
+    import os
+
+    if verbose:
+        print(cmd)
+    os.system(cmd)
+
+
+def setup_fsl(directory):
+    """Setup FSL.
+
+    Parameters
+    ----------
+    directory : str
+        Path to FSL installation.
+    """
+    if "FSLDIR" not in os.environ:
+        os.environ["FSLDIR"] = directory
+    if "{:s}/bin" not in os.getenv("PATH"):
+        os.environ["PATH"] = "{:s}/bin:{:s}".format(directory, os.getenv("PATH"))
+    if "FSLOUTPUTTYPE" not in os.environ:
+        os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"

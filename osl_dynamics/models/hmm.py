@@ -39,7 +39,7 @@ from osl_dynamics.models.inf_mod_base import (
     MarkovStateInferenceModelBase,
 )
 from osl_dynamics.analysis.post_hoc import hmm_dual_estimation
-from osl_dynamics.utils.misc import set_logging_level
+from osl_dynamics.utils.logger import set_logging_level
 
 _logger = logging.getLogger("osl-dynamics")
 

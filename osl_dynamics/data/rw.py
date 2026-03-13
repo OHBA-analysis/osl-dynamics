@@ -7,7 +7,6 @@ from typing import Dict, List, Optional, Union
 import mne
 import numpy as np
 import scipy.io
-from scipy import ndimage
 
 _logger = logging.getLogger("osl-dynamics")
 _allowed_ext = [".npy", ".mat", ".txt", ".fif"]
@@ -257,92 +256,6 @@ def load_fif(
             verbose=False,
         ).T
     return data
-
-
-def save_fif(
-    data: np.ndarray,
-    filename: str,
-    sampling_frequency: Optional[float] = None,
-    bad_samples: Optional[np.ndarray] = None,
-    original_fif: Optional[str] = None,
-    verbose: bool = True,
-) -> None:
-    """Save a fif file.
-
-    Parameters
-    ----------
-    data : np.ndarray
-        Data to save. Shape must be (n_good_samples, n_channels).
-    filename : str, optional
-        Output filename. Recommended to end with 'raw.fif'.
-    sampling_frequency : float
-        Sampling frequency in Hz. If None, the sampling frequency
-        is taken from :code:`original_fif`.
-    bad_samples : np.ndarray, optional
-        Boolean numpy array of shape (n_samples,) which indicates
-        if a time point is good (False) or bad (True).
-    original_fif : str, optional
-        Path to original fif file containing the data.
-        We take the timing info from this file if passed.
-    verbose : bool, optional
-        Should we print the messages?
-    """
-    if sampling_frequency is None and original_fif is None:
-        raise ValueError("Either sampling_frequency or original_fif must be passed.")
-
-    if original_fif is not None:
-        # Load original fif file and get sampling frequency
-        original_raw = mne.io.read_raw_fif(original_fif, verbose=verbose)
-        if sampling_frequency is not None:
-            if sampling_frequency != original_raw.info["sfreq"]:
-                raise ValueError(
-                    "sampling_frequency does not match original_fif.info['sfreq']."
-                )
-        sampling_frequency = original_raw.info["sfreq"]
-
-    # Create Info object
-    n_channels = data.shape[1]
-    info = mne.create_info(
-        ch_names=[f"ch_{i}" for i in range(n_channels)],
-        sfreq=sampling_frequency,
-        ch_types=["misc"] * n_channels,
-    )
-
-    if bad_samples is not None:
-        # Create the full time series with nans during bad segments
-        x = np.full([bad_samples.shape[0], data.shape[1]], np.nan)
-        x[~bad_samples] = data
-
-        # Create the Raw object
-        raw = mne.io.RawArray(x.T, info, verbose=verbose)
-
-        if original_fif is not None:
-            # Set timing info
-            raw.set_meas_date(original_raw.info["meas_date"])
-            raw.__dict__["_first_samps"] = original_raw.__dict__["_first_samps"]
-            raw.__dict__["_last_samps"] = original_raw.__dict__["_last_samps"]
-            raw.__dict__["_cropped_samp"] = original_raw.__dict__["_cropped_samp"]
-
-        # Annotate bad segments
-        _, times = raw.get_data(return_times=True)
-        labels, n_bad_segments = ndimage.label(bad_samples)
-        annotations = []
-        for i in range(1, n_bad_segments + 1):
-            indices = np.where(labels == i)[0]
-            onset = times[indices[0]]
-            duration = times[indices[-1]] - onset + raw.times[1] - raw.times[0]
-            annotations.append(
-                mne.Annotations(onset=onset, duration=duration, description="bad")
-            )
-        if annotations:
-            raw.set_annotations(sum(annotations[1:], annotations[0]))
-
-    else:
-        # Create Raw object (all time points are good)
-        raw = mne.io.RawArray(data.T, info, verbose=verbose)
-
-    # Save
-    raw.save(filename, overwrite=True, verbose=verbose)
 
 
 def load_matlab(filename: str, field: str) -> np.ndarray:

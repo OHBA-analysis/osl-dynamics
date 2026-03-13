@@ -6,7 +6,7 @@ dependencies:
   - pip
   - jupyter
   - matplotlib
-  - mne
+  - mne-base
   - nibabel
   - nilearn
   - numpy
@@ -16,7 +16,19 @@ dependencies:
   - pqdm
   - scipy
   - scikit-learn
+  - scikit-image
   - seaborn
   - tqdm
+  - fslpy
+  - ipyevents
+  - numba
+  - vtk=*=*osmesa*
+  - pyvista
+  - pyvistaqt
+  - h5io
+  - nest-asyncio2
+  - trame
+  - trame-vtk
+  - trame-vuetify
   - pip:
     - osl-dynamics

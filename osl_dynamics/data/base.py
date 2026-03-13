@@ -1209,101 +1209,6 @@ class Data:
 
         return self
 
-    def remove_bad_segments(
-        self,
-        window_length: Optional[int] = None,
-        mode: Optional[str] = None,
-        metric: str = "std",
-        significance_level: float = 0.05,
-        maximum_fraction: float = 0.1,
-        use_raw: bool = False,
-    ) -> "Data":
-        """Automated bad segment removal using the G-ESD algorithm.
-
-        Parameters
-        ----------
-        window_length : int, optional
-            Window length to used to calculate statistics.
-            Defaults to twice the sampling frequency.
-        mode : str, optional
-            None or 'diff' to take the difference fo the time series
-            before detecting bad segments.
-        metric : str, optional
-            Either 'std' (for standard deivation) or 'kurtosis'.
-        significance_level : float, optional
-            Significance level (p-value) to consider as an outlier.
-        maximum_fraction : float, optional
-            Maximum fraction of time series to mark as bad.
-        use_raw : bool, optional
-            Should we prepare the original 'raw' data that we loaded?
-
-        Returns
-        -------
-        data : osl_dynamics.data.Data
-            The modified Data object.
-        """
-        self.gesd_window_length = window_length
-        self.gesd_mode = mode
-        self.gesd_metric = metric
-        self.gesd_significance_level = significance_level
-        self.gesd_maximum_fraction = maximum_fraction
-
-        if window_length is None:
-            if self.sampling_frequency is None:
-                raise ValueError(
-                    "window_length must be passed. Alternatively, set the "
-                    "sampling frequency to use "
-                    "window_length=2*sampling_frequency. The sampling "
-                    "frequency can be set using Data.set_sampling_frequency() "
-                    "or pass Data(..., sampling_frequency=...) when creating "
-                    "the Data object."
-                )
-            else:
-                window_length = 2 * self.sampling_frequency
-
-        if hasattr(self, "bad_samples"):
-            raise ValueError("remove_bad_segments can only be called once.")
-
-        # Function to remove bad segments to a single array
-        def _apply(array, prepared_data_file):
-            array, bad = processing.remove_bad_segments(
-                array,
-                window_length,
-                mode,
-                metric,
-                significance_level,
-                maximum_fraction,
-            )
-            if self.load_memmaps:
-                array = misc.array_to_memmap(prepared_data_file, array)
-            return array, bad
-
-        # Run in parallel
-        arrays = self.raw_data_arrays if use_raw else self.arrays
-        args = zip(arrays, self.prepared_data_filenames)
-        results = pqdm(
-            args,
-            function=_apply,
-            desc="Bad segment removal",
-            n_jobs=self.n_jobs,
-            argument_type="args",
-            total=self.n_sessions,
-        )
-        if any([isinstance(e, Exception) for e in results]):
-            for i, e in enumerate(results):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
-
-        # Unpack results
-        self.bad_samples = []
-        for i, (a, b) in enumerate(results):
-            self.arrays[i] = a
-            self.bad_samples.append(b)
-
-        return self
-
     def prepare(self, methods: Dict) -> "Data":
         """Prepare data.
 
@@ -2119,7 +2024,6 @@ class Data:
     def save(
         self,
         output_dir: str = ".",
-        as_fif: bool = False,
         outnames: Optional[List[str]] = None,
     ) -> None:
         """Saves (prepared) data.
@@ -2131,9 +2035,6 @@ class Data:
         output_dir : str
             Path to save data files to. Default is the current working
             directory.
-        as_fif : bool, optional
-            Should we save data as fif files? If we are saving fif files
-            the :code:`Data.sampling_frequency` attribute must be set.
         outnames : list of str, optional
             Names/IDs for output files (excluding the extension).
         """
@@ -2153,40 +2054,10 @@ class Data:
         output_dir = pathlib.Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 
-        if as_fif:
-            # Function to save a fif file
-            def _save(i):
-                filename = f"{output_dir}/{outnames[i]}_raw.fif"
-                if hasattr(self, "bad_samples"):
-                    bad_samples = self.bad_samples[i]
-                else:
-                    bad_samples = None
-                if rw.file_ext(self.inputs[i]) == ".fif":
-                    original_fif = self.inputs[i]
-                else:
-                    original_fif = None
-                if self.sampling_frequency is None and original_fif is None:
-                    raise ValueError(
-                        "Data.sampling_frequency must be set if we are saving fif "
-                        "files. Use Data.set_sampling_frequency() or pass "
-                        "Data(..., sampling_frequency=...) when creating the Data "
-                        "object. Alternatively, pass the fif files when creating "
-                        "the Data object."
-                    )
-                rw.save_fif(
-                    self.arrays[i],
-                    filename,
-                    sampling_frequency=self.sampling_frequency,
-                    bad_samples=bad_samples,
-                    original_fif=original_fif,
-                    verbose=False,
-                )
-
-        else:
-            # Function to save a single array
-            def _save(i):
-                filename = f"{output_dir}/{outnames[i]}.npy"
-                np.save(filename, self.arrays[i])
+        # Function to save a single array
+        def _save(i):
+            filename = f"{output_dir}/{outnames[i]}.npy"
+            np.save(filename, self.arrays[i])
 
         # Save arrays in parallel
         pqdm(
