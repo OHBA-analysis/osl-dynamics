@@ -2,6 +2,8 @@
 
 This directory contains Python scripts that run the M/EEG processing pipeline on multiple sessions in parallel using `multiprocessing`.
 
+For a step-by-step interactive walkthrough, see the [MEG Preprocessing tutorial](https://osl-dynamics.readthedocs.io/en/latest/tutorials_build/0-1_meg_preprocessing.html) in the docs.
+
 ## Input Data
 
 The scripts expect data in BIDS format:
