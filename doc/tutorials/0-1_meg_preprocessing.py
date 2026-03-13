@@ -1,8 +1,8 @@
 """
-MEG Preprocessing
-=================
+MEG: Preprocessing, Source Reconstruction, Parcellation
+=======================================================
 
-This tutorial walks through the full MEG preprocessing pipeline step by step:
+This tutorial walks through the full MEG processing pipeline step by step:
 
 1. Preprocessing — Downsample, filter, detect bad segments/channels.
 2. Surface Extraction — Extract skull/scalp surfaces from a structural MRI.
@@ -33,11 +33,6 @@ We expect data in BIDS format::
     ├── ...
 
 Output is written to ``BIDS/derivatives/``.
-
-Batch Processing
-^^^^^^^^^^^^^^^^
-
-This tutorial processes a single session interactively. For processing many sessions in parallel, see the batch scripts in the `examples/meg_preproc <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ directory.
 """
 
 #%%
@@ -343,7 +338,7 @@ parcellation.save_qc_plots(parc_fif, parcellation_file, plots_dir / id)
 #    :widths: 5 25 40
 #
 #    * - Step
-#      - What
+#      - Name
 #      - Output
 #    * - 1
 #      - Preprocessing
@@ -376,7 +371,7 @@ parcellation.save_qc_plots(parc_fif, parcellation_file, plots_dir / id)
 # Where to go from here
 # *********************
 #
-# - **Canonical HMM analysis** — See the `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ notebooks for applying a canonical HMM to the parcellated data.
+# - **Canonical HMM analysis** — See `here <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ for notebooks applying a canonical HMM to the parcellated data.
 # - **Batch processing** — See the `batch scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for processing many sessions in parallel.
 # - **osl-dynamics documentation** — See the :doc:`documentation <../documentation>` for further analysis tutorials.
 #
@@ -385,5 +380,5 @@ parcellation.save_qc_plots(parc_fif, parcellation_file, plots_dir / id)
 #
 # This tutorial uses Elekta MEG data. If you are working with different MEG systems:
 #
-# - **CTF:** Use ``mne.io.read_raw_ctf()`` to load data. Set ``chantypes=["mag"]`` and adjust ``rank`` (CTF data is not MaxFiltered, so the rank is typically higher). Fiducials may need to be extracted from a ``.pos`` file rather than the data file — pass ``pos_file`` to ``OSLFilenames``.
+# - **CTF:** Use ``mne.io.read_raw_ctf()`` to load data. Set ``chantypes=["mag"]`` and adjust ``rank`` (CTF data is not MaxFiltered, so the rank is typically higher). Fiducials/headshape points may need to be extracted from a ``.pos`` file rather than the data file — pass ``pos_file`` to ``OSLFilenames``.
 # - **OPM:** Loading depends on the OPM system. Adjust ``chantypes`` and ``rank`` accordingly.

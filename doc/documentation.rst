@@ -54,7 +54,7 @@ Tutorials
 
 The following tutorials illustrate basic usage and analysis that can be done with osl-dynamics.
 
-**MEG preprocessing tutorial**:
+**MEG processing tutorial**:
 
 - :doc:`tutorials_build/0-1_meg_preprocessing`.
 
