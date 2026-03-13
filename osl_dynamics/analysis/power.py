@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 
 from osl_dynamics import files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
-from osl_dynamics.utils import array_ops, parcellation, plotting
+from osl_dynamics.utils import array_ops, plotting
+from osl_dynamics.meeg.parcellation import parcel_vector_to_voxel_grid
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -394,7 +395,7 @@ def save(
         if ".nii" in filename:
             # Convert parcel values to voxel values
             power_map = [
-                parcellation.parcel_vector_to_voxel_grid(
+                parcel_vector_to_voxel_grid(
                     mask_file, parcellation_file, p
                 )
                 for p in power_map

@@ -78,7 +78,7 @@ Example code for obtaining the MNI coordinates of each parcel center:
 
 .. code::
 
-    from osl_dynamics.utils.parcellation import Parcellation
+    from osl_dynamics.meeg.parcellation import Parcellation
 
     filename = 'atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz'
     parc = Parcellation(filename)

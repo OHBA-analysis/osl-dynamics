@@ -2,6 +2,7 @@ import logging
 from importlib.metadata import PackageNotFoundError, version
 
 from osl_dynamics.config_api.pipeline import run_pipeline
+from osl_dynamics import meeg
 
 # Setup the version
 try:

@@ -2,9 +2,10 @@
 
 from osl_dynamics.utils import (
     array_ops,
+    filenames,
+    logger,
     misc,
     model,
-    parcellation,
     plotting,
     sklearn_wrappers,
     topoplots,

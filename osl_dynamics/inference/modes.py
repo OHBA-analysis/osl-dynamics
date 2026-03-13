@@ -544,11 +544,13 @@ def convert_to_mne_raw(
         `MNE Raw <https://mne.tools/stable/generated/mne.io.Raw.html>`_ object
         for :code:`alpha`.
     """
-    # Validation
-    if extra_chans is None:
-        extra_chans = []
-    if isinstance(extra_chans, str):
-        extra_chans = [extra_chans]
+    from osl_dynamics.meeg.parcellation import (
+        convert_to_mne_raw as _convert_to_mne_raw,
+    )
+
+    # Load the Raw object
+    if isinstance(raw, str):
+        raw = mne.io.read_raw_fif(raw, verbose=verbose)
 
     # How many time points from the start of parcellated data should we remove?
     n_trim = 0
@@ -556,10 +558,6 @@ def convert_to_mne_raw(
         n_trim += n_embeddings // 2
     if n_window is not None:
         n_trim += n_window // 2
-
-    # Load the Raw object
-    if isinstance(raw, str):
-        raw = mne.io.read_raw_fif(raw, verbose=verbose)
 
     # Get time indices excluding bad segments from raw
     _, times = raw.get_data(
@@ -570,53 +568,19 @@ def convert_to_mne_raw(
     # Remove time points lost due to time delay embedding
     indices = indices[n_trim:]
 
-    # Create an array for the full time series including bad segments
-    n_samples = raw.times.shape[0]
-    n_channels = alpha.shape[1]
-    alpha_ = np.zeros([n_samples, n_channels], dtype=np.float32)
-
     # Trim the indices we lost when we separate the time series into sequences
     indices = indices[: alpha.shape[0]]
 
-    # Fill in the value for the time series for non-bad segments
-    alpha_[indices] = alpha
+    # Create full-length array with bad segments as zeros
+    n_channels = alpha.shape[1]
+    data = np.zeros([n_channels, len(raw.times)], dtype=np.float32)
+    data[:, indices] = alpha.T
 
-    # Create info object
+    # Default channel names
     if ch_names is None:
         ch_names = [f"alpha_{ch}" for ch in range(n_channels)]
-    alpha_info = mne.create_info(
-        ch_names=ch_names,
-        ch_types="misc",
-        sfreq=raw.info["sfreq"],
-        verbose=verbose,
-    )
 
-    # Create Raw object
-    alpha_raw = mne.io.RawArray(alpha_.T, alpha_info, verbose=verbose)
-
-    # Copy timing info
-    alpha_raw.set_meas_date(raw.info["meas_date"])
-    alpha_raw.__dict__["_first_samps"] = raw.__dict__["_first_samps"]
-    alpha_raw.__dict__["_last_samps"] = raw.__dict__["_last_samps"]
-    alpha_raw.__dict__["_cropped_samp"] = raw.__dict__["_cropped_samp"]
-
-    # Copy annotations from raw
-    alpha_raw.set_annotations(raw._annotations)
-
-    # Add extra channels
-    for extra_chan in extra_chans:
-        if extra_chan in raw:
-            chan_raw = raw.copy().pick(extra_chan)
-            chan_data = chan_raw.get_data()
-            chan_info = mne.create_info(
-                chan_raw.ch_names,
-                raw.info["sfreq"],
-                [extra_chan] * chan_data.shape[0],
-            )
-            chan_raw = mne.io.RawArray(chan_data, chan_info, verbose=verbose)
-            alpha_raw.add_channels([chan_raw], force_update_info=True)
-
-    return alpha_raw
+    return _convert_to_mne_raw(data, raw, ch_names=ch_names, extra_chans=extra_chans)
 
 
 def reweight_alphas(
