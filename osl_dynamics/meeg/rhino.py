@@ -1484,6 +1484,7 @@ def plot_coregistration(
     # Do plots
     # --------
     import pyvista
+
     pyvista.OFF_SCREEN = True
     mne.viz.set_3d_backend("notebook")
 
