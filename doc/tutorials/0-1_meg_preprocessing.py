@@ -27,7 +27,7 @@ We expect data in BIDS format::
     BIDS/
     ├── sub-01/
     │   ├── meg/
-    │   │   └── sub-01_run-01_task-visual_raw_meg.fif
+    │   │   └── sub-01_run-01_task-visual_raw_sss.fif
     │   └── anat/
     │       └── sub-01_T1w.nii.gz
     ├── ...
@@ -81,7 +81,7 @@ id = f"sub-{subject}_run-{run}_task-{task}"
 
 # Paths
 bids_dir = Path("BIDS")
-raw_file = bids_dir / f"sub-{subject}/meg/sub-{subject}_run-{run}_task-{task}_raw_meg.fif"
+raw_file = bids_dir / f"sub-{subject}/meg/sub-{subject}_run-{run}_task-{task}_raw_sss.fif"
 mri_file = bids_dir / f"sub-{subject}/anat/sub-{subject}_T1w.nii.gz"
 output_dir = bids_dir / "derivatives"
 plots_dir = Path("plots")
@@ -182,18 +182,19 @@ print(f"Saved: {preproc_file}")
 # .. note::
 #
 #     **No structural MRI?** If you don't have a subject-specific MRI, you can skip this step and use the standard MNI152 brain bundled with osl-dynamics. Set ``surfaces_dir = files.mni152_surfaces.directory`` in Step 3 and pass ``allow_mri_scaling=True`` during coregistration.
+#
+# This step requires `FSL <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki>`_. The example data includes pre-computed surfaces, so we skip extraction here. To run it yourself, uncomment the code below.
+#
+# The output plots overlay each extracted surface (yellow line) on the structural MRI. Check that each surface matches the corresponding anatomical boundary. If they don't, consider using the standard MNI152 brain as a fallback.
 
 surfaces_dir = str(output_dir / "anat_surfaces" / f"sub-{subject}")
 
-rhino.extract_surfaces(
-    mri_file=str(mri_file),
-    outdir=surfaces_dir,
-    include_nose=False,
-    do_mri2mniaxes_xform=False,
-)
-
-#%%
-# The plots above overlay each extracted surface (yellow line) on the structural MRI. Check that each surface matches the corresponding anatomical boundary. If they don't, consider using the standard MNI152 brain as a fallback.
+# rhino.extract_surfaces(
+#     mri_file=str(mri_file),
+#     outdir=surfaces_dir,
+#     include_nose=False,
+#     do_mri2mniaxes_xform=False,
+# )
 
 #%%
 # Step 3: Coregistration
