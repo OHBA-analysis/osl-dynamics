@@ -19,6 +19,7 @@ seaborn
 tqdm
 fslpy
 ipyevents
+numba
 tensorflow==2.19
 tensorflow-probability[tf]==0.25
 -e .

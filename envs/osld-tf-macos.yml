@@ -21,6 +21,7 @@ dependencies:
   - tqdm
   - fslpy
   - ipyevents
+  - numba
   - pip:
     - tensorflow==2.16.1
     - tensorflow-probability==0.24

@@ -21,5 +21,6 @@ dependencies:
   - tqdm
   - fslpy
   - ipyevents
+  - numba
   - pip:
     - osl-dynamics
