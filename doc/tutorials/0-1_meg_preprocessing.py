@@ -41,8 +41,6 @@ Output is written to ``BIDS/derivatives/``.
 # We will download example data hosted on `OSF <https://osf.io/by2tc/>`_.
 
 import os
-import matplotlib
-matplotlib.use("Agg")
 
 def get_data(name):
     os.system(f"osf -p by2tc fetch data/{name}.zip")
@@ -60,6 +58,9 @@ get_data("wakeman_henson_raw_1_subject")
 from pathlib import Path
 
 import mne
+import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 
 from osl_dynamics import files
 from osl_dynamics.meeg import preproc, rhino, source_recon, parcellation
@@ -170,7 +171,8 @@ print(f"Saved: {preproc_file}")
 #
 # - **Inner skull (inskull)** — used for the forward model.
 # - **Outer skull (outskull)** — boundary between skull and scalp.
-# - **Outer skin (outskin)** — scalp surface, used for coregistration.
+# - **Outer skin (outskin)** — scalp surface (used for coregistration).
+# - **Outer skin (outskin_plus_nose)** — scalp surface including the nose, only generated if ``include_nose=True``.
 #
 # These surfaces define the geometry needed for coregistration and source reconstruction.
 #
@@ -215,12 +217,29 @@ print(fns)
 rhino.extract_fiducials_and_headshape_from_fif(fns)
 
 #%%
+# Fix stray Polhemus headshape points
+# ***********************************
+#
+# Sometimes we want to remove some Polhemus headshape points, we have to do this manually. Note, this step has to be adapted to your specific dataset of interest.
+
+hs = np.loadtxt(fns.coreg.head_headshape_file)
+nas = np.loadtxt(fns.coreg.head_nasion_file)
+lpa = np.loadtxt(fns.coreg.head_lpa_file)
+rpa = np.loadtxt(fns.coreg.head_rpa_file)
+
+remove = np.logical_and(hs[1] > max(lpa[1], rpa[1]), hs[2] < nas[2])
+hs = hs[:, ~remove]
+
+print(f"Overwriting: {fns.coreg.head_headshape_file}")
+np.savetxt(fns.coreg.head_headshape_file, hs)
+
+#%%
 # Run coregistration
 # ******************
 #
 # Key parameters:
 #
-# - ``use_nose=False`` — Exclude nose headshape points (the nose is often poorly digitised and can pull the fit off).
+# - ``use_nose=False`` — Should we use the nose in the coregistration? (the nose is often removed when an MRI is defaced, in this scenario you shouldn't use the nose).
 # - ``allow_mri_scaling=False`` — Don't scale the MRI to fit the headshape. Set ``True`` if using the MNI152 standard brain, which needs to be scaled to match the subject's head size.
 
 rhino.coregister_head_and_mri(
@@ -236,7 +255,7 @@ rhino.coregister_head_and_mri(
 #
 # - Removing stray headshape points with ``rhino.remove_stray_headshape_points``.
 # - Manually editing the headshape/fiducial text files in ``fns.coreg_dir``.
-# - Setting ``use_nose=True`` if the nose digitisation is good.
+# - Setting ``use_nose=False`` if the nose is included in the MRI.
 
 import shutil
 
