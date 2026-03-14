@@ -1,12 +1,20 @@
 """Run a processing function over multiple items in parallel."""
 
+import multiprocessing as mp
+import os
 import traceback
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-from multiprocessing import Pool
 
 from . import report
 from osl_dynamics.utils.logger import MEEGSessionLogger
+
+_THREAD_LIMIT_VARS = [
+    "OMP_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+]
 
 
 def _worker(
@@ -68,8 +76,23 @@ def run(
     log_dir = Path(log_dir)
     worker_args = [(func, id, item, log_dir, kwargs) for id, item in items.items()]
 
-    with Pool(processes=n_workers) as pool:
+    # Limit BLAS/LAPACK threads to 1 per worker to avoid over-subscription.
+    # We set these before spawning workers so each child process picks them
+    # up before NumPy/SciPy initialise their threading backends.
+    old_env = {var: os.environ.get(var) for var in _THREAD_LIMIT_VARS}
+    for var in _THREAD_LIMIT_VARS:
+        os.environ[var] = "1"
+
+    ctx = mp.get_context("spawn")
+    with ctx.Pool(processes=n_workers) as pool:
         results = pool.map(_worker, worker_args)
+
+    # Restore original environment
+    for var, val in old_env.items():
+        if val is None:
+            os.environ.pop(var, None)
+        else:
+            os.environ[var] = val
 
     failed = [id for id, ok in results if not ok]
     if failed:
