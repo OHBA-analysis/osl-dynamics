@@ -36,9 +36,8 @@ STEPS = {
         "name": "Source Recon & Parcellation",
         "files": [
             "4_psd_topo.png",
-            "4_power_maps.png",
         ],
-        "large": ["4_psd_topo.png", "4_power_maps.png"],
+        "large": ["4_psd_topo.png"],
     },
 }
 
@@ -441,6 +440,66 @@ def _copy_surface_plots(
             shutil.copy(png, session_plots_dir / f"2_{png.name}")
 
 
+def _copy_coreg_plots(
+    plots_dir: Path,
+    sessions: Dict,
+    output_dir: Path,
+) -> None:
+    """Copy coregistration PNGs from the derivatives directory.
+
+    Copies ``coreg.png`` from ``output_dir/osl/<session_id>/coreg/``
+    into the session's plots directory as ``3_coreg.png``.
+
+    Parameters
+    ----------
+    plots_dir : Path
+        Path to the plots directory.
+    sessions : dict
+        Sessions dictionary mapping session IDs to info dicts.
+    output_dir : Path
+        Path to the derivatives directory.
+    """
+    for session_id in sessions:
+        coreg_png = output_dir / "osl" / session_id / "coreg" / "coreg.png"
+        if not coreg_png.exists():
+            continue
+        session_plots_dir = plots_dir / session_id
+        session_plots_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy(coreg_png, session_plots_dir / "3_coreg.png")
+
+
+def _copy_parc_plots(
+    plots_dir: Path,
+    sessions: Dict,
+    output_dir: Path,
+) -> None:
+    """Copy parcellation QC PNGs from the derivatives directory.
+
+    Copies ``psd_topo.png`` from ``output_dir/osl/<session_id>/``
+    into the session's plots directory as ``4_psd_topo.png``.
+
+    Parameters
+    ----------
+    plots_dir : Path
+        Path to the plots directory.
+    sessions : dict
+        Sessions dictionary mapping session IDs to info dicts.
+    output_dir : Path
+        Path to the derivatives directory.
+    """
+    for session_id in sessions:
+        session_plots_dir = plots_dir / session_id
+        osl_dir = output_dir / "osl" / session_id
+        for src_name, dst_name in [
+            ("psd_topo.png", "4_psd_topo.png"),
+            ("power_maps.png", "4_power_maps.png"),
+        ]:
+            src = osl_dir / src_name
+            if src.exists():
+                session_plots_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy(src, session_plots_dir / dst_name)
+
+
 def generate_report(
     plots_dir: Union[str, Path],
     sessions: Dict,
@@ -461,24 +520,37 @@ def generate_report(
     sessions : dict
         Dictionary of sessions (same format as the pipeline scripts).
     output_dir : str or Path, optional
-        Path to the derivatives directory. If provided, surface extraction
-        plots are copied from here into the plots directory.
+        Path to the derivatives directory. If provided, surface extraction,
+        coregistration, and parcellation plots are copied from here into
+        the plots directory.
     output_file : str, optional
         Filename for the report. Written to plots_dir/output_file.
     """
     plots_dir = Path(plots_dir)
     session_ids = list(sessions.keys())
 
-    # Copy surface plots from derivatives if available
+    # Copy plots from derivatives if available
     if output_dir is not None:
         _copy_surface_plots(plots_dir, sessions, Path(output_dir))
+        _copy_coreg_plots(plots_dir, sessions, Path(output_dir))
+        _copy_parc_plots(plots_dir, sessions, Path(output_dir))
+
+    # Add power maps to step 4 if any session has them
+    has_power_maps = any(
+        (plots_dir / sid / "4_power_maps.png").exists() for sid in session_ids
+    )
+    steps = {k: dict(v) for k, v in STEPS.items()}
+    if has_power_maps:
+        steps[4] = dict(steps[4])
+        steps[4]["files"] = list(steps[4]["files"]) + ["4_power_maps.png"]
+        steps[4]["large"] = list(steps[4].get("large", [])) + ["4_power_maps.png"]
 
     # Build tab buttons and content
     tab_buttons = []
     tab_contents = []
 
     first = True
-    for step_num, step_info in STEPS.items():
+    for step_num, step_info in steps.items():
         content, done, total = _build_step_tab(
             step_num, step_info, plots_dir, session_ids
         )

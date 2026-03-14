@@ -62,7 +62,7 @@ n_workers = 4
 
 - `input_dir` — Path to your BIDS directory containing the raw data.
 - `output_dir` — Path to the output directory for derivatives.
-- `plots_dir` — Directory for QC plots (steps 1, 3, 4).
+- `plots_dir` — Directory for QC plots and the HTML report.
 - `log_dir` — Directory for per-session log files.
 - `sessions` — Dictionary of sessions to process. Each key is a session ID used for naming output files and logs. Each value contains the `subject` (BIDS subject directory) and `file` (MEG filename).
 - `n_workers` — Number of sessions to process in parallel.
@@ -93,10 +93,12 @@ BIDS/derivatives/
     ├── sub-01_task-rest/
     │   ├── bem/
     │   ├── coreg/
+    │   │   ├── coreg.png
     │   │   └── model-fwd.fif
     │   ├── src/
     │   │   └── filters-lcmv.h5
-    │   └── lcmv-parc-raw.fif
+    │   ├── lcmv-parc-raw.fif
+    │   └── psd_topo.png
     └── ...
 
 plots/
@@ -107,8 +109,7 @@ plots/
 │   ├── 1_sum_square_exclude_bads.png
 │   ├── 1_channel_stds.png
 │   ├── 3_coreg.png
-│   ├── 4_psd_topo.png
-│   └── 4_power_maps.png
+│   └── 4_psd_topo.png
 ├── sub-02_task-rest/
 │   └── ...
 └── report.html
@@ -118,7 +119,7 @@ plots/
 
 A self-contained HTML report (`plots/report.html`) is automatically generated after steps 1, 3 and 4 complete. It contains tabs for each pipeline step with all session QC plots embedded. Open it in a browser to review results.
 
-The report updates incrementally — after step 1 you'll see preprocessing plots, after step 3 coregistration and surfaces appear, etc. Surface extraction plots (step 2) are automatically copied from the derivatives directory when the report is next generated, so they appear without step 2 needing to generate the report itself.
+The report updates incrementally — after step 1 you'll see preprocessing plots, after step 3 coregistration and surfaces appear, etc. Surface extraction (step 2), coregistration (step 3), and parcellation (step 4) plots are automatically copied from the derivatives directory when the report is generated.
 
 ## Logging
 

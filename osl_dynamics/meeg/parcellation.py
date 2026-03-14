@@ -397,14 +397,15 @@ def plot_psds(
 def save_qc_plots(
     parc_fif: str,
     parcellation_file: str,
-    output_dir: Union[str, Path],
+    output_dir: Optional[Union[str, Path]] = None,
+    power_maps: bool = False,
     cmap: str = "hot",
 ) -> None:
     """Save parcellation QC plots.
 
     Saves the following files to output_dir:
-    - 4_psd_topo.png: PSD topography plot
-    - 4_power_maps.png: composite band power maps (delta, theta, alpha, beta, gamma)
+    - psd_topo.png: PSD topography plot
+    - power_maps.png: composite band power maps (only if power_maps=True)
 
     Parameters
     ----------
@@ -412,12 +413,18 @@ def save_qc_plots(
         Path to parcellated fif file.
     parcellation_file : str
         Parcellation file name.
-    output_dir : str or Path
-        Directory to save plots to.
+    output_dir : str or Path, optional
+        Directory to save plots to. Defaults to the directory containing
+        parc_fif.
+    power_maps : bool, optional
+        Whether to create band power map plots. Default is False.
     cmap : str, optional
         Colormap for power maps.
     """
-    output_dir = Path(output_dir)
+    if output_dir is None:
+        output_dir = Path(parc_fif).parent
+    else:
+        output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     from osl_dynamics.analysis import power
@@ -439,9 +446,12 @@ def save_qc_plots(
         psd,
         parcellation_file=parcellation_file,
         frequency_range=[1, 45],
-        filename=str(output_dir / "4_psd_topo.png"),
+        filename=str(output_dir / "psd_topo.png"),
     )
     plt.close("all")
+
+    if not power_maps:
+        return
 
     # Band power maps — render each band and composite into a single image
     mask_file = f"{files.mask.path}/MNI152_T1_8mm_brain.nii.gz"
@@ -475,7 +485,7 @@ def save_qc_plots(
         ax.axis("off")
     composite_fig.tight_layout()
     composite_fig.savefig(
-        str(output_dir / "4_power_maps.png"), dpi=150, bbox_inches="tight"
+        str(output_dir / "power_maps.png"), dpi=150, bbox_inches="tight"
     )
     plt.close(composite_fig)
 

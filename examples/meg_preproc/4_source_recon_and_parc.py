@@ -78,7 +78,7 @@ def process_session(id, info, logger, **kwargs):
     )
 
     logger.log("Saving QC plots...")
-    parcellation.save_qc_plots(parc_fif, parcellation_file, plots_dir / id)
+    parcellation.save_qc_plots(parc_fif, parcellation_file)
 
     logger.log("Done.")
 
