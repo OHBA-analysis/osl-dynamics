@@ -106,15 +106,9 @@ plots/
 │   ├── 1_sum_square.png
 │   ├── 1_sum_square_exclude_bads.png
 │   ├── 1_channel_stds.png
-│   ├── 3_coreg_frontal.png
-│   ├── 3_coreg_right.png
-│   ├── 3_coreg_top.png
+│   ├── 3_coreg.png
 │   ├── 4_psd_topo.png
-│   ├── 4_power_delta.png
-│   ├── 4_power_theta.png
-│   ├── 4_power_alpha.png
-│   ├── 4_power_beta.png
-│   └── 4_power_gamma.png
+│   └── 4_power_maps.png
 ├── sub-02_task-rest/
 │   └── ...
 └── report.html

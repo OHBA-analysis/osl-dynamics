@@ -8,6 +8,7 @@ Overview
 
 osl-dynamics is a Python toolbox for studying dynamic brain networks from neuroimaging data (M/EEG and fMRI). It provides:
 
+- **M/EEG processing**: preprocessing, source reconstruction (LCMV beamformer) and parcellation.
 - **Generative models** for inferring dynamic brain states: the Hidden Markov Model (HMM), Dynamic Network Modes (DyNeMo), and Dynamic Network States (DyNeSte).
 - **Post-hoc analysis tools**: spectral analysis, summary statistics, and network visualization.
 - **Static analysis**: time-averaged power and connectivity analysis.

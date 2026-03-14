@@ -404,11 +404,7 @@ def save_qc_plots(
 
     Saves the following files to output_dir:
     - 4_psd_topo.png: PSD topography plot
-    - 4_power_delta.png: delta band power map
-    - 4_power_theta.png: theta band power map
-    - 4_power_alpha.png: alpha band power map
-    - 4_power_beta.png: beta band power map
-    - 4_power_gamma.png: gamma band power map
+    - 4_power_maps.png: composite band power maps (delta, theta, alpha, beta, gamma)
 
     Parameters
     ----------
@@ -447,7 +443,7 @@ def save_qc_plots(
     )
     plt.close("all")
 
-    # Band power maps
+    # Band power maps — render each band and composite into a single image
     mask_file = f"{files.mask.path}/MNI152_T1_8mm_brain.nii.gz"
     bands = {
         "delta": [1, 4],
@@ -456,18 +452,32 @@ def save_qc_plots(
         "beta": [13, 30],
         "gamma": [30, 45],
     }
+    band_images = []
     for band_name, freq_range in bands.items():
         band_power = power.variance_from_spectra(f, psd, frequency_range=freq_range)
-        plot_brain_surface(
+        fig, ax = plot_brain_surface(
             band_power,
             mask_file=mask_file,
             parcellation_file=parcellation_file,
             title=f"{band_name} ({freq_range[0]}-{freq_range[1]} Hz)",
             cmap=cmap,
             symmetric_cbar=False,
-            filename=str(output_dir / f"4_power_{band_name}.png"),
         )
-        plt.close("all")
+        fig.canvas.draw()
+        img = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+        img = img.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+        band_images.append(img)
+        plt.close(fig)
+
+    composite_fig, axes = plt.subplots(1, 5, figsize=(30, 6))
+    for ax, img in zip(axes, band_images):
+        ax.imshow(img)
+        ax.axis("off")
+    composite_fig.tight_layout()
+    composite_fig.savefig(
+        str(output_dir / "4_power_maps.png"), dpi=150, bbox_inches="tight"
+    )
+    plt.close(composite_fig)
 
 
 def _resample_parcellation(fns, parcellation_file, voxel_coords):

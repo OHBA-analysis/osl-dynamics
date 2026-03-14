@@ -1777,6 +1777,7 @@ def plot_brain_surface(
         fig.savefig(filename)
         if not show_plot:
             plt.close(fig)
+        return fig
     else:
         return fig, ax
 

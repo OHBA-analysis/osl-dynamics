@@ -14,6 +14,7 @@
 
 This package contains models for analysing neuroimaging data. In particular, this package contains methods (based on generative models) for studying dynamics in time series data. This package can be used for:
 
+- Processing M/EEG data: preprocessing, source reconstruction and parcellation.
 - Inferring and visualising dynamic (and static) functional networks.
 - Spectral estimation: including multitaper spectra and wavelet transforms.
 - Burst detection.

@@ -14,7 +14,7 @@ This tutorial walks through the full MEG processing pipeline step by step:
 Prerequisites
 ^^^^^^^^^^^^^
 
-- `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_ (this installs `MNE-Python <https://mne.tools/stable/index.html>`_ as a dependency).
+- `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_ (this installs `MNE-Python <https://mne.tools/stable/index.html>`_ as a dependency). Note, TensorFlow is not required for processing M/EEG. (osl-dynamics can be installed without TensorFlow using the `envs/osld.yml <https://github.com/OHBA-analysis/osl-dynamics/blob/main/envs/osld.yml>`_ environment.)
 - `FSL <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki>`_ (needed for surface extraction).
 
 Input Data
@@ -289,10 +289,9 @@ Output is written to ``BIDS/derivatives/``.
 #
 #     session_plots_dir = plots_dir / id
 #     session_plots_dir.mkdir(parents=True, exist_ok=True)
-#     for view in ["frontal", "right", "top"]:
-#         src = Path(fns.coreg_dir) / f"coreg_{view}.png"
-#         if src.exists():
-#             shutil.copy(src, session_plots_dir / f"3_coreg_{view}.png")
+#     src = Path(fns.coreg_dir) / "coreg.png"
+#     if src.exists():
+#         shutil.copy(src, session_plots_dir / "3_coreg.png")
 
 #%%
 # Step 4: Forward Model
@@ -316,7 +315,7 @@ Output is written to ``BIDS/derivatives/``.
 # Key parameters:
 #
 # - ``chantypes=["mag", "grad"]`` — Use both magnetometers and gradiometers (Elekta systems). For CTF, use ``["mag"]``.
-# - ``rank={"meg": 60}`` — Effective rank of the data after MaxFilter. Elekta data is typically rank 60-64. For non-MaxFiltered data or CTF, you can use ``"info"`` to let MNE estimate the rank.
+# - ``rank={"meg": 60}`` — Effective rank of the data after MaxFilter. Elekta data is typically rank 60-64.
 #
 # Compute beamformer weights
 # **************************
@@ -343,8 +342,8 @@ Output is written to ``BIDS/derivatives/``.
 #
 # We reduce the high-dimensional voxel data to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis.
 #
-# - ``method="spatial_basis"`` — Weight voxels by their loading on each parcel (from the atlas), rather than simple averaging.
-# - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels caused by the beamformer.
+# - ``method="spatial_basis"`` — Weight voxels by their loading on each parcel (from the atlas) because calculate PCA.
+# - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels.
 #
 # .. code-block:: python
 #

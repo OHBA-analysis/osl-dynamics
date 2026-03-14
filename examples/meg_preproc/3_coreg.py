@@ -54,10 +54,9 @@ def process_session(id, info, logger, **kwargs):
     logger.log("Copying plots...")
     session_plots_dir = plots_dir / id
     session_plots_dir.mkdir(parents=True, exist_ok=True)
-    for view in ["frontal", "right", "top"]:
-        src = Path(fns.coreg_dir) / f"coreg_{view}.png"
-        if src.exists():
-            shutil.copy(src, session_plots_dir / f"3_coreg_{view}.png")
+    src = Path(fns.coreg_dir) / "coreg.png"
+    if src.exists():
+        shutil.copy(src, session_plots_dir / "3_coreg.png")
 
     logger.log("Done.")
 

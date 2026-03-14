@@ -12,7 +12,6 @@ import pandas as pd
 import nibabel as nib
 import nilearn as nil
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 from sklearn.mixture import GaussianMixture
 from skimage import measure
 from numba import cfunc, carray
@@ -1623,17 +1622,15 @@ def plot_coregistration(
         # Save
         ext = Path(filename).suffix.lower()
 
-        outnames = []
         if ext == ".html":
             print(f"Saving {filename}")
             renderer.figure.plotter.export_html(filename)
 
         elif ext == ".png":
-            # Save three static PNG views (frontal, right, top)
-            base = str(Path(filename).with_suffix(""))
+            # Capture three views and composite into a single PNG
             views = [
                 (
-                    "frontal",
+                    "Frontal",
                     dict(
                         azimuth=90,
                         elevation=90,
@@ -1642,7 +1639,7 @@ def plot_coregistration(
                     ),
                 ),
                 (
-                    "right",
+                    "Right",
                     dict(
                         azimuth=0,
                         elevation=90,
@@ -1651,7 +1648,7 @@ def plot_coregistration(
                     ),
                 ),
                 (
-                    "top",
+                    "Top",
                     dict(
                         azimuth=90,
                         elevation=0,
@@ -1662,6 +1659,7 @@ def plot_coregistration(
             ]
 
             plotter = renderer.figure.plotter
+            screenshots = []
 
             for name, cam in views:
                 renderer.set_camera(
@@ -1670,22 +1668,22 @@ def plot_coregistration(
                     distance=cam["distance"],
                     focalpoint=cam["focalpoint"],
                 )
-                outname = f"{base}_{name}.png"
-                outnames.append(outname)
-                print(f"Saving view {name} -> {outname}")
-                plotter.screenshot(outname)
+                screenshots.append(plotter.screenshot())
+
+            fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+            for ax, img, (name, _) in zip(axes, screenshots, views):
+                ax.imshow(img)
+                ax.axis("off")
+                ax.set_title(name, fontsize=18)
+            fig.tight_layout()
+            print(f"Saving {filename}")
+            fig.savefig(filename, dpi=150, bbox_inches="tight")
+            if show:
+                plt.show()
+            plt.close(fig)
 
         else:
             raise ValueError("Extension must be png or html.")
-
-        if show and len(outnames) > 0:
-            titles = ["Frontal", "Right", "Top"]
-            fig, axes = plt.subplots(1, 3, figsize=(12, 8))
-            for ax, fname, title in zip(axes, outnames, titles):
-                img = mpimg.imread(fname)
-                ax.imshow(img)
-                ax.axis("off")
-                ax.set_title(title, fontsize=12)
 
 
 def forward_model(

@@ -29,27 +29,16 @@ STEPS = {
     },
     3: {
         "name": "Coregistration",
-        "files": [],
-        "row_files": [
-            "3_coreg_frontal.png",
-            "3_coreg_right.png",
-            "3_coreg_top.png",
-        ],
-        "row_labels": ["Frontal", "Right", "Top"],
+        "files": ["3_coreg.png"],
+        "large": ["3_coreg.png"],
     },
     4: {
         "name": "Source Recon & Parcellation",
         "files": [
             "4_psd_topo.png",
+            "4_power_maps.png",
         ],
-        "large": ["4_psd_topo.png"],
-        "row_files": [
-            "4_power_delta.png",
-            "4_power_theta.png",
-            "4_power_alpha.png",
-            "4_power_beta.png",
-            "4_power_gamma.png",
-        ],
+        "large": ["4_psd_topo.png", "4_power_maps.png"],
     },
 }
 
