@@ -14,7 +14,7 @@ This tutorial walks through the full MEG processing pipeline step by step:
 Prerequisites
 ^^^^^^^^^^^^^
 
-- `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_ (this installs `MNE-Python <https://mne.tools/stable/index.html>`_ as a dependency).
+- `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_ (this installs `MNE-Python <https://mne.tools/stable/index.html>`_ as a dependency). Note, TensorFlow is not required for processing M/EEG. (osl-dynamics can be installed without TensorFlow using the `envs/osld.yml <https://github.com/OHBA-analysis/osl-dynamics/blob/main/envs/osld.yml>`_ environment.)
 - `FSL <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki>`_ (needed for surface extraction).
 
 Input Data
@@ -61,8 +61,7 @@ Output is written to ``BIDS/derivatives/``.
 #
 #     import mne
 #     import numpy as np
-#     import matplotlib
-#     matplotlib.use("Agg")
+#     %matplotlib inline
 #
 #     from osl_dynamics import files
 #     from osl_dynamics.meeg import preproc, rhino, source_recon, parcellation
@@ -166,7 +165,7 @@ Output is written to ``BIDS/derivatives/``.
 #
 # .. code-block:: python
 #
-#     preproc.save_qc_plots(raw, plots_dir / id)
+#     preproc.save_qc_plots(raw, plots_dir / id, show=True)
 
 #%%
 # Save preprocessed data
@@ -207,6 +206,7 @@ Output is written to ``BIDS/derivatives/``.
 #         outdir=surfaces_dir,
 #         include_nose=False,
 #         do_mri2mniaxes_xform=False,
+#         show=True,
 #     )
 
 #%%
@@ -272,27 +272,17 @@ Output is written to ``BIDS/derivatives/``.
 #         fns,
 #         use_nose=False,
 #         allow_mri_scaling=False,  # set True if using MNI152 standard brain
+#         show=True,
 #     )
 
 #%%
-# Save the coregistration plot. The 3D plot shows the MEG sensors (blue), headshape points (red dots), fiducials, and MRI surfaces. Check that the headshape points sit on the scalp surface and the sensors surround the head correctly.
+# The coregistration plot is saved automatically to ``fns.coreg_dir/coreg.png``. The 3D plot shows the MEG sensors (blue), headshape points (red dots), fiducials, and MRI surfaces. Check that the headshape points sit on the scalp surface and the sensors surround the head correctly. The QC report copies this plot automatically when generated.
 #
 # If the coregistration looks off, you can try:
 #
 # - Removing stray headshape points with ``rhino.remove_stray_headshape_points``.
 # - Manually editing the headshape/fiducial text files in ``fns.coreg_dir``.
-# - Setting ``use_nose=False`` if the nose is included in the MRI.
-#
-# .. code-block:: python
-#
-#     import shutil
-#
-#     session_plots_dir = plots_dir / id
-#     session_plots_dir.mkdir(parents=True, exist_ok=True)
-#     for view in ["frontal", "right", "top"]:
-#         src = Path(fns.coreg_dir) / f"coreg_{view}.png"
-#         if src.exists():
-#             shutil.copy(src, session_plots_dir / f"3_coreg_{view}.png")
+# - Setting ``use_nose=False``.
 
 #%%
 # Step 4: Forward Model
@@ -316,7 +306,7 @@ Output is written to ``BIDS/derivatives/``.
 # Key parameters:
 #
 # - ``chantypes=["mag", "grad"]`` — Use both magnetometers and gradiometers (Elekta systems). For CTF, use ``["mag"]``.
-# - ``rank={"meg": 60}`` — Effective rank of the data after MaxFilter. Elekta data is typically rank 60-64. For non-MaxFiltered data or CTF, you can use ``"info"`` to let MNE estimate the rank.
+# - ``rank={"meg": 60}`` — Effective rank of the data after MaxFilter. Elekta data is typically rank 60-64.
 #
 # Compute beamformer weights
 # **************************
@@ -343,8 +333,8 @@ Output is written to ``BIDS/derivatives/``.
 #
 # We reduce the high-dimensional voxel data to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis.
 #
-# - ``method="spatial_basis"`` — Weight voxels by their loading on each parcel (from the atlas), rather than simple averaging.
-# - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels caused by the beamformer.
+# - ``method="spatial_basis"`` — Weight voxels by their loading on each parcel (from the atlas) because calculate PCA.
+# - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels.
 #
 # .. code-block:: python
 #
@@ -376,11 +366,11 @@ Output is written to ``BIDS/derivatives/``.
 #     print(f"Saved: {parc_fif}")
 
 #%%
-# A good sanity check is to plot the PSD of each parcel and band-limited power maps. We expect to see an alpha peak (~10 Hz) that is strongest in posterior parcels. If this is absent or the spectra look unusual, something may have gone wrong in the pipeline.
+# A good sanity check is to plot the PSD of each parcel. We expect to see an alpha peak (~10 Hz) that is strongest in posterior parcels. If this is absent or the spectra look unusual, something may have gone wrong in the pipeline. You can also pass ``power_maps=True`` to generate band-limited power maps on the cortical surface.
 #
 # .. code-block:: python
 #
-#     parcellation.save_qc_plots(parc_fif, parcellation_file, plots_dir / id)
+#     parcellation.save_qc_plots(parc_fif, parcellation_file, show=True)
 
 #%%
 # Summary and Next Steps

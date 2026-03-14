@@ -1729,7 +1729,7 @@ def plot_brain_surface(
         # Plotting 2 views
 
         # Title
-        fig.suptitle(title, fontsize=26, y=0.97)
+        fig.suptitle(title, fontsize=30, y=0.97)
 
         if colorbar:
             # Positioning and size of the colour bar
@@ -1752,7 +1752,7 @@ def plot_brain_surface(
         # Plotting 4 views
 
         # Title
-        fig.suptitle(title, fontsize=18, y=0.98)
+        fig.suptitle(title, fontsize=22, y=0.98)
 
         if colorbar:
             # Positioning and size of the colour bar
@@ -1777,6 +1777,7 @@ def plot_brain_surface(
         fig.savefig(filename)
         if not show_plot:
             plt.close(fig)
+        return fig
     else:
         return fig, ax
 

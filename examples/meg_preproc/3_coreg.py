@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import shutil
 from osl_dynamics import files
 from osl_dynamics.meeg import parallel, rhino
 from osl_dynamics.utils.filenames import OSLFilenames
@@ -50,14 +49,6 @@ def process_session(id, info, logger, **kwargs):
         use_nose=use_nose,
         allow_mri_scaling=allow_mri_scaling,
     )
-
-    logger.log("Copying plots...")
-    session_plots_dir = plots_dir / id
-    session_plots_dir.mkdir(parents=True, exist_ok=True)
-    for view in ["frontal", "right", "top"]:
-        src = Path(fns.coreg_dir) / f"coreg_{view}.png"
-        if src.exists():
-            shutil.copy(src, session_plots_dir / f"3_coreg_{view}.png")
 
     logger.log("Done.")
 

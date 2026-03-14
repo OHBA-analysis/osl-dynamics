@@ -397,18 +397,16 @@ def plot_psds(
 def save_qc_plots(
     parc_fif: str,
     parcellation_file: str,
-    output_dir: Union[str, Path],
+    output_dir: Optional[Union[str, Path]] = None,
+    power_maps: bool = False,
+    show: bool = False,
     cmap: str = "hot",
 ) -> None:
     """Save parcellation QC plots.
 
     Saves the following files to output_dir:
-    - 4_psd_topo.png: PSD topography plot
-    - 4_power_delta.png: delta band power map
-    - 4_power_theta.png: theta band power map
-    - 4_power_alpha.png: alpha band power map
-    - 4_power_beta.png: beta band power map
-    - 4_power_gamma.png: gamma band power map
+    - psd_topo.png: PSD topography plot
+    - power_maps.png: composite band power maps (only if power_maps=True)
 
     Parameters
     ----------
@@ -416,12 +414,20 @@ def save_qc_plots(
         Path to parcellated fif file.
     parcellation_file : str
         Parcellation file name.
-    output_dir : str or Path
-        Directory to save plots to.
+    output_dir : str or Path, optional
+        Directory to save plots to. Defaults to the directory containing
+        parc_fif.
+    power_maps : bool, optional
+        Whether to create band power map plots. Default is False.
+    show : bool, optional
+        Whether to display the plots interactively. Default is False.
     cmap : str, optional
         Colormap for power maps.
     """
-    output_dir = Path(output_dir)
+    if output_dir is None:
+        output_dir = Path(parc_fif).parent
+    else:
+        output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     from osl_dynamics.analysis import power
@@ -443,11 +449,15 @@ def save_qc_plots(
         psd,
         parcellation_file=parcellation_file,
         frequency_range=[1, 45],
-        filename=str(output_dir / "4_psd_topo.png"),
+        filename=str(output_dir / "psd_topo.png"),
     )
-    plt.close("all")
+    if not show:
+        plt.close("all")
 
-    # Band power maps
+    if not power_maps:
+        return
+
+    # Band power maps — render each band and composite into a single image
     mask_file = f"{files.mask.path}/MNI152_T1_8mm_brain.nii.gz"
     bands = {
         "delta": [1, 4],
@@ -456,18 +466,33 @@ def save_qc_plots(
         "beta": [13, 30],
         "gamma": [30, 45],
     }
+    band_images = []
     for band_name, freq_range in bands.items():
         band_power = power.variance_from_spectra(f, psd, frequency_range=freq_range)
-        plot_brain_surface(
+        fig, ax = plot_brain_surface(
             band_power,
             mask_file=mask_file,
             parcellation_file=parcellation_file,
             title=f"{band_name} ({freq_range[0]}-{freq_range[1]} Hz)",
             cmap=cmap,
             symmetric_cbar=False,
-            filename=str(output_dir / f"4_power_{band_name}.png"),
         )
-        plt.close("all")
+        fig.canvas.draw()
+        img = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
+        img = img.reshape(fig.canvas.get_width_height()[::-1] + (4,))
+        band_images.append(img)
+        plt.close(fig)
+
+    composite_fig, axes = plt.subplots(1, 5, figsize=(30, 6))
+    for ax, img in zip(axes, band_images):
+        ax.imshow(img)
+        ax.axis("off")
+    composite_fig.tight_layout()
+    composite_fig.savefig(
+        str(output_dir / "power_maps.png"), dpi=150, bbox_inches="tight"
+    )
+    if not show:
+        plt.close(composite_fig)
 
 
 def _resample_parcellation(fns, parcellation_file, voxel_coords):

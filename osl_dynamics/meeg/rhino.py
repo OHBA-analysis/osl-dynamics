@@ -12,7 +12,6 @@ import pandas as pd
 import nibabel as nib
 import nilearn as nil
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 from sklearn.mixture import GaussianMixture
 from skimage import measure
 from numba import cfunc, carray
@@ -45,6 +44,7 @@ def extract_surfaces(
     outdir: str,
     include_nose: bool = True,
     do_mri2mniaxes_xform: bool = True,
+    show: bool = False,
 ) -> None:
     """Extract surfaces.
 
@@ -89,6 +89,9 @@ def extract_surfaces(
         Specifies whether to do step (1) above, i.e. transform MRI to be
         aligned with the MNI axes. Sometimes needed when the MRI goes out
         of the MNI FOV after step (1).
+    show : bool, optional
+        Whether to display the surface plots interactively. Default is
+        False (suitable for batch processing).
     """
 
     # Note the jargon used varies for xforms and coord spaces:
@@ -528,6 +531,8 @@ def extract_surfaces(
 
     # Plot the surfaces
     plot_surfaces(outdir, id, include_nose=include_nose)
+    if not show:
+        plt.close("all")
 
     print("Surface extraction complete.")
 
@@ -705,7 +710,7 @@ def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
 
     # These values are in cm in HEAD space
     num_headshape_pnts = int(pd.read_csv(fns.pos_file, header=None).to_numpy()[0])
-    data = pd.read_csv(fns.pos_file, header=None, skiprows=[0], delim_whitespace=True)
+    data = pd.read_csv(fns.pos_file, header=None, skiprows=[0], sep=r"\s+")
 
     # RHINO is going to work with distances in mm
     data.iloc[:, 1:4] = data.iloc[:, 1:4] * 10
@@ -883,6 +888,7 @@ def coregister_head_and_mri(
     mni_fiducials: Optional[Dict[str, np.ndarray]] = None,
     n_init: int = 1,
     plot_type: str = "png",
+    show: bool = False,
 ) -> None:
     """Coregister HEAD (polhemus) and MRI space.
 
@@ -956,6 +962,9 @@ def coregister_head_and_mri(
         "png" saves static PNG images (requires a display/render window).
         "html" saves an interactive HTML file (works in headless environments).
         None skips plotting.
+    show : bool, optional
+        Whether to display the coregistration plot interactively. Default is
+        False (suitable for batch processing).
     """
 
     # Note the jargon used varies for xforms and coord spaces:
@@ -1243,7 +1252,7 @@ def coregister_head_and_mri(
     # -----------------------
     if plot_type is not None:
         filename = f"{fns.coreg_dir}/coreg.{plot_type}"
-        plot_coregistration(fns, include_nose=use_nose, filename=filename)
+        plot_coregistration(fns, include_nose=use_nose, filename=filename, show=show)
 
     print("Coregistration complete.")
 
@@ -1257,7 +1266,7 @@ def plot_coregistration(
     display_headshape_pnts: bool = True,
     include_nose: bool = True,
     filename: Optional[str] = None,
-    show: bool = True,
+    show: bool = False,
 ) -> None:
     """Plot coregistration.
 
@@ -1623,17 +1632,15 @@ def plot_coregistration(
         # Save
         ext = Path(filename).suffix.lower()
 
-        outnames = []
         if ext == ".html":
             print(f"Saving {filename}")
             renderer.figure.plotter.export_html(filename)
 
         elif ext == ".png":
-            # Save three static PNG views (frontal, right, top)
-            base = str(Path(filename).with_suffix(""))
+            # Capture three views and composite into a single PNG
             views = [
                 (
-                    "frontal",
+                    "Frontal",
                     dict(
                         azimuth=90,
                         elevation=90,
@@ -1642,7 +1649,7 @@ def plot_coregistration(
                     ),
                 ),
                 (
-                    "right",
+                    "Right",
                     dict(
                         azimuth=0,
                         elevation=90,
@@ -1651,7 +1658,7 @@ def plot_coregistration(
                     ),
                 ),
                 (
-                    "top",
+                    "Top",
                     dict(
                         azimuth=90,
                         elevation=0,
@@ -1662,6 +1669,7 @@ def plot_coregistration(
             ]
 
             plotter = renderer.figure.plotter
+            screenshots = []
 
             for name, cam in views:
                 renderer.set_camera(
@@ -1670,22 +1678,22 @@ def plot_coregistration(
                     distance=cam["distance"],
                     focalpoint=cam["focalpoint"],
                 )
-                outname = f"{base}_{name}.png"
-                outnames.append(outname)
-                print(f"Saving view {name} -> {outname}")
-                plotter.screenshot(outname)
+                screenshots.append(plotter.screenshot())
+
+            fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+            for ax, img, (name, _) in zip(axes, screenshots, views):
+                ax.imshow(img)
+                ax.axis("off")
+                ax.set_title(name, fontsize=22)
+            fig.tight_layout()
+            print(f"Saving {filename}")
+            fig.savefig(filename, dpi=150, bbox_inches="tight")
+            if show:
+                plt.show()
+            plt.close(fig)
 
         else:
             raise ValueError("Extension must be png or html.")
-
-        if show and len(outnames) > 0:
-            titles = ["Frontal", "Right", "Top"]
-            fig, axes = plt.subplots(1, 3, figsize=(12, 8))
-            for ax, fname, title in zip(axes, outnames, titles):
-                img = mpimg.imread(fname)
-                ax.imshow(img)
-                ax.axis("off")
-                ax.set_title(title, fontsize=12)
 
 
 def forward_model(

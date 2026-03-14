@@ -8,18 +8,24 @@ Overview
 
 osl-dynamics is a Python toolbox for studying dynamic brain networks from neuroimaging data (M/EEG and fMRI). It provides:
 
-- **Generative models** for inferring dynamic brain states: the Hidden Markov Model (HMM), Dynamic Network Modes (DyNeMo), and Dynamic Network States (DyNeSte).
+- **M/EEG processing**: preprocessing, source reconstruction (LCMV beamformer) and parcellation.
+- **Generative models** for inferring dynamic brain networks, e.g. the Hidden Markov Model (HMM) and Dynamic Network Modes (DyNeMo).
 - **Post-hoc analysis tools**: spectral analysis, summary statistics, and network visualization.
 - **Static analysis**: time-averaged power and connectivity analysis.
 - **Statistical testing**: GLM-based permutation testing for group comparisons.
 - **Simulation tools**: for generating synthetic time series data.
 
+M/EEG Processing
+-----------------
+
+If you are starting from raw M/EEG data, osl-dynamics includes a full processing pipeline covering preprocessing, surface extraction, coregistration, source reconstruction (LCMV beamformer), and parcellation. See the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>` for a step-by-step walkthrough, or the `batch processing scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for running multiple sessions in parallel.
+
 A Typical Workflow
 ------------------
 
-A typical analysis with osl-dynamics follows these steps:
+Once you have parcellated source-space data (or fMRI data), a typical analysis follows these steps:
 
-1. **Load data** — Load your preprocessed source-space M/EEG or fMRI data.
+1. **Load data** — Load your parcellated (or sensor) M/EEG or fMRI data.
 2. **Prepare data** — Standardize, and optionally apply time-delay embedding (TDE) and PCA.
 3. **Train a model** — Fit an HMM, DyNeMo, or DyNeSte to infer dynamic brain states/modes.
 4. **Post-hoc analysis** — Estimate state/mode spectra, compute summary statistics, and visualize networks.

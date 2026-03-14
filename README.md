@@ -1,6 +1,8 @@
 # OHBA Software Library: Dynamics Toolbox
 
-See the read the docs page for a description of this project: [https://osl-dynamics.readthedocs.io](https://osl-dynamics.readthedocs.io).
+osl-dynamics is a Python toolbox for studying brain dynamics using neuroimaging data (M/EEG and fMRI).
+
+See the readthedocs page for a description of this project: [https://osl-dynamics.readthedocs.io](https://osl-dynamics.readthedocs.io).
 
 ## Citation
 
