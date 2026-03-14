@@ -1256,7 +1256,7 @@ def plot_coregistration(
     display_headshape_pnts: bool = True,
     include_nose: bool = True,
     filename: Optional[str] = None,
-    show: bool = True,
+    show: bool = False,
 ) -> None:
     """Plot coregistration.
 
@@ -1674,7 +1674,7 @@ def plot_coregistration(
             for ax, img, (name, _) in zip(axes, screenshots, views):
                 ax.imshow(img)
                 ax.axis("off")
-                ax.set_title(name, fontsize=18)
+                ax.set_title(name, fontsize=22)
             fig.tight_layout()
             print(f"Saving {filename}")
             fig.savefig(filename, dpi=150, bbox_inches="tight")
