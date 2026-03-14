@@ -282,7 +282,7 @@ Output is written to ``BIDS/derivatives/``.
 #
 # - Removing stray headshape points with ``rhino.remove_stray_headshape_points``.
 # - Manually editing the headshape/fiducial text files in ``fns.coreg_dir``.
-# - Setting ``use_nose=False`` if the nose is included in the MRI.
+# - Setting ``use_nose=False``.
 
 #%%
 # Step 4: Forward Model
