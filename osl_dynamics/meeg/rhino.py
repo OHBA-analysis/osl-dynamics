@@ -705,7 +705,7 @@ def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
 
     # These values are in cm in HEAD space
     num_headshape_pnts = int(pd.read_csv(fns.pos_file, header=None).to_numpy()[0])
-    data = pd.read_csv(fns.pos_file, header=None, skiprows=[0], delim_whitespace=True)
+    data = pd.read_csv(fns.pos_file, header=None, skiprows=[0], sep=r"\s+")
 
     # RHINO is going to work with distances in mm
     data.iloc[:, 1:4] = data.iloc[:, 1:4] * 10
