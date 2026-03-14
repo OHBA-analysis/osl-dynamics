@@ -61,8 +61,7 @@ Output is written to ``BIDS/derivatives/``.
 #
 #     import mne
 #     import numpy as np
-#     import matplotlib
-#     matplotlib.use("Agg")
+#     %matplotlib inline
 #
 #     from osl_dynamics import files
 #     from osl_dynamics.meeg import preproc, rhino, source_recon, parcellation
@@ -166,7 +165,7 @@ Output is written to ``BIDS/derivatives/``.
 #
 # .. code-block:: python
 #
-#     preproc.save_qc_plots(raw, plots_dir / id)
+#     preproc.save_qc_plots(raw, plots_dir / id, show=True)
 
 #%%
 # Save preprocessed data
@@ -207,6 +206,7 @@ Output is written to ``BIDS/derivatives/``.
 #         outdir=surfaces_dir,
 #         include_nose=False,
 #         do_mri2mniaxes_xform=False,
+#         show=True,
 #     )
 
 #%%
@@ -272,6 +272,7 @@ Output is written to ``BIDS/derivatives/``.
 #         fns,
 #         use_nose=False,
 #         allow_mri_scaling=False,  # set True if using MNI152 standard brain
+#         show=True,
 #     )
 
 #%%
@@ -365,11 +366,11 @@ Output is written to ``BIDS/derivatives/``.
 #     print(f"Saved: {parc_fif}")
 
 #%%
-# A good sanity check is to plot the PSD of each parcel. We expect to see an alpha peak (~10 Hz) that is strongest in posterior parcels. If this is absent or the spectra look unusual, something may have gone wrong in the pipeline. You can also pass ``power_maps=True`` to generate band-limited power maps on the cortical surface (slower).
+# A good sanity check is to plot the PSD of each parcel. We expect to see an alpha peak (~10 Hz) that is strongest in posterior parcels. If this is absent or the spectra look unusual, something may have gone wrong in the pipeline. You can also pass ``power_maps=True`` to generate band-limited power maps on the cortical surface.
 #
 # .. code-block:: python
 #
-#     parcellation.save_qc_plots(parc_fif, parcellation_file)
+#     parcellation.save_qc_plots(parc_fif, parcellation_file, show=True)
 
 #%%
 # Summary and Next Steps

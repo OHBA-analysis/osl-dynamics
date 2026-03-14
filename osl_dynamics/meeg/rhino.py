@@ -44,6 +44,7 @@ def extract_surfaces(
     outdir: str,
     include_nose: bool = True,
     do_mri2mniaxes_xform: bool = True,
+    show: bool = False,
 ) -> None:
     """Extract surfaces.
 
@@ -88,6 +89,9 @@ def extract_surfaces(
         Specifies whether to do step (1) above, i.e. transform MRI to be
         aligned with the MNI axes. Sometimes needed when the MRI goes out
         of the MNI FOV after step (1).
+    show : bool, optional
+        Whether to display the surface plots interactively. Default is
+        False (suitable for batch processing).
     """
 
     # Note the jargon used varies for xforms and coord spaces:
@@ -527,6 +531,8 @@ def extract_surfaces(
 
     # Plot the surfaces
     plot_surfaces(outdir, id, include_nose=include_nose)
+    if not show:
+        plt.close("all")
 
     print("Surface extraction complete.")
 
@@ -882,6 +888,7 @@ def coregister_head_and_mri(
     mni_fiducials: Optional[Dict[str, np.ndarray]] = None,
     n_init: int = 1,
     plot_type: str = "png",
+    show: bool = False,
 ) -> None:
     """Coregister HEAD (polhemus) and MRI space.
 
@@ -955,6 +962,9 @@ def coregister_head_and_mri(
         "png" saves static PNG images (requires a display/render window).
         "html" saves an interactive HTML file (works in headless environments).
         None skips plotting.
+    show : bool, optional
+        Whether to display the coregistration plot interactively. Default is
+        False (suitable for batch processing).
     """
 
     # Note the jargon used varies for xforms and coord spaces:
@@ -1242,7 +1252,7 @@ def coregister_head_and_mri(
     # -----------------------
     if plot_type is not None:
         filename = f"{fns.coreg_dir}/coreg.{plot_type}"
-        plot_coregistration(fns, include_nose=use_nose, filename=filename)
+        plot_coregistration(fns, include_nose=use_nose, filename=filename, show=show)
 
     print("Coregistration complete.")
 

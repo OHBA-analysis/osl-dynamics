@@ -631,6 +631,7 @@ def _grid_average_decimate(
 def save_qc_plots(
     raw: mne.io.Raw,
     output_dir: Union[str, Path],
+    show: bool = False,
 ) -> None:
     """Save preprocessing QC plots and summary.
 
@@ -647,6 +648,8 @@ def save_qc_plots(
         Preprocessed MNE Raw object.
     output_dir : str or Path
         Directory to save plots to.
+    show : bool, optional
+        Whether to display the plots interactively. Default is False.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -669,24 +672,28 @@ def save_qc_plots(
     # PSD
     raw.compute_psd(fmax=45).plot()
     plt.savefig(output_dir / "1_psd.png", dpi=150, bbox_inches="tight")
-    plt.close("all")
+    if not show:
+        plt.close("all")
 
     # Sum-square time series
     plot_sum_square_time_series(raw)
     plt.savefig(output_dir / "1_sum_square.png", dpi=150, bbox_inches="tight")
-    plt.close("all")
+    if not show:
+        plt.close("all")
 
     # Sum-square excluding bads
     plot_sum_square_time_series(raw, exclude_bads=True)
     plt.savefig(
         output_dir / "1_sum_square_exclude_bads.png", dpi=150, bbox_inches="tight"
     )
-    plt.close("all")
+    if not show:
+        plt.close("all")
 
     # Channel standard deviations
     plot_channel_stds(raw)
     plt.savefig(output_dir / "1_channel_stds.png", dpi=150, bbox_inches="tight")
-    plt.close("all")
+    if not show:
+        plt.close("all")
 
 
 def plot_sum_square_time_series(

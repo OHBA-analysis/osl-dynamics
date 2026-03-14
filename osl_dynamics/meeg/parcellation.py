@@ -399,6 +399,7 @@ def save_qc_plots(
     parcellation_file: str,
     output_dir: Optional[Union[str, Path]] = None,
     power_maps: bool = False,
+    show: bool = False,
     cmap: str = "hot",
 ) -> None:
     """Save parcellation QC plots.
@@ -418,6 +419,8 @@ def save_qc_plots(
         parc_fif.
     power_maps : bool, optional
         Whether to create band power map plots. Default is False.
+    show : bool, optional
+        Whether to display the plots interactively. Default is False.
     cmap : str, optional
         Colormap for power maps.
     """
@@ -448,7 +451,8 @@ def save_qc_plots(
         frequency_range=[1, 45],
         filename=str(output_dir / "psd_topo.png"),
     )
-    plt.close("all")
+    if not show:
+        plt.close("all")
 
     if not power_maps:
         return
@@ -487,7 +491,8 @@ def save_qc_plots(
     composite_fig.savefig(
         str(output_dir / "power_maps.png"), dpi=150, bbox_inches="tight"
     )
-    plt.close(composite_fig)
+    if not show:
+        plt.close(composite_fig)
 
 
 def _resample_parcellation(fns, parcellation_file, voxel_coords):
