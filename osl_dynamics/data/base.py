@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from pqdm.threads import pqdm
+from threadpoolctl import threadpool_limits
 from tqdm.auto import tqdm
 
 from osl_dynamics.data import processing, rw, tf as dtf
@@ -740,14 +741,15 @@ class Data:
 
         # Apply PCA in parallel
         args = zip(arrays, self.prepared_data_filenames)
-        self.arrays = pqdm(
-            args,
-            function=_apply,
-            desc="PCA",
-            n_jobs=self.n_jobs,
-            argument_type="args",
-            total=self.n_sessions,
-        )
+        with threadpool_limits(limits=1 if self.n_jobs > 1 else None):
+            self.arrays = pqdm(
+                args,
+                function=_apply,
+                desc="PCA",
+                n_jobs=self.n_jobs,
+                argument_type="args",
+                total=self.n_sessions,
+            )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
@@ -886,14 +888,15 @@ class Data:
 
         # Apply TDE and PCA in parallel
         args = zip(arrays, self.prepared_data_filenames)
-        self.arrays = pqdm(
-            args,
-            function=_apply,
-            desc="TDE-PCA",
-            n_jobs=self.n_jobs,
-            argument_type="args",
-            total=self.n_sessions,
-        )
+        with threadpool_limits(limits=1 if self.n_jobs > 1 else None):
+            self.arrays = pqdm(
+                args,
+                function=_apply,
+                desc="TDE-PCA",
+                n_jobs=self.n_jobs,
+                argument_type="args",
+                total=self.n_sessions,
+            )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
@@ -1161,14 +1164,15 @@ class Data:
         arrays = self.raw_data_arrays if use_raw else self.arrays
 
         # Calculate covariance of each session
-        covs = pqdm(
-            array=zip(arrays),
-            function=_calc_cov,
-            desc="Calculating covariances",
-            n_jobs=self.n_jobs,
-            argument_type="args",
-            total=self.n_sessions,
-        )
+        with threadpool_limits(limits=1 if self.n_jobs > 1 else None):
+            covs = pqdm(
+                array=zip(arrays),
+                function=_calc_cov,
+                desc="Calculating covariances",
+                n_jobs=self.n_jobs,
+                argument_type="args",
+                total=self.n_sessions,
+            )
         if any([isinstance(e, Exception) for e in covs]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
@@ -1192,14 +1196,15 @@ class Data:
         _logger.info("Aligning channel signs across sessions")
         tcovs = [template_cov] * self.n_sessions
         indices = range(self.n_sessions)
-        self.arrays = pqdm(
-            array=zip(covs, tcovs, arrays, indices),
-            function=_find_and_apply_flips,
-            n_jobs=self.n_jobs,
-            argument_type="args",
-            total=self.n_sessions,
-            disable=True,
-        )
+        with threadpool_limits(limits=1 if self.n_jobs > 1 else None):
+            self.arrays = pqdm(
+                array=zip(covs, tcovs, arrays, indices),
+                function=_find_and_apply_flips,
+                n_jobs=self.n_jobs,
+                argument_type="args",
+                total=self.n_sessions,
+                disable=True,
+            )
         if any([isinstance(e, Exception) for e in self.arrays]):
             for i, e in enumerate(self.arrays):
                 if isinstance(e, Exception):
