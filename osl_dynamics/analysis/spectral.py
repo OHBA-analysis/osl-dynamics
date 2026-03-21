@@ -7,7 +7,8 @@ import numpy as np
 from scipy import signal
 from scipy.signal._spectral_py import _median_bias
 from sklearn.decomposition import non_negative_factorization
-from pqdm.processes import pqdm
+from pqdm.threads import pqdm
+from threadpoolctl import threadpool_limits
 from tqdm.auto import trange
 
 from osl_dynamics.utils import array_ops
@@ -282,7 +283,8 @@ def welch_spectra(
     else:
         # Calculate spectra in parallel
         _logger.info("Calculating spectra")
-        results = pqdm(kwargs, _welch, n_jobs=n_jobs, argument_type="kwargs")
+        with threadpool_limits(limits=1):
+            results = pqdm(kwargs, _welch, n_jobs=n_jobs, argument_type="kwargs")
 
     # Unpack the results
     if calc_coh:
@@ -488,12 +490,13 @@ def multitaper_spectra(
     else:
         # Calculate spectra in parallel
         _logger.info("Calculating spectra")
-        results = pqdm(
-            kwargs,
-            _multitaper,
-            n_jobs=n_jobs,
-            argument_type="kwargs",
-        )
+        with threadpool_limits(limits=1):
+            results = pqdm(
+                kwargs,
+                _multitaper,
+                n_jobs=n_jobs,
+                argument_type="kwargs",
+            )
 
     # Unpack the results
     if calc_coh:
@@ -687,12 +690,13 @@ def regression_spectra(
     else:
         # Calculate a time-varying PSD and regress to get the mode PSDs
         _logger.info("Calculating spectra")
-        results = pqdm(
-            kwargs,
-            _regress_welch_spectrogram,
-            n_jobs=n_jobs,
-            argument_type="kwargs",
-        )
+        with threadpool_limits(limits=1):
+            results = pqdm(
+                kwargs,
+                _regress_welch_spectrogram,
+                n_jobs=n_jobs,
+                argument_type="kwargs",
+            )
 
     # Unpack results
     Pj = []

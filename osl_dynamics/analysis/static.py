@@ -6,6 +6,7 @@ from typing import Callable, List, Optional, Union
 import numpy as np
 from sklearn.covariance import LedoitWolf
 from pqdm.threads import pqdm
+from threadpoolctl import threadpool_limits
 from tqdm.auto import trange
 
 from osl_dynamics.analysis import spectral
@@ -150,7 +151,8 @@ def functional_connectivity(
     else:
         # Calculate in parallel
         _logger.info("Calculating FC")
-        results = pqdm(data, measure, n_jobs=n_jobs)
+        with threadpool_limits(limits=1):
+            results = pqdm(data, measure, n_jobs=n_jobs)
 
     return np.squeeze(results)
 
