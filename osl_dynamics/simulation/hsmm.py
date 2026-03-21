@@ -4,7 +4,7 @@ from typing import Optional, Union
 
 import numpy as np
 
-from osl_dynamics.simulation.mvn import MVN
+from osl_dynamics.simulation.obs_mod import MVN
 from osl_dynamics.simulation.base import Simulation
 from osl_dynamics.utils import array_ops
 

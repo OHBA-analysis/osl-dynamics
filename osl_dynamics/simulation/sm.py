@@ -5,7 +5,7 @@ from typing import List, Optional, Union
 import numpy as np
 from scipy.special import softmax
 
-from osl_dynamics.simulation.mvn import MVN, MSess_MVN
+from osl_dynamics.simulation.obs_mod import MVN, MSess_MVN
 from osl_dynamics.simulation.base import Simulation
 
 

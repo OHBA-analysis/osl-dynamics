@@ -5,11 +5,17 @@ from typing import List, Optional, Union
 
 import numpy as np
 
-from osl_dynamics.simulation.mar import MAR
-from osl_dynamics.simulation.mvn import MVN, MDyn_MVN, MSess_MVN
+from osl_dynamics.simulation.obs_mod import (
+    MAR,
+    MVN,
+    MDyn_MVN,
+    MSess_MVN,
+    OscillatoryBursts,
+    Poisson,
+    TDECovs,
+)
 from osl_dynamics.simulation.hsmm import HSMM
 from osl_dynamics.simulation.base import Simulation
-from osl_dynamics.simulation.poi import Poisson
 from osl_dynamics.utils import array_ops
 
 
@@ -840,3 +846,247 @@ class HierarchicalHMM_MVN(Simulation):
         sigma = np.std(self.time_series, axis=0).astype(np.float64)
         super().standardize()
         self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
+
+
+class HMM_OscillatoryBursts:
+    """Simulate an HMM with oscillatory burst observation model.
+
+    Uses an HMM to generate state time courses, then fills active periods
+    with sinusoidal oscillations at specified frequencies. Each mode has a
+    set of active channels and a characteristic frequency. An extra
+    "background" state (silence) is included automatically.
+
+    Multiple subjects can be simulated with optional group-level frequency
+    shifts.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of time points per subject.
+    n_subjects : int, optional
+        Number of subjects.
+    n_groups : int, optional
+        Number of subject groups. ``n_subjects`` must be divisible by
+        ``n_groups``.
+    true_freqs : np.ndarray, optional
+        Frequencies for each mode in Hz. Shape: (n_modes,). If not provided,
+        ``n_modes`` frequencies are linearly spaced between 8 and 25 Hz.
+    group_freq_shift : float, optional
+        Frequency shift between groups in Hz.
+    channel_activity : np.ndarray, optional
+        Binary matrix indicating active channels per mode.
+        Shape: (n_modes, n_channels). If not provided, an identity-like
+        matrix is created with ``n_channels_per_mode`` channels per mode.
+    n_modes : int, optional
+        Number of frequency modes. Ignored if ``channel_activity`` is given.
+    n_channels_per_mode : int, optional
+        Channels per mode when auto-generating ``channel_activity``.
+    sampling_frequency : float, optional
+        Sampling frequency in Hz.
+    snr : float, optional
+        Signal-to-noise ratio.
+    stay_prob : float, optional
+        HMM state stay probability.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        n_subjects: int = 1,
+        n_groups: int = 1,
+        true_freqs: Optional[np.ndarray] = None,
+        group_freq_shift: float = 0.5,
+        channel_activity: Optional[np.ndarray] = None,
+        n_modes: int = 4,
+        n_channels_per_mode: int = 8,
+        sampling_frequency: float = 100,
+        snr: float = 4,
+        stay_prob: float = 0.98,
+    ):
+        self.n_samples = n_samples
+        self.n_subjects = n_subjects
+        self.n_groups = n_groups
+        self.n_subjects_per_group = n_subjects // n_groups
+        self.sampling_frequency = sampling_frequency
+        self.snr = snr
+        self.stay_prob = stay_prob
+
+        # Set up channel activity
+        if channel_activity is not None:
+            self.channel_activity = np.asarray(channel_activity)
+            self.n_modes = self.channel_activity.shape[0]
+            self.n_channels = self.channel_activity.shape[1]
+        else:
+            self.n_modes = n_modes
+            self.n_channels = n_modes * n_channels_per_mode
+            self.channel_activity = np.tile(np.eye(n_modes), n_channels_per_mode)
+
+        # Set up per-subject frequencies
+        self.true_freqs = self._get_subject_freqs(true_freqs, group_freq_shift)
+
+        # HMM (n_modes + 1 states: modes + background)
+        self.hmm = HMM(
+            trans_prob="uniform",
+            stay_prob=stay_prob,
+            n_states=self.n_modes + 1,
+        )
+
+        # Simulate
+        self.data, self.true_signal, self.mode_time_course = self._simulate()
+
+    def _get_subject_freqs(self, true_freqs, group_freq_shift):
+        """Get per-subject frequencies with group shifts.
+
+        Returns
+        -------
+        freqs : np.ndarray
+            Shape: (n_subjects, n_modes).
+        """
+        if true_freqs is None:
+            true_freqs = np.linspace(8, 25, self.n_modes)
+        true_freqs = np.asarray(true_freqs)
+
+        freqs = np.tile(true_freqs, (self.n_subjects, 1))
+        for i in range(self.n_groups):
+            shift = (i - (self.n_groups - 1) / 2) * group_freq_shift
+            start = i * self.n_subjects_per_group
+            end = start + self.n_subjects_per_group
+            freqs[start:end] += shift
+
+        return freqs
+
+    def _simulate(self):
+        """Simulate all subjects.
+
+        Returns
+        -------
+        data : np.ndarray
+            Shape: (n_subjects, n_samples, n_channels).
+        true_signal : np.ndarray
+            Shape: (n_subjects, n_samples, n_channels).
+        mode_time_course : np.ndarray
+            Shape: (n_subjects, n_samples, n_modes + 1).
+        """
+        data = np.zeros((self.n_subjects, self.n_samples, self.n_channels))
+        true_signal = np.zeros_like(data)
+        mode_time_course = np.zeros((self.n_subjects, self.n_samples, self.n_modes + 1))
+
+        for k in range(self.n_subjects):
+            stc = self.hmm.generate_states(self.n_samples)
+            mode_time_course[k] = stc
+
+            obs_mod = OscillatoryBursts(
+                n_modes=self.n_modes,
+                n_channels=self.n_channels,
+                true_freqs=self.true_freqs[k],
+                channel_activity=self.channel_activity,
+                sampling_frequency=self.sampling_frequency,
+                snr=self.snr,
+            )
+            data[k], true_signal[k] = obs_mod.simulate_data(stc)
+
+        return data, true_signal, mode_time_course
+
+    @property
+    def time_series(self):
+        """np.ndarray: Simulated data. Shape: (n_subjects, n_samples,
+        n_channels)."""
+        return self.data
+
+    @property
+    def state_time_course(self):
+        """np.ndarray: State time courses. Shape: (n_subjects, n_samples,
+        n_modes + 1)."""
+        return self.mode_time_course
+
+
+class HMM_TDECovs:
+    """Simulate an HMM with TDE covariance observation model.
+
+    Uses an HMM to generate state time courses, then generates time series
+    data from TDE covariance matrices using conditional multivariate normal
+    sampling. Each mode is defined by a TDE covariance matrix that encodes
+    both spectral and cross-channel structure.
+
+    Multiple subjects can be simulated, each with independent state time
+    courses.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of time points per subject.
+    true_tde_covs : list of np.ndarray
+        List of ``n_modes`` TDE covariance matrices, each of shape
+        ``(n_channels * n_embeddings, n_channels * n_embeddings)``.
+    n_subjects : int, optional
+        Number of subjects.
+    n_embeddings : int, optional
+        Number of time-delay embeddings.
+    stay_prob : float, optional
+        HMM state stay probability.
+    rho : float, optional
+        Regularisation parameter for inverting the covariance.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        true_tde_covs: list,
+        n_subjects: int = 1,
+        n_embeddings: int = 1,
+        stay_prob: float = 0.98,
+        rho: float = 0.1,
+    ):
+        self.n_samples = n_samples
+        self.n_subjects = n_subjects
+
+        # Observation model
+        self.obs_mod = TDECovs(
+            true_tde_covs=true_tde_covs,
+            n_embeddings=n_embeddings,
+            rho=rho,
+        )
+        self.n_modes = self.obs_mod.n_modes
+        self.n_channels = self.obs_mod.n_channels
+
+        # HMM
+        self.hmm = HMM(
+            trans_prob="uniform",
+            stay_prob=stay_prob,
+            n_states=self.n_modes,
+        )
+
+        # Simulate
+        self.data, self.mode_time_course = self._simulate()
+
+    def _simulate(self):
+        """Simulate all subjects.
+
+        Returns
+        -------
+        data : np.ndarray
+            Shape: (n_subjects, n_samples, n_channels).
+        mode_time_course : np.ndarray
+            Shape: (n_subjects, n_samples, n_modes).
+        """
+        data = np.zeros((self.n_subjects, self.n_samples, self.n_channels))
+        mode_time_course = np.zeros((self.n_subjects, self.n_samples, self.n_modes))
+
+        for k in range(self.n_subjects):
+            stc = self.hmm.generate_states(self.n_samples)
+            mode_time_course[k] = stc
+            data[k] = self.obs_mod.simulate_data(stc)
+
+        return data, mode_time_course
+
+    @property
+    def time_series(self):
+        """np.ndarray: Simulated data. Shape: (n_subjects, n_samples,
+        n_channels)."""
+        return self.data
+
+    @property
+    def state_time_course(self):
+        """np.ndarray: State time courses. Shape: (n_subjects, n_samples,
+        n_modes)."""
+        return self.mode_time_course

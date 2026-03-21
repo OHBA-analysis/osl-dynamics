@@ -1,6 +1,6 @@
-"""Multivariate normal observation model."""
+"""Observation models for simulations."""
 
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
 import numpy as np
 
@@ -835,3 +835,379 @@ class MSess_MVN(MVN):
         for session in range(self.n_sessions):
             data.append(self.simulate_session_data(session, mode_time_courses[session]))
         return np.array(data)
+
+
+class MAR:
+    r"""Class that generates data from a multivariate autoregressive (MAR) model.
+
+    A :math:`p`-order MAR model can be written as
+
+    .. math::
+        x_t = A_1 x_{t-1} + ... + A_p x_{t-p} + \epsilon_t
+
+    where :math:`\epsilon_t \sim N(0, \Sigma)`. The MAR model is therefore
+    parameterized by the MAR coefficients (:math:`A`) and covariance
+    (:math:`\Sigma`).
+
+    Parameters
+    ----------
+    coeffs : np.ndarray
+        Array of MAR coefficients, :math:`A`. Shape must be
+        (n_states, n_lags, n_channels, n_channels).
+    covs : np.ndarray
+        Covariance of the error :math:`\epsilon_t`. Shape must be
+        (n_states, n_channels) or (n_states, n_channels, n_channels).
+
+    Note
+    ----
+    This model is also known as VAR or MVAR.
+    """
+
+    def __init__(self, coeffs: np.ndarray, covs: np.ndarray) -> None:
+        # Validation
+        if coeffs.ndim != 4:
+            raise ValueError(
+                "coeffs must be a (n_states, n_lags, n_channels, n_channels) array."
+            )
+
+        if covs.ndim == 2:
+            covs = np.array([np.diag(c) for c in covs])
+
+        if coeffs.shape[0] != covs.shape[0]:
+            raise ValueError("Different number of states in coeffs and covs passed.")
+
+        if coeffs.shape[-1] != covs.shape[-1]:
+            raise ValueError("Different number of channels in coeffs and covs passed.")
+
+        # Model parameters
+        self.coeffs = coeffs
+        self.covs = covs
+        self.order = coeffs.shape[1]
+
+        # Number of states and channels
+        self.n_states = coeffs.shape[0]
+        self.n_channels = coeffs.shape[2]
+
+    def simulate_data(self, state_time_course: np.ndarray) -> np.ndarray:
+        """Simulate time series data.
+
+        We simulate MAR data based on the hidden state at each time point.
+
+        Parameters
+        ----------
+        state_time_course : np.ndarray
+            State time course. Shape must be (n_samples, n_states).
+            States must be mutually exclusive.
+
+        Returns
+        -------
+        data : np.ndarray
+            Simulated data. Shape is (n_samples, n_channels).
+        """
+        n_samples = state_time_course.shape[0]
+        data = np.empty([n_samples, self.n_channels])
+
+        # Generate the noise term first
+        for i in range(self.n_states):
+            time_points_active = state_time_course[:, i] == 1
+            n_time_points_active = np.count_nonzero(time_points_active)
+            data[time_points_active] = np.random.multivariate_normal(
+                np.zeros(self.n_channels),
+                self.covs[i],
+                size=n_time_points_active,
+            )
+
+        # Generate the MAR process
+        for t in range(n_samples):
+            state = state_time_course[t].argmax()
+            for lag in range(min(t, self.order)):
+                data[t] += np.dot(self.coeffs[state, lag], data[t - lag - 1])
+
+        return data.astype(np.float32)
+
+
+class OscillatoryBursts:
+    """Oscillatory burst observation model.
+
+    Generates sinusoidal oscillatory bursts at specified frequencies. Each mode
+    has an associated frequency and a set of active channels defined by a
+    channel activity matrix. During active periods (determined by the state
+    time course), channels produce sinusoidal signals at the mode's frequency
+    with a slowly varying phase offset.
+
+    Parameters
+    ----------
+    n_modes : int
+        Number of frequency modes.
+    n_channels : int
+        Number of channels.
+    true_freqs : np.ndarray
+        Frequencies for each mode in Hz. Shape: (n_modes,).
+    channel_activity : np.ndarray
+        Binary matrix indicating which channels are active for each mode.
+        Shape: (n_modes, n_channels).
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. Default: 100.
+    snr : float, optional
+        Signal-to-noise ratio. Default: 4.
+    """
+
+    def __init__(
+        self,
+        n_modes: int,
+        n_channels: int,
+        true_freqs: np.ndarray,
+        channel_activity: np.ndarray,
+        sampling_frequency: float = 100,
+        snr: float = 4,
+    ):
+        self.n_modes = n_modes
+        self.n_channels = n_channels
+        self.true_freqs = np.asarray(true_freqs)
+        self.channel_activity = np.asarray(channel_activity)
+        self.sampling_frequency = sampling_frequency
+        self.snr = snr
+
+    def simulate_data(
+        self,
+        state_time_course: np.ndarray,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Simulate oscillatory burst data for a single subject.
+
+        Parameters
+        ----------
+        state_time_course : np.ndarray
+            One-hot encoded state time course. Shape: (n_samples, n_states).
+            The first n_modes columns correspond to the oscillatory modes.
+            Any additional columns (e.g. a "background" state) are ignored.
+
+        Returns
+        -------
+        data : np.ndarray
+            Simulated data with noise. Shape: (n_samples, n_channels).
+        true_signal : np.ndarray
+            Clean signal without noise. Shape: (n_samples, n_channels).
+        """
+        n_samples = state_time_course.shape[0]
+        timestamps = np.arange(n_samples) / self.sampling_frequency
+
+        # Generate sinusoidal activity for each mode and channel
+        phase_diff = np.linspace(0, 0.25, self.n_channels)
+        true_signal = np.zeros((n_samples, self.n_channels))
+
+        for i in range(self.n_modes):
+            active = state_time_course[:, i] == 1
+            for j in range(self.n_channels):
+                if self.channel_activity[i, j] == 1:
+                    phase = (
+                        (0.5 * np.sin(2 * np.pi * 0.005 * timestamps) + phase_diff[j])
+                        * 2
+                        * np.pi
+                    )
+                    true_signal[active, j] += np.sin(
+                        2 * np.pi * self.true_freqs[i] * timestamps[active]
+                        + phase[active]
+                    )
+
+        # Add noise
+        noise_std = 1 / self.snr
+        data = true_signal + np.random.normal(0, noise_std, true_signal.shape)
+
+        return data, true_signal
+
+
+class Poisson:
+    """Class that generates Poisson time series data.
+
+    The time series for each channel is a single Poisson observation. The rate
+    of the poisson observation can be different for different states and
+    channels.
+
+    Parameters
+    ----------
+    rates : np.ndarray or str
+        Rate vector for each mode, shape should be (n_states, n_channels).
+        Either a numpy array or 'random'.
+    n_channels : int
+        Number of channels.
+    n_modes : int
+        Number of modes.
+    """
+
+    def __init__(
+        self,
+        rates: Union[np.ndarray, str],
+        n_states: Optional[int] = None,
+        n_channels: Optional[int] = None,
+    ) -> None:
+        if isinstance(rates, np.ndarray):
+            self.n_states = rates.shape[0]
+            self.n_channels = rates.shape[1]
+            self.rates = rates
+
+        elif not isinstance(rates, np.ndarray):
+            if n_states is None or n_channels is None:
+                raise ValueError(
+                    "If we are generating rates, "
+                    "n_states and n_channels must be passed."
+                )
+            self.n_states = n_states
+            self.n_channels = n_channels
+            self.rates = self.create_rates(rates)
+
+    def create_rates(self, option: str, eps: float = 1e-2) -> np.ndarray:
+        if option == "random":
+            # Randomly sample the rates from a gamma distribution
+            rates = np.random.gamma(
+                shape=1.0, scale=1.1, size=(self.n_states, self.n_channels)
+            )
+
+            #  Add a large rate to a small number of the channels at random
+            n_active_channels = max(1, self.n_channels // self.n_states)
+            for i in range(self.n_states):
+                active_channels = np.unique(
+                    np.random.randint(0, self.n_channels, size=n_active_channels)
+                )
+                rates[i, active_channels] += 1
+
+        else:
+            raise NotImplementedError("Please use rates='random'.")
+
+        return rates + eps
+
+    def simulate_data(self, state_time_course: np.ndarray) -> np.ndarray:
+        n_samples = state_time_course.shape[0]
+        data = np.empty([n_samples, self.n_channels])
+
+        # Generate data
+        for i in range(n_samples):
+            state = np.argmax(state_time_course[i])
+            data[i] = np.random.poisson(self.rates[state])
+
+        return data
+
+
+class TDECovs:
+    """Time-delay embedded covariance observation model.
+
+    Generates time series data from TDE covariance matrices using conditional
+    multivariate normal sampling. Each mode is defined by a ``CE x CE``
+    covariance matrix (where ``C`` is the number of channels and ``E`` is the
+    number of embeddings). At each time point, the current sample is drawn
+    conditioned on the previous ``E-1`` samples.
+
+    Parameters
+    ----------
+    true_tde_covs : list of np.ndarray
+        List of ``n_modes`` TDE covariance matrices, each of shape
+        ``(n_channels * n_embeddings, n_channels * n_embeddings)``.
+        The row/column ordering is assumed to be blocks of ``E x E``
+        matrices (i.e. channel-major ordering).
+    n_embeddings : int, optional
+        Number of time-delay embeddings.
+    rho : float, optional
+        Regularisation parameter for inverting the covariance.
+    """
+
+    def __init__(
+        self,
+        true_tde_covs: list,
+        n_embeddings: int = 1,
+        rho: float = 0.1,
+    ):
+        self.true_tde_covs = [np.asarray(c) for c in true_tde_covs]
+        self.n_embeddings = n_embeddings
+        self.rho = rho
+        self.n_channels = self.true_tde_covs[0].shape[0] // n_embeddings
+        self.n_modes = len(self.true_tde_covs)
+
+    def _gen_data_from_tde_cov(
+        self,
+        tde_cov: np.ndarray,
+        n_samples: int,
+    ) -> np.ndarray:
+        """Generate a time series from a single TDE covariance matrix.
+
+        Uses conditional multivariate normal sampling: at each time step,
+        the current sample ``x_t`` is drawn from
+        ``N(mu_cond, Sigma_cond)`` conditioned on the previous
+        ``n_embeddings - 1`` samples.
+
+        Parameters
+        ----------
+        tde_cov : np.ndarray
+            TDE covariance matrix. Shape: (CE, CE).
+        n_samples : int
+            Number of time points to generate.
+
+        Returns
+        -------
+        data : np.ndarray
+            Generated time series. Shape: (n_samples, n_channels).
+        """
+        n_embeddings = self.n_embeddings
+        n_channels = self.n_channels
+        rho = self.rho
+
+        # Reorder from channel-major (blocks of ExE) to embedding-major
+        tde_cov = tde_cov.reshape(n_channels, n_embeddings, n_channels, n_embeddings)
+        tde_cov = np.transpose(tde_cov, [1, 0, 3, 2])
+        tde_cov = tde_cov.reshape(n_embeddings * n_channels, n_embeddings * n_channels)
+
+        # Partition covariance for conditional distribution
+        # See "Conditional Distributions":
+        # https://en.wikipedia.org/wiki/Multivariate_normal_distribution
+        Sig22 = tde_cov[:-n_channels, :-n_channels]
+        Sig11 = tde_cov[-n_channels:, -n_channels:]
+        Sig12 = tde_cov[-n_channels:, :-n_channels]
+
+        # Initial condition
+        x_2 = np.random.multivariate_normal(np.zeros(tde_cov.shape[0]), tde_cov, size=1)
+        x_2 = x_2[:, :-n_channels].T  # (C*(E-1), 1)
+
+        # Precompute projection and conditional covariance
+        invSig22 = np.linalg.pinv(Sig22 + np.eye(Sig22.shape[0]) * rho)
+        Sig_cond = (Sig11 - Sig12 @ invSig22 @ Sig12.T) + np.eye(n_channels) * 0.001
+        proj = Sig12 @ invSig22
+
+        # Generate data autoregressively
+        data = np.zeros((n_samples, n_channels))
+        for t in range(n_samples):
+            mu = proj @ x_2
+            x_1 = np.random.multivariate_normal(mu.flatten(), Sig_cond)
+            data[t] = x_1
+            x_2 = np.concatenate([x_2[n_channels:], x_1[:, np.newaxis]], axis=0)
+
+        # Standardise
+        data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
+
+        return data
+
+    def simulate_data(
+        self,
+        state_time_course: np.ndarray,
+    ) -> np.ndarray:
+        """Simulate time series data.
+
+        For each mode, generates a full-length time series from the mode's
+        TDE covariance, then masks it by the state time course.
+
+        Parameters
+        ----------
+        state_time_course : np.ndarray
+            One-hot encoded state time course.
+            Shape: (n_samples, n_modes).
+
+        Returns
+        -------
+        data : np.ndarray
+            Simulated data. Shape: (n_samples, n_channels).
+        """
+        n_samples = state_time_course.shape[0]
+        data = np.zeros((n_samples, self.n_channels))
+
+        for i in range(self.n_modes):
+            activity = self._gen_data_from_tde_cov(self.true_tde_covs[i], n_samples)
+            data += state_time_course[:, i : i + 1] * activity
+
+        return data
