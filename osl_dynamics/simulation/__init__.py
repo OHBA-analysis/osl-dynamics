@@ -20,10 +20,10 @@ Observation models
   covariance matrix.
 - :py:class:`MAR` — Multivariate autoregressive. Each state has a set of
   autoregressive coefficients and an error covariance.
-- :py:class:`OscillatoryBursts` — Oscillatory bursts. Each mode has a
+- :py:class:`OscillatoryBursts` — Oscillatory bursts. Each state has a
   frequency and a set of active channels; generates sinusoidal signals
   during active periods.
-- :py:class:`TDECovs` — TDE covariance. Each mode has a TDE covariance
+- :py:class:`TDECovs` — TDE covariance. Each state has a TDE covariance
   matrix; generates autoregressive data via conditional sampling.
 - :py:class:`Poisson` — Poisson. Each state has a rate vector.
 
