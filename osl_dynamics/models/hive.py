@@ -1,4 +1,7 @@
-"""HIVE (HMM with Integrated Variability Estimation)."""
+"""HIVE (HMM with Integrated Variability Estimation).
+
+See the :doc:`model description </models/hive>` for more details.
+"""
 
 import logging
 from typing import Dict, List, Optional, Tuple, Union

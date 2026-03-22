@@ -38,6 +38,14 @@ extensions = [
 ]
 
 autoapi_dirs = ["../osl_dynamics"]
+autoapi_template_dir = "_templates"
+autoapi_options = [
+    "members",
+    "undoc-members",
+    "show-inheritance",
+    "show-module-summary",
+    "imported-members",
+]
 
 sphinx_gallery_conf = {
     "examples_dirs": "tutorials",        # Contains source .py files

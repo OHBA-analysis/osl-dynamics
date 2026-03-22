@@ -1,4 +1,7 @@
-"""Dynamic Network States (DyNeStE)."""
+"""Dynamic Network States (DyNeStE).
+
+See the :doc:`model description </models/dyneste>` for more details.
+"""
 
 import logging
 from dataclasses import dataclass

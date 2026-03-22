@@ -1,5 +1,7 @@
 """Multi-Dynamic Network Modes (M-DyNeMo).
 
+See the :doc:`model description </models/mdynemo>` for more details.
+
 See Also
 --------
 `Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main\

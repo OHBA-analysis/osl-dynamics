@@ -1,8 +1,8 @@
-"""Config API.
+"""Config API for specifying and running pipelines.
 
-------
-
-Specify a pipeline using a config, e.g. to train a TDE-HMM::
+The config API allows you to define a full analysis pipeline (data loading,
+preparation, and model training) as a YAML config and run it in a single
+call. For example, to train a TDE-HMM::
 
     config = '''
         load_data:
@@ -17,48 +17,39 @@ Specify a pipeline using a config, e.g. to train a TDE-HMM::
                 learn_covariances: True
     '''
 
-and run with::
-
     run_pipeline(config, output_dir="results")
 
-------
+Command line usage
+------------------
+The config API can also be used from the command line::
 
-See the `toolbox paper examples <https://github.com/OHBA-analysis/osl-dynamics\
-/tree/main/examples/toolbox_paper>`_ for scripts that use the config API:
+    osl-dynamics <config-file> <output-directory>
 
-- `TDE-HMM burst analysis <https://github.com/OHBA-analysis/osl-dynamics\
-  /blob/main/examples/toolbox_paper/ctf_rest/tde_hmm_bursts.py>`_.
-- `AE-HMM network analysis <https://github.com/OHBA-analysis/osl-dynamics\
-  /blob/main/examples/toolbox_paper/elekta_task/ae_hmm.py>`_.
-- `TDE-HMM network analysis <https://github.com/OHBA-analysis/osl-dynamics\
-  /blob/main/examples/toolbox_paper/ctf_rest/tde_hmm_networks.py>`_.
-- `TDE-DyNeMo network analysis <https://github.com/OHBA-analysis/osl-dynamics\
-  /blob/main/examples/toolbox_paper/ctf_rest/tde_dynemo_networks.py>`_.
+where ``<config-file>`` is a YAML file containing the config and
+``<output-directory>`` is the output directory.
 
-------
+To restrict to a specific GPU::
 
-Note
-----
-The config API can be used via the command line with::
+    osl-dynamics <config-file> <output-directory> --restrict 0
 
-    % osl-dynamics <config-file> <output-directory>
+Remember to activate the ``osld`` conda environment first.
 
-where
+Modules
+-------
+- :py:mod:`~osl_dynamics.config_api.pipeline` — :py:func:`run_pipeline` for
+  executing a config.
+- :py:mod:`~osl_dynamics.config_api.wrappers` — Wrapper functions for each
+  pipeline step.
 
-- :code:`<config-file>` is a yaml file containing the config.
-- :code:`<output-directory>` is the output directory.
+Python example scripts
+----------------------
 
-Optionally, you can specify a particular GPU to use with::
+Code to reproduce the `eLife paper <https://elifesciences.org/articles/91949>`_ results can be found `here <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/toolbox_paper>`_. The different pipelines are:
 
-    % osl-dynamics <config-file> <output-directory> --restrict <restrict>
-
-where :code:`<restrict>` is an integer specifying the GPU number. E.g. if you
-would just like to use the first GPU, you can pass::
-
-    % osl-dynamics <config-file> <output-directory> --restrict 0
-
-Remember you need to activate the :code:`osld` conda environment to use the
-command line interface.
+- `TDE-HMM burst analysis <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/toolbox_paper/ctf_rest/tde_hmm_bursts.py>`_
+- `AE-HMM network analysis <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/toolbox_paper/elekta_task/ae_hmm.py>`_
+- `TDE-HMM network analysis <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/toolbox_paper/ctf_rest/tde_hmm_networks.py>`_
+- `TDE-DyNeMo network analysis <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/toolbox_paper/ctf_rest/tde_dynemo_networks.py>`_
 """
 
 from osl_dynamics.config_api import pipeline, wrappers
