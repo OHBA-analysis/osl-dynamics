@@ -4,6 +4,12 @@ This subpackage contains all the models implemented in osl-dynamics. Each
 model module (e.g. ``hmm.py``, ``dynemo.py``) defines a ``Config`` dataclass
 and a ``Model`` class.
 
+See also
+--------
+- :doc:`HMM Training </tutorials_build/3-2_hmm_training>`
+- :doc:`DyNeMo Training </tutorials_build/3-3_dynemo_training>`
+- :doc:`Getting Inferred Parameters </tutorials_build/3-4_hmm_dynemo_get_inf_params>`
+
 Code structure
 --------------
 

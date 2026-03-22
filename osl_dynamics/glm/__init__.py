@@ -1,5 +1,10 @@
 """General Linear Model (GLM) and permutation testing.
 
+See also
+--------
+- :doc:`Group Contrast </tutorials_build/7-1_group_contrast>`
+- :doc:`Network Response </tutorials_build/7-2_group_network_response>`
+
 Modules
 -------
 - ``base.py`` — :py:class:`DesignConfig` for specifying regressors/contrasts
