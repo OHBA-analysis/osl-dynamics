@@ -1,9 +1,13 @@
 """General Linear Model (GLM) and permutation testing.
 
-See also
---------
+Tutorials
+---------
 - :doc:`Group Contrast </tutorials_build/7-1_group_contrast>`
 - :doc:`Network Response </tutorials_build/7-2_group_network_response>`
+
+Python example scripts
+----------------------
+- `Statistics <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/statistics>`_
 
 Modules
 -------

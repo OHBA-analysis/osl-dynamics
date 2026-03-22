@@ -4,8 +4,8 @@ The main entry point is the :py:class:`Data` class, which handles loading
 time series data from various formats (NumPy, MATLAB, FIF) and preparing
 it for model training.
 
-See also
---------
+Tutorials
+---------
 - :doc:`Loading Data </tutorials_build/1-1_data_loading>`
 - :doc:`Preparing M/EEG Data </tutorials_build/1-2_data_prepare_meg>`
 - :doc:`Preparing fMRI Data </tutorials_build/1-3_data_prepare_fmri>`

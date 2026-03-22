@@ -1,9 +1,15 @@
 """M/EEG processing pipeline.
 
 This subpackage provides a complete pipeline for processing M/EEG data from
-raw sensor recordings to parcellated source-space time courses. See the
-:doc:`MEG Preprocessing tutorial </tutorials_build/0-1_meg_preprocessing>`
-for a step-by-step walkthrough.
+raw sensor recordings to parcellated source-space time courses.
+
+Tutorials
+---------
+- :doc:`MEG Preprocessing </tutorials_build/0-1_meg_preprocessing>`
+
+Python example scripts
+----------------------
+- `Batch MEG preprocessing <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_
 
 Modules
 -------

@@ -3,8 +3,8 @@
 This subpackage provides tools for analysing the output of trained models
 (HMM states, DyNeMo modes, etc.) and for static (time-averaged) analysis.
 
-See also
---------
+Tutorials
+---------
 - :doc:`Static Spectral Analysis </tutorials_build/2-1_static_spectra_analysis>`
 - :doc:`Static Power Analysis </tutorials_build/2-2_static_power_analysis>`
 - :doc:`Static AEC Analysis </tutorials_build/2-3_static_aec_analysis>`
@@ -16,6 +16,16 @@ See also
 - :doc:`DyNeMo Regression Spectra </tutorials_build/5-1_dynemo_regression_spectra>`
 - :doc:`DyNeMo Plotting Networks </tutorials_build/5-2_dynemo_plotting_networks>`
 - :doc:`DyNeMo Mixing Coefficients </tutorials_build/5-3_dynemo_mixing_coefs>`
+
+Python example scripts
+----------------------
+- `Spectra <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/spectra>`_
+- `Static analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/static>`_
+- `Statistics <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/statistics>`_
+- `MEG analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_analysis>`_
+- `fMRI analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/fmri>`_
+- `Decoding <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/decoding>`_
+- `Plotting <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/plotting>`_
 
 Modules
 -------
