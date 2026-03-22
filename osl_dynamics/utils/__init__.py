@@ -2,21 +2,23 @@
 
 Modules
 -------
-- ``array_ops.py`` — Array operations (covariance ↔ correlation conversions,
-  matrix decompositions, etc.).
-- ``filenames.py`` — :py:class:`OSLFilenames` for managing pipeline file
-  paths.
-- ``logger.py`` — Logging utilities for pipeline scripts.
-- ``misc.py`` — Miscellaneous helpers (random seeds, FSL setup, YAML
-  loading).
-- ``model.py`` — Model I/O utilities (saving/loading configs and weights).
-- ``plotting.py`` — Plotting functions (brain surfaces, power maps, PSDs,
-  state time courses, networks).
-- ``sklearn_wrappers.py`` — Scikit-learn compatible wrappers for
-  osl-dynamics models.
-- ``topoplots.py`` — Sensor-space topographic plots.
-- ``workbench.py`` — HCP Workbench integration for cortical surface
-  visualisation.
+- :py:mod:`~osl_dynamics.utils.array_ops` — Array operations (covariance ↔
+  correlation conversions, matrix decompositions, etc.).
+- :py:mod:`~osl_dynamics.utils.filenames` — :py:class:`OSLFilenames` for
+  managing pipeline file paths.
+- :py:mod:`~osl_dynamics.utils.logger` — Logging utilities for pipeline
+  scripts.
+- :py:mod:`~osl_dynamics.utils.misc` — Miscellaneous helpers (random seeds,
+  FSL setup, YAML loading).
+- :py:mod:`~osl_dynamics.utils.model` — Model I/O utilities (saving/loading
+  configs and weights).
+- :py:mod:`~osl_dynamics.utils.plotting` — Plotting functions (brain
+  surfaces, power maps, PSDs, state time courses, networks).
+- :py:mod:`~osl_dynamics.utils.sklearn_wrappers` — Scikit-learn compatible
+  wrappers for osl-dynamics models.
+- :py:mod:`~osl_dynamics.utils.topoplots` — Sensor-space topographic plots.
+- :py:mod:`~osl_dynamics.utils.workbench` — HCP Workbench integration for
+  cortical surface visualisation.
 """
 
 from osl_dynamics.utils import (

@@ -5,10 +5,6 @@ with known ground truth dynamics. Simulations are built by combining a
 **state model** (how states evolve over time) with an **observation model**
 (how data is generated given the active state).
 
-Python example scripts
-----------------------
-- `Simulation <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/simulation>`_
-
 State models
 ------------
 - :py:class:`HMM` — Hidden Markov Model. Generates discrete state sequences
@@ -52,6 +48,10 @@ Variants
   :py:class:`MSess_HMM_MVN`, :py:class:`MSess_MixedSine_MVN`.
 - :py:class:`HierarchicalHMM_MVN` — Two-level hierarchical HMM where a
   top-level HMM selects which bottom-level HMM is active.
+
+Python example scripts
+----------------------
+- `Simulation <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/simulation>`_
 """
 
 from osl_dynamics.simulation.base import Simulation

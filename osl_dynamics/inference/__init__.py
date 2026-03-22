@@ -6,17 +6,21 @@ interact with this subpackage directly.
 
 Modules
 -------
-- ``layers.py`` — Custom Keras layers (RNN inference networks, softmax
-  layers, sampling layers, observation model layers, etc.).
-- ``callbacks.py`` — Training callbacks (KL annealing, transition
-  probability updates, EMA).
-- ``initializers.py`` — Weight initialisers for observation model parameters.
-- ``metrics.py`` — Loss metrics and evaluation functions.
-- ``modes.py`` — Utilities for manipulating inferred mode/state time courses
-  (reordering, matching, correlation).
-- ``optimizers.py`` — Custom optimisers.
-- ``regularizers.py`` — Regularisers for observation model parameters.
-- ``tf_ops.py`` — TensorFlow utility operations.
+- :py:mod:`~osl_dynamics.inference.layers` — Custom Keras layers (RNN
+  inference networks, softmax layers, sampling layers, observation model
+  layers, etc.).
+- :py:mod:`~osl_dynamics.inference.callbacks` — Training callbacks (KL
+  annealing, transition probability updates, EMA).
+- :py:mod:`~osl_dynamics.inference.initializers` — Weight initialisers for
+  observation model parameters.
+- :py:mod:`~osl_dynamics.inference.metrics` — Loss metrics and evaluation
+  functions.
+- :py:mod:`~osl_dynamics.inference.modes` — Utilities for manipulating
+  inferred mode/state time courses (reordering, matching, correlation).
+- :py:mod:`~osl_dynamics.inference.optimizers` — Custom optimisers.
+- :py:mod:`~osl_dynamics.inference.regularizers` — Regularisers for
+  observation model parameters.
+- :py:mod:`~osl_dynamics.inference.tf_ops` — TensorFlow utility operations.
 """
 
 from osl_dynamics.inference import metrics

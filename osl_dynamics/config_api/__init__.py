@@ -34,6 +34,13 @@ To restrict to a specific GPU::
 
 Remember to activate the ``osld`` conda environment first.
 
+Modules
+-------
+- :py:mod:`~osl_dynamics.config_api.pipeline` — :py:func:`run_pipeline` for
+  executing a config.
+- :py:mod:`~osl_dynamics.config_api.wrappers` — Wrapper functions for each
+  pipeline step.
+
 Python example scripts
 ----------------------
 
@@ -43,11 +50,6 @@ Code to reproduce the `eLife paper <https://elifesciences.org/articles/91949>`_ 
 - `AE-HMM network analysis <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/toolbox_paper/elekta_task/ae_hmm.py>`_
 - `TDE-HMM network analysis <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/toolbox_paper/ctf_rest/tde_hmm_networks.py>`_
 - `TDE-DyNeMo network analysis <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/toolbox_paper/ctf_rest/tde_dynemo_networks.py>`_
-
-Modules
--------
-- ``pipeline.py`` — :py:func:`run_pipeline` for executing a config.
-- ``wrappers.py`` — Wrapper functions for each pipeline step.
 """
 
 from osl_dynamics.config_api import pipeline, wrappers

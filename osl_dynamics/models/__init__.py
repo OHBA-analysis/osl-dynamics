@@ -4,18 +4,6 @@ This subpackage contains all the models implemented in osl-dynamics. Each
 model module (e.g. ``hmm.py``, ``dynemo.py``) defines a ``Config`` dataclass
 and a ``Model`` class.
 
-Tutorials
----------
-- :doc:`HMM Training </tutorials_build/3-2_hmm_training>`
-- :doc:`DyNeMo Training </tutorials_build/3-3_dynemo_training>`
-- :doc:`Getting Inferred Parameters </tutorials_build/3-4_hmm_dynemo_get_inf_params>`
-
-Python example scripts
-----------------------
-- `Simulation <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/simulation>`_
-- `MEG analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_analysis>`_
-- `fMRI analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/fmri>`_
-
 Code structure
 --------------
 
@@ -101,6 +89,18 @@ the appropriate inference base class):
 
 Shared functions for getting/setting observation model parameters
 (means, covariances, embeddings, regularizers).
+
+Tutorials
+---------
+- :doc:`HMM Training </tutorials_build/3-2_hmm_training>`
+- :doc:`DyNeMo Training </tutorials_build/3-3_dynemo_training>`
+- :doc:`Getting Inferred Parameters </tutorials_build/3-4_hmm_dynemo_get_inf_params>`
+
+Python example scripts
+----------------------
+- `Simulation <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/simulation>`_
+- `MEG analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_analysis>`_
+- `fMRI analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/fmri>`_
 """
 
 import yaml

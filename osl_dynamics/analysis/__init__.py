@@ -3,6 +3,25 @@
 This subpackage provides tools for analysing the output of trained models
 (HMM states, DyNeMo modes, etc.) and for static (time-averaged) analysis.
 
+Modules
+-------
+- :py:mod:`~osl_dynamics.analysis.connectivity` — Functional connectivity
+  analysis (coherence, imaginary coherence, correlation).
+- :py:mod:`~osl_dynamics.analysis.fisher_kernel` — Fisher kernel for
+  comparing HMM dynamics across sessions.
+- :py:mod:`~osl_dynamics.analysis.post_hoc` — Post-hoc spectral estimation
+  of state/mode spectra using multitaper or regression methods.
+- :py:mod:`~osl_dynamics.analysis.power` — Power analysis (variance from
+  spectra, band-limited power).
+- :py:mod:`~osl_dynamics.analysis.prediction` — Decoding/prediction using
+  inferred dynamics.
+- :py:mod:`~osl_dynamics.analysis.spectral` — Spectral decomposition of
+  state/mode covariances into power maps and coherence networks.
+- :py:mod:`~osl_dynamics.analysis.static` — Static (time-averaged) power
+  and functional connectivity.
+- :py:mod:`~osl_dynamics.analysis.statistics` — Statistical testing
+  (permutation tests, group comparisons).
+
 Tutorials
 ---------
 - :doc:`Static Spectral Analysis </tutorials_build/2-1_static_spectra_analysis>`
@@ -26,22 +45,6 @@ Python example scripts
 - `fMRI analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/fmri>`_
 - `Decoding <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/decoding>`_
 - `Plotting <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/plotting>`_
-
-Modules
--------
-- ``connectivity.py`` — Functional connectivity analysis (coherence,
-  imaginary coherence, correlation).
-- ``fisher_kernel.py`` — Fisher kernel for comparing HMM dynamics across
-  sessions.
-- ``post_hoc.py`` — Post-hoc spectral estimation of state/mode spectra
-  using multitaper or regression methods.
-- ``power.py`` — Power analysis (variance from spectra, band-limited power).
-- ``prediction.py`` — Decoding/prediction using inferred dynamics.
-- ``spectral.py`` — Spectral decomposition of state/mode covariances into
-  power maps and coherence networks.
-- ``static.py`` — Static (time-averaged) power and functional connectivity.
-- ``statistics.py`` — Statistical testing (permutation tests, group
-  comparisons).
 """
 
 from osl_dynamics.analysis import (

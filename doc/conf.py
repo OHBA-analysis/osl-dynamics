@@ -38,6 +38,7 @@ extensions = [
 ]
 
 autoapi_dirs = ["../osl_dynamics"]
+autoapi_template_dir = "_templates"
 autoapi_options = [
     "members",
     "undoc-members",
