@@ -16,8 +16,9 @@ STEPS = {
             "1_sum_square.png",
             "1_sum_square_exclude_bads.png",
             "1_channel_stds.png",
+            "1_ica_components.png",
         ],
-        "large": ["1_psd.png"],
+        "large": ["1_psd.png", "1_ica_components.png"],
     },
     2: {
         "name": "Surfaces",
@@ -299,14 +300,26 @@ def _build_summary(session_dir: Path) -> str:
     pct = s["bad_percent"]
     n_bad_ch = s["n_bad_channels"]
     bad_chs = ", ".join(s["bad_channels"]) if s["bad_channels"] else "none"
-    return (
+    html = (
         f'<div class="summary-box">'
         f'<span class="label">Duration:</span> {total:.1f}s &nbsp; | &nbsp; '
         f'<span class="label">Bad segments:</span> '
         f'<span class="bad">{bad:.1f}s ({pct:.1f}%)</span> &nbsp; | &nbsp; '
         f'<span class="label">Bad channels ({n_bad_ch}):</span> {bad_chs}'
-        f"</div>"
     )
+    if "ica_n_excluded" in s:
+        n_exc = s["ica_n_excluded"]
+        n_tot = s["ica_n_components"]
+        ica_labels = ", ".join(s.get("ica_excluded_labels", []))
+        if not ica_labels:
+            ica_labels = "none"
+        html += (
+            f" &nbsp; | &nbsp; "
+            f'<span class="label">ICA excluded ({n_exc}/{n_tot}):</span> '
+            f"{ica_labels}"
+        )
+    html += "</div>"
+    return html
 
 
 def _embed_png(filepath: Path, css_class: str = "") -> str:

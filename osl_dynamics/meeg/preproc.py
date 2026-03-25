@@ -2,13 +2,17 @@
 
 import json
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import mne
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 from scipy.ndimage.filters import uniform_filter1d
+
+# -------------------------------------------------------------------------
+# Artefact detection
+# -------------------------------------------------------------------------
 
 
 def detect_bad_segments(
@@ -348,6 +352,392 @@ def _gesd(
     return out_mask
 
 
+# -------------------------------------------------------------------------
+# ICA artefact rejection
+# -------------------------------------------------------------------------
+
+
+def ica_label(
+    raw: mne.io.Raw,
+    picks: str = "mag",
+    n_components: int = 20,
+    method: str = "megnet",
+    threshold: float = 0.5,
+    random_state: int = 42,
+) -> Tuple[mne.io.Raw, Any, dict]:
+    """Automatic ICA artefact rejection using mne-icalabel.
+
+    Fits ICA on a bandpass-filtered copy of the data, labels components
+    using a pre-trained classifier, and removes artefact components from
+    the original data.
+
+    For MEG data, uses the MEGNet classifier. For EEG data, uses ICLabel.
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        MNE Raw object.
+    picks : str, optional
+        Channel type to use for ICA. For Elekta MEG data, use ``"mag"``
+        (MEGNet was trained on magnetometer topographies).
+    n_components : int, optional
+        Number of ICA components. Should not exceed the data rank.
+        For MaxFiltered Elekta data (rank ~60), 20 is a safe default.
+    method : str, optional
+        Labelling method: ``"megnet"`` for MEG or ``"iclabel"`` for EEG.
+    threshold : float, optional
+        Probability threshold (0–1) for excluding a component. Components
+        labelled as artefact with probability above this threshold are
+        removed.
+    random_state : int, optional
+        Random seed for ICA reproducibility.
+
+    Returns
+    -------
+    raw : mne.io.Raw
+        Cleaned MNE Raw object.
+    ica : mne.preprocessing.ICA
+        Fitted ICA object with ``exclude`` set.
+    ic_labels : dict
+        Dictionary with keys ``"labels"`` (list of str) and
+        ``"y_pred_proba"`` (array of float).
+
+    Notes
+    -----
+    Requires ``mne-icalabel >= 0.4``. Install with::
+
+        pip install mne-icalabel
+
+    For EEG data, use ``picks="eeg"`` and ``method="iclabel"``::
+
+        raw, ica, ic_labels = preproc.ica_label(
+            raw, picks="eeg", method="iclabel", n_components=30,
+        )
+    """
+    try:
+        from mne_icalabel import label_components
+    except ImportError:
+        raise ImportError(
+            "mne-icalabel is required for ICA artefact rejection. "
+            "Install it with: pip install mne-icalabel"
+        )
+    from mne.preprocessing import ICA
+
+    print()
+    print("ICA artefact rejection")
+    print("----------------------")
+    print(f"Method: {method}")
+    print(f"Picks: {picks}")
+    print(f"Components: {n_components}")
+    print(f"Threshold: {threshold}")
+
+    # Filter a copy for ICA fitting (classifiers expect 1-100 Hz)
+    print("Filtering data copy (1-100 Hz) for ICA fitting...")
+    raw_fit = raw.copy().filter(l_freq=1.0, h_freq=100.0, verbose=False)
+
+    # ICLabel (EEG) requires average reference
+    if method == "iclabel":
+        raw_fit.set_eeg_reference("average", verbose=False)
+
+    # Fit ICA
+    print("Fitting ICA...")
+    ica = ICA(
+        n_components=n_components,
+        method="infomax",
+        fit_params=dict(extended=True),
+        random_state=random_state,
+        verbose=False,
+    )
+    ica.fit(raw_fit, picks=picks)
+
+    # Label components
+    print("Labelling components...")
+    ic_labels = label_components(raw_fit, ica, method=method)
+
+    labels = ic_labels["labels"]
+    probs = ic_labels["y_pred_proba"]
+
+    # Identify artefact components (exclude everything except brain/other)
+    exclude_idx = []
+    for idx, (label, prob) in enumerate(zip(labels, probs)):
+        if label not in ["brain", "other"]:
+            if prob > threshold:
+                exclude_idx.append(idx)
+                print(f"  ICA{idx:03d}: {label} ({prob:.2f}) -> excluded")
+            else:
+                print(
+                    f"  ICA{idx:03d}: {label} ({prob:.2f}) -> kept "
+                    f"(below threshold)"
+                )
+
+    # Apply to original data
+    if len(exclude_idx) > 0:
+        print(f"Removing {len(exclude_idx)} artefact component(s)...")
+        ica.exclude = exclude_idx
+        ica.apply(raw)
+    else:
+        print("No artefact components found.")
+
+    return raw, ica, ic_labels
+
+
+def ica_ecg_eog_correlation(
+    raw: mne.io.Raw,
+    picks: str = "meg",
+    n_components: int = 40,
+    ecg: bool = True,
+    eog: bool = True,
+    ecg_method: str = "ctps",
+    ecg_threshold: Union[str, float] = "auto",
+    eog_threshold: float = 3.0,
+    random_state: int = 42,
+) -> Tuple[mne.io.Raw, Any, dict]:
+    """ICA artefact rejection using ECG/EOG correlation.
+
+    Fits ICA on a bandpass-filtered copy of the data, identifies artefact
+    components by correlating with ECG and EOG signals, and removes them
+    from the original data.
+
+    Uses ``picks="meg"`` by default so both magnetometers and gradiometers
+    are denoised. Does not require mne-icalabel.
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        MNE Raw object.
+    picks : str, optional
+        Channel type to use for ICA. ``"meg"`` fits on both mags and grads.
+    n_components : int, optional
+        Number of ICA components. Should not exceed the data rank.
+        For MaxFiltered Elekta data (rank ~60), 40 is a safe default.
+    ecg : bool, optional
+        Whether to detect ECG artefact components. If no ECG channel is
+        present, a synthetic ECG is created from the magnetometers.
+    eog : bool, optional
+        Whether to detect EOG artefact components. Requires an EOG
+        channel; skipped with a warning if absent.
+    ecg_method : str, optional
+        Method for ECG detection: ``"ctps"`` (cross-trial phase
+        statistics) or ``"correlation"``.
+    ecg_threshold : str or float, optional
+        Threshold for ECG component detection.
+    eog_threshold : float, optional
+        Z-score threshold for EOG component detection.
+    random_state : int, optional
+        Random seed for ICA reproducibility.
+
+    Returns
+    -------
+    raw : mne.io.Raw
+        Cleaned MNE Raw object.
+    ica : mne.preprocessing.ICA
+        Fitted ICA object with ``exclude`` set.
+    ic_labels : dict
+        Dictionary with keys ``"labels"`` (list of str) and
+        ``"y_pred_proba"`` (array of float), compatible with
+        :func:`plot_ica_components`.
+
+    Notes
+    -----
+    For EEG data, use ``picks="eeg"``. Note that synthetic ECG detection
+    only works with MEG magnetometers — for EEG data a dedicated ECG
+    channel must be present, otherwise set ``ecg=False``::
+
+        raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(
+            raw, picks="eeg", n_components=30, ecg=False,
+        )
+    """
+    from mne.preprocessing import ICA
+
+    print()
+    print("ICA artefact rejection (ECG/EOG correlation)")
+    print("---------------------------------------------")
+    print(f"Picks: {picks}")
+    print(f"Components: {n_components}")
+    print(f"ECG: {ecg}, EOG: {eog}")
+
+    # Filter a copy for ICA fitting
+    print("Filtering data copy (1-100 Hz) for ICA fitting...")
+    raw_fit = raw.copy().filter(l_freq=1.0, h_freq=100.0, verbose=False)
+
+    # Fit ICA
+    print("Fitting ICA...")
+    ica = ICA(
+        n_components=n_components,
+        method="infomax",
+        fit_params=dict(extended=True),
+        random_state=random_state,
+        verbose=False,
+    )
+    ica.fit(raw_fit, picks=picks)
+
+    # Detect ECG components
+    ecg_indices = []
+    ecg_scores = np.zeros(ica.n_components_)
+    if ecg:
+        print("Detecting ECG components...")
+        try:
+            ecg_indices, ecg_scores = ica.find_bads_ecg(
+                raw_fit,
+                method=ecg_method,
+                threshold=ecg_threshold,
+                verbose=False,
+            )
+            for idx in ecg_indices:
+                print(f"  ICA{idx:03d}: ecg (score={ecg_scores[idx]:.2f})")
+            if not ecg_indices:
+                print("  No ECG components found.")
+        except Exception as e:
+            print(f"  ECG detection failed: {e}")
+
+    # Detect EOG components
+    eog_indices = []
+    eog_scores = np.zeros(ica.n_components_)
+    if eog:
+        # Check if EOG channels exist
+        eog_chs = mne.pick_types(raw_fit.info, eog=True)
+        if len(eog_chs) == 0:
+            print("No EOG channel found, skipping EOG detection.")
+        else:
+            print("Detecting EOG components...")
+            try:
+                eog_indices, eog_scores = ica.find_bads_eog(
+                    raw_fit,
+                    threshold=eog_threshold,
+                    verbose=False,
+                )
+                # eog_scores can be a list of arrays if multiple EOG channels
+                if isinstance(eog_scores, list):
+                    eog_scores = np.max(np.abs(eog_scores), axis=0)
+                for idx in eog_indices:
+                    print(f"  ICA{idx:03d}: eog (score={eog_scores[idx]:.2f})")
+                if not eog_indices:
+                    print("  No EOG components found.")
+            except Exception as e:
+                print(f"  EOG detection failed: {e}")
+
+    # Combine and exclude
+    exclude_idx = sorted(set(ecg_indices + eog_indices))
+
+    if len(exclude_idx) > 0:
+        print(f"Removing {len(exclude_idx)} artefact component(s)...")
+        ica.exclude = exclude_idx
+        ica.apply(raw)
+    else:
+        print("No artefact components found.")
+
+    # Build ic_labels dict (same structure as ica_label output)
+    labels = []
+    probs = []
+    for idx in range(ica.n_components_):
+        if idx in ecg_indices and idx in eog_indices:
+            labels.append("ecg+eog")
+            probs.append(max(abs(ecg_scores[idx]), abs(eog_scores[idx])))
+        elif idx in ecg_indices:
+            labels.append("ecg")
+            probs.append(abs(ecg_scores[idx]))
+        elif idx in eog_indices:
+            labels.append("eog")
+            probs.append(abs(eog_scores[idx]))
+        else:
+            labels.append("brain")
+            probs.append(0.0)
+
+    ic_labels = {"labels": labels, "y_pred_proba": np.array(probs)}
+
+    return raw, ica, ic_labels
+
+
+def plot_ica_components(
+    ica: Any,
+    ic_labels: dict,
+) -> plt.Figure:
+    """Plot ICA component topographies with labels.
+
+    Creates a composite figure showing all ICA components with their
+    classification labels and probabilities. Excluded components are
+    highlighted in red.
+
+    Parameters
+    ----------
+    ica : mne.preprocessing.ICA
+        Fitted ICA object.
+    ic_labels : dict
+        Dictionary with keys ``"labels"`` and ``"y_pred_proba"``.
+
+    Returns
+    -------
+    fig : matplotlib.figure.Figure
+        The composite figure.
+    """
+    labels = ic_labels["labels"]
+    probs = ic_labels["y_pred_proba"]
+    n_components = len(labels)
+
+    # Create composite figure
+    n_cols = min(n_components, 5)
+    n_rows = (n_components + n_cols - 1) // n_cols
+    fig, axes = plt.subplots(
+        n_rows,
+        n_cols,
+        figsize=(4 * n_cols, 4 * n_rows),
+    )
+    if n_rows == 1 and n_cols == 1:
+        axes = np.array([[axes]])
+    elif n_rows == 1:
+        axes = axes[np.newaxis, :]
+    elif n_cols == 1:
+        axes = axes[:, np.newaxis]
+
+    for idx in range(n_components):
+        row, col = divmod(idx, n_cols)
+        ax = axes[row, col]
+
+        # Plot individual component topography
+        comp_figs = ica.plot_components(picks=[idx], show=False)
+        if isinstance(comp_figs, list):
+            comp_fig = comp_figs[0]
+        else:
+            comp_fig = comp_figs
+        comp_fig.canvas.draw()
+        buf = comp_fig.canvas.buffer_rgba()
+        img = np.asarray(buf)
+        plt.close(comp_fig)
+
+        ax.imshow(img)
+        ax.set_axis_off()
+
+        # Title with label and probability
+        label = labels[idx]
+        prob = probs[idx]
+        excluded = idx in ica.exclude
+        color = "red" if excluded else "black"
+        marker = " *" if excluded else ""
+        ax.set_title(
+            f"ICA{idx:03d}: {label} ({prob:.2f}){marker}",
+            fontsize=12,
+            color=color,
+            fontweight="bold" if excluded else "normal",
+        )
+
+    # Hide unused axes
+    for idx in range(n_components, n_rows * n_cols):
+        row, col = divmod(idx, n_cols)
+        axes[row, col].set_axis_off()
+
+    fig.suptitle(
+        f"ICA Components — {len(ica.exclude)} excluded " f"(marked in red with *)",
+        fontsize=16,
+    )
+    fig.tight_layout()
+    return fig
+
+
+# -------------------------------------------------------------------------
+# Headshape decimation
+# -------------------------------------------------------------------------
+
+
 def decimate_headshape_points(
     raw: mne.io.Raw,
     decimate_amount: float = 0.01,
@@ -628,19 +1018,30 @@ def _grid_average_decimate(
     return np.array([np.mean(voxel_dict[key], axis=0) for key in voxel_dict])
 
 
+# -------------------------------------------------------------------------
+# QC plots
+# -------------------------------------------------------------------------
+
+
 def save_qc_plots(
     raw: mne.io.Raw,
     output_dir: Union[str, Path],
     show: bool = False,
+    ica: Any = None,
+    ic_labels: Optional[dict] = None,
 ) -> None:
     """Save preprocessing QC plots and summary.
 
     Saves the following files to output_dir:
-    - 1_summary.json: preprocessing summary stats
-    - 1_psd.png: sensor-level PSD
-    - 1_sum_square.png: sum-square time series
-    - 1_sum_square_exclude_bads.png: sum-square excluding bad segments/channels
-    - 1_channel_stds.png: channel standard deviation distributions
+
+    - ``1_summary.json``: preprocessing summary stats
+    - ``1_psd.png``: sensor-level PSD
+    - ``1_sum_square.png``: sum-square time series
+    - ``1_sum_square_exclude_bads.png``: sum-square excluding bad
+      segments/channels
+    - ``1_channel_stds.png``: channel standard deviation distributions
+    - ``1_ica_components.png``: ICA component topographies (if ``ica``
+      and ``ic_labels`` are provided)
 
     Parameters
     ----------
@@ -650,6 +1051,11 @@ def save_qc_plots(
         Directory to save plots to.
     show : bool, optional
         Whether to display the plots interactively. Default is False.
+    ica : mne.preprocessing.ICA, optional
+        Fitted ICA object. If provided along with ``ic_labels``, saves
+        ICA component topography plot.
+    ic_labels : dict, optional
+        ICA label dictionary from ``ica_label``.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -666,6 +1072,13 @@ def save_qc_plots(
         "bad_channels": raw.info["bads"],
         "n_bad_channels": len(raw.info["bads"]),
     }
+    if ica is not None and ic_labels is not None:
+        summary["ica_n_components"] = ica.n_components_
+        summary["ica_n_excluded"] = len(ica.exclude)
+        summary["ica_excluded_labels"] = [
+            f"{ic_labels['labels'][i]} ({ic_labels['y_pred_proba'][i]:.2f})"
+            for i in ica.exclude
+        ]
     with open(output_dir / "1_summary.json", "w") as f:
         json.dump(summary, f, indent=2)
 
@@ -694,6 +1107,13 @@ def save_qc_plots(
     plt.savefig(output_dir / "1_channel_stds.png", dpi=150, bbox_inches="tight")
     if not show:
         plt.close("all")
+
+    # ICA component topographies
+    if ica is not None and ic_labels is not None:
+        plot_ica_components(ica, ic_labels)
+        plt.savefig(output_dir / "1_ica_components.png", dpi=150, bbox_inches="tight")
+        if not show:
+            plt.close("all")
 
 
 def plot_sum_square_time_series(

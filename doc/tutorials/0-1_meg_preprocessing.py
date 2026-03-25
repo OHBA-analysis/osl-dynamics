@@ -4,7 +4,7 @@ MEG: Preprocessing, Source Reconstruction, Parcellation
 
 This tutorial walks through the full MEG processing pipeline step by step:
 
-1. Preprocessing — Downsample, filter, detect bad segments/channels.
+1. Preprocessing — Downsample, filter, detect bad segments/channels, ICA artefact rejection.
 2. Surface Extraction — Extract skull/scalp surfaces from a structural MRI.
 3. Coregistration — Align MEG sensor space to MRI space.
 4. Forward Model — Compute the lead field matrix.
@@ -161,11 +161,37 @@ Output is written to ``BIDS/derivatives/``.
 #     raw = preproc.detect_bad_channels(raw, picks="grad")
 
 #%%
-# Save preprocessing QC plots (PSD, sum-of-squares time series, channel standard deviations). Check that bad segments and channels are being correctly identified.
+# ICA artefact rejection
+# **********************
+#
+# Automatic ICA artefact rejection to remove ECG and EOG artefacts.
+# Two approaches are available:
+#
+# **Option A: ECG/EOG correlation** — Uses MNE-Python's built-in
+# correlation-based detection.
 #
 # .. code-block:: python
 #
-#     preproc.save_qc_plots(raw, plots_dir / id, show=True)
+#     raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(raw, picks="meg")
+#
+# **Option B: MEGNet automatic labelling** — Uses ``mne-icalabel`` to
+# classify components with a pre-trained deep learning model. Note, MEGNet
+# was trained on ``'mag'`` sensor topographies.
+#
+# Install with ``pip install mne-icalabel``.
+#
+# .. code-block:: python
+#
+#     raw, ica, ic_labels = preproc.ica_label(raw, picks="mag", method="megnet")
+
+#%%
+# Save preprocessing QC plots (PSD, sum-of-squares time series, channel
+# standard deviations, ICA component topographies). Check that bad segments,
+# channels, and ICA components are being correctly identified.
+#
+# .. code-block:: python
+#
+#     preproc.save_qc_plots(raw, plots_dir / id, show=True, ica=ica, ic_labels=ic_labels)
 
 #%%
 # Save preprocessed data

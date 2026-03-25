@@ -26,7 +26,7 @@ Run the scripts **in order**. Each script processes all sessions in parallel.
 
 | Script | Step | Description |
 |--------|------|-------------|
-| `1_preproc.py` | Preprocessing | Downsample (250 Hz), bandpass filter (1-45 Hz), notch filter (50/100 Hz), bad segment and bad channel detection |
+| `1_preproc.py` | Preprocessing | Downsample (250 Hz), bandpass filter (1-45 Hz), notch filter (50/100 Hz), bad segment/channel detection, ICA artefact rejection (ECG/EOG correlation or MEGNet) |
 | `2_surfaces.py` | Surface Extraction | Extract inner skull, outer skull and scalp surfaces from structural MRI using FSL BET |
 | `3_coreg.py` | Coregistration | Coregister MEG to MRI using Polhemus headshape points |
 | `4_source_recon_and_parc.py` | Forward Model, Source Reconstruction and Parcellation | Compute forward model (8 mm dipole grid), LCMV beamformer, parcellate voxel data, apply symmetric orthogonalisation |
@@ -108,6 +108,7 @@ plots/
 │   ├── 1_sum_square.png
 │   ├── 1_sum_square_exclude_bads.png
 │   ├── 1_channel_stds.png
+│   ├── 1_ica_components.png
 │   ├── 3_coreg.png
 │   └── 4_psd_topo.png
 ├── sub-02_task-rest/

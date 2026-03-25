@@ -51,8 +51,11 @@ def process_session(id, info, logger, **kwargs):
     raw = preproc.detect_bad_channels(raw, picks="mag")
     raw = preproc.detect_bad_channels(raw, picks="grad")
 
+    logger.log("Running ICA artefact rejection...")
+    raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(raw, picks="meg")
+
     logger.log("Saving QC plots...")
-    preproc.save_qc_plots(raw, plots_dir / id)
+    preproc.save_qc_plots(raw, plots_dir / id, ica=ica, ic_labels=ic_labels)
 
     logger.log("Saving preprocessed data...")
     preproc_out_dir = output_dir / "preprocessed"
