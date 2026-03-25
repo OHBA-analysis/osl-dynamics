@@ -7,6 +7,8 @@ from typing import Any, List, Optional, Tuple, Union
 import mne
 import numpy as np
 import matplotlib.pyplot as plt
+from mne.preprocessing import ICA
+from mne_icalabel import label_components
 from scipy import stats
 from scipy.ndimage.filters import uniform_filter1d
 
@@ -404,25 +406,12 @@ def ica_label(
 
     Notes
     -----
-    Requires ``mne-icalabel >= 0.4``. Install with::
-
-        pip install mne-icalabel
-
     For EEG data, use ``picks="eeg"`` and ``method="iclabel"``::
 
         raw, ica, ic_labels = preproc.ica_label(
             raw, picks="eeg", method="iclabel", n_components=30,
         )
     """
-    try:
-        from mne_icalabel import label_components
-    except ImportError:
-        raise ImportError(
-            "mne-icalabel is required for ICA artefact rejection. "
-            "Install it with: pip install mne-icalabel"
-        )
-    from mne.preprocessing import ICA
-
     print()
     print("ICA artefact rejection")
     print("----------------------")
@@ -547,8 +536,6 @@ def ica_ecg_eog_correlation(
             raw, picks="eeg", n_components=30, ecg=False,
         )
     """
-    from mne.preprocessing import ICA
-
     print()
     print("ICA artefact rejection (ECG/EOG correlation)")
     print("---------------------------------------------")

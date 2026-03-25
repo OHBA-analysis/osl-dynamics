@@ -174,11 +174,10 @@ Output is written to ``BIDS/derivatives/``.
 #
 #     raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(raw, picks="meg")
 #
-# **Option B: MEGNet automatic labelling** — Uses ``mne-icalabel`` to
-# classify components with a pre-trained deep learning model. Note, MEGNet
-# was trained on ``'mag'`` sensor topographies.
-#
-# Install with ``pip install mne-icalabel``.
+# **Option B: MEGNet automatic labelling** — Uses ``mne-icalabel`` (included
+# in the osl-dynamics conda environments) to classify components with a
+# pre-trained deep learning model. Note, MEGNet was trained on ``'mag'``
+# sensor topographies.
 #
 # .. code-block:: python
 #

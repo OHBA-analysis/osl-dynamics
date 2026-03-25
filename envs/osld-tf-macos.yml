@@ -31,6 +31,7 @@ dependencies:
   - trame-vtk
   - trame-vuetify
   - pip:
+    - mne-icalabel[onnx]
     - tensorflow==2.16.1
     - tensorflow-probability==0.24
     - tf-keras==2.16
