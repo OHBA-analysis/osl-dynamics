@@ -38,8 +38,20 @@ STEPS = {
         "name": "Surfaces",
         "subpanels": [
             {
-                "name": "Surfaces",
-                "files": ["2_inskull.png", "2_outskin.png", "2_outskull.png"],
+                "name": "Inner Skull",
+                "files": ["2_inskull.png"],
+            },
+            {
+                "name": "Outer Skull",
+                "files": ["2_outskull.png"],
+            },
+            {
+                "name": "Outer Skin",
+                "files": ["2_outskin.png"],
+            },
+            {
+                "name": "Outer Skin + Nose",
+                "files": ["2_outskin_plus_nose.png"],
             },
         ],
     },
