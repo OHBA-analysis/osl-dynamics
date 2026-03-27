@@ -30,7 +30,7 @@ def process_session(id, info, logger, **kwargs):
     raw_file = input_dir / info["subject"] / "meg" / info["file"]
     raw = mne.io.read_raw_fif(raw_file, preload=True)
 
-    raw = raw.crop(tmax=30)
+    raw = raw.crop(tmax=60)
 
     logger.log("Filtering and downsampling...")
     raw = raw.resample(sfreq=250)
@@ -52,7 +52,7 @@ def process_session(id, info, logger, **kwargs):
     raw = preproc.detect_bad_channels(raw, picks="grad")
 
     logger.log("Running ICA artefact rejection...")
-    raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(raw, picks="meg")
+    raw, ica, ic_labels = preproc.ica_label(raw, picks="meg")
 
     logger.log("Saving QC plots...")
     preproc.save_qc_plots(raw, plots_dir / id, ica=ica, ic_labels=ic_labels)

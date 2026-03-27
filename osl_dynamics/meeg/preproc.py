@@ -403,7 +403,6 @@ def ica_label(
     ic_labels : dict
         Dictionary with keys ``"labels"`` (list of str) and
         ``"y_pred_proba"`` (array of float).
-
     Notes
     -----
     For EEG data, use ``picks="eeg"`` and ``method="iclabel"``::
@@ -447,9 +446,12 @@ def ica_label(
     probs = ic_labels["y_pred_proba"]
 
     # Identify artefact components (exclude everything except brain/other)
+    # Note: MEGNet returns "brain/other" as a single label, while ICLabel
+    # returns "brain" and "other" separately
+    keep_labels = ["brain", "other", "brain/other"]
     exclude_idx = []
     for idx, (label, prob) in enumerate(zip(labels, probs)):
-        if label not in ["brain", "other"]:
+        if label not in keep_labels:
             if prob > threshold:
                 exclude_idx.append(idx)
                 print(f"  ICA{idx:03d}: {label} ({prob:.2f}) -> excluded")
@@ -474,18 +476,19 @@ def ica_ecg_eog_correlation(
     raw: mne.io.Raw,
     picks: str = "meg",
     n_components: int = 40,
-    ecg: bool = True,
-    eog: bool = True,
-    ecg_method: str = "ctps",
+    l_freq: float = 1.0,
+    h_freq: Optional[float] = None,
+    ecg_method: Optional[str] = "ctps",
     ecg_threshold: Union[str, float] = "auto",
-    eog_threshold: float = 3.0,
+    eog_measure: str = "correlation",
+    eog_threshold: float = 0.35,
     random_state: int = 42,
 ) -> Tuple[mne.io.Raw, Any, dict]:
     """ICA artefact rejection using ECG/EOG correlation.
 
-    Fits ICA on a bandpass-filtered copy of the data, identifies artefact
+    Fits ICA on a high-pass filtered copy of the data, identifies artefact
     components by correlating with ECG and EOG signals, and removes them
-    from the original data.
+    from the original data. Follows the approach used in osl-ephys.
 
     Uses ``picks="meg"`` by default so both magnetometers and gradiometers
     are denoised. Does not require mne-icalabel.
@@ -499,19 +502,23 @@ def ica_ecg_eog_correlation(
     n_components : int, optional
         Number of ICA components. Should not exceed the data rank.
         For MaxFiltered Elekta data (rank ~60), 40 is a safe default.
-    ecg : bool, optional
-        Whether to detect ECG artefact components. If no ECG channel is
-        present, a synthetic ECG is created from the magnetometers.
-    eog : bool, optional
-        Whether to detect EOG artefact components. Requires an EOG
-        channel; skipped with a warning if absent.
+    l_freq : float, optional
+        High-pass filter frequency for the ICA fitting copy.
+    h_freq : float, optional
+        Low-pass filter frequency for the ICA fitting copy.
     ecg_method : str, optional
         Method for ECG detection: ``"ctps"`` (cross-trial phase
-        statistics) or ``"correlation"``.
+        statistics) or ``"correlation"``. Set to ``None`` to skip
+        ECG detection.
     ecg_threshold : str or float, optional
         Threshold for ECG component detection.
+    eog_measure : str, optional
+        Measure for EOG detection: ``"correlation"`` or ``"zscore"``.
     eog_threshold : float, optional
-        Z-score threshold for EOG component detection.
+        Threshold for EOG component detection. When
+        ``eog_measure="correlation"``, this is an absolute correlation
+        threshold (e.g. 0.35). When ``eog_measure="zscore"``, this is
+        a z-score threshold (e.g. 3.0).
     random_state : int, optional
         Random seed for ICA reproducibility.
 
@@ -525,15 +532,14 @@ def ica_ecg_eog_correlation(
         Dictionary with keys ``"labels"`` (list of str) and
         ``"y_pred_proba"`` (array of float), compatible with
         :func:`plot_ica_components`.
-
     Notes
     -----
     For EEG data, use ``picks="eeg"``. Note that synthetic ECG detection
     only works with MEG magnetometers — for EEG data a dedicated ECG
-    channel must be present, otherwise set ``ecg=False``::
+    channel must be present, otherwise set ``ecg_method=None``::
 
         raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(
-            raw, picks="eeg", n_components=30, ecg=False,
+            raw, picks="eeg", n_components=30, ecg_method=None,
         )
     """
     print()
@@ -541,18 +547,16 @@ def ica_ecg_eog_correlation(
     print("---------------------------------------------")
     print(f"Picks: {picks}")
     print(f"Components: {n_components}")
-    print(f"ECG: {ecg}, EOG: {eog}")
 
     # Filter a copy for ICA fitting
-    print("Filtering data copy (1-100 Hz) for ICA fitting...")
-    raw_fit = raw.copy().filter(l_freq=1.0, h_freq=100.0, verbose=False)
+    print(f"Filtering data copy ({l_freq}-{h_freq} Hz) for ICA fitting...")
+    raw_fit = raw.copy().filter(l_freq=l_freq, h_freq=h_freq, verbose=False)
 
     # Fit ICA
     print("Fitting ICA...")
     ica = ICA(
         n_components=n_components,
-        method="infomax",
-        fit_params=dict(extended=True),
+        method="fastica",
         random_state=random_state,
         verbose=False,
     )
@@ -561,7 +565,7 @@ def ica_ecg_eog_correlation(
     # Detect ECG components
     ecg_indices = []
     ecg_scores = np.zeros(ica.n_components_)
-    if ecg:
+    if ecg_method is not None:
         print("Detecting ECG components...")
         try:
             ecg_indices, ecg_scores = ica.find_bads_ecg(
@@ -580,31 +584,33 @@ def ica_ecg_eog_correlation(
     # Detect EOG components
     eog_indices = []
     eog_scores = np.zeros(ica.n_components_)
-    if eog:
-        # Check if EOG channels exist
-        eog_chs = mne.pick_types(raw_fit.info, eog=True)
-        if len(eog_chs) == 0:
-            print("No EOG channel found, skipping EOG detection.")
-        else:
-            print("Detecting EOG components...")
-            try:
-                eog_indices, eog_scores = ica.find_bads_eog(
-                    raw_fit,
-                    threshold=eog_threshold,
-                    verbose=False,
-                )
-                # eog_scores can be a list of arrays if multiple EOG channels
-                if isinstance(eog_scores, list):
-                    eog_scores = np.max(np.abs(eog_scores), axis=0)
-                for idx in eog_indices:
-                    print(f"  ICA{idx:03d}: eog (score={eog_scores[idx]:.2f})")
-                if not eog_indices:
-                    print("  No EOG components found.")
-            except Exception as e:
-                print(f"  EOG detection failed: {e}")
+    eog_chs = mne.pick_types(raw_fit.info, eog=True)
+    if len(eog_chs) == 0:
+        print("No EOG channel found, skipping EOG detection.")
+    else:
+        print("Detecting EOG components...")
+        try:
+            eog_indices, eog_scores = ica.find_bads_eog(
+                raw_fit,
+                measure=eog_measure,
+                threshold=eog_threshold,
+                verbose=False,
+            )
+            # eog_scores can be a list of arrays if multiple EOG channels
+            if isinstance(eog_scores, list):
+                eog_scores = np.max(np.abs(eog_scores), axis=0)
+            for idx in eog_indices:
+                print(f"  ICA{idx:03d}: eog (score={eog_scores[idx]:.2f})")
+            if not eog_indices:
+                print("  No EOG components found.")
+        except Exception as e:
+            print(f"  EOG detection failed: {e}")
 
     # Combine and exclude
     exclude_idx = sorted(set(ecg_indices + eog_indices))
+
+    # Capture pre-ICA PSD
+    psd_before_ica = raw.compute_psd(fmax=45)
 
     if len(exclude_idx) > 0:
         print(f"Removing {len(exclude_idx)} artefact component(s)...")
@@ -638,12 +644,11 @@ def ica_ecg_eog_correlation(
 def plot_ica_components(
     ica: Any,
     ic_labels: dict,
-) -> plt.Figure:
-    """Plot ICA component topographies with labels.
+) -> Optional[plt.Figure]:
+    """Plot excluded ICA component topographies with labels.
 
-    Creates a composite figure showing all ICA components with their
-    classification labels and probabilities. Excluded components are
-    highlighted in red.
+    Creates a composite figure showing only the excluded ICA components
+    with their classification labels and probabilities.
 
     Parameters
     ----------
@@ -654,20 +659,25 @@ def plot_ica_components(
 
     Returns
     -------
-    fig : matplotlib.figure.Figure
-        The composite figure.
+    fig : matplotlib.figure.Figure or None
+        The composite figure, or None if no components were excluded.
     """
+    exclude_idx = ica.exclude
+    if len(exclude_idx) == 0:
+        print("No ICA components excluded — nothing to plot.")
+        return None
+
     labels = ic_labels["labels"]
     probs = ic_labels["y_pred_proba"]
-    n_components = len(labels)
+    n_excluded = len(exclude_idx)
 
     # Create composite figure
-    n_cols = min(n_components, 5)
-    n_rows = (n_components + n_cols - 1) // n_cols
+    n_cols = min(n_excluded, 5)
+    n_rows = (n_excluded + n_cols - 1) // n_cols
     fig, axes = plt.subplots(
         n_rows,
         n_cols,
-        figsize=(4 * n_cols, 4 * n_rows),
+        figsize=(5 * n_cols, 5 * n_rows),
     )
     if n_rows == 1 and n_cols == 1:
         axes = np.array([[axes]])
@@ -676,8 +686,8 @@ def plot_ica_components(
     elif n_cols == 1:
         axes = axes[:, np.newaxis]
 
-    for idx in range(n_components):
-        row, col = divmod(idx, n_cols)
+    for i, idx in enumerate(exclude_idx):
+        row, col = divmod(i, n_cols)
         ax = axes[row, col]
 
         # Plot individual component topography
@@ -694,27 +704,23 @@ def plot_ica_components(
         ax.imshow(img)
         ax.set_axis_off()
 
-        # Title with label and probability
         label = labels[idx]
         prob = probs[idx]
-        excluded = idx in ica.exclude
-        color = "red" if excluded else "black"
-        marker = " *" if excluded else ""
         ax.set_title(
-            f"ICA{idx:03d}: {label} ({prob:.2f}){marker}",
-            fontsize=12,
-            color=color,
-            fontweight="bold" if excluded else "normal",
+            f"ICA{idx:03d}: {label} ({prob:.2f})",
+            fontsize=16,
+            color="red",
+            fontweight="bold",
         )
 
     # Hide unused axes
-    for idx in range(n_components, n_rows * n_cols):
-        row, col = divmod(idx, n_cols)
+    for i in range(n_excluded, n_rows * n_cols):
+        row, col = divmod(i, n_cols)
         axes[row, col].set_axis_off()
 
     fig.suptitle(
-        f"ICA Components — {len(ica.exclude)} excluded " f"(marked in red with *)",
-        fontsize=16,
+        f"Excluded ICA Components ({n_excluded})",
+        fontsize=20,
     )
     fig.tight_layout()
     return fig
@@ -1095,12 +1101,15 @@ def save_qc_plots(
     if not show:
         plt.close("all")
 
-    # ICA component topographies
+    # ICA component topographies (excluded components only)
     if ica is not None and ic_labels is not None:
-        plot_ica_components(ica, ic_labels)
-        plt.savefig(output_dir / "1_ica_components.png", dpi=150, bbox_inches="tight")
-        if not show:
-            plt.close("all")
+        fig = plot_ica_components(ica, ic_labels)
+        if fig is not None:
+            fig.savefig(
+                output_dir / "1_ica_components.png", dpi=150, bbox_inches="tight"
+            )
+            if not show:
+                plt.close("all")
 
 
 def plot_sum_square_time_series(
