@@ -11,33 +11,67 @@ from typing import Dict, List, Optional, Tuple, Union
 STEPS = {
     1: {
         "name": "Preprocessing",
-        "files": [
-            "1_psd.png",
-            "1_sum_square.png",
-            "1_sum_square_exclude_bads.png",
-            "1_channel_stds.png",
+        "subpanels": [
+            {
+                "name": "PSD",
+                "files": ["1_psd.png"],
+            },
+            {
+                "name": "Sum-Square",
+                "files": ["1_sum_square.png"],
+            },
+            {
+                "name": "Sum-Square (excl. bads)",
+                "files": ["1_sum_square_exclude_bads.png"],
+            },
+            {
+                "name": "Channel Stds",
+                "files": ["1_channel_stds.png"],
+            },
+            {
+                "name": "ICA Components",
+                "files": ["1_ica_components.png"],
+            },
         ],
-        "large": ["1_psd.png"],
     },
     2: {
         "name": "Surfaces",
-        "files": [
-            "2_inskull.png",
-            "2_outskin.png",
-            "2_outskull.png",
+        "subpanels": [
+            {
+                "name": "Inner Skull",
+                "files": ["2_inskull.png"],
+            },
+            {
+                "name": "Outer Skull",
+                "files": ["2_outskull.png"],
+            },
+            {
+                "name": "Outer Skin",
+                "files": ["2_outskin.png"],
+            },
+            {
+                "name": "Outer Skin + Nose",
+                "files": ["2_outskin_plus_nose.png"],
+            },
         ],
     },
     3: {
         "name": "Coregistration",
-        "files": ["3_coreg.png"],
-        "large": ["3_coreg.png"],
+        "subpanels": [
+            {
+                "name": "Coregistration",
+                "files": ["3_coreg.png"],
+            },
+        ],
     },
     4: {
         "name": "Source Recon & Parcellation",
-        "files": [
-            "4_psd_topo.png",
+        "subpanels": [
+            {
+                "name": "Parcellation PSD",
+                "files": ["4_psd_topo.png"],
+            },
         ],
-        "large": ["4_psd_topo.png"],
     },
 }
 
@@ -83,8 +117,6 @@ h1 {
     background: #fff;
     padding: 20px;
     border-radius: 0 0 6px 6px;
-    max-height: calc(100vh - 160px);
-    overflow-y: auto;
 }
 .tab-content.active {
     display: block;
@@ -93,7 +125,7 @@ h1 {
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
     padding: 10px;
     background: #f0f0f0;
     border-radius: 6px;
@@ -123,23 +155,61 @@ h1 {
     color: #888;
     margin-left: auto;
 }
+.subpanel-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 8px 10px;
+    background: #e8f0fe;
+    border-radius: 6px;
+}
+.subpanel-nav button {
+    padding: 4px 12px;
+    border: 1px solid #b0c4de;
+    background: #fff;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 16px;
+    line-height: 1;
+}
+.subpanel-nav button:hover {
+    background: #dce8f5;
+}
+.subpanel-nav .subpanel-label {
+    font-size: 14px;
+    font-weight: bold;
+    color: #333;
+}
+.subpanel-nav .subpanel-counter {
+    font-size: 12px;
+    color: #888;
+    margin-left: auto;
+}
+.subpanel-nav .hint {
+    font-size: 11px;
+    color: #aaa;
+}
 .session-panel {
     display: none;
 }
 .session-panel.active {
     display: block;
 }
-.session-panel img {
+.subpanel {
+    display: none;
+}
+.subpanel.active {
+    display: block;
+}
+.subpanel img {
     max-width: 100%;
-    max-height: 250px;
+    max-height: calc(80vh - 280px);
     display: block;
     margin: 4px auto;
     border: 1px solid #eee;
 }
-.session-panel img.large {
-    max-height: 400px;
-}
-.session-panel iframe {
+.subpanel iframe {
     width: 100%;
     height: 350px;
     border: 1px solid #ddd;
@@ -207,10 +277,15 @@ h1 {
 JS = """
 var sessions = SESSION_LIST;
 var currentStep = 1;
-var currentIdx = {};  // per-step session index
+var currentIdx = {};       // per-step session index
+var currentSubpanel = {};  // per-step subpanel index
+var subpanelCounts = SUBPANEL_COUNTS;  // {step: count}
 
-// Initialise each step to session 0
-STEP_NUMS.forEach(function(s) { currentIdx[s] = 0; });
+// Initialise each step to session 0, subpanel 0
+STEP_NUMS.forEach(function(s) {
+    currentIdx[s] = 0;
+    currentSubpanel[s] = 0;
+});
 
 function switchTab(step) {
     currentStep = step;
@@ -226,19 +301,52 @@ function showSession(step, idx) {
     if (idx >= sessions.length) idx = sessions.length - 1;
     currentIdx[step] = idx;
 
-    // Hide all session panels for this step
     var panels = document.querySelectorAll('#tab-' + step + ' .session-panel');
     panels.forEach(p => p.classList.remove('active'));
 
-    // Show the selected one
     var panel = document.getElementById('step-' + step + '-session-' + idx);
     if (panel) panel.classList.add('active');
 
-    // Update input and counter
     var input = document.getElementById('input-' + step);
     var counter = document.getElementById('counter-' + step);
     input.value = sessions[idx];
     counter.textContent = (idx + 1) + ' / ' + sessions.length;
+
+    showSubpanel(step, currentSubpanel[step]);
+}
+
+function showSubpanel(step, spIdx) {
+    var count = subpanelCounts[step] || 1;
+    if (spIdx < 0) spIdx = 0;
+    if (spIdx >= count) spIdx = count - 1;
+    currentSubpanel[step] = spIdx;
+
+    // Hide all subpanels in the current session panel
+    var sessionIdx = currentIdx[step];
+    var panel = document.getElementById('step-' + step + '-session-' + sessionIdx);
+    if (!panel) return;
+    var subs = panel.querySelectorAll('.subpanel');
+    subs.forEach(s => s.classList.remove('active'));
+    var target = panel.querySelector('.subpanel[data-sp-idx="' + spIdx + '"]');
+    if (target) target.classList.add('active');
+
+    // Update subpanel nav label and counter
+    var label = document.getElementById('sp-label-' + step);
+    var spCounter = document.getElementById('sp-counter-' + step);
+    if (label && target) {
+        label.textContent = target.getAttribute('data-sp-name') || '';
+    }
+    if (spCounter) {
+        spCounter.textContent = (spIdx + 1) + ' / ' + count;
+    }
+}
+
+function prevSubpanel(step) {
+    showSubpanel(step, currentSubpanel[step] - 1);
+}
+
+function nextSubpanel(step) {
+    showSubpanel(step, currentSubpanel[step] + 1);
 }
 
 function prevSession(step) {
@@ -258,7 +366,6 @@ function jumpToSession(step) {
             return;
         }
     }
-    // Partial match: find first session containing the input
     for (var i = 0; i < sessions.length; i++) {
         if (sessions[i].toLowerCase().indexOf(val) !== -1) {
             showSession(step, i);
@@ -268,7 +375,6 @@ function jumpToSession(step) {
 }
 
 document.addEventListener('keydown', function(e) {
-    // Ignore if user is typing in the input
     if (document.activeElement.tagName === 'INPUT') {
         if (e.key === 'Enter') {
             e.preventDefault();
@@ -282,6 +388,12 @@ document.addEventListener('keydown', function(e) {
     } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         nextSession(currentStep);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        prevSubpanel(currentStep);
+    } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        nextSubpanel(currentStep);
     }
 });
 """
@@ -299,14 +411,26 @@ def _build_summary(session_dir: Path) -> str:
     pct = s["bad_percent"]
     n_bad_ch = s["n_bad_channels"]
     bad_chs = ", ".join(s["bad_channels"]) if s["bad_channels"] else "none"
-    return (
+    html = (
         f'<div class="summary-box">'
         f'<span class="label">Duration:</span> {total:.1f}s &nbsp; | &nbsp; '
         f'<span class="label">Bad segments:</span> '
         f'<span class="bad">{bad:.1f}s ({pct:.1f}%)</span> &nbsp; | &nbsp; '
         f'<span class="label">Bad channels ({n_bad_ch}):</span> {bad_chs}'
-        f"</div>"
     )
+    if "ica_n_excluded" in s:
+        n_exc = s["ica_n_excluded"]
+        n_tot = s["ica_n_components"]
+        ica_labels = ", ".join(s.get("ica_excluded_labels", []))
+        if not ica_labels:
+            ica_labels = "none"
+        html += (
+            f" &nbsp; | &nbsp; "
+            f'<span class="label">ICA excluded ({n_exc}/{n_tot}):</span> '
+            f"{ica_labels}"
+        )
+    html += "</div>"
+    return html
 
 
 def _embed_png(filepath: Path, css_class: str = "") -> str:
@@ -331,22 +455,24 @@ def _build_step_tab(
     session_ids: List[str],
 ) -> Tuple[str, int, int]:
     """Build the HTML content for a single step tab."""
-    files = step_info["files"]
-    large_files = step_info.get("large", [])
-    row_files = step_info.get("row_files", [])
-    all_filenames = files + row_files
+    subpanels = step_info["subpanels"]
+
+    # Collect all files across subpanels
+    all_files = []
+    for sp in subpanels:
+        all_files.extend(sp["files"])
 
     # Count how many sessions have at least one file for this step
     done = 0
     for session_id in session_ids:
         session_dir = plots_dir / session_id
-        if any((session_dir / f).exists() for f in all_filenames):
+        if any((session_dir / f).exists() for f in all_files):
             done += 1
     total = len(session_ids)
 
     parts = []
 
-    # Session navigator
+    # Session navigator (left/right arrows)
     parts.append(f'<div class="session-nav">')
     parts.append(f'<button onclick="prevSession({step_num})">&#9664;</button>')
     parts.append(
@@ -356,12 +482,26 @@ def _build_step_tab(
         f'placeholder="Type session ID...">'
     )
     parts.append(f'<button onclick="nextSession({step_num})">&#9654;</button>')
-    parts.append(
-        f'<span class="counter" id="counter-{step_num}">' f"1 / {total}</span>"
-    )
+    parts.append(f'<span class="counter" id="counter-{step_num}">1 / {total}</span>')
     parts.append("</div>")
 
-    # Session panels (one per session, only one visible at a time)
+    # Subpanel navigator (up/down arrows) — only if more than 1 subpanel
+    if len(subpanels) > 1:
+        parts.append(f'<div class="subpanel-nav">')
+        parts.append(f'<button onclick="prevSubpanel({step_num})">&#9650;</button>')
+        parts.append(
+            f'<span class="subpanel-label" '
+            f'id="sp-label-{step_num}">{subpanels[0]["name"]}</span>'
+        )
+        parts.append(f'<button onclick="nextSubpanel({step_num})">&#9660;</button>')
+        parts.append(
+            f'<span class="subpanel-counter" '
+            f'id="sp-counter-{step_num}">1 / {len(subpanels)}</span>'
+        )
+        parts.append(f'<span class="hint">&#8593;&#8595; to switch plots</span>')
+        parts.append("</div>")
+
+    # Session panels
     for idx, session_id in enumerate(session_ids):
         session_dir = plots_dir / session_id
         active = " active" if idx == 0 else ""
@@ -374,32 +514,31 @@ def _build_step_tab(
         if step_num == 1:
             parts.append(_build_summary(session_dir))
 
-        for filename in files:
-            filepath = session_dir / filename
-            parts.append(f'<div class="file-label">{filename}</div>')
-            if filepath.exists():
-                if filename.endswith(".png"):
-                    css_class = "large" if filename in large_files else ""
-                    parts.append(_embed_png(filepath, css_class=css_class))
-                elif filename.endswith(".html"):
-                    parts.append(_embed_html(filepath))
+        # Build subpanels
+        for sp_idx, sp in enumerate(subpanels):
+            sp_active = " active" if sp_idx == 0 else ""
+            sp_name = sp["name"]
+            # Check if any file in this subpanel exists
+            has_files = any((session_dir / f).exists() for f in sp["files"])
+
+            parts.append(
+                f'<div class="subpanel{sp_active}" '
+                f'data-sp-idx="{sp_idx}" data-sp-name="{sp_name}">'
+            )
+
+            if has_files:
+                for filename in sp["files"]:
+                    filepath = session_dir / filename
+                    if filepath.exists():
+                        if filename.endswith(".png"):
+                            parts.append(_embed_png(filepath))
+                        elif filename.endswith(".html"):
+                            parts.append(_embed_html(filepath))
+                    else:
+                        parts.append('<div class="placeholder">Pending</div>')
             else:
                 parts.append('<div class="placeholder">Pending</div>')
 
-        # Render row files (e.g. power maps in a horizontal row)
-        if row_files:
-            row_labels = step_info.get("row_labels", [])
-            parts.append('<div class="image-row">')
-            for i, filename in enumerate(row_files):
-                filepath = session_dir / filename
-                parts.append('<div class="image-row-item">')
-                if i < len(row_labels):
-                    parts.append(f'<div class="file-label">{row_labels[i]}</div>')
-                if filepath.exists():
-                    parts.append(_embed_png(filepath))
-                else:
-                    parts.append('<div class="placeholder">Pending</div>')
-                parts.append("</div>")
             parts.append("</div>")
 
         parts.append("</div>")
@@ -510,8 +649,8 @@ def generate_report(
 
     Scans the plots directory for existing QC files and builds a
     self-contained HTML report with tabs for each pipeline step.
-    Sessions are navigated one at a time using arrow keys or a
-    text input field.
+    Sessions are navigated with left/right arrows or a text input field.
+    Within each step, subpanels are navigated with up/down arrows.
 
     Parameters
     ----------
@@ -542,8 +681,15 @@ def generate_report(
     steps = {k: dict(v) for k, v in STEPS.items()}
     if has_power_maps:
         steps[4] = dict(steps[4])
-        steps[4]["files"] = list(steps[4]["files"]) + ["4_power_maps.png"]
-        steps[4]["large"] = list(steps[4].get("large", [])) + ["4_power_maps.png"]
+        steps[4]["subpanels"] = list(steps[4]["subpanels"]) + [
+            {
+                "name": "Power Maps",
+                "files": ["4_power_maps.png"],
+            }
+        ]
+
+    # Build subpanel counts for JS
+    subpanel_counts = {k: len(v["subpanels"]) for k, v in steps.items()}
 
     # Build tab buttons and content
     tab_buttons = []
@@ -568,11 +714,13 @@ def generate_report(
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # Inject session list and step numbers into JS
+    # Inject session list, step numbers, and subpanel counts into JS
     session_list_js = json.dumps(session_ids)
-    step_nums_js = json.dumps(list(STEPS.keys()))
+    step_nums_js = json.dumps(list(steps.keys()))
+    subpanel_counts_js = json.dumps(subpanel_counts)
     js = JS.replace("SESSION_LIST", session_list_js)
     js = js.replace("STEP_NUMS", step_nums_js)
+    js = js.replace("SUBPANEL_COUNTS", subpanel_counts_js)
 
     report = f"""<!DOCTYPE html>
 <html>

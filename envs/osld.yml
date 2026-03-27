@@ -31,4 +31,5 @@ dependencies:
   - trame-vtk
   - trame-vuetify
   - pip:
+    - mne-icalabel[onnx]
     - osl-dynamics
