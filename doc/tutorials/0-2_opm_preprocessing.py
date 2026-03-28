@@ -4,16 +4,15 @@ OPM: Preprocessing, Source Reconstruction, Parcellation (Without an MRI)
 
 This tutorial walks through the full OPM-MEG processing pipeline when no
 individual structural MRI is available. A template MRI is scaled to match
-the participant's 3D head scan (e.g., EinScan) to generate a "pseudo-MRI"
-that can be used for source reconstruction.
+the participant's 3D head scan (e.g., EinScan) to scale the template
+surfaces for source reconstruction.
 
 1. Preprocessing — Downsample, filter, detect bad segments/channels, ICA artefact rejection, decimate headshape points.
-2. Pseudo-MRI Generation — Scale a template MRI to match the EinScan headshape.
-3. Surface Extraction — Extract skull/scalp surfaces from the pseudo-MRI.
-4. Coregistration — Align OPM sensor space to pseudo-MRI space.
-5. Forward Model — Compute the lead field matrix.
-6. Source Reconstruction — LCMV beamformer to project sensor data to source space.
-7. Parcellation — Reduce voxel data to parcel time courses.
+2. Scale Surfaces to Headshape — Scale template MRI surfaces to match the EinScan headshape.
+3. Coregistration — Align OPM sensor space to the scaled MRI.
+4. Forward Model — Compute the lead field matrix.
+5. Source Reconstruction — LCMV beamformer to project sensor data to source space.
+6. Parcellation — Reduce voxel data to parcel time courses.
 
 If you have an individual MRI, you can skip Step 2 and follow the standard
 :doc:`MEG preprocessing tutorial </tutorials_build/0-1_meg_preprocessing>`
@@ -22,7 +21,7 @@ instead.
 Prerequisites
 ^^^^^^^^^^^^^
 
-- `FSL <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki>`_ (needed for surface extraction and pseudo-MRI generation).
+- `FSL <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki>`_ (needed for surface extraction).
 - `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_ (this installs `MNE-Python <https://mne.tools/stable/index.html>`_ as a dependency). Note, TensorFlow is not required for processing M/EEG. (osl-dynamics can be installed without TensorFlow using the `envs/osld.yml <https://github.com/OHBA-analysis/osl-dynamics/blob/main/envs/osld.yml>`_ environment.)
 - (Optional) A custom template MRI. If not provided, the MNI152 standard brain from FSL is used. For paediatric data, an age-appropriate template (e.g. from the `Neurodevelopmental MRI Database <https://doi.org/10.1016/j.neuroimage.2015.04.055>`_) is recommended.
 
@@ -81,12 +80,6 @@ id = f"sub-{subject}_task-{task}_run-{run}"
 bids_dir = Path("BIDS")
 raw_file = bids_dir / f"sub-{subject}/meg/{id}_meg.fif"
 output_dir = bids_dir / "derivatives"
-
-# Template MRI (optional)
-# If None, the MNI152 standard brain from FSL is used.
-# For children or older adults, an age-matched template is recommended,
-# e.g. from https://doi.org/10.1016/j.neuroimage.2015.04.055
-template_mri = None
 
 # Preprocessing parameters
 resample_freq = 250  # Hz
@@ -173,63 +166,44 @@ raw.save(preproc_file, overwrite=True)
 print(f"Saved: {preproc_file}")
 
 #%%
-# Step 2: Pseudo-MRI Generation
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Step 2: Scale Surfaces to Headshape
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
-# This step replaces the need for an individual structural MRI. We scale a
-# template MRI to match the participant's head shape, as captured by the
-# EinScan headshape points stored in the FIF file.
+# This step replaces the need for an individual structural MRI. We take the
+# pre-computed MNI152 surfaces and scale them to match the participant's head
+# shape, as captured by the EinScan headshape points stored in the FIF file.
 #
 # The method:
 #
-# 1. Segments the template MRI to extract a scalp surface.
-# 2. Aligns the EinScan headshape to the template scalp using fiducials + ICP.
-# 3. Computes an affine warp (with anisotropic scaling) from surface
+# 1. Aligns the EinScan headshape to the template scalp using fiducials + ICP.
+# 2. Computes an affine transform (with anisotropic scaling) from surface
 #    correspondences.
-# 4. Applies the warp to the template MRI to produce the pseudo-MRI.
+# 3. Applies the transform to the template MRI and surfaces.
 #
-# The ``padding`` parameter (default 50 voxels) adds space around the template
-# to accommodate heads larger than the template without clipping.
-
-pseudo_mri_dir = str(output_dir / "pseudo_mri" / f"sub-{subject}")
-
-pseudo_mri = rhino.generate_pseudo_mri(
-    preproc_file=str(preproc_file),
-    outdir=pseudo_mri_dir,
-    template_mri_file=template_mri,
-)
-
-#%%
 # .. note::
 #
-#     If you have an individual structural MRI, skip this step and pass the
-#     MRI path directly to ``rhino.extract_surfaces`` in the next step.
-
-#%%
-# Step 3: Surface Extraction
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^
+#     If you have an individual structural MRI, use ``rhino.extract_surfaces``
+#     instead and skip this step.
 #
-# We extract skull and scalp surfaces from the pseudo-MRI, just as we would
-# from an individual structural MRI.
+# For the default MNI152 brain, we use the pre-computed surfaces bundled
+# with osl-dynamics. For a custom template, first run
+# ``rhino.extract_surfaces`` on it, then pass the output directory here.
+
+from osl_dynamics.files import mni152_surfaces
 
 surfaces_dir = str(output_dir / "anat_surfaces" / f"sub-{subject}")
 
-rhino.extract_surfaces(
-    mri_file=pseudo_mri,
+rhino.scale_surfaces_to_headshape(
+    preproc_file=str(preproc_file),
+    surfaces_dir=mni152_surfaces.directory,
     outdir=surfaces_dir,
-    include_nose=False,
-    show=True,
 )
 
 #%%
-# Check that the extracted surfaces (yellow lines) match the corresponding
-# anatomical boundaries in the pseudo-MRI.
-
-#%%
-# Step 4: Coregistration
+# Step 3: Coregistration
 # ^^^^^^^^^^^^^^^^^^^^^^
 #
-# We coregister the OPM sensor space to the pseudo-MRI using the EinScan
+# We coregister the OPM sensor space to the scaled MRI using the EinScan
 # headshape points and fiducials.
 
 fns = OSLFilenames(
@@ -247,7 +221,7 @@ rhino.coregister_head_and_mri(fns, use_nose=False, show=True)
 # sensors (blue) surround the head correctly.
 
 #%%
-# Step 5: Forward Model
+# Step 4: Forward Model
 # ^^^^^^^^^^^^^^^^^^^^^
 #
 # Compute the forward model using a Single Layer (Single Shell) head model.
@@ -255,7 +229,7 @@ rhino.coregister_head_and_mri(fns, use_nose=False, show=True)
 rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
 
 #%%
-# Step 6: Source Reconstruction
+# Step 5: Source Reconstruction
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # We compute and apply an LCMV beamformer. For OPMs, we use
@@ -266,7 +240,7 @@ voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns, raw)
 print(f"Voxel data shape: {voxel_data.shape} (voxels x time)")
 
 #%%
-# Step 7: Parcellation
+# Step 6: Parcellation
 # ^^^^^^^^^^^^^^^^^^^^
 #
 # Reduce voxel data to parcel time courses using a brain atlas with symmetric
@@ -318,21 +292,18 @@ parcellation.save_qc_plots(parc_fif, parcellation_file, show=True)
 #      - Preprocessing
 #      - ``BIDS/derivatives/preprocessed/{id}_preproc-raw.fif``
 #    * - 2
-#      - Pseudo-MRI
-#      - ``BIDS/derivatives/pseudo_mri/sub-{subject}/pseudo_mri.nii.gz``
-#    * - 3
-#      - Surface extraction
+#      - Scale surfaces to headshape
 #      - ``BIDS/derivatives/anat_surfaces/sub-{subject}/``
-#    * - 4
+#    * - 3
 #      - Coregistration
 #      - ``BIDS/derivatives/osl/{id}/coreg/``
-#    * - 5
+#    * - 4
 #      - Forward model
 #      - ``BIDS/derivatives/osl/{id}/coreg/model-fwd.fif``
-#    * - 6
+#    * - 5
 #      - Source reconstruction
 #      - ``BIDS/derivatives/osl/{id}/src/filters-lcmv.h5``
-#    * - 7
+#    * - 6
 #      - Parcellation
 #      - ``BIDS/derivatives/osl/{id}/lcmv-parc-raw.fif``
 #
