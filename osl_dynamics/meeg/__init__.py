@@ -8,7 +8,8 @@ Modules
 - :py:mod:`~osl_dynamics.meeg.preproc` — Sensor-level preprocessing
   (filtering, bad segment/channel detection, QC plots).
 - :py:mod:`~osl_dynamics.meeg.rhino` — Surface extraction, coregistration
-  (RHINO), and forward modelling.
+  (RHINO), forward modelling, and pseudo-MRI generation (for OPM data
+  without an MRI).
 - :py:mod:`~osl_dynamics.meeg.source_recon` — Source reconstruction (LCMV
   beamformer).
 - :py:mod:`~osl_dynamics.meeg.parcellation` — Parcellation of voxel data
@@ -20,6 +21,7 @@ Modules
 Tutorials
 ---------
 - :doc:`MEG Preprocessing </tutorials_build/0-1_meg_preprocessing>`
+- :doc:`OPM Preprocessing (Without an MRI) </tutorials_build/0-2_opm_preprocessing>`
 
 Python example scripts
 ----------------------

@@ -39,6 +39,233 @@ from osl_dynamics.utils.filenames import OSLFilenames, SurfaceFilenames
 from osl_dynamics.utils.misc import system_call
 
 
+def generate_pseudo_mri(
+    preproc_file: str,
+    outdir: str,
+    template_mri_file: Optional[str] = None,
+    padding: int = 50,
+    n_init: int = 10,
+) -> str:
+    """Generate a pseudo-MRI by scaling a template MRI to a 3D head scan.
+
+    Scales a template MRI to match the head shape captured by a 3D
+    structured-light scanner (e.g., EinScan). The head scan points are
+    expected to be stored as headshape digitisation points in the FIF
+    file's ``info['dig']``.
+
+    The method:
+
+    1. Segments the template MRI scalp surface.
+    2. Aligns the headshape to the template scalp using fiducials and ICP.
+    3. Computes an affine transform (with anisotropic scaling) from
+       nearest-neighbour correspondences between the aligned surfaces.
+    4. Applies the transform to the template MRI to produce the pseudo-MRI.
+
+    The output pseudo-MRI can be used in the standard pipeline:
+    ``extract_surfaces`` -> ``coregister_head_and_mri`` ->
+    ``forward_model`` -> ``lcmv_beamformer`` -> ``parcellate``.
+
+    Parameters
+    ----------
+    preproc_file : str
+        Path to preprocessed FIF file containing EinScan headshape
+        points in ``info['dig']``.
+    outdir : str
+        Output directory for the pseudo-MRI and intermediate files.
+    template_mri_file : str, optional
+        Path to a template MRI NIfTI file (.nii or .nii.gz).
+        If None, the MNI152 standard brain from FSL is used.
+        For paediatric data, an age-appropriate template is
+        recommended, e.g. from the Neurodevelopmental MRI Database
+        (Richards et al., 2016).
+    padding : int, optional
+        Number of voxels to pad the template MRI by on each side.
+        Provides extra space for warping to larger heads without
+        clipping. Set to 0 to disable.
+    n_init : int, optional
+        Number of random initialisations for ICP alignment.
+
+    Returns
+    -------
+    pseudo_mri_file : str
+        Path to the generated pseudo-MRI NIfTI file.
+    """
+    outdir = str(Path(outdir).resolve())
+
+    if template_mri_file is None:
+        fsldir = os.environ.get("FSLDIR")
+        if fsldir is None:
+            raise RuntimeError("FSLDIR environment variable not set. FSL is required.")
+        template_mri_file = os.path.join(
+            fsldir, "data", "standard", "MNI152_T1_1mm.nii.gz"
+        )
+        print(f"Using MNI152 standard brain: {template_mri_file}")
+    os.makedirs(outdir, exist_ok=True)
+
+    print()
+    print("Generating pseudo-MRI")
+    print("---------------------")
+
+    # ------------------------------------------
+    # 1. Reorient template to standard orientation
+    # ------------------------------------------
+    print("Reorienting template MRI to standard orientation")
+    reoriented_file = os.path.join(outdir, "template_reoriented.nii.gz")
+    system_call(
+        f"fslreorient2std {template_mri_file} {reoriented_file}",
+        verbose=False,
+    )
+
+    # fslreorient2std can change the sform code (e.g. to 2).
+    # We need code 1 or 4 for _get_sform. Since fslreorient2std only
+    # reorders axes (no registration), the original code is still valid.
+    orig_code = int(nib.load(template_mri_file).header["sform_code"])
+    if orig_code not in (1, 4):
+        raise ValueError(
+            f"sform code for {template_mri_file} is {orig_code}, " "needs to be 1 or 4."
+        )
+    reoriented = nib.load(reoriented_file)
+    if int(reoriented.header["sform_code"]) != orig_code:
+        reoriented.header["sform_code"] = orig_code
+        nib.save(reoriented, reoriented_file)
+
+    # ------------------------------------------
+    # 2. Compute MNI -> MRI transform via FLIRT
+    # ------------------------------------------
+    print("Computing MNI-to-MRI transform")
+    mni2mri_mm = _compute_mni_to_mri_transform(reoriented_file, outdir)
+
+    # ------------------------------------------
+    # 3. Pad template MRI
+    # ------------------------------------------
+    if padding > 0:
+        print(f"Padding template MRI by {padding} voxels")
+        working_mri_file = _pad_mri(reoriented_file, padding, outdir)
+    else:
+        working_mri_file = reoriented_file
+
+    # ------------------------------------------
+    # 4. Segment template scalp
+    # ------------------------------------------
+    print("Segmenting template scalp")
+    template_scalp = _segment_scalp(working_mri_file)
+
+    # Get scalp surface points in mm for ICP
+    working_sform = _get_sform(working_mri_file)["trans"]
+
+    scalp_surface = template_scalp & ~ndimage.binary_erosion(template_scalp)
+    scalp_voxels = np.array(np.where(scalp_surface))  # 3 x N
+
+    # Subsample for ICP efficiency
+    n_scalp = scalp_voxels.shape[1]
+    if n_scalp > 5000:
+        indices = np.random.choice(n_scalp, 5000, replace=False)
+        scalp_voxels_sub = scalp_voxels[:, indices]
+    else:
+        scalp_voxels_sub = scalp_voxels
+
+    scalp_mm = _xform_points(working_sform, scalp_voxels_sub)
+
+    # ------------------------------------------
+    # 5. Extract headshape from FIF file
+    # ------------------------------------------
+    print(f"Loading headshape from {preproc_file}")
+    headshape_mm, nasion_mm, rpa_mm, lpa_mm = _extract_headshape(preproc_file)
+    print(f"Found {headshape_mm.shape[1]} headshape points")
+
+    # ------------------------------------------
+    # 6. Initial alignment using fiducials
+    # ------------------------------------------
+    print("Computing initial alignment via fiducials")
+
+    # Map MNI fiducials to template MRI space
+    mni_nasion = np.array([1.0, 85.0, -41.0])
+    mni_rpa = np.array([83.0, -20.0, -65.0])
+    mni_lpa = np.array([-83.0, -20.0, -65.0])
+
+    mri_nasion = _xform_points(mni2mri_mm, mni_nasion)
+    mri_rpa = _xform_points(mni2mri_mm, mni_rpa)
+    mri_lpa = _xform_points(mni2mri_mm, mni_lpa)
+
+    # Rigid transform: HEAD -> MRI
+    polhemus_fid = np.column_stack(
+        [
+            nasion_mm.reshape(-1, 1),
+            rpa_mm.reshape(-1, 1),
+            lpa_mm.reshape(-1, 1),
+        ]
+    )
+    mri_fid = np.column_stack(
+        [
+            mri_nasion.reshape(-1, 1),
+            mri_rpa.reshape(-1, 1),
+            mri_lpa.reshape(-1, 1),
+        ]
+    )
+    head2mri_xform, _ = _rigid_transform_3D(mri_fid, polhemus_fid)
+
+    # ------------------------------------------
+    # 7. ICP refinement
+    # ------------------------------------------
+    print(f"Running ICP with {n_init} initialisations")
+
+    headshape_mri_mm = _xform_points(head2mri_xform, headshape_mm)
+
+    xform_icp, _, _ = _rhino_icp(scalp_mm, headshape_mri_mm, n_init=n_init)
+
+    head2mri_refined = xform_icp @ head2mri_xform
+
+    # ------------------------------------------
+    # 8. Compute affine warp from point correspondences
+    # ------------------------------------------
+    print("Computing affine warp from surface correspondences")
+    headshape_aligned = _xform_points(head2mri_refined, headshape_mm)
+
+    # Find nearest template scalp point for each headshape point
+    scalp_tree = KDTree(scalp_mm.T)
+    _, indices = scalp_tree.query(headshape_aligned.T)
+    template_correspondences = scalp_mm[:, indices]
+
+    # Solve for affine: headshape = A @ template_correspondences
+    # In homogeneous coords: [headshape; 1] = A_4x4 @ [template; 1]
+    n_pts = headshape_aligned.shape[1]
+    src = np.vstack([template_correspondences, np.ones(n_pts)])  # 4 x N
+    dst = headshape_aligned  # 3 x N
+
+    # Least squares: dst = A[:3,:] @ src
+    affine_warp, _, _, _ = np.linalg.lstsq(src.T, dst.T, rcond=None)
+    affine_warp = affine_warp.T  # 3 x 4
+
+    warp_xform = np.eye(4)
+    warp_xform[:3, :] = affine_warp
+
+    print(
+        f"  Scaling: x={warp_xform[0,0]:.3f} "
+        f"y={warp_xform[1,1]:.3f} z={warp_xform[2,2]:.3f}"
+    )
+
+    # Combined transform: MRI voxels -> MRI mm -> warped mm
+    warp_voxel_xform = warp_xform @ working_sform
+
+    # ------------------------------------------
+    # 9. Apply warp to template MRI
+    # ------------------------------------------
+    print("Applying warp to template MRI")
+    pseudo_mri_file = os.path.join(outdir, "pseudo_mri.nii.gz")
+
+    mri_img = nib.load(working_mri_file)
+    mri_data = mri_img.get_fdata()
+
+    # Create output image with warped sform
+    pseudo_img = nib.Nifti1Image(mri_data, warp_voxel_xform)
+    sform_code = int(mri_img.header["sform_code"])
+    pseudo_img.header.set_sform(warp_voxel_xform, code=sform_code)
+    nib.save(pseudo_img, pseudo_mri_file)
+
+    print(f"Pseudo-MRI saved: {pseudo_mri_file}")
+    return pseudo_mri_file
+
+
 def extract_surfaces(
     mri_file: str,
     outdir: str,
@@ -2658,3 +2885,185 @@ def _binary_majority3d(img):
     return ndimage.generic_filter(
         img, LowLevelCallable(_majority.ctypes), size=3
     ).astype(int)
+
+
+# ---------------------------------------------------------------------------
+# Template warping helpers (for generate_pseudo_mri)
+# ---------------------------------------------------------------------------
+
+
+def _extract_headshape(preproc_file):
+    """Extract headshape points and fiducials from a FIF file.
+
+    Parameters
+    ----------
+    preproc_file : str
+        Path to FIF file.
+
+    Returns
+    -------
+    headshape_mm : numpy.ndarray
+        3 x N array of headshape points in mm (HEAD space).
+    nasion_mm : numpy.ndarray
+        Nasion position in mm (HEAD space).
+    rpa_mm : numpy.ndarray
+        RPA position in mm (HEAD space).
+    lpa_mm : numpy.ndarray
+        LPA position in mm (HEAD space).
+    """
+    info = mne.io.read_info(preproc_file)
+
+    headshape_m = []
+    nasion_m = None
+    rpa_m = None
+    lpa_m = None
+
+    for dig in info["dig"]:
+        if dig["kind"] == FIFF.FIFFV_POINT_EXTRA:
+            headshape_m.append(dig["r"])
+        elif dig["kind"] == FIFF.FIFFV_POINT_CARDINAL:
+            if dig["ident"] == FIFF.FIFFV_POINT_NASION:
+                nasion_m = dig["r"]
+            elif dig["ident"] == FIFF.FIFFV_POINT_LPA:
+                lpa_m = dig["r"]
+            elif dig["ident"] == FIFF.FIFFV_POINT_RPA:
+                rpa_m = dig["r"]
+
+    if not headshape_m:
+        raise ValueError("No headshape points found in FIF file")
+    if nasion_m is None or rpa_m is None or lpa_m is None:
+        raise ValueError("Fiducials (nasion, LPA, RPA) not found in FIF file")
+
+    headshape_mm = np.array(headshape_m).T * 1000
+    nasion_mm = np.array(nasion_m) * 1000
+    rpa_mm = np.array(rpa_m) * 1000
+    lpa_mm = np.array(lpa_m) * 1000
+
+    # Remove points below the ears (neck/body)
+    z_min = min(lpa_mm[2], rpa_mm[2])
+    keep = headshape_mm[2] >= z_min
+    headshape_mm = headshape_mm[:, keep]
+
+    return headshape_mm, nasion_mm, rpa_mm, lpa_mm
+
+
+def _compute_mni_to_mri_transform(mri_file, outdir):
+    """Compute MNI -> MRI mm-to-mm transform via BET + FLIRT.
+
+    Parameters
+    ----------
+    mri_file : str
+        Path to the template MRI (should be in standard orientation).
+    outdir : str
+        Output directory for intermediate files.
+
+    Returns
+    -------
+    mni2mri_mm : numpy.ndarray
+        4x4 transform from MNI mm to MRI mm.
+    """
+    fsldir = os.environ.get("FSLDIR")
+    if fsldir is None:
+        raise RuntimeError("FSLDIR environment variable not set. FSL is required.")
+
+    std_brain = os.path.join(fsldir, "data", "standard", "MNI152_T1_1mm_brain.nii.gz")
+
+    # Skull strip the template
+    bet_file = os.path.join(outdir, "template_brain")
+    system_call(f"bet {mri_file} {bet_file}", verbose=False)
+
+    # FLIRT to MNI
+    mri2mni_mat = os.path.join(outdir, "template2mni.mat")
+    system_call(
+        f"flirt" f" -in {bet_file}" f" -ref {std_brain}" f" -omat {mri2mni_mat}",
+        verbose=False,
+    )
+
+    # Invert
+    mni2mri_mat = os.path.join(outdir, "mni2template.mat")
+    system_call(
+        f"convert_xfm -omat {mni2mri_mat} -inverse {mri2mni_mat}",
+        verbose=False,
+    )
+
+    # Convert FLIRT xform to mm-to-mm
+    flirt_mni2mri = np.loadtxt(mni2mri_mat)
+    mni2mri_mm = _get_mne_xform_from_flirt_xform(flirt_mni2mri, std_brain, mri_file)
+
+    return mni2mri_mm
+
+
+def _pad_mri(mri_file, padding, outdir):
+    """Pad an MRI with zeros on all sides.
+
+    Parameters
+    ----------
+    mri_file : str
+        Path to the MRI NIfTI file.
+    padding : int
+        Number of voxels to pad on each side.
+    outdir : str
+        Output directory.
+
+    Returns
+    -------
+    padded_file : str
+        Path to the padded MRI NIfTI file.
+    """
+    mri = nib.load(mri_file)
+    data = mri.get_fdata()
+    sform = mri.header.get_sform()
+
+    padded_data = np.pad(data, padding, mode="constant", constant_values=0)
+
+    # Update sform translation to account for padding offset
+    pad_offset = sform[:3, :3] @ np.full(3, -padding)
+    padded_sform = sform.copy()
+    padded_sform[:3, 3] += pad_offset
+
+    padded_img = nib.Nifti1Image(padded_data, padded_sform)
+    sform_code = int(mri.header["sform_code"])
+    padded_img.header.set_sform(padded_sform, code=sform_code)
+    padded_file = os.path.join(outdir, "template_padded.nii.gz")
+    nib.save(padded_img, padded_file)
+
+    return padded_file
+
+
+def _segment_scalp(mri_file):
+    """Get a binary head mask from a template MRI using thresholding.
+
+    Parameters
+    ----------
+    mri_file : str
+        Path to the MRI NIfTI file.
+
+    Returns
+    -------
+    mask : numpy.ndarray
+        Binary 3D head mask.
+    """
+    data = nib.load(mri_file).get_fdata()
+
+    nonzero = data[data > 0].flatten()
+    if len(nonzero) == 0:
+        raise ValueError("Template MRI appears to be empty")
+
+    threshold = np.percentile(nonzero, 10)
+    mask = data > threshold
+
+    # Fill holes
+    mask = ndimage.binary_fill_holes(mask)
+
+    # Keep largest connected component
+    labeled, n_labels = ndimage.label(mask)
+    if n_labels > 1:
+        sizes = ndimage.sum(mask, labeled, range(1, n_labels + 1))
+        largest = np.argmax(sizes) + 1
+        mask = labeled == largest
+
+    # Smooth with morphological operations
+    mask = ndimage.binary_closing(mask, iterations=2)
+    mask = ndimage.binary_fill_holes(mask)
+
+    return mask

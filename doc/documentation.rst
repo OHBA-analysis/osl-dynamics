@@ -54,9 +54,10 @@ Tutorials
 
 The following tutorials illustrate basic usage and analysis that can be done with osl-dynamics.
 
-**M/EEG processing tutorial**:
+**M/EEG processing tutorials**:
 
 - :doc:`tutorials_build/0-1_meg_preprocessing`.
+- :doc:`tutorials_build/0-2_opm_preprocessing`.
 
 **Data tutorials**:
 
