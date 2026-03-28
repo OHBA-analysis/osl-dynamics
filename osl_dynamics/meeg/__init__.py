@@ -5,6 +5,8 @@ raw sensor recordings to parcellated source-space time courses.
 
 Modules
 -------
+- :py:mod:`~osl_dynamics.meeg.amm` — Adaptive Multipole Model (AMM) for
+  OPM interference rejection.
 - :py:mod:`~osl_dynamics.meeg.preproc` — Sensor-level preprocessing
   (filtering, bad segment/channel detection, QC plots).
 - :py:mod:`~osl_dynamics.meeg.rhino` — Surface extraction, coregistration

@@ -7,7 +7,7 @@ individual structural MRI is available. A template MRI is scaled to match
 the participant's 3D head scan (e.g., EinScan) to scale the template
 surfaces for source reconstruction.
 
-1. Preprocessing — Downsample, filter, detect bad segments/channels, ICA artefact rejection, decimate headshape points.
+1. Preprocessing — Downsample, filter, AMM interference rejection, detect bad segments/channels, ICA artefact rejection, decimate headshape points.
 2. Scale Surfaces to Headshape — Scale template MRI surfaces to match the EinScan headshape.
 3. Coregistration — Align OPM sensor space to the scaled MRI.
 4. Forward Model — Compute the lead field matrix.
@@ -64,7 +64,7 @@ from pathlib import Path
 import mne
 import numpy as np
 
-from osl_dynamics.meeg import preproc, rhino, source_recon, parcellation
+from osl_dynamics.meeg import amm, preproc, rhino, source_recon, parcellation
 from osl_dynamics.utils.filenames import OSLFilenames
 
 #%%
@@ -112,6 +112,20 @@ print(f"Raw file: {raw_file}")
 # *************
 
 raw = mne.io.read_raw_fif(raw_file, preload=True)
+
+#%%
+# AMM interference rejection
+# **************************
+#
+# The Adaptive Multipole Model (AMM) separates brain signals from
+# environmental interference by decomposing the data into internal
+# (brain) and external (interference) prolate spheroidal harmonics.
+# This is the OPM equivalent of MaxFilter for Elekta MEG systems and
+# should be applied first, before any temporal filtering or downsampling.
+#
+# See `Tierney et al. (2024) <https://doi.org/10.1002/hbm.26596>`_.
+
+raw, amm_info = amm.apply_amm(raw)
 
 #%%
 # Resample and filter
