@@ -1063,13 +1063,13 @@ def apply_amm(raw, li=9, le=2, window=10.0, corr_lim=1.0):
             if inter_rms > 1e-6 * y_rms:
                 # _orth(): SVD-based, keeps columns with significant
                 # singular values (> max(size) * eps * s[0])
-                Oinner = _orth(inner.T)
-                Ointer = _orth(inter.T)
+                orth_inner = _orth(inner.T)
+                orth_inter = _orth(inter.T)
 
                 # CCA
-                C = Oinner.T @ Ointer
+                C = orth_inner.T @ orth_inter
                 _, Sc, Zt = np.linalg.svd(C, full_matrices=False)
-                noise = Ointer @ Zt.T
+                noise = orth_inter @ Zt.T
 
                 # Remove components above correlation limit
                 n_remove = int(np.sum(Sc > corr_lim))
