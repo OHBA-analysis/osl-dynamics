@@ -23,7 +23,6 @@ Modules
 Tutorials
 ---------
 - :doc:`MEG Preprocessing </tutorials_build/0-1_meg_preprocessing>`
-- :doc:`OPM Preprocessing (Without an MRI) </tutorials_build/0-2_opm_preprocessing>`
 
 Python example scripts
 ----------------------
