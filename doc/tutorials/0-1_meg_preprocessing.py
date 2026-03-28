@@ -177,11 +177,12 @@ Output is written to ``BIDS/derivatives/``.
 # **Option B: MEGNet automatic labelling** — Uses ``mne-icalabel`` (included
 # in the osl-dynamics conda environments) to classify components with a
 # pre-trained deep learning model. Note, MEGNet was trained on ``'mag'``
-# sensor topographies.
+# sensor topographies but we'll pass ``'meg'`` to include both magnetometers
+# and gradiometers.
 #
 # .. code-block:: python
 #
-#     raw, ica, ic_labels = preproc.ica_label(raw, picks="mag", method="megnet")
+#     raw, ica, ic_labels = preproc.ica_label(raw, picks="meg", method="megnet")
 
 #%%
 # Save preprocessing QC plots (PSD, sum-of-squares time series, channel
