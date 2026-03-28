@@ -91,9 +91,9 @@ def scale_surfaces_to_headshape(
     print("Scaling surfaces to headshape")
     print("-----------------------------")
 
-    # ------------------------------------------
+    # -------------
     # Load surfaces
-    # ------------------------------------------
+    # -------------
     sfns = SurfaceFilenames(surfaces_dir)
 
     outskin_sform = _get_sform(sfns.bet_outskin_mesh_file)["trans"]
@@ -107,16 +107,16 @@ def scale_surfaces_to_headshape(
         scalp_voxels = scalp_voxels[:, indices]
     scalp_mm = _xform_points(outskin_sform, scalp_voxels)
 
-    # ------------------------------------------
+    # -------------------------------
     # Extract headshape from FIF file
-    # ------------------------------------------
+    # -------------------------------
     print(f"Loading headshape from {preproc_file}")
     headshape_mm, nasion_mm, rpa_mm, lpa_mm = _extract_headshape(preproc_file)
     print(f"Found {headshape_mm.shape[1]} headshape points")
 
-    # ------------------------------------------
+    # ---------------------------------
     # Initial alignment using fiducials
-    # ------------------------------------------
+    # ---------------------------------
     print("Computing initial alignment via fiducials")
 
     mni_nasion = np.array([1.0, 85.0, -41.0])
@@ -143,18 +143,18 @@ def scale_surfaces_to_headshape(
     )
     head2mri_xform, _ = _rigid_transform_3D(mri_fid, polhemus_fid)
 
-    # ------------------------------------------
+    # --------------
     # ICP refinement
-    # ------------------------------------------
+    # --------------
     print(f"Running ICP with {n_init} initialisations")
 
     headshape_mri_mm = _xform_points(head2mri_xform, headshape_mm)
     xform_icp, _, _ = _rhino_icp(scalp_mm, headshape_mri_mm, n_init=n_init)
     head2mri_refined = xform_icp @ head2mri_xform
 
-    # ------------------------------------------
+    # -----------------------------------------
     # Compute affine from point correspondences
-    # ------------------------------------------
+    # -----------------------------------------
     print("Computing affine transform from surface correspondences")
     headshape_aligned = _xform_points(head2mri_refined, headshape_mm)
 
@@ -176,9 +176,9 @@ def scale_surfaces_to_headshape(
         f"y={warp_xform[1,1]:.3f} z={warp_xform[2,2]:.3f}"
     )
 
-    # ------------------------------------------
+    # ---------------
     # Save scaled MRI
-    # ------------------------------------------
+    # ---------------
     print("Saving scaled MRI and surfaces")
 
     mri_img = nib.load(sfns.mri_file)
@@ -191,9 +191,9 @@ def scale_surfaces_to_headshape(
     smri_img.header.set_sform(scaled_sform, code=sform_code)
     nib.save(smri_img, smri_out)
 
-    # ------------------------------------------
+    # --------------------
     # Save scaled surfaces
-    # ------------------------------------------
+    # --------------------
     for mesh_name in ["outskin_mesh", "inskull_mesh", "outskull_mesh"]:
         # Scale NIfTI mesh sform
         src_nii = os.path.join(surfaces_dir, f"{mesh_name}.nii.gz")
@@ -2842,11 +2842,6 @@ def _binary_majority3d(img):
     return ndimage.generic_filter(
         img, LowLevelCallable(_majority.ctypes), size=3
     ).astype(int)
-
-
-# ---------------------------------------------------------------------------
-# Helpers for scale_surfaces_to_headshape
-# ---------------------------------------------------------------------------
 
 
 def _extract_headshape(preproc_file):
