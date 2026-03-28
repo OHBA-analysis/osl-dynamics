@@ -449,7 +449,7 @@ Output is written to ``BIDS/derivatives/``.
 # Notes on CTF and OPM data
 # *************************
 #
-# This tutorial uses Elekta MEG data. If you are working with different MEG systems:
+# This tutorial uses Elekta MEG data. If you are working with different MEG systems (or EEG) see `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_. Note:
 #
 # - **CTF:** Use ``mne.io.read_raw_ctf()`` to load data. Set ``chantypes=["mag"]`` and adjust ``rank`` (CTF data is not MaxFiltered, so the rank is typically higher). Fiducials/headshape points may need to be extracted from a ``.pos`` file rather than the data file — pass ``pos_file`` to ``OSLFilenames``.
 # - **OPM:** Loading depends on the OPM system. Adjust ``chantypes`` and ``rank`` accordingly.
