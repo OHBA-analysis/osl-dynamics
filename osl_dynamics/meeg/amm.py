@@ -17,7 +17,7 @@ import numpy as np
 from scipy.special import gammaln
 
 
-def associated_legendre(x, l, m):
+def _associated_legendre(x, l, m):
     """Compute associated Legendre polynomial P_l^m(x).
 
     Uses (-1)^m Condon-Shortley phase, matching spm_slm.m lines 64-76.
@@ -58,7 +58,7 @@ def associated_legendre(x, l, m):
     return pl
 
 
-def associated_legendre_deriv(theta, l, m):
+def _associated_legendre_deriv(theta, l, m):
     """Compute dP_l^m/dtheta.
 
     Translated from spm_slm.m lines 50-62.
@@ -106,7 +106,7 @@ def associated_legendre_deriv(theta, l, m):
     return dpl
 
 
-def spherical_harmonics(theta, phi, L):
+def _spherical_harmonics(theta, phi, L):
     """Compute real spherical harmonics and angular derivatives.
 
     Parameters
@@ -141,25 +141,25 @@ def spherical_harmonics(theta, phi, L):
             )
 
             if m < 0:
-                Lval = associated_legendre(np.cos(theta), l, am)
+                Lval = _associated_legendre(np.cos(theta), l, am)
                 slm[:, count] = a * Lval * np.sin(am * phi)
                 dslm_dphi[:, count] = am * a * Lval * np.cos(am * phi)
-                Ld = associated_legendre_deriv(theta, l, am)
+                Ld = _associated_legendre_deriv(theta, l, am)
                 dslm_dtheta[:, count] = a * Ld * np.sin(am * phi)
 
             elif m == 0:
-                Lval = associated_legendre(np.cos(theta), l, 0)
+                Lval = _associated_legendre(np.cos(theta), l, 0)
                 norm = np.sqrt((2 * l + 1) / (4 * np.pi))
                 slm[:, count] = norm * Lval
                 dslm_dphi[:, count] = 0.0
-                Ld = associated_legendre_deriv(theta, l, 0)
+                Ld = _associated_legendre_deriv(theta, l, 0)
                 dslm_dtheta[:, count] = norm * Ld
 
             else:  # m > 0
-                Lval = associated_legendre(np.cos(theta), l, m)
+                Lval = _associated_legendre(np.cos(theta), l, m)
                 slm[:, count] = a * Lval * np.cos(m * phi)
                 dslm_dphi[:, count] = (-m) * a * Lval * np.sin(m * phi)
-                Ld = associated_legendre_deriv(theta, l, m)
+                Ld = _associated_legendre_deriv(theta, l, m)
                 dslm_dtheta[:, count] = a * Ld * np.cos(m * phi)
 
             count += 1
@@ -167,7 +167,7 @@ def spherical_harmonics(theta, phi, L):
     return slm, dslm_dphi, dslm_dtheta
 
 
-def spheroid_fit(positions_m):
+def _spheroid_fit(positions_m):
     """Fit a prolate spheroid to sensor positions.
 
     Parameters
@@ -199,7 +199,7 @@ def spheroid_fit(positions_m):
 def _spheroid_fit_axis(X, ax):
     """Core spheroid fit for a given longest axis.
 
-    Direct translation of MATLAB spheroid_fit(X, ax).
+    Direct translation of MATLAB _spheroid_fit(X, ax).
 
     Parameters
     ----------
@@ -290,7 +290,7 @@ def _spheroid_fit_axis(X, ax):
     return o, r
 
 
-def shrink_spheroid(positions_m, center_m, radii_m):
+def _shrink_spheroid(positions_m, center_m, radii_m):
     """Iteratively shrink radii by 1 mm until all sensors are outside.
 
     Parameters
@@ -331,7 +331,7 @@ def shrink_spheroid(positions_m, center_m, radii_m):
     return r / 1000.0
 
 
-def cartesian_to_prolate(positions_m, orientations, center_m, a_m, b_m, longest_axis):
+def _cartesian_to_prolate(positions_m, orientations, center_m, a_m, b_m, longest_axis):
     """Convert Cartesian sensor coords to prolate spheroidal coords.
 
     The MATLAB code hardcodes column index 1 (0-based) as the major axis
@@ -442,7 +442,7 @@ def _compute_radial_functions(major, a, c, L, func):
     a, c : float
     L : int
     func : callable
-        One of qlm_hat, dqlm_hat_dmajor, plm_hat, dplm_hat_dmajor.
+        One of _qlm_hat, _d_qlm_hat_dmajor, _plm_hat, _d_plm_hat_dmajor.
 
     Returns
     -------
@@ -458,7 +458,7 @@ def _compute_radial_functions(major, a, c, L, func):
     return result
 
 
-def qlm_hat(major, a, c, l, m):
+def _qlm_hat(major, a, c, l, m):
     """Internal radial function via infinite series.
 
     Translated from spm_ipharm.m lines 84-113.
@@ -524,7 +524,7 @@ def qlm_hat(major, a, c, l, m):
     return qlm
 
 
-def dqlm_hat_dmajor(major, a, c, l, m):
+def _d_qlm_hat_dmajor(major, a, c, l, m):
     """Derivative of internal radial function w.r.t. major.
 
     Translated from spm_ipharm.m lines 129-182.
@@ -542,7 +542,7 @@ def dqlm_hat_dmajor(major, a, c, l, m):
     m = abs(m)
     c = c + 1e-32  # avoid log(0)
 
-    # Compute F1, F2 (same series as qlm_hat but with 1e-16 convergence)
+    # Compute F1, F2 (same series as _qlm_hat but with 1e-16 convergence)
     k = 0
     lg = (
         gammaln((1 + l + m) / 2 + k)
@@ -606,7 +606,7 @@ def dqlm_hat_dmajor(major, a, c, l, m):
     return dqlm
 
 
-def plm_hat(major, a, c, l, m):
+def _plm_hat(major, a, c, l, m):
     """External radial function via finite series.
 
     Translated from spm_epharm.m lines 84-107.
@@ -660,7 +660,7 @@ def plm_hat(major, a, c, l, m):
     return plm
 
 
-def dplm_hat_dmajor(major, a, c, l, m):
+def _d_plm_hat_dmajor(major, a, c, l, m):
     """Derivative of external radial function w.r.t. major.
 
     Translated from spm_epharm.m lines 122-171.
@@ -771,30 +771,30 @@ def _compute_harmonic_basis(
     longest_axis : int
         Index of the longest axis.
     radial_func : callable
-        Radial function (qlm_hat or plm_hat).
+        Radial function (_qlm_hat or _plm_hat).
     radial_deriv_func : callable
-        Radial derivative (dqlm_hat_dmajor or dplm_hat_dmajor).
+        Radial derivative (_d_qlm_hat_dmajor or _d_plm_hat_dmajor).
 
     Returns
     -------
     harmonics : ndarray, shape (n, L^2+2L)
         Normalized harmonic basis.
     """
-    # cartesian_to_prolate works internally in mm; major and metric
+    # _cartesian_to_prolate works internally in mm; major and metric
     # coefficients are returned in mm.
     a = a_m * 1000.0
     b = b_m * 1000.0
     c = np.sqrt(a**2 - b**2)
 
     major, nabla, phi, emajor, enabla, ephi, hmajor, hnabla, hphi = (
-        cartesian_to_prolate(
+        _cartesian_to_prolate(
             positions_m, orientations, center_m, a_m, b_m, longest_axis
         )
     )
     # major, hmajor, hnabla, hphi are already in mm
 
     # Spherical harmonics
-    slm, dslm_dphi, dslm_dnabla = spherical_harmonics(nabla, phi, L)
+    slm, dslm_dphi, dslm_dnabla = _spherical_harmonics(nabla, phi, L)
 
     # Radial functions (all in mm)
     rl = _compute_radial_functions(major, a, c, L, radial_func)
@@ -824,7 +824,7 @@ def _compute_harmonic_basis(
     return harmonics
 
 
-def compute_internal_harmonics(
+def _compute_internal_harmonics(
     positions_m, orientations, a_m, b_m, L, center_m, longest_axis
 ):
     """Compute internal prolate spheroidal harmonic basis.
@@ -859,12 +859,12 @@ def compute_internal_harmonics(
         L,
         center_m,
         longest_axis,
-        qlm_hat,
-        dqlm_hat_dmajor,
+        _qlm_hat,
+        _d_qlm_hat_dmajor,
     )
 
 
-def compute_external_harmonics(
+def _compute_external_harmonics(
     positions_m, orientations, a_m, b_m, L, center_m, longest_axis
 ):
     """Compute external prolate spheroidal harmonic basis.
@@ -899,8 +899,8 @@ def compute_external_harmonics(
         L,
         center_m,
         longest_axis,
-        plm_hat,
-        dplm_hat_dmajor,
+        _plm_hat,
+        _d_plm_hat_dmajor,
     )
 
 
@@ -915,7 +915,7 @@ def _orth(A):
     return U[:, :rank]
 
 
-def apply_amm(raw, li=9, le=2, window=10.0, corr_lim=1.0):
+def apply_amm(raw, li=9, le=2, window=10.0, corr_lim=0.98):
     """Apply AMM denoising.
 
     Parameters
@@ -970,7 +970,7 @@ def apply_amm(raw, li=9, le=2, window=10.0, corr_lim=1.0):
     )
 
     # Fit spheroid
-    center, radii, longest_axis = spheroid_fit(positions)
+    center, radii, longest_axis = _spheroid_fit(positions)
     print(f"  Spheroid centre: {center * 1000} mm")
     print(f"  Spheroid radii: {radii * 1000} mm")
     print(f"  Longest axis: {longest_axis} " f"({'XYZ'[longest_axis]})")
@@ -979,7 +979,7 @@ def apply_amm(raw, li=9, le=2, window=10.0, corr_lim=1.0):
     positions_centered = positions - center
 
     # Shrink spheroid until all sensors are outside
-    radii = shrink_spheroid(positions_centered, np.zeros(3), radii)
+    radii = _shrink_spheroid(positions_centered, np.zeros(3), radii)
     print(f"  Shrunk radii: {radii * 1000} mm")
 
     a = np.max(np.abs(radii))
@@ -988,11 +988,11 @@ def apply_amm(raw, li=9, le=2, window=10.0, corr_lim=1.0):
 
     # Build harmonic bases
     print("  Computing external harmonics...")
-    external = compute_external_harmonics(
+    external = _compute_external_harmonics(
         positions, orientations, a, b, le, center, longest_axis
     )
     print("  Computing internal harmonics...")
-    internal = compute_internal_harmonics(
+    internal = _compute_internal_harmonics(
         positions, orientations, a, b, li, center, longest_axis
     )
 
