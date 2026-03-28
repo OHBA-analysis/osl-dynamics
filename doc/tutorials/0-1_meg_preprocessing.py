@@ -14,8 +14,8 @@ This tutorial walks through the full MEG processing pipeline step by step:
 Prerequisites
 ^^^^^^^^^^^^^
 
-- `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_ (this installs `MNE-Python <https://mne.tools/stable/index.html>`_ as a dependency). Note, TensorFlow is not required for processing M/EEG. (osl-dynamics can be installed without TensorFlow using the `envs/osld.yml <https://github.com/OHBA-analysis/osl-dynamics/blob/main/envs/osld.yml>`_ environment.)
 - `FSL <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki>`_ (needed for surface extraction).
+- `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_ (this installs `MNE-Python <https://mne.tools/stable/index.html>`_ as a dependency). Note, TensorFlow is not required for processing M/EEG. (osl-dynamics can be installed without TensorFlow using the `envs/osld.yml <https://github.com/OHBA-analysis/osl-dynamics/blob/main/envs/osld.yml>`_ environment.)
 
 Input Data
 ^^^^^^^^^^
@@ -177,11 +177,12 @@ Output is written to ``BIDS/derivatives/``.
 # **Option B: MEGNet automatic labelling** — Uses ``mne-icalabel`` (included
 # in the osl-dynamics conda environments) to classify components with a
 # pre-trained deep learning model. Note, MEGNet was trained on ``'mag'``
-# sensor topographies.
+# sensor topographies but we'll pass ``'meg'`` to include both magnetometers
+# and gradiometers.
 #
 # .. code-block:: python
 #
-#     raw, ica, ic_labels = preproc.ica_label(raw, picks="mag", method="megnet")
+#     raw, ica, ic_labels = preproc.ica_label(raw, picks="meg", method="megnet")
 
 #%%
 # Save preprocessing QC plots (PSD, sum-of-squares time series, channel
@@ -448,7 +449,7 @@ Output is written to ``BIDS/derivatives/``.
 # Notes on CTF and OPM data
 # *************************
 #
-# This tutorial uses Elekta MEG data. If you are working with different MEG systems:
+# This tutorial uses Elekta MEG data. If you are working with different MEG systems (or EEG) see `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_. Note:
 #
 # - **CTF:** Use ``mne.io.read_raw_ctf()`` to load data. Set ``chantypes=["mag"]`` and adjust ``rank`` (CTF data is not MaxFiltered, so the rank is typically higher). Fiducials/headshape points may need to be extracted from a ``.pos`` file rather than the data file — pass ``pos_file`` to ``OSLFilenames``.
 # - **OPM:** Loading depends on the OPM system. Adjust ``chantypes`` and ``rank`` accordingly.

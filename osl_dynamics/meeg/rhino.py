@@ -39,6 +39,190 @@ from osl_dynamics.utils.filenames import OSLFilenames, SurfaceFilenames
 from osl_dynamics.utils.misc import system_call
 
 
+def scale_surfaces_to_headshape(
+    preproc_file: str,
+    surfaces_dir: str,
+    outdir: str,
+    n_init: int = 10,
+) -> str:
+    """Scale surfaces to match headshape points.
+
+    Computes an affine transform that scales an existing set of surfaces
+    (from ``extract_surfaces`` or the bundled MNI152 surfaces) to match
+    the headshape digitisation points in a FIF file. The scaled MRI and
+    surfaces are written to ``outdir``.
+
+    This is useful when no individual structural MRI is available (e.g.,
+    OPM recordings with EinScan headshape).
+
+    The method:
+
+    1. Aligns the headshape to the template scalp surface using fiducials
+       and ICP.
+    2. Computes an affine transform (with anisotropic scaling) from
+       nearest-neighbour correspondences between the aligned surfaces.
+    3. Applies the transform to the MRI and surfaces.
+
+    Parameters
+    ----------
+    preproc_file : str
+        Path to preprocessed FIF file containing headshape points in
+        ``info['dig']``.
+    surfaces_dir : str
+        Path to a directory containing extracted surfaces (from
+        ``extract_surfaces``). For the default MNI152 brain, use
+        ``osl_dynamics.files.mni152_surfaces.directory``.
+    outdir : str
+        Output directory for the scaled MRI and surfaces. Pass this
+        as ``surfaces_dir`` when creating ``OSLFilenames``.
+    n_init : int, optional
+        Number of random initialisations for ICP alignment.
+
+    Returns
+    -------
+    outdir : str
+        Path to the output directory containing the scaled MRI and
+        surfaces.
+    """
+    outdir = str(Path(outdir).resolve())
+    os.makedirs(outdir, exist_ok=True)
+
+    print()
+    print("Scaling surfaces to headshape")
+    print("-----------------------------")
+
+    # -------------
+    # Load surfaces
+    # -------------
+    sfns = SurfaceFilenames(surfaces_dir)
+
+    outskin_sform = _get_sform(sfns.bet_outskin_mesh_file)["trans"]
+    scalp_voxels = _niimask2indexpointcloud(sfns.bet_outskin_mesh_file)
+    mni2mri_mm = read_trans(sfns.mni_mri_t_file)["trans"]
+
+    # Subsample scalp surface for ICP efficiency
+    n_scalp = scalp_voxels.shape[1]
+    if n_scalp > 5000:
+        indices = np.random.choice(n_scalp, 5000, replace=False)
+        scalp_voxels = scalp_voxels[:, indices]
+    scalp_mm = _xform_points(outskin_sform, scalp_voxels)
+
+    # -------------------------------
+    # Extract headshape from FIF file
+    # -------------------------------
+    print(f"Loading headshape from {preproc_file}")
+    headshape_mm, nasion_mm, rpa_mm, lpa_mm = _extract_headshape(preproc_file)
+    print(f"Found {headshape_mm.shape[1]} headshape points")
+
+    # ---------------------------------
+    # Initial alignment using fiducials
+    # ---------------------------------
+    print("Computing initial alignment via fiducials")
+
+    mni_nasion = np.array([1.0, 85.0, -41.0])
+    mni_rpa = np.array([83.0, -20.0, -65.0])
+    mni_lpa = np.array([-83.0, -20.0, -65.0])
+
+    mri_nasion = _xform_points(mni2mri_mm, mni_nasion)
+    mri_rpa = _xform_points(mni2mri_mm, mni_rpa)
+    mri_lpa = _xform_points(mni2mri_mm, mni_lpa)
+
+    polhemus_fid = np.column_stack(
+        [
+            nasion_mm.reshape(-1, 1),
+            rpa_mm.reshape(-1, 1),
+            lpa_mm.reshape(-1, 1),
+        ]
+    )
+    mri_fid = np.column_stack(
+        [
+            mri_nasion.reshape(-1, 1),
+            mri_rpa.reshape(-1, 1),
+            mri_lpa.reshape(-1, 1),
+        ]
+    )
+    head2mri_xform, _ = _rigid_transform_3D(mri_fid, polhemus_fid)
+
+    # --------------
+    # ICP refinement
+    # --------------
+    print(f"Running ICP with {n_init} initialisations")
+
+    headshape_mri_mm = _xform_points(head2mri_xform, headshape_mm)
+    xform_icp, _, _ = _rhino_icp(scalp_mm, headshape_mri_mm, n_init=n_init)
+    head2mri_refined = xform_icp @ head2mri_xform
+
+    # -----------------------------------------
+    # Compute affine from point correspondences
+    # -----------------------------------------
+    print("Computing affine transform from surface correspondences")
+    headshape_aligned = _xform_points(head2mri_refined, headshape_mm)
+
+    scalp_tree = KDTree(scalp_mm.T)
+    _, nn_indices = scalp_tree.query(headshape_aligned.T)
+    template_correspondences = scalp_mm[:, nn_indices]
+
+    n_pts = headshape_aligned.shape[1]
+    src = np.vstack([template_correspondences, np.ones(n_pts)])
+    dst = headshape_aligned
+
+    affine_warp, _, _, _ = np.linalg.lstsq(src.T, dst.T, rcond=None)
+    affine_warp = affine_warp.T
+    warp_xform = np.eye(4)
+    warp_xform[:3, :] = affine_warp
+
+    print(
+        f"  Scaling: x={warp_xform[0,0]:.3f} "
+        f"y={warp_xform[1,1]:.3f} z={warp_xform[2,2]:.3f}"
+    )
+
+    # ---------------
+    # Save scaled MRI
+    # ---------------
+    print("Saving scaled MRI and surfaces")
+
+    mri_img = nib.load(sfns.mri_file)
+    mri_sform = mri_img.header.get_sform()
+    sform_code = int(mri_img.header["sform_code"])
+    scaled_sform = warp_xform @ mri_sform
+
+    smri_out = os.path.join(outdir, "smri.nii.gz")
+    smri_img = nib.Nifti1Image(mri_img.get_fdata(), scaled_sform)
+    smri_img.header.set_sform(scaled_sform, code=sform_code)
+    nib.save(smri_img, smri_out)
+
+    # --------------------
+    # Save scaled surfaces
+    # --------------------
+    for mesh_name in ["outskin_mesh", "inskull_mesh", "outskull_mesh"]:
+        # Scale NIfTI mesh sform
+        src_nii = os.path.join(surfaces_dir, f"{mesh_name}.nii.gz")
+        dst_nii = os.path.join(outdir, f"{mesh_name}.nii.gz")
+        mesh_img = nib.load(src_nii)
+        mesh_sform = warp_xform @ mesh_img.header.get_sform()
+        new_img = nib.Nifti1Image(mesh_img.get_fdata(), mesh_sform)
+        new_img.header.set_sform(mesh_sform, code=sform_code)
+        nib.save(new_img, dst_nii)
+
+        # Scale VTK mesh vertex coordinates
+        src_vtk = os.path.join(surfaces_dir, f"{mesh_name}.vtk")
+        dst_vtk = os.path.join(outdir, f"{mesh_name}.vtk")
+        if os.path.exists(src_vtk):
+            _transform_vtk_mesh(src_vtk, src_nii, dst_vtk, dst_nii, warp_xform)
+
+    # Save scaled MNI -> MRI transform
+    mni_mri_t = warp_xform @ mni2mri_mm
+    mni_mri_t_out = Transform("mni_tal", "mri", mni_mri_t)
+    write_trans(
+        os.path.join(outdir, "mni_mri-trans.fif"),
+        mni_mri_t_out,
+        overwrite=True,
+    )
+
+    print(f"Surfaces saved: {outdir}")
+    return outdir
+
+
 def extract_surfaces(
     mri_file: str,
     outdir: str,
@@ -2658,3 +2842,58 @@ def _binary_majority3d(img):
     return ndimage.generic_filter(
         img, LowLevelCallable(_majority.ctypes), size=3
     ).astype(int)
+
+
+def _extract_headshape(preproc_file):
+    """Extract headshape points and fiducials from a FIF file.
+
+    Parameters
+    ----------
+    preproc_file : str
+        Path to FIF file.
+
+    Returns
+    -------
+    headshape_mm : numpy.ndarray
+        3 x N array of headshape points in mm (HEAD space).
+    nasion_mm : numpy.ndarray
+        Nasion position in mm (HEAD space).
+    rpa_mm : numpy.ndarray
+        RPA position in mm (HEAD space).
+    lpa_mm : numpy.ndarray
+        LPA position in mm (HEAD space).
+    """
+    info = mne.io.read_info(preproc_file)
+
+    headshape_m = []
+    nasion_m = None
+    rpa_m = None
+    lpa_m = None
+
+    for dig in info["dig"]:
+        if dig["kind"] == FIFF.FIFFV_POINT_EXTRA:
+            headshape_m.append(dig["r"])
+        elif dig["kind"] == FIFF.FIFFV_POINT_CARDINAL:
+            if dig["ident"] == FIFF.FIFFV_POINT_NASION:
+                nasion_m = dig["r"]
+            elif dig["ident"] == FIFF.FIFFV_POINT_LPA:
+                lpa_m = dig["r"]
+            elif dig["ident"] == FIFF.FIFFV_POINT_RPA:
+                rpa_m = dig["r"]
+
+    if not headshape_m:
+        raise ValueError("No headshape points found in FIF file")
+    if nasion_m is None or rpa_m is None or lpa_m is None:
+        raise ValueError("Fiducials (nasion, LPA, RPA) not found in FIF file")
+
+    headshape_mm = np.array(headshape_m).T * 1000
+    nasion_mm = np.array(nasion_m) * 1000
+    rpa_mm = np.array(rpa_m) * 1000
+    lpa_mm = np.array(lpa_m) * 1000
+
+    # Remove points below the ears (neck/body)
+    z_min = min(lpa_mm[2], rpa_mm[2])
+    keep = headshape_mm[2] >= z_min
+    headshape_mm = headshape_mm[:, keep]
+
+    return headshape_mm, nasion_mm, rpa_mm, lpa_mm
