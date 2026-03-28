@@ -17,7 +17,6 @@ import numpy as np
 from scipy.special import gammaln
 
 
-
 def associated_legendre(x, l, m):
     """Compute associated Legendre polynomial P_l^m(x).
 
@@ -136,7 +135,8 @@ def spherical_harmonics(theta, phi, L):
         for m in range(-l, l + 1):
             am = abs(m)
             a = (-1) ** m * np.sqrt(
-                (2 * l + 1) / (2 * np.pi)
+                (2 * l + 1)
+                / (2 * np.pi)
                 * np.exp(gammaln(l - am + 1) - gammaln(l + am + 1))
             )
 

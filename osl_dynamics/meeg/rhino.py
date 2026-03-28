@@ -111,9 +111,7 @@ def scale_surfaces_to_headshape(
     # Extract headshape from FIF file
     # ------------------------------------------
     print(f"Loading headshape from {preproc_file}")
-    headshape_mm, nasion_mm, rpa_mm, lpa_mm = _extract_headshape(
-        preproc_file
-    )
+    headshape_mm, nasion_mm, rpa_mm, lpa_mm = _extract_headshape(preproc_file)
     print(f"Found {headshape_mm.shape[1]} headshape points")
 
     # ------------------------------------------
@@ -151,9 +149,7 @@ def scale_surfaces_to_headshape(
     print(f"Running ICP with {n_init} initialisations")
 
     headshape_mri_mm = _xform_points(head2mri_xform, headshape_mm)
-    xform_icp, _, _ = _rhino_icp(
-        scalp_mm, headshape_mri_mm, n_init=n_init
-    )
+    xform_icp, _, _ = _rhino_icp(scalp_mm, headshape_mri_mm, n_init=n_init)
     head2mri_refined = xform_icp @ head2mri_xform
 
     # ------------------------------------------
@@ -212,9 +208,7 @@ def scale_surfaces_to_headshape(
         src_vtk = os.path.join(surfaces_dir, f"{mesh_name}.vtk")
         dst_vtk = os.path.join(outdir, f"{mesh_name}.vtk")
         if os.path.exists(src_vtk):
-            _transform_vtk_mesh(
-                src_vtk, src_nii, dst_vtk, dst_nii, warp_xform
-            )
+            _transform_vtk_mesh(src_vtk, src_nii, dst_vtk, dst_nii, warp_xform)
 
     # Save scaled MNI -> MRI transform
     mni_mri_t = warp_xform @ mni2mri_mm
@@ -2908,5 +2902,3 @@ def _extract_headshape(preproc_file):
     headshape_mm = headshape_mm[:, keep]
 
     return headshape_mm, nasion_mm, rpa_mm, lpa_mm
-
-
