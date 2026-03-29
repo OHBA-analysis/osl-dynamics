@@ -28,12 +28,15 @@ def evoked_response_max_stat_perm(
     n_perm : int
         Number of permutations.
     covariates : dict, optional
-        Dictionary of continuous covariates.
+        Dictionary of continuous covariates to include as confound regressors.
+        Each key is a covariate name and each value is a 1D array of length
+        n_samples. These are z-scored internally. Example::
 
-        - key: name of the covariate.
-        - value: np.ndarray of covariate values. Shape is (n_samples,).
+            covariates = {
+                "age": np.array([25, 30, 28, ...]),
+                "head_size": np.array([55.1, 57.3, 54.8, ...]),
+            }
 
-        These are z-transformed.
     metric : str, optional
         Statistic to compute p-values.
         Options are :code:`'copes'` or :code:`'tstats'`.
@@ -96,12 +99,15 @@ def group_diff_max_stat_perm(
     n_perm : int
         Number of permutations.
     covariates : dict, optional
-        Dictionary of continuous covariates.
+        Dictionary of continuous covariates to include as confound regressors.
+        Each key is a covariate name and each value is a 1D array of length
+        n_samples. These are z-scored internally. Example::
 
-        - key: name of the covariate.
-        - value: np.ndarray of covariate values. Shape is (n_samples,).
+            covariates = {
+                "age": np.array([25, 30, 28, ...]),
+                "head_size": np.array([55.1, 57.3, 54.8, ...]),
+            }
 
-        These are z-transformed.
     metric : str, optional
         Statistic to compute p-values with.
         Options are :code:`'copes'` or :code:`'tstats'`.

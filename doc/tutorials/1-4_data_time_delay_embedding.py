@@ -311,7 +311,7 @@ print(data)
 #
 # Apply TDE and PCA
 # *****************
-# Both TDE and PCA can be done in one step using the `tde_pca` method. We often also want to standardize (z-transform) the data before training a model. Both of these steps can be done with the `prepare` method.
+# Both TDE and PCA can be done in one step using the `tde_pca` method. We often also want to standardize (z-score) the data before training a model. Both of these steps can be done with the `prepare` method.
 
 methods = {
     "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},

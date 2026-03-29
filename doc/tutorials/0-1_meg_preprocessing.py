@@ -11,6 +11,10 @@ This tutorial walks through the full MEG processing pipeline step by step:
 5. Source Reconstruction — LCMV beamformer to project sensor data to source space.
 6. Parcellation — Reduce voxel data to parcel time courses.
 
+The processing code in osl-dynamics is built on top of `MNE-Python <https://mne.tools>`_:
+
+    Gramfort, A., Luessi, M., Larson, E., Engemann, D. A., Strohmeier, D., Brodbeck, C., Goj, R., Jas, M., Brooks, T., Parkkonen, L., & Hämäläinen, M. S. (2013). MEG and EEG data analysis with MNE-Python. *Frontiers in Neuroscience*, 7(267), 1–13. https://doi.org/10.3389/fnins.2013.00267.
+
 Prerequisites
 ^^^^^^^^^^^^^
 

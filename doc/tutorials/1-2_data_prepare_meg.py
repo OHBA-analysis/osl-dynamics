@@ -58,7 +58,7 @@ print(data)
 #
 # Here, we demonstrate how to apply this process to data. For further details, including the impact of different parameters, see the :doc:`TDE tutorial <../tutorials_build/1-4_data_time_delay_embedding>`. 
 #
-# Performing TDE often results in a very large number of channels. Consequently, Principal Component Analysis (PCA) is often used to reduce the number of channels. Both TDE and PCA can be done in one step using the `tde_pca` method. We often also want to standardize (z-transform) the data before training a model. Both of these steps can be done with the `prepare` method.
+# Performing TDE often results in a very large number of channels. Consequently, Principal Component Analysis (PCA) is often used to reduce the number of channels. Both TDE and PCA can be done in one step using the `tde_pca` method. We often also want to standardize (z-score) the data before training a model. Both of these steps can be done with the `prepare` method.
 
 data = Data("example_loading_data/numpy_format")
 print(data)

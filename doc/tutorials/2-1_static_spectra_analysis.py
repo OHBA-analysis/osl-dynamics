@@ -66,7 +66,7 @@ ts = data.time_series()
 #
 # We can also specify an optional argument:
 #
-# - `standardize`. This will z-transform the data (for each subejct separately) before calculate the power spectra. This can be helpful if you want to examine power the fraction of power in a frequency band relative to the total power (across all frequencies) of the subject.
+# - `standardize`. This will z-score the data (for each subejct separately) before calculate the power spectra. This can be helpful if you want to examine power the fraction of power in a frequency band relative to the total power (across all frequencies) of the subject.
 
 from osl_dynamics.analysis import static
 

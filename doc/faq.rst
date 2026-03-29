@@ -61,7 +61,7 @@ No, strictly speaking you don't need to prepare your data before training a mode
 
 There are three common choices for preparing the data:
 
-#. **Just standardize**. Here, all we do is z-transform the data (subtract the mean and divide by the standard deviation for each channel individually). Standardization is helpful for the optimization process used to train the models in osl-dynamics. **This is the recommended approach for studying sensor-level M/EEG data or fMRI data**.
+#. **Just standardize**. Here, all we do is z-score the data (subtract the mean and divide by the standard deviation for each channel individually). Standardization is helpful for the optimization process used to train the models in osl-dynamics. **This is the recommended approach for studying sensor-level M/EEG data or fMRI data**.
 
 #. **Calculate time-delay embedded data, followed by principal component analysis and standardization**. Time-delay embedding is described in the 'What is time-delay embedding?' section below. **This is the recommended approach for studying source-space M/EEG data**.
 
@@ -106,7 +106,7 @@ Note, you can trim data using the :code:`Data.trim_time_series` method, example 
 
     from osl_dynamics.data import Data
 
-    Data = data(...)
+    data = Data(...)
     data = data.trim_time_series(n_embeddings=..., sequence_length=...)
 
 By default this will return a trimmed version of the prepared data. Pass :code:`prepared=False` to get the trimmed original data.
@@ -234,7 +234,7 @@ I've encountered a NaN when I tried to train a model? Why did this happen and ho
 
 Models in osl-dynamics are trained using 'stochastic gradient decent'. We believe the NaN values in the loss function arise from a bad update to the model parameters. There a few things you can do to help resolve this:
 
-- Change your data for any periods of consecutive zeros or NaNs.
+- Check your data for any periods of consecutive zeros or NaNs.
 - Remove bad segments (with abnormally high variance). You can use the :code:`Data.remove_bad_segments` method to do this in osl-dynamics.
 - If you are loading fif files, make sure you have specified :code:`Data(..., picks="...", reject_by_annotation="omit")` correctly.
 - Lower the learning rate.
@@ -247,7 +247,7 @@ The loss function we use for DyNeMo is the variational free energy:
 .. math::
     \mathcal{F} = -LL + \eta KL
 
-where :math:`\eta` is the 'KL annealing factor'. This is a scalar that starts off at zero and increases to one as training progresses. At the start of training we suppress the KL term of the loss function (by setting :math:`\eta` to zero), which allows us to find the model that maximises the likliehood (via minimising the negative log-likelihood term, :math:`-LL`). Then we slowly turn on the KL term by increasing :math:`\eta`, this adds more of the KL term to the loss function which gives the apparent rise. This process is known as **KL annealing**. We typically use KL annealing for the first half of training (set using the :code:`n_kl_annealing_epochs` hyperparameter). After :code:`n_kl_annealing_epochs` of training have occurred then the model is using the full loss function (with :math:`\eta=1`). If we are using early stopping we should make sure we're only considering epochs after :code:`n_kl_annealing_epochs`.
+where :math:`\eta` is the 'KL annealing factor'. This is a scalar that starts off at zero and increases to one as training progresses. At the start of training we suppress the KL term of the loss function (by setting :math:`\eta` to zero), which allows us to find the model that maximises the likelihood (via minimising the negative log-likelihood term, :math:`-LL`). Then we slowly turn on the KL term by increasing :math:`\eta`, this adds more of the KL term to the loss function which gives the apparent rise. This process is known as **KL annealing**. We typically use KL annealing for the first half of training (set using the :code:`n_kl_annealing_epochs` hyperparameter). After :code:`n_kl_annealing_epochs` of training have occurred then the model is using the full loss function (with :math:`\eta=1`). If we are using early stopping we should make sure we're only considering epochs after :code:`n_kl_annealing_epochs`.
 
 Post-Hoc Analysis
 -----------------
@@ -264,7 +264,7 @@ It is common to look at four summary statistics for dynamics when using the HMM:
 
 Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <tutorials_build/4-3_hmm_summary_stats>` for example code of how to calculate these quantities.
 
-Often, we are interested in comparing two groups or conditions. E.g. we might find static alpha (8-12 Hz) power is increased for one group/condition. Let's speculate there are segments in our data where alpha power bursts occur - this would be identified by the HMM as a state with high alpha power that only activates for particular segments. The increase in alpha power seen for a group/condition can arise in many ways, maybe the alpha bursts are longer in duration, maybe they're more frequency, maybe the dynamics are unchanged but the alpha state just has more alpha power in it. The different summary statistics can potentially help interpret which of these options it is.
+Often, we are interested in comparing two groups or conditions. E.g. we might find static alpha (8-12 Hz) power is increased for one group/condition. Let's speculate there are segments in our data where alpha power bursts occur - this would be identified by the HMM as a state with high alpha power that only activates for particular segments. The increase in alpha power seen for a group/condition can arise in many ways, maybe the alpha bursts are longer in duration, maybe they're more frequent, maybe the dynamics are unchanged but the alpha state just has more alpha power in it. The different summary statistics can potentially help interpret which of these options it is.
 
 Generally, it's difficult to say whether or not one summary statistic is more important than another. The recommended approach is to calculate all four of the above as a summary of dynamics for each subject/group/condition.
 

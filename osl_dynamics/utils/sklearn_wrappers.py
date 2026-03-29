@@ -37,7 +37,7 @@ def linear_regression(
     fit_intercept : bool
         Should we fit an intercept?
     normalize : bool, optional
-        Should we z-transform the regressors?
+        Should we z-score the regressors?
     log_message : bool, optional
         Should we log a message?
     n_jobs : int, optional

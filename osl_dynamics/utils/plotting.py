@@ -2604,3 +2604,143 @@ def plot_wavelet(
         save(fig, filename)
     elif create_fig:
         return fig, ax
+
+
+def plot_design_matrix(
+    design,
+    show_contrasts: bool = True,
+    cmap: str = "coolwarm",
+    ax: Optional[plt.Axes] = None,
+    filename: Optional[str] = None,
+):
+    """Plot a GLM design matrix.
+
+    Displays the design matrix as a heatmap with feature names as column
+    labels and a diverging colormap centred at zero.
+
+    Parameters
+    ----------
+    design : osl_dynamics.glm.base.Design
+        Design object.
+    show_contrasts : bool, optional
+        If :code:`True`, display the contrast matrix below the design matrix.
+    cmap : str, optional
+        Matplotlib colormap name.
+    ax : plt.Axes, optional
+        Axis to plot on. If :code:`None`, a new figure is created.
+        Cannot be used with :code:`show_contrasts=True`.
+    filename : str, optional
+        Output filename. If :code:`None`, the figure and axes are returned.
+
+    Returns
+    -------
+    fig : plt.Figure
+        Matplotlib figure. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    axes : plt.Axes or np.ndarray of plt.Axes
+        Matplotlib axes. Only returned if :code:`ax=None` and
+        :code:`filename=None`.
+    """
+    X = design.build_X()
+    feature_names = design.feature_names
+    n_samples, n_features = X.shape
+
+    vm = np.max(np.abs(X))
+    if vm == 0:
+        vm = 1
+
+    if show_contrasts and len(design.contrasts) > 0:
+        C = design.build_contrast_array()
+        create_fig = ax is None
+        if create_fig:
+            fig, axes = plt.subplots(
+                2,
+                1,
+                gridspec_kw={"height_ratios": [max(n_samples, 4), len(C)]},
+                figsize=(max(n_features * 1.2, 4), 6),
+            )
+        else:
+            raise ValueError("Cannot pass ax when show_contrasts=True.")
+
+        ax_design, ax_contrast = axes
+
+        # Design matrix
+        im = ax_design.imshow(
+            X,
+            aspect="auto",
+            cmap=cmap,
+            vmin=-vm,
+            vmax=vm,
+            interpolation="nearest",
+        )
+        ax_design.set_xticks(range(n_features))
+        ax_design.set_xticklabels(feature_names, rotation=45, ha="left")
+        ax_design.xaxis.tick_top()
+        ax_design.set_ylabel("Samples")
+        ax_design.set_title("Design Matrix", pad=40)
+
+        divider = make_axes_locatable(ax_design)
+        cax = divider.append_axes("right", size="3%", pad=0.1)
+        fig.colorbar(im, cax=cax)
+
+        # Contrast matrix
+        cvm = np.max(np.abs(C))
+        if cvm == 0:
+            cvm = 1
+        ax_contrast.imshow(
+            C,
+            aspect="auto",
+            cmap=cmap,
+            vmin=-cvm,
+            vmax=cvm,
+            interpolation="nearest",
+        )
+        ax_contrast.set_xticks(range(n_features))
+        ax_contrast.set_xticklabels(feature_names, rotation=45, ha="right")
+        ax_contrast.set_yticks(range(len(C)))
+        ax_contrast.set_yticklabels(design.contrast_names)
+        ax_contrast.set_title("Contrasts")
+
+        # Annotate contrast weights
+        for i in range(C.shape[0]):
+            for j in range(C.shape[1]):
+                ax_contrast.text(
+                    j,
+                    i,
+                    f"{C[i, j]:g}",
+                    ha="center",
+                    va="center",
+                    fontsize=9,
+                    color="black",
+                )
+
+    else:
+        create_fig = ax is None
+        if create_fig:
+            fig, ax = create_figure(figsize=(max(n_features * 1.2, 4), 6))
+        else:
+            fig = ax.figure
+        axes = ax
+
+        im = ax.imshow(
+            X,
+            aspect="auto",
+            cmap=cmap,
+            vmin=-vm,
+            vmax=vm,
+            interpolation="nearest",
+        )
+        ax.set_xticks(range(n_features))
+        ax.set_xticklabels(feature_names, rotation=45, ha="left")
+        ax.xaxis.tick_top()
+        ax.set_ylabel("Samples")
+        ax.set_title("Design Matrix", pad=40)
+
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="3%", pad=0.1)
+        fig.colorbar(im, cax=cax)
+
+    if filename is not None:
+        save(fig, filename, tight_layout=True)
+    elif create_fig:
+        return fig, axes

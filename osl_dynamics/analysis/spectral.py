@@ -1208,7 +1208,7 @@ def mar_spectra(
     # Frequencies to evaluate the PSD at
     f = np.arange(0, sampling_frequency / 2, sampling_frequency / (2 * n_freq))
 
-    # z-transform of the coefficients
+    # z-score of the coefficients
     A = np.zeros([n_freq, n_modes, n_channels, n_channels], dtype=np.complex64)
     for i in range(n_freq):
         for l in range(n_lags):

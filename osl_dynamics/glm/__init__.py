@@ -20,3 +20,4 @@ Python example scripts
 
 from osl_dynamics.glm.base import DesignConfig, GLM
 from osl_dynamics.glm.permutation import MaxStatPermutation
+from osl_dynamics.utils.plotting import plot_design_matrix
