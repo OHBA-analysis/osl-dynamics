@@ -14,17 +14,63 @@ _THREAD_LIMIT_VARS = [
     "MKL_NUM_THREADS",
     "OPENBLAS_NUM_THREADS",
     "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_MAX_THREADS",
 ]
 
 
+def _limit_onnx_threads():
+    """Patch ONNX Runtime to use 1 thread per session."""
+    try:
+        import onnxruntime as ort
+
+        _OriginalSession = ort.InferenceSession
+
+        class _SingleThreadSession(_OriginalSession):
+            def __init__(self, *args, **kwargs):
+                if "sess_options" not in kwargs or kwargs["sess_options"] is None:
+                    opts = ort.SessionOptions()
+                    opts.intra_op_num_threads = 1
+                    opts.inter_op_num_threads = 1
+                    kwargs["sess_options"] = opts
+                super().__init__(*args, **kwargs)
+
+        ort.InferenceSession = _SingleThreadSession
+    except ImportError:
+        pass
+
+
+def _get_id(item: Any, index: int) -> str:
+    """Get the ID for an item."""
+    if isinstance(item, str):
+        return item
+    if isinstance(item, dict):
+        if "id" in item:
+            return item["id"]
+        return f"session_{index}"
+    return str(index)
+
+
+def _items_to_sessions_dict(items: list) -> Dict:
+    """Convert a list of items to a sessions dict for the report module."""
+    sessions = {}
+    for i, item in enumerate(items):
+        id = _get_id(item, i)
+        if isinstance(item, dict):
+            sessions[id] = item
+        else:
+            sessions[id] = None
+    return sessions
+
+
 def _worker(
-    args: Tuple[Callable, str, Any, Path, dict],
+    args: Tuple[Callable, str, Any, Path],
 ) -> Tuple[str, bool]:
     """Wrapper that handles logging and error catching for a single item."""
-    func, id, item, log_dir, kwargs = args
+    _limit_onnx_threads()
+    func, id, item, log_dir = args
     with MEEGSessionLogger(id, log_dir) as logger:
         try:
-            func(id, item, logger, **kwargs)
+            func(item, logger)
             return id, True
         except Exception as e:
             logger.error(str(e))
@@ -34,14 +80,11 @@ def _worker(
 
 def run(
     func: Callable,
-    items: Union[Dict[str, Any], List[str]],
+    items: List[Any],
     n_workers: int,
     log_dir: Union[str, Path],
-    plots_dir: Optional[Union[str, Path]] = None,
-    sessions: Optional[Dict] = None,
     output_dir: Optional[Union[str, Path]] = None,
-    step_name: str = "Step",
-    **kwargs,
+    plots_dir: Optional[Union[str, Path]] = None,
 ) -> None:
     """Run a function over items in parallel.
 
@@ -49,32 +92,26 @@ def run(
     ----------
     func : callable
         Function to call for each item. Signature:
-        ``func(id, item, logger, **kwargs)``.
-    items : dict or list
-        Items to process. If a dict, each key is an ID and each value
-        is passed as the second argument to func. If a list, each
-        element is used as the ID with None as the value.
+        ``func(item, logger)``.
+    items : list
+        Items to process. Each item is passed as the first argument to
+        :code:`func`. Items can be strings or dicts. If a dict contains
+        an :code:`"id"` key, it is used as the session ID for logging;
+        otherwise, a numeric index is used.
     n_workers : int
         Number of parallel workers.
     log_dir : str or Path
         Directory for per-item log files.
-    plots_dir : str or Path, optional
-        If provided, generate a QC report after processing.
-    sessions : dict, optional
-        Sessions dictionary for the QC report. If None, uses items.
     output_dir : str or Path, optional
         Derivatives directory. Passed to report generation for
         copying surface extraction plots.
-    step_name : str, optional
-        Name for the step (used in summary message).
-    **kwargs
-        Extra keyword arguments passed to func.
+    plots_dir : str or Path, optional
+        If provided, generate a QC report after processing.
     """
-    if isinstance(items, list):
-        items = {item: None for item in items}
-
     log_dir = Path(log_dir)
-    worker_args = [(func, id, item, log_dir, kwargs) for id, item in items.items()]
+    worker_args = [
+        (func, _get_id(item, i), item, log_dir) for i, item in enumerate(items)
+    ]
 
     # Limit BLAS/LAPACK threads to 1 per worker to avoid over-subscription.
     # We set these before spawning workers so each child process picks them
@@ -96,13 +133,13 @@ def run(
 
     failed = [id for id, ok in results if not ok]
     if failed:
-        print(f"\n{step_name} finished with errors in: {', '.join(failed)}")
+        print(f"\nFinished with errors in: {', '.join(failed)}")
     else:
-        print(f"\n{step_name} complete.")
+        print(f"\nComplete.")
 
     if plots_dir is not None:
         report.generate_report(
             plots_dir,
-            sessions or items,
+            _items_to_sessions_dict(items),
             output_dir=output_dir,
         )
