@@ -228,6 +228,7 @@ def extract_surfaces(
     outdir: str,
     include_nose: bool = True,
     do_mri2mniaxes_xform: bool = True,
+    bet_fval: float = None,
     show: bool = False,
 ) -> None:
     """Extract surfaces.
@@ -273,6 +274,11 @@ def extract_surfaces(
         Specifies whether to do step (1) above, i.e. transform MRI to be
         aligned with the MNI axes. Sometimes needed when the MRI goes out
         of the MNI FOV after step (1).
+    bet_fval : float, optional
+        Fractional intensity threshold for FSL's BET. Default is None, which
+        uses BET's default (0.5). Higher values (e.g. 0.6-0.7) give more
+        aggressive skull stripping, which can help when the inner skull
+        surface includes non-brain tissue.
     show : bool, optional
         Whether to display the surface plots interactively. Default is
         False (suitable for batch processing).
@@ -395,7 +401,10 @@ def extract_surfaces(
 
     # Command: bet <flirt_mri_mniaxes_file> <flirt_mri_mniaxes_bet_file>
     flirt_mri_mniaxes_bet_file = f"{fns.root}/flirt_mri_mniaxes_bet"
-    fsl_wrappers.bet(flirt_mri_mniaxes_file, flirt_mri_mniaxes_bet_file)
+    bet_kwargs = {}
+    if bet_fval is not None:
+        bet_kwargs["fracintensity"] = bet_fval
+    fsl_wrappers.bet(flirt_mri_mniaxes_file, flirt_mri_mniaxes_bet_file, **bet_kwargs)
 
     # ---------------------------------------------------------
     # 3) Use FLIRT to register skull stripped MRI to MNI space
@@ -469,7 +478,7 @@ def extract_surfaces(
     #
     # Command: bet <flirt_mri_mni_file> <flirt_mri_mni_bet_file> -A
     flirt_mri_mni_bet_file = f"{fns.root}/flirt"
-    fsl_wrappers.bet(flirt_mri_mni_file, flirt_mri_mni_bet_file, A=True)
+    fsl_wrappers.bet(flirt_mri_mni_file, flirt_mri_mni_bet_file, A=True, **bet_kwargs)
 
     # ---------------------------------------
     # 5) Add nose to scalp surface (optional)
