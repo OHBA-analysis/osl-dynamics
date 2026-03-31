@@ -1,7 +1,10 @@
 """Run a processing function over multiple items in parallel."""
 
+import importlib
+import importlib.abc
 import multiprocessing as mp
 import os
+import sys
 import traceback
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -19,24 +22,40 @@ _THREAD_LIMIT_VARS = [
 
 
 def _limit_onnx_threads():
-    """Patch ONNX Runtime to use 1 thread per session."""
-    try:
-        import onnxruntime as ort
+    """Import hook to patch ONNX Runtime to use 1 thread."""
 
-        _OriginalSession = ort.InferenceSession
+    class _OnnxThreadLimiter(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+        def __init__(self):
+            self._patched = False
 
-        class _SingleThreadSession(_OriginalSession):
-            def __init__(self, *args, **kwargs):
-                if "sess_options" not in kwargs or kwargs["sess_options"] is None:
-                    opts = ort.SessionOptions()
-                    opts.intra_op_num_threads = 1
-                    opts.inter_op_num_threads = 1
-                    kwargs["sess_options"] = opts
-                super().__init__(*args, **kwargs)
+        def find_module(self, fullname, path=None):
+            if fullname == "onnxruntime" and not self._patched:
+                return self
+            return None
 
-        ort.InferenceSession = _SingleThreadSession
-    except ImportError:
-        pass
+        def load_module(self, fullname):
+            self._patched = True
+            # Remove ourselves temporarily to avoid recursion
+            sys.meta_path.remove(self)
+            import onnxruntime as ort
+
+            sys.meta_path.insert(0, self)
+
+            _OriginalSession = ort.InferenceSession
+
+            class _SingleThreadSession(_OriginalSession):
+                def __init__(self, *args, **kwargs):
+                    if "sess_options" not in kwargs or kwargs["sess_options"] is None:
+                        opts = ort.SessionOptions()
+                        opts.intra_op_num_threads = 1
+                        opts.inter_op_num_threads = 1
+                        kwargs["sess_options"] = opts
+                    super().__init__(*args, **kwargs)
+
+            ort.InferenceSession = _SingleThreadSession
+            return ort
+
+    sys.meta_path.insert(0, _OnnxThreadLimiter())
 
 
 def _get_id(item: Any, index: int) -> str:
