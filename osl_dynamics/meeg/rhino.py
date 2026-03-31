@@ -258,11 +258,13 @@ def extract_surfaces(
     Parameters
     ----------
     mri_file : str
-        Full path to structural MRI in niftii format (with .nii.gz extension).
-        This is assumed to have a valid sform, i.e. the sform code needs to be
-        4 or 1, and the sform should transform from voxel indices to voxel
-        coords in mm. The axis sform used to do this will be the native/MRI
-        axis used throughout RHINO. The qform will be ignored.
+        Full path to structural MRI in NIfTI format (with .nii.gz extension).
+        The sform code must be 1 (Scanner Anat) or 4 (MNI), and the sform
+        matrix should transform from voxel indices to coordinates in mm. The
+        sform defines the native/MRI coordinate system used throughout RHINO.
+        The qform is ignored. You can check the sform code with
+        ``fslorient -getsformcode <mri_file>`` and set it with
+        ``fslorient -setsformcode 1 <mri_file>``.
     outdir : str
         Output directory.
     include_nose : bool, optional
@@ -2254,7 +2256,26 @@ def _get_sform(nii_file):
         sform = nib.load(nii_file).header.get_sform()
     else:
         raise ValueError(
-            f"sformcode for {nii_file} is {sformcode}, needs to be 4 or 1."
+            f"sformcode for {nii_file} is {sformcode}, needs to be 1 or 4.\n\n"
+            "The sform code indicates how the sform matrix should be "
+            "interpreted:\n"
+            "  1 = Scanner Anat (native scanner coordinates)\n"
+            "  4 = MNI (MNI-152 standard space)\n\n"
+            "How to fix this:\n\n"
+            "1. If the qform is valid (check with "
+            f"'fslorient -getqformcode {nii_file}'),\n"
+            "   copy it to the sform:\n"
+            f"     fslorient -copyqform2sform {nii_file}\n\n"
+            "2. If the sform matrix is correct but only the code is wrong "
+            "(check with\n"
+            f"   'fslorient -getsform {nii_file}'), set the code directly:\n"
+            f"     fslorient -setsformcode 1 {nii_file}\n\n"
+            "3. If the orientation is non-standard, reorient to standard "
+            "axes:\n"
+            f"     fslreorient2std {nii_file} {nii_file}\n\n"
+            "4. If both sform and qform are invalid, re-convert the "
+            "original DICOMs\n"
+            "   with dcm2niix, which correctly populates both.\n\n"
         )
     sform = mne.Transform("mri_voxel", "mri", sform)
     return sform
