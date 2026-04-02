@@ -1,6 +1,5 @@
 """Generate a QC summary HTML report from pipeline plots."""
 
-import base64
 import html
 import json
 import shutil
@@ -433,12 +432,9 @@ def _build_summary(session_dir: Path) -> str:
     return html
 
 
-def _embed_png(filepath: Path, css_class: str = "") -> str:
-    """Encode a PNG file as a base64 data URI."""
-    data = filepath.read_bytes()
-    b64 = base64.b64encode(data).decode("ascii")
-    cls = f' class="{css_class}"' if css_class else ""
-    return f'<img{cls} src="data:image/png;base64,{b64}">'
+def _img_tag(session_id: str, filename: str) -> str:
+    """Return an img tag with a relative path and lazy loading."""
+    return f'<img src="{session_id}/{filename}" loading="lazy">'
 
 
 def _embed_html(filepath: Path) -> str:
@@ -531,7 +527,7 @@ def _build_step_tab(
                     filepath = session_dir / filename
                     if filepath.exists():
                         if filename.endswith(".png"):
-                            parts.append(_embed_png(filepath))
+                            parts.append(_img_tag(session_id, filename))
                         elif filename.endswith(".html"):
                             parts.append(_embed_html(filepath))
                     else:
