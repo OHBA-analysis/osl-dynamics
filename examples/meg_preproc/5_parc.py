@@ -1,18 +1,17 @@
-"""Step 4: Forward Model, Source Reconstruction and Parcellation."""
+"""Step 5: Parcellation."""
 
 from pathlib import Path
 import mne
 import matplotlib
 matplotlib.use("Agg")
-from osl_dynamics import files
-from osl_dynamics.meeg import parallel, rhino, source_recon, parcellation
+from osl_dynamics.meeg import parallel, source_recon, parcellation
 from osl_dynamics.utils.filenames import OSLFilenames
 
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
 output_dir = Path("derivatives")
 plots_dir = Path("plots")
-log_dir = Path("logs/4_source_recon")
+log_dir = Path("logs/5_parc")
 
 sessions = [
     {"id": "sub-01_task-rest", "subject": "sub-01", "raw_file": "sub-01_task-rest.fif"},
@@ -21,9 +20,6 @@ sessions = [
     {"id": "sub-04_task-rest", "subject": "sub-04", "raw_file": "sub-04_task-rest.fif"},
 ]
 
-gridstep = 8  # mm
-chantypes = ["mag", "grad"]
-rank = {"meg": 60}
 parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
 parcellation_method = "spatial_basis"
 orthogonalisation = "symmetric"
@@ -32,11 +28,12 @@ use_mni152 = False
 
 
 def process_session(session, logger):
-    """Source reconstruct and parcellate a single session."""
+    """Parcellate a single session."""
 
     preproc_file = output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif"
 
     if use_mni152:
+        from osl_dynamics import files
         surfaces_dir = files.mni152_surfaces.directory
     else:
         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
@@ -47,12 +44,6 @@ def process_session(session, logger):
         preproc_file=str(preproc_file),
         surfaces_dir=surfaces_dir,
     )
-
-    logger.log("Computing forward model...")
-    rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
-
-    logger.log("Computing LCMV beamformer...")
-    source_recon.lcmv_beamformer(fns, chantypes=chantypes, rank=rank)
 
     logger.log("Applying LCMV beamformer...")
     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns)

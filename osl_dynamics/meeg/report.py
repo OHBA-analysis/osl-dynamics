@@ -63,12 +63,12 @@ STEPS = {
             },
         ],
     },
-    4: {
-        "name": "Source Recon & Parcellation",
+    5: {
+        "name": "Parcellation",
         "subpanels": [
             {
                 "name": "Parcellation PSD",
-                "files": ["4_psd_topo.png"],
+                "files": ["5_psd_topo.png"],
             },
         ],
     },
@@ -611,7 +611,7 @@ def _copy_parc_plots(
     """Copy parcellation QC PNGs from the derivatives directory.
 
     Copies ``psd_topo.png`` from ``output_dir/osl/<session_id>/``
-    into the session's plots directory as ``4_psd_topo.png``.
+    into the session's plots directory as ``5_psd_topo.png``.
 
     Parameters
     ----------
@@ -626,8 +626,8 @@ def _copy_parc_plots(
         session_plots_dir = plots_dir / session_id
         osl_dir = output_dir / "osl" / session_id
         for src_name, dst_name in [
-            ("psd_topo.png", "4_psd_topo.png"),
-            ("power_maps.png", "4_power_maps.png"),
+            ("psd_topo.png", "5_psd_topo.png"),
+            ("power_maps.png", "5_power_maps.png"),
         ]:
             src = osl_dir / src_name
             if src.exists():

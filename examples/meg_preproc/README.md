@@ -29,7 +29,8 @@ Run the scripts **in order**. Each script processes all sessions in parallel.
 | `1_preproc.py` | Preprocessing | Notch filter (50/100 Hz), bandpass filter (1-45 Hz), downsample (250 Hz), bad segment/channel detection, ICA artefact rejection (based on MEGNet) |
 | `2_surfaces.py` | Surface Extraction | Extract inner skull, outer skull and scalp surfaces from structural MRI using FSL BET |
 | `3_coreg.py` | Coregistration | Coregister MEG to MRI using Polhemus headshape points |
-| `4_source_recon_and_parc.py` | Forward Model, Source Reconstruction and Parcellation | Compute forward model (8 mm dipole grid), LCMV beamformer, parcellate voxel data, apply symmetric orthogonalisation |
+| `4_source_recon.py` | Forward Model and Source Reconstruction | Compute forward model (8 mm dipole grid) and LCMV beamformer weights |
+| `5_parc.py` | Parcellation | Apply beamformer, parcellate voxel data, apply symmetric orthogonalisation |
 
 ## Usage
 
@@ -41,7 +42,8 @@ conda activate osld
 python 1_preproc.py
 python 2_surfaces.py
 python 3_coreg.py
-python 4_source_recon_and_parc.py
+python 4_source_recon.py
+python 5_parc.py
 ```
 
 ## Configuration
@@ -110,7 +112,7 @@ plots/
 │   ├── 1_channel_stds.png
 │   ├── 1_ica_components.png
 │   ├── 3_coreg.png
-│   └── 4_psd_topo.png
+│   └── 5_psd_topo.png
 ├── sub-02_task-rest/
 │   └── ...
 └── report.html
@@ -118,9 +120,9 @@ plots/
 
 ## QC Report
 
-A self-contained HTML report (`plots/report.html`) is automatically generated after steps 1, 3 and 4 complete. It contains tabs for each pipeline step with all session QC plots embedded. Open it in a browser to review results.
+A self-contained HTML report (`plots/report.html`) is automatically generated after steps 1, 3 and 5 complete. It contains tabs for each pipeline step with all session QC plots embedded. Open it in a browser to review results.
 
-The report updates incrementally — after step 1 you'll see preprocessing plots, after step 3 coregistration and surfaces appear, etc. Surface extraction (step 2), coregistration (step 3), and parcellation (step 4) plots are automatically copied from the derivatives directory when the report is generated.
+The report updates incrementally — after step 1 you'll see preprocessing plots, after step 3 coregistration and surfaces appear, etc. Surface extraction (step 2), coregistration (step 3), and parcellation (step 5) plots are automatically copied from the derivatives directory when the report is generated.
 
 ## Logging
 
@@ -129,5 +131,5 @@ Full verbose output (from MNE, osl-dynamics, etc.) is saved to per-session log f
 ## Notes
 
 - Steps must be run sequentially (each depends on the output of the previous step), but within each step all sessions are processed in parallel.
-- If you do not have a structural MRI for a subject, set `use_mni152 = True` and `allow_mri_scaling = True` in `3_coreg.py` (and `4_source_recon_and_parc.py`) to use the standard MNI152 brain (bundled in osl-dynamics at `osl_dynamics.files.mni152_surfaces`). You can skip `2_surfaces.py` in this case.
+- If you do not have a structural MRI for a subject, set `use_mni152 = True` and `allow_mri_scaling = True` in `3_coreg.py` (and `4_source_recon.py` / `5_parc.py`) to use the standard MNI152 brain (bundled in osl-dynamics at `osl_dynamics.files.mni152_surfaces`). You can skip `2_surfaces.py` in this case.
 - Set `n_workers` based on the number of CPU cores available. For memory-intensive steps (source reconstruction, parcellation), you may need to reduce this.
