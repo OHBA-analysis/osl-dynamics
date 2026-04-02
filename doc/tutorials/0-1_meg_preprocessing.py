@@ -4,7 +4,7 @@ MEG: Preprocessing, Source Reconstruction, Parcellation
 
 This tutorial walks through the full MEG processing pipeline step by step:
 
-1. Preprocessing — Downsample, filter, detect bad segments/channels, ICA artefact rejection.
+1. Preprocessing — Filter, downsample, detect bad segments/channels, ICA artefact rejection.
 2. Surface Extraction — Extract skull/scalp surfaces from a structural MRI.
 3. Coregistration — Align MEG sensor space to MRI space.
 4. Forward Model — Compute the lead field matrix.
@@ -112,9 +112,9 @@ Output is written to ``BIDS/derivatives/``.
 #
 # We clean the sensor-level MEG data by:
 #
-# - Resampling to reduce data size.
-# - Bandpass filtering to remove slow drifts and high-frequency noise.
 # - Notch filtering to remove mains frequency contamination.
+# - Bandpass filtering to remove slow drifts and high-frequency noise.
+# - Resampling to reduce data size.
 # - Detecting and annotating bad segments (outlier temporal windows).
 # - Detecting bad channels (outlier sensors).
 #
@@ -126,19 +126,19 @@ Output is written to ``BIDS/derivatives/``.
 #     raw = mne.io.read_raw_fif(raw_file, preload=True)
 
 #%%
-# Resample and filter
+# Filter and resample
 # *******************
 #
 # .. code-block:: python
 #
-#     raw = raw.resample(sfreq=resample_freq)
+#     raw = raw.notch_filter(notch_freqs)
 #     raw = raw.filter(
 #         l_freq=bandpass[0],
 #         h_freq=bandpass[1],
 #         method="iir",
 #         iir_params={"order": 5, "ftype": "butter"},
 #     )
-#     raw = raw.notch_filter(notch_freqs)
+#     raw = raw.resample(sfreq=resample_freq)
 
 #%%
 # Bad segment detection
