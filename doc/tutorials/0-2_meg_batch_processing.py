@@ -307,29 +307,19 @@ The output of this script is written to ``derivatives/``.
 #         )
 
 #%%
-# Step 4: Forward Model, Source Reconstruction and Parcellation
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Step 4: Forward Model and Source Reconstruction
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
-# The final step computes the forward model, runs the LCMV beamformer,
-# parcellates, and saves the output for each session.
-#
-# Key parameters:
-#
-# - ``gridstep=8`` — 8 mm dipole grid spacing.
-# - ``chantypes=["mag", "grad"]`` — Elekta system (magnetometers + gradiometers).
-# - ``rank={"meg": 60}`` — Effective rank.
-# - ``parcellation_file`` — reduced Desikan-Killiany atlas with 54 parcels. See the :ref:`parcellations <parcellations>` page for the full list of available parcellations.
-# - ``parcellation_method="spatial_basis"`` — Weight voxels by atlas loadings.
-# - ``orthogonalisation="symmetric"`` — Reduce spatial leakage.
+# This step computes the forward model and LCMV beamformer weights for
+# each session.
 #
 # .. code-block:: python
 #
 #     from pathlib import Path
 #     import pandas as pd
-#     import mne
 #     import matplotlib
 #     matplotlib.use("Agg")
-#     from osl_dynamics.meeg import parallel, rhino, source_recon, parcellation
+#     from osl_dynamics.meeg import parallel, rhino, source_recon
 #     from osl_dynamics.utils.filenames import OSLFilenames
 #
 #     output_dir = Path("derivatives")
@@ -338,16 +328,9 @@ The output of this script is written to ``derivatives/``.
 #
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
 #
-#     gridstep = 8  # mm
-#     chantypes = ["mag", "grad"]
-#     rank = {"meg": 60}
-#     parcellation_file = "atlas-DK_nparc-54_space-MNI_res-8x8x8.nii.gz"
-#     parcellation_method = "spatial_basis"
-#     orthogonalisation = "symmetric"
-#
 #
 #     def process_session(session, logger):
-#         """Source reconstruct and parcellate a single session."""
+#         """Source reconstruct a single session."""
 #
 #         preproc_file = str(output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif")
 #         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
@@ -360,21 +343,74 @@ The output of this script is written to ``derivatives/``.
 #         )
 #
 #         logger.log("Computing forward model...")
-#         rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
+#         rhino.forward_model(fns, model="Single Layer", gridstep=8)
 #
 #         logger.log("Computing LCMV beamformer...")
-#         source_recon.lcmv_beamformer(fns, chantypes=chantypes, rank=rank)
+#         source_recon.lcmv_beamformer(fns, chantypes=["mag", "grad"], rank={"meg": 60})
+#
+#         logger.log("Done.")
+#
+#
+#     if __name__ == "__main__":
+#         parallel.run(
+#             process_session,
+#             items=sessions,
+#             output_dir=output_dir,
+#             log_dir=log_dir,
+#             plots_dir=plots_dir,
+#             n_workers=8,
+#         )
+
+#%%
+# Step 5: Parcellation
+# ^^^^^^^^^^^^^^^^^^^^
+#
+# The final step applies the beamformer, parcellates the voxel data, and
+# saves the output. See the :ref:`parcellations <parcellations>` page for
+# the full list of available parcellations.
+#
+# .. code-block:: python
+#
+#     from pathlib import Path
+#     import pandas as pd
+#     import mne
+#     import matplotlib
+#     matplotlib.use("Agg")
+#     from osl_dynamics.meeg import parallel, source_recon, parcellation
+#     from osl_dynamics.utils.filenames import OSLFilenames
+#
+#     output_dir = Path("derivatives")
+#     plots_dir = Path("plots")
+#     log_dir = Path("logs/5_parc")
+#
+#     sessions = pd.read_csv("sessions.csv").to_dict("records")
+#
+#
+#     def process_session(session, logger):
+#         """Parcellate a single session."""
+#
+#         preproc_file = str(output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif")
+#         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
+#
+#         fns = OSLFilenames(
+#             outdir=str(output_dir / "osl"),
+#             id=session["id"],
+#             preproc_file=preproc_file,
+#             surfaces_dir=surfaces_dir,
+#         )
 #
 #         logger.log("Applying LCMV beamformer...")
 #         voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns)
+#
+#         parcellation_file = "atlas-DK_nparc-54_space-MNI_res-8x8x8.nii.gz"
 #
 #         logger.log("Parcellating...")
 #         parcel_data = parcellation.parcellate(
 #             fns,
 #             voxel_data,
 #             voxel_coords,
-#             method=parcellation_method,
-#             orthogonalisation=orthogonalisation,
+#             method="spatial_basis",
+#             orthogonalisation="symmetric",
 #             parcellation_file=parcellation_file,
 #         )
 #
