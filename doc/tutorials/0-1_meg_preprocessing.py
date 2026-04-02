@@ -34,7 +34,7 @@ In this tutorial, we will use data from the `Wakeman-Henson dataset <https://www
     │       └── sub-01_T1w.nii.gz
     ├── ...
 
-Output is written to ``BIDS/derivatives/``.
+Output is written to ``derivatives/``.
 """
 
 #%%
@@ -86,7 +86,7 @@ Output is written to ``BIDS/derivatives/``.
 #     bids_dir = Path("BIDS")
 #     raw_file = bids_dir / f"sub-{subject}/meg/sub-{subject}_run-{run}_task-{task}_raw_sss.fif"
 #     mri_file = bids_dir / f"sub-{subject}/anat/sub-{subject}_T1w.nii.gz"
-#     output_dir = bids_dir / "derivatives"
+#     output_dir = Path("derivatives")
 #     plots_dir = Path("plots")
 #
 #     # Preprocessing parameters

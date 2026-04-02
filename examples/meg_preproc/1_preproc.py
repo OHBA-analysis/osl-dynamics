@@ -8,7 +8,7 @@ from osl_dynamics.meeg import parallel, preproc
 
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
-output_dir = Path("BIDS/derivatives")
+output_dir = Path("derivatives")
 plots_dir = Path("plots")
 log_dir = Path("logs/1_preproc")
 

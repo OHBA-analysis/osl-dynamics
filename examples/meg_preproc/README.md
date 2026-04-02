@@ -18,7 +18,7 @@ BIDS/
 │   ├── ...
 ```
 
-Output is written to `BIDS/derivatives/`.
+Output is written to `derivatives/`.
 
 ## Scripts
 
@@ -50,7 +50,7 @@ Each script has a config block at the top. Edit these variables before running:
 
 ```python
 input_dir = Path("BIDS")
-output_dir = Path("BIDS/derivatives")
+output_dir = Path("derivatives")
 plots_dir = Path("plots")
 log_dir = Path("logs/1_preproc")
 sessions = {
@@ -78,7 +78,7 @@ Some scripts have additional settings (e.g. `parcellation_file`, `gridstep`). Se
 ## Output Structure
 
 ```
-BIDS/derivatives/
+derivatives/
 ├── preprocessed/
 │   ├── sub-01_task-rest_preproc-raw.fif
 │   └── ...

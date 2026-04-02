@@ -10,7 +10,7 @@ from osl_dynamics.utils.filenames import OSLFilenames
 
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
-output_dir = Path("BIDS/derivatives")
+output_dir = Path("derivatives")
 plots_dir = Path("plots")
 log_dir = Path("logs/4_source_recon")
 
