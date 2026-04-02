@@ -361,7 +361,7 @@ Output is written to ``derivatives/``.
 # Step 6: Parcellation
 # ^^^^^^^^^^^^^^^^^^^^
 #
-# We reduce the high-dimensional voxel data to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis.
+# We reduce the high-dimensional voxel data to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis. See the :ref:`parcellations <parcellations>` page for the full list of available parcellations.
 #
 # - ``method="spatial_basis"`` — Weight voxels by their loading on each parcel (from the atlas) because calculate PCA.
 # - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels.
