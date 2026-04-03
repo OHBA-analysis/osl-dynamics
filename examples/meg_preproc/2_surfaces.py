@@ -5,7 +5,7 @@ from osl_dynamics.meeg import parallel, rhino
 
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
-output_dir = Path("BIDS/derivatives")
+output_dir = Path("derivatives")
 log_dir = Path("logs/2_surfaces")
 
 subjects = ["sub-01", "sub-02", "sub-03", "sub-04"]

@@ -956,10 +956,7 @@ def convert_to_mne_raw(
         _, times = raw.get_data(reject_by_annotation="omit", return_times=True)
         indices = raw.time_as_index(times, use_rounding=True)
         indices = indices[: data.shape[1]]
-        full_data = np.zeros(
-            [data.shape[0], len(raw.times)],
-            dtype=np.float32,
-        )
+        full_data = np.zeros([data.shape[0], len(raw.times)], dtype=np.float32)
         full_data[:, indices] = data
     else:
         full_data = data

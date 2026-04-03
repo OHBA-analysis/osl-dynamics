@@ -228,6 +228,7 @@ def extract_surfaces(
     outdir: str,
     include_nose: bool = True,
     do_mri2mniaxes_xform: bool = True,
+    bet_fval: float = None,
     show: bool = False,
 ) -> None:
     """Extract surfaces.
@@ -257,11 +258,13 @@ def extract_surfaces(
     Parameters
     ----------
     mri_file : str
-        Full path to structural MRI in niftii format (with .nii.gz extension).
-        This is assumed to have a valid sform, i.e. the sform code needs to be
-        4 or 1, and the sform should transform from voxel indices to voxel
-        coords in mm. The axis sform used to do this will be the native/MRI
-        axis used throughout RHINO. The qform will be ignored.
+        Full path to structural MRI in NIfTI format (with .nii.gz extension).
+        The sform code must be 1 (Scanner Anat) or 4 (MNI), and the sform
+        matrix should transform from voxel indices to coordinates in mm. The
+        sform defines the native/MRI coordinate system used throughout RHINO.
+        The qform is ignored. You can check the sform code with
+        ``fslorient -getsformcode <mri_file>`` and set it with
+        ``fslorient -setsformcode 1 <mri_file>``.
     outdir : str
         Output directory.
     include_nose : bool, optional
@@ -273,6 +276,11 @@ def extract_surfaces(
         Specifies whether to do step (1) above, i.e. transform MRI to be
         aligned with the MNI axes. Sometimes needed when the MRI goes out
         of the MNI FOV after step (1).
+    bet_fval : float, optional
+        Fractional intensity threshold for FSL's BET. Default is None, which
+        uses BET's default (0.5). Higher values (e.g. 0.6-0.7) give more
+        aggressive skull stripping, which can help when the inner skull
+        surface includes non-brain tissue.
     show : bool, optional
         Whether to display the surface plots interactively. Default is
         False (suitable for batch processing).
@@ -395,7 +403,10 @@ def extract_surfaces(
 
     # Command: bet <flirt_mri_mniaxes_file> <flirt_mri_mniaxes_bet_file>
     flirt_mri_mniaxes_bet_file = f"{fns.root}/flirt_mri_mniaxes_bet"
-    fsl_wrappers.bet(flirt_mri_mniaxes_file, flirt_mri_mniaxes_bet_file)
+    bet_kwargs = {}
+    if bet_fval is not None:
+        bet_kwargs["fracintensity"] = bet_fval
+    fsl_wrappers.bet(flirt_mri_mniaxes_file, flirt_mri_mniaxes_bet_file, **bet_kwargs)
 
     # ---------------------------------------------------------
     # 3) Use FLIRT to register skull stripped MRI to MNI space
@@ -469,7 +480,7 @@ def extract_surfaces(
     #
     # Command: bet <flirt_mri_mni_file> <flirt_mri_mni_bet_file> -A
     flirt_mri_mni_bet_file = f"{fns.root}/flirt"
-    fsl_wrappers.bet(flirt_mri_mni_file, flirt_mri_mni_bet_file, A=True)
+    fsl_wrappers.bet(flirt_mri_mni_file, flirt_mri_mni_bet_file, A=True, **bet_kwargs)
 
     # ---------------------------------------
     # 5) Add nose to scalp surface (optional)
@@ -2245,7 +2256,26 @@ def _get_sform(nii_file):
         sform = nib.load(nii_file).header.get_sform()
     else:
         raise ValueError(
-            f"sformcode for {nii_file} is {sformcode}, needs to be 4 or 1."
+            f"sformcode for {nii_file} is {sformcode}, needs to be 1 or 4.\n\n"
+            "The sform code indicates how the sform matrix should be "
+            "interpreted:\n"
+            "  1 = Scanner Anat (native scanner coordinates)\n"
+            "  4 = MNI (MNI-152 standard space)\n\n"
+            "How to fix this:\n\n"
+            "1. If the qform is valid (check with "
+            f"'fslorient -getqformcode {nii_file}'),\n"
+            "   copy it to the sform:\n"
+            f"     fslorient -copyqform2sform {nii_file}\n\n"
+            "2. If the sform matrix is correct but only the code is wrong "
+            "(check with\n"
+            f"   'fslorient -getsform {nii_file}'), set the code directly:\n"
+            f"     fslorient -setsformcode 1 {nii_file}\n\n"
+            "3. If the orientation is non-standard, reorient to standard "
+            "axes:\n"
+            f"     fslreorient2std {nii_file} {nii_file}\n\n"
+            "4. If both sform and qform are invalid, re-convert the "
+            "original DICOMs\n"
+            "   with dcm2niix, which correctly populates both.\n\n"
         )
     sform = mne.Transform("mri_voxel", "mri", sform)
     return sform

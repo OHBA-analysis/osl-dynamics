@@ -1,6 +1,5 @@
 """Generate a QC summary HTML report from pipeline plots."""
 
-import base64
 import html
 import json
 import shutil
@@ -64,12 +63,12 @@ STEPS = {
             },
         ],
     },
-    4: {
-        "name": "Source Recon & Parcellation",
+    5: {
+        "name": "Parcellation",
         "subpanels": [
             {
                 "name": "Parcellation PSD",
-                "files": ["4_psd_topo.png"],
+                "files": ["5_psd_topo.png"],
             },
         ],
     },
@@ -433,12 +432,9 @@ def _build_summary(session_dir: Path) -> str:
     return html
 
 
-def _embed_png(filepath: Path, css_class: str = "") -> str:
-    """Encode a PNG file as a base64 data URI."""
-    data = filepath.read_bytes()
-    b64 = base64.b64encode(data).decode("ascii")
-    cls = f' class="{css_class}"' if css_class else ""
-    return f'<img{cls} src="data:image/png;base64,{b64}">'
+def _img_tag(session_id: str, filename: str) -> str:
+    """Return an img tag with a relative path and lazy loading."""
+    return f'<img src="{session_id}/{filename}" loading="lazy">'
 
 
 def _embed_html(filepath: Path) -> str:
@@ -531,7 +527,7 @@ def _build_step_tab(
                     filepath = session_dir / filename
                     if filepath.exists():
                         if filename.endswith(".png"):
-                            parts.append(_embed_png(filepath))
+                            parts.append(_img_tag(session_id, filename))
                         elif filename.endswith(".html"):
                             parts.append(_embed_html(filepath))
                     else:
@@ -615,7 +611,7 @@ def _copy_parc_plots(
     """Copy parcellation QC PNGs from the derivatives directory.
 
     Copies ``psd_topo.png`` from ``output_dir/osl/<session_id>/``
-    into the session's plots directory as ``4_psd_topo.png``.
+    into the session's plots directory as ``5_psd_topo.png``.
 
     Parameters
     ----------
@@ -630,8 +626,8 @@ def _copy_parc_plots(
         session_plots_dir = plots_dir / session_id
         osl_dir = output_dir / "osl" / session_id
         for src_name, dst_name in [
-            ("psd_topo.png", "4_psd_topo.png"),
-            ("power_maps.png", "4_power_maps.png"),
+            ("psd_topo.png", "5_psd_topo.png"),
+            ("power_maps.png", "5_power_maps.png"),
         ]:
             src = osl_dir / src_name
             if src.exists():

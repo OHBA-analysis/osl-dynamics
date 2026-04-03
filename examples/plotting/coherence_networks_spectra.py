@@ -4,8 +4,8 @@ from state/mode spectra.
 The spectra can be calculate with a multitaper (in the case of a state time
 course) or regression (in the case of a mode time course).
 
-See examples/minimal/multitaper_spectra.py for how to calculate a multitaper
-and examples/minimal/regression_spectra.py for how to calculate regression spectra.
+See examples/spectra/hmm_multitaper.py for how to calculate a multitaper
+and examples/spectra/dynemo_regression_spectra.py for how to calculate regression spectra.
 
 In this script we assume this has been done and we have the group-average spectra
 files: f.npy and coh.npy. (The other file: psd.npy is not needed for this script.)

@@ -16,6 +16,8 @@ import mne
 import numpy as np
 from scipy.special import gammaln
 
+from mne._fiff.proj import Projection
+
 
 def _associated_legendre(x, l, m):
     """Compute associated Legendre polynomial P_l^m(x).
@@ -291,7 +293,10 @@ def _spheroid_fit_axis(X, ax):
 
 
 def _shrink_spheroid(positions_m, center_m, radii_m):
-    """Iteratively shrink radii by 1 mm until all sensors are outside.
+    """Iteratively shrink radii until all sensors are outside.
+
+    Matches spm_opm_amm.m lines 106-118: uses step size of 0.5% of the
+    max radius, counts sensors outside, and loops until all are outside.
 
     Parameters
     ----------
@@ -310,22 +315,24 @@ def _shrink_spheroid(positions_m, center_m, radii_m):
     # Work in mm
     v = (positions_m - center_m) * 1000.0
     r = radii_m.copy() * 1000.0
+    n_sensors = len(v)
+    stepsize = np.max(r * 0.005)
 
     inside = (
         v[:, 0] ** 2 / r[0] ** 2 + v[:, 1] ** 2 / r[1] ** 2 + v[:, 2] ** 2 / r[2] ** 2
     )
-    c = np.sum(inside < 1)
+    c = np.sum(inside > 1)
 
-    while c > 0:
-        rt = r - 1.0
+    while c != n_sensors:
+        rt = r - stepsize
         inside = (
             v[:, 0] ** 2 / rt[0] ** 2
             + v[:, 1] ** 2 / rt[1] ** 2
             + v[:, 2] ** 2 / rt[2] ** 2
         )
-        cc = np.sum(inside < 1)
-        if cc <= c:
-            r = r - 1.0
+        cc = np.sum(inside > 1)
+        if cc >= c:
+            r = r - stepsize
             c = cc
 
     return r / 1000.0
@@ -1082,6 +1089,27 @@ def apply_amm(raw, li=9, le=2, window=10.0, corr_lim=0.98):
         data[meg_picks, start:end] = inner
 
     raw_amm._data[meg_picks, :] = data[meg_picks, :]
+
+    # Add SSP projectors for the external harmonic subspace
+    n_ext = external.shape[1]
+    ext_norm = external / np.linalg.norm(external, axis=0, keepdims=True)
+    projs = []
+    count = 0
+    for l in range(1, le + 1):
+        for m in range(-l, l + 1):
+            proj_data = dict(
+                col_names=meg_ch_names,
+                row_names=None,
+                data=ext_norm[:, count][np.newaxis, :],
+                ncol=n_ch,
+                nrow=1,
+            )
+            projs.append(
+                Projection(active=True, data=proj_data, desc=f"AMM: l={l} m={m}")
+            )
+            count += 1
+    raw_amm.add_proj(projs)
+    print(f"  Added {n_ext} SSP projectors for external harmonics.")
     print("  AMM complete.")
 
     info = {
