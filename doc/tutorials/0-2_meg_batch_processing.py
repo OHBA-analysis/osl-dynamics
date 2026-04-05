@@ -4,7 +4,8 @@ Cam-CAN MEG Batch Processing
 
 This tutorial shows how to process a large MEG dataset in batch using
 osl-dynamics' parallel processing utilities. We use the
-`Cam-CAN dataset <https://www.cam-can.org>`_ as an example.
+`Cam-CAN dataset <https://opendata.mrc-cbu.cam.ac.uk/projects/camcan/>`_
+as an example.
 
 The pipeline mirrors the single-session tutorial
 (:doc:`0-1_meg_preprocessing <0-1_meg_preprocessing>`) but wraps each
