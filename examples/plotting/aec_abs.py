@@ -23,7 +23,7 @@ def get_data(name, output_dir):
     print(f"Data downloaded to: {output_dir}")
 
 # We will download example data hosted on osf.io/by2tc.
-get_data("ae_hmm_notts_mrc_meguk_glasser", output_dir="notts_ae_hmm")
+get_data("ae_hmm_notts_meguk_glasser", output_dir="notts_ae_hmm")
 
 # Load the inferred state covariances
 covariances = np.load("notts_ae_hmm/covs.npy")

@@ -22,7 +22,7 @@ def get_inf_params(name, rename):
     return f"Data downloaded to: {rename}"
 
 # Download the dataset (approximately 11 MB)
-get_inf_params("tde_dynemo_notts_mrc_meguk_giles_5_subjects", rename="results/inf_params")
+get_inf_params("tde_dynemo_notts_meguk_giles_5_subjects", rename="results/inf_params")
 
 #%%
 # Summarizing the mixing coefficient time course

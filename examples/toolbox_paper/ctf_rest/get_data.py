@@ -21,10 +21,10 @@ def get_data(name, output_dir):
 # We will download example data hosted on osf.io/by2tc.
 # (approximately 708 MB)
 #
-# This will unzip the notts_mrc_meguk_giles.zip file into a
+# This will unzip the notts_meguk_giles.zip file into a
 # directory called "training_data". There are two subdirectories:
 # - "bursts", which contains single channel data for the burst
 #   detection pipeline.
 # - "networks", which contains multi-channel data for the dynamic
 #   network analysis pipelines.
-get_data("notts_mrc_meguk_giles", output_dir="training_data")
+get_data("notts_meguk_giles", output_dir="training_data")

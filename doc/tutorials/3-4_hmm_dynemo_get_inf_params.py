@@ -22,7 +22,7 @@ In this tutorial we will get the inferred parameters from a dynamic network mode
 #         return f"Data downloaded to: {rename}"
 #
 #     # Download the dataset (approximately 162 MB)
-#     get_data("notts_mrc_meguk_giles_prepared_5_subjects", rename="prepared_data")
+#     get_data("notts_meguk_giles_prepared_5_subjects", rename="prepared_data")
 
 #%%
 # Let's also download a model. In this tutorial, we will download a trained HMM, however, this can be substituted with a DyNeMo model without any other changes being needed.
@@ -36,7 +36,7 @@ In this tutorial we will get the inferred parameters from a dynamic network mode
 #         os.remove(f"{name}.zip")
 #         return f"Model downloaded to: {rename}"
 #
-#     get_model("tde_hmm_notts_mrc_meguk_giles", rename="results/model")
+#     get_model("tde_hmm_notts_meguk_giles", rename="results/model")
 
 #%%
 # Load Trained Model
