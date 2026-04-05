@@ -255,11 +255,14 @@ def parcellate(
     voxel_coords :
         (nvoxels x 3) coordinates in mm in same space as parcellation.
     method : str, optional
-        'pca'           - take 1st PC of voxels
+        'pca'           - take 1st PC of voxels.
         'spatial_basis' - The parcel time-course for each spatial map is the
                           1st PC from all voxels, weighted by the spatial map.
-        If the parcellation is unweighted and non-overlapping, 'spatial_basis'
-        will give the same result as 'PCA' except with a different normalisation.
+                          If the parcellation is unweighted and non-overlapping,
+                          'spatial_basis' will give the same result as 'pca'
+                          except with a different normalisation.
+        'centroid'      - Use the time course of the voxel nearest to each
+                          parcel centroid.
     parcellation_file : str
         Path to parcellation file. In same space as voxel_coords.
     orthogonalisation : str, optional
@@ -277,19 +280,26 @@ def parcellate(
     if orthogonalisation not in [None, "symmetric"]:
         raise ValueError("orthogonalisation must be None or 'symmetric'.")
 
-    if method not in ["pca", "spatial_basis"]:
-        raise ValueError("method must be 'pca' or 'spatial_basis'.")
+    if method not in ["pca", "spatial_basis", "centroid"]:
+        raise ValueError("method must be 'pca', 'spatial_basis' or 'centroid'.")
 
     # Get parcellation file
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
     )
 
-    # Resample parcellation to match the mask
-    parcellation = _resample_parcellation(fns, parcellation_file, voxel_coords)
+    if method == "centroid":
+        parcel_data = _get_parcel_data_centroid(
+            voxel_data, voxel_coords, parcellation_file
+        )
+    else:
+        # Resample parcellation to match the mask
+        parcellation = _resample_parcellation(fns, parcellation_file, voxel_coords)
 
-    # Calculate parcel time courses
-    parcel_data, _, _ = _get_parcel_data(voxel_data, parcellation, method=method)
+        # Calculate parcel time courses
+        parcel_data, _, _ = _get_parcel_data_pca(
+            voxel_data, parcellation, method=method
+        )
 
     # Orthogonalisation
     if orthogonalisation == "symmetric":
@@ -571,8 +581,8 @@ def _resample_parcellation(fns, parcellation_file, voxel_coords):
     return parcellation_asmatrix
 
 
-def _get_parcel_data(voxel_data, parcellation_asmatrix, method="spatial_basis"):
-    """Calculate parcel time courses.
+def _get_parcel_data_pca(voxel_data, parcellation_asmatrix, method="spatial_basis"):
+    """Calculate parcel time courses using PCA over the voxels in each parcel.
 
     Parameters
     ----------
@@ -813,6 +823,51 @@ def _get_parcel_data(voxel_data, parcellation_asmatrix, method="spatial_basis"):
         voxel_assignments[ivoxel, winning_parcel] = 1
 
     return parcel_data, voxel_weightings, voxel_assignments
+
+
+def _get_parcel_data_centroid(voxel_data, voxel_coords, parcellation_file):
+    """Calculate parcel time courses using the voxel nearest to each parcel
+    centroid.
+
+    Parameters
+    ----------
+    voxel_data : np.ndarray
+        (n_voxels, n_time) or (n_voxels, n_time, n_trials) and is assumed to be
+        on the same grid as voxel_coords.
+    voxel_coords : np.ndarray
+        (3, n_voxels) voxel coordinates in mm in the same space as the
+        parcellation.
+    parcellation_file : str
+        Path to parcellation file.
+
+    Returns
+    -------
+    parcel_data : np.ndarray
+        (n_parcels, n_time) or (n_parcels, n_time, n_trials).
+    """
+    print("Calculating parcel time courses with centroid")
+
+    parcellation = Parcellation(parcellation_file)
+    centers = parcellation.roi_centers()  # (n_parcels, 3) in mm
+
+    gridstep = source_recon._get_gridstep(voxel_coords.T / 1000)
+
+    kdtree = scipy.spatial.KDTree(voxel_coords.T)
+    distances, indices = kdtree.query(centers)
+
+    far = distances > gridstep
+    if np.any(far):
+        _logger.warning(
+            f"{int(far.sum())} parcel centroid(s) are further than "
+            f"{gridstep} mm from the nearest voxel."
+        )
+    if len(np.unique(indices)) < len(indices):
+        _logger.warning(
+            "Multiple parcels map to the same voxel under method='centroid'. "
+            "Consider a finer voxel grid or a different method."
+        )
+
+    return voxel_data[indices]
 
 
 def _symmetric_orthogonalisation(
