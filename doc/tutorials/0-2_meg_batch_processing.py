@@ -8,8 +8,8 @@ osl-dynamics' parallel processing utilities. We use the
 as an example.
 
 The pipeline mirrors the single-session tutorial
-(:doc:`0-1_meg_preprocessing <0-1_meg_preprocessing>`) but wraps each
-step in a function that is dispatched across subjects/sessions using
+(:doc:`MEG Processing <0-1_meg_preprocessing>`) but wraps each
+step in a function that is dispatched across sessions using
 ``osl_dynamics.meeg.parallel.run``.
 
 Prerequisites
