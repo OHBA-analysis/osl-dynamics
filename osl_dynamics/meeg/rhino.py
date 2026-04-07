@@ -950,6 +950,71 @@ def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
     np.savetxt(fns.coreg.head_headshape_file, headshape)
 
 
+def extract_fiducials_and_headshape_from_elc(
+    fns: OSLFilenames,
+    remove_nose: bool = True,
+) -> None:
+    """Extract fiducials and headshape points from an ELC file.
+
+    Reads fiducial locations (nasion, LPA, RPA) and headshape points from
+    an ELC file (ANT Neuro) and saves them in the RHINO file format.
+
+    The ELC file is expected to contain a ``Positions`` section with three
+    fiducial rows (nasion, LPA, RPA) and a ``HeadShapePoints`` section
+    with 3D coordinates. All values are assumed to be in mm.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames. ``fns.elc_file`` must be set.
+    remove_nose : bool, optional
+        Remove headshape points on the nose? A point is considered to be
+        on the nose if it is anterior to both LPA and RPA and inferior to
+        the nasion.
+    """
+    if fns.elc_file is None:
+        raise ValueError("elc_file must have been passed to OSLFilenames")
+
+    print(f"Saving fiducials/headshape points from {fns.elc_file}")
+
+    with open(fns.elc_file, "r") as f:
+        lines = f.readlines()
+
+    # Extract fiducials from the Positions section
+    for i in range(len(lines)):
+        if lines[i] == "Positions\n":
+            nasion = np.array(lines[i + 1].split()[-3:]).astype(np.float64)
+            lpa = np.array(lines[i + 2].split()[-3:]).astype(np.float64)
+            rpa = np.array(lines[i + 3].split()[-3:]).astype(np.float64)
+            break
+
+    # Extract headshape points from the HeadShapePoints section
+    for i in range(len(lines)):
+        if lines[i] == "HeadShapePoints\n":
+            headshape = (
+                np.array([line.split() for line in lines[i + 1 :]]).astype(np.float64).T
+            )
+            break
+
+    # Optionally remove headshape points on the nose
+    if remove_nose:
+        on_nose = np.logical_and(
+            headshape[0] > max(lpa[0], rpa[0]),
+            headshape[2] < nasion[2],
+        )
+        headshape = headshape[:, ~on_nose]
+
+    # Save
+    print(f"Saved: {fns.coreg.head_nasion_file}")
+    np.savetxt(fns.coreg.head_nasion_file, nasion)
+    print(f"Saved: {fns.coreg.head_rpa_file}")
+    np.savetxt(fns.coreg.head_rpa_file, rpa)
+    print(f"Saved: {fns.coreg.head_lpa_file}")
+    np.savetxt(fns.coreg.head_lpa_file, lpa)
+    print(f"Saved: {fns.coreg.head_headshape_file}")
+    np.savetxt(fns.coreg.head_headshape_file, headshape)
+
+
 def remove_stray_headshape_points(
     fns: OSLFilenames,
     nose: bool = True,
