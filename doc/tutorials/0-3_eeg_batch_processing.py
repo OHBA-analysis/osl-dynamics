@@ -1,16 +1,16 @@
 """
-Cam-CAN MEG Batch Processing
-============================
+LEMON EEG Batch Processing
+===========================
 
-This tutorial shows how to process a large MEG dataset in batch using
+This tutorial shows how to process a large EEG dataset in batch using
 osl-dynamics' parallel processing utilities. We use the
-`Cam-CAN dataset <https://opendata.mrc-cbu.cam.ac.uk/projects/camcan/>`_
+`LEMON dataset <https://ftp.gwdg.de/pub/misc/MPI-Leipzig_Mind-Brain-Body-LEMON/>`_
 as an example.
 
 The pipeline mirrors the single-session tutorial
-(:doc:`MEG Processing <0-1_meg_preprocessing>`) but wraps each
-step in a function that is dispatched across sessions using
-``osl_dynamics.meeg.parallel.run``.
+(:doc:`MEG Processing <0-1_meg_preprocessing>`) but adapted for EEG data.
+Each step is wrapped in a function that is dispatched across sessions
+using ``osl_dynamics.meeg.parallel.run``.
 
 Prerequisites
 ^^^^^^^^^^^^^
@@ -21,20 +21,17 @@ Prerequisites
 Input Data
 ^^^^^^^^^^
 
-The Cam-CAN dataset contains resting-state (``rest``), sensorimotor
-(``smt``) and passive stimulation (``passive``) MEG recordings from
-~650 subjects. The raw data has already been MaxFiltered. Each subject
-also has a structural MRI. The data is organised as::
+The LEMON dataset contains resting-state EEG recordings from ~200
+subjects. Each subject also has a structural MRI (MP2RAGE) and an
+EEG localizer file (``.mat``) containing digitised electrode positions
+and fiducials. The data is organised as::
 
-    cc700/
-    ├── meg/
-    │   └── pipeline/release005/BIDSsep/
-    │       ├── derivatives_rest/...
-    │       ├── derivatives_smt/...
-    │       └── derivatives_passive/...
-    └── mri/
-        └── pipeline/release004/BIDS_20190411/anat/
-            └── sub-*/anat/sub-*_T1w.nii.gz
+    lemon/
+    ├── sub-*/
+    │   ├── RSEEG/sub-*.vhdr
+    │   └── ses-01/anat/sub-*_ses-01_inv-2_mp2rage.nii.gz
+    └── EEG_MPILMBB_LEMON/EEG_Localizer_BIDS_ID/
+        └── sub-*/sub-*.mat
 
 The output of this script is written to ``derivatives/``.
 """
@@ -43,54 +40,50 @@ The output of this script is written to ``derivatives/``.
 # Step 0: Find File Paths
 # ^^^^^^^^^^^^^^^^^^^^^^^
 #
-# First, we locate all raw MEG files and their corresponding T1w
-# structural MRIs and save them to a CSV file. This CSV acts as
-# the session manifest for all subsequent steps.
+# First, we locate all raw EEG files and their corresponding structural
+# MRIs and localizer files, keeping only subjects that have all three.
+# The results are saved to a CSV file that acts as the session manifest
+# for all subsequent steps.
 #
 # .. code-block:: python
 #
-#     from glob import glob
 #     from pathlib import Path
-#     import re
 #     import pandas as pd
 #
 #     # Raw data directory
-#     raw_dir = "/ohba/pi/mwoolrich/raw_datasets/camcan/cc700"
-#     anat_dir = f"{raw_dir}/mri/pipeline/release004/BIDS_20190411/anat"
+#     raw_dir = "/ohba/pi/mwoolrich/raw_datasets/lemon"
+#     localizer_dir = f"{raw_dir}/EEG_MPILMBB_LEMON/EEG_Localizer_BIDS_ID"
 #
-#     # Find MaxFiltered MEG files for all three tasks
-#     inputs = []
-#     for task in ["rest", "smt", "passive"]:
-#         inputs += sorted(
-#             glob(
-#                 f"{raw_dir}/meg/pipeline/release005/BIDSsep"
-#                 f"/derivatives_{task}/aa/AA_movecomp"
-#                 f"/aamod_meg_maxfilt_00002/sub-*"
-#                 f"/mf2pt2_sub-*_ses-{task}_task-{task}_meg.fif"
-#             )
-#         )
+#     # Get subjects that have localizer data
+#     localizer_subjects = set()
+#     for loc_dir in sorted(Path(localizer_dir).glob("sub-*")):
+#         localizer_subjects.add(loc_dir.name)
 #
-#     # Build a table of sessions, keeping only those with a structural MRI
 #     rows = []
-#     for fpath in inputs:
-#         match = re.search(r"(sub-[A-Za-z0-9]+)_ses-(\w+)_task-(\w+)_meg\.fif", fpath)
-#         if match:
-#             subject = match.group(1)
-#             task = match.group(2)
-#             mri_file = f"{anat_dir}/{subject}/anat/{subject}_T1w.nii.gz"
-#             if not Path(mri_file).exists():
-#                 continue
-#             rows.append({
-#                 "id": f"{subject}_task-{task}",
-#                 "subject": subject,
-#                 "task": task,
-#                 "raw_file": fpath,
-#                 "mri_file": mri_file,
-#             })
+#     for sub_dir in sorted(Path(raw_dir).glob("sub-*")):
+#         subject = sub_dir.name
+#         if subject not in localizer_subjects:
+#             continue
+#
+#         raw_file = sub_dir / "RSEEG" / f"{subject}.vhdr"
+#         mri_file = sub_dir / "ses-01" / "anat" / f"{subject}_ses-01_inv-2_mp2rage.nii.gz"
+#         loc_file = f"{localizer_dir}/{subject}/{subject}.mat"
+#
+#         if not raw_file.exists():
+#             continue
+#         if not mri_file.exists():
+#             continue
+#
+#         rows.append({
+#             "id": subject,
+#             "subject": subject,
+#             "raw_file": str(raw_file),
+#             "mri_file": str(mri_file),
+#             "localizer_file": loc_file,
+#         })
 #
 #     df = pd.DataFrame(rows)
-#     print(f"Found {len(df)} sessions from {df['subject'].nunique()} subjects")
-#     print(f"Tasks: {df['task'].value_counts().to_dict()}")
+#     print(f"Found {len(df)} subjects")
 #
 #     df.to_csv("sessions.csv", index=False)
 #     print("Saved sessions.csv")
@@ -102,19 +95,33 @@ The output of this script is written to ``derivatives/``.
 # We define a function that preprocesses a single session and use
 # ``parallel.run`` to dispatch it across sessions.
 #
+# Key differences from MEG preprocessing:
+#
+# - Data is loaded from BrainVision (``.vhdr``) format.
+# - A channel montage is set from the localizer ``.mat`` file, which
+#   contains digitised electrode positions and fiducials.
+# - A synthetic HEOG channel is created from F7 - F8.
+# - The first 15 seconds are cropped (equipment settling time).
+# - Bad channels are detected, interpolated, and an average reference
+#   is applied.
+#
 # Each session is independently:
 #
 # - Notch filtered at 50 and 100 Hz.
-# - Bandpass filtered (0.5–80 Hz, 5th-order Butterworth).
+# - Bandpass filtered (0.5-80 Hz, 5th-order Butterworth).
 # - Downsampled to 250 Hz.
-# - Checked for bad segments and channels.
+# - Checked for bad channels and segments.
+# - Bad channels interpolated.
+# - Average referenced.
 # - QC plots saved.
 #
 # .. code-block:: python
 #
 #     from pathlib import Path
+#     import numpy as np
 #     import pandas as pd
 #     import mne
+#     from scipy import io
 #     import matplotlib
 #     matplotlib.use("Agg")
 #     from osl_dynamics.meeg import parallel, preproc
@@ -126,11 +133,49 @@ The output of this script is written to ``derivatives/``.
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
 #
 #
+#     def set_channel_montage(raw, localizer_file):
+#         """Set channel montage from localizer .mat file."""
+#         X = io.loadmat(localizer_file, simplify_cells=True)
+#         ch_pos = {}
+#         for i in range(len(X["Channel"]) - 1):  # final channel is reference
+#             key = X["Channel"][i]["Name"].split("_")[2]
+#             if key[:2] == "FP":
+#                 key = "Fp" + key[2]
+#             ch_pos[key] = X["Channel"][i]["Loc"]
+#         hp = X["HeadPoints"]["Loc"]
+#         nas = np.mean([hp[:, 0], hp[:, 3]], axis=0)
+#         lpa = np.mean([hp[:, 1], hp[:, 4]], axis=0)
+#         rpa = np.mean([hp[:, 2], hp[:, 5]], axis=0)
+#         dig = mne.channels.make_dig_montage(
+#             ch_pos=ch_pos, nasion=nas, lpa=lpa, rpa=rpa,
+#         )
+#         raw.set_montage(dig)
+#         return raw
+#
+#
+#     def create_heog(raw):
+#         """Create synthetic HEOG channel from F7-F8."""
+#         heog = raw.get_data(picks="F7") - raw.get_data(picks="F8")
+#         info = mne.create_info(["HEOG"], raw.info["sfreq"], ["eog"])
+#         raw.add_channels([mne.io.RawArray(heog, info)], force_update_info=True)
+#         return raw
+#
+#
 #     def process_session(session, logger):
 #         """Preprocess a single session."""
 #
 #         logger.log("Loading raw data...")
-#         raw = mne.io.read_raw_fif(session["raw_file"], preload=True)
+#         raw = mne.io.read_raw_brainvision(session["raw_file"], preload=True)
+#
+#         logger.log("Setting channel montage...")
+#         raw = set_channel_montage(raw, session["localizer_file"])
+#
+#         logger.log("Creating HEOG channel...")
+#         raw = create_heog(raw)
+#         raw.set_channel_types({"VEOG": "eog", "HEOG": "eog"})
+#
+#         logger.log("Cropping first 15 seconds...")
+#         raw = raw.crop(tmin=15)
 #
 #         logger.log("Filtering and downsampling...")
 #         raw = raw.notch_filter([50, 100])
@@ -142,15 +187,18 @@ The output of this script is written to ``derivatives/``.
 #         )
 #         raw = raw.resample(sfreq=250)
 #
-#         logger.log("Detecting bad segments...")
-#         raw = preproc.detect_bad_segments(raw, picks="mag")
-#         raw = preproc.detect_bad_segments(raw, picks="mag", mode="diff")
-#         raw = preproc.detect_bad_segments(raw, picks="grad")
-#         raw = preproc.detect_bad_segments(raw, picks="grad", mode="diff")
-#
 #         logger.log("Detecting bad channels...")
-#         raw = preproc.detect_bad_channels(raw, picks="mag")
-#         raw = preproc.detect_bad_channels(raw, picks="grad")
+#         raw = preproc.detect_bad_channels(raw, picks="eeg")
+#
+#         logger.log("Detecting bad segments...")
+#         raw = preproc.detect_bad_segments(raw, picks="eeg")
+#         raw = preproc.detect_bad_segments(raw, picks="eeg", mode="diff")
+#
+#         logger.log("Interpolating bad channels...")
+#         raw = raw.interpolate_bads()
+#
+#         logger.log("Setting EEG reference...")
+#         raw = raw.set_eeg_reference(projection=True)
 #
 #         logger.log("Saving QC plots...")
 #         preproc.save_qc_plots(raw, plots_dir / session["id"])
@@ -228,9 +276,14 @@ The output of this script is written to ``derivatives/``.
 # Step 3: Coregistration
 # ^^^^^^^^^^^^^^^^^^^^^^
 #
-# The coregistration step also includes a dataset-specific function to
-# remove stray Polhemus headshape points. You will likely need to adapt
-# ``fix_headshape_points`` for your own dataset.
+# The coregistration step includes a dataset-specific function to adjust
+# headshape points and fiducials for EEG coregistration. The LEMON
+# localizer positions need to be shrunk by 5% and the fiducials shifted
+# down and back by 1 cm to account for systematic offsets. You will
+# likely need to adapt ``fix_headshape_fiducials`` for your own dataset.
+#
+# Note for EEG we pass ``include_eeg_as_headshape=True`` when extracting
+# fiducials and ``use_headshape=False`` during coregistration.
 #
 # .. code-block:: python
 #
@@ -247,7 +300,9 @@ The output of this script is written to ``derivatives/``.
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
 #
 #
-#     def fix_headshape_points(fns):
+#     def fix_headshape_fiducials(fns, logger):
+#         """Shrink headshape and shift fiducials for EEG coregistration."""
+#
 #         fns = fns.coreg
 #
 #         hs = np.loadtxt(fns.head_headshape_file)
@@ -255,50 +310,51 @@ The output of this script is written to ``derivatives/``.
 #         lpa = np.loadtxt(fns.head_lpa_file)
 #         rpa = np.loadtxt(fns.head_rpa_file)
 #
-#         # Drop nasion by 4cm and remove headshape points more than 7cm away
-#         nas[2] -= 40
-#         distances = np.sqrt(
-#             (nas[0] - hs[0]) ** 2 + (nas[1] - hs[1]) ** 2 + (nas[2] - hs[2]) ** 2
-#         )
-#         keep = distances > 70
-#         hs = hs[:, keep]
+#         # Shrink headshape points by 5%
+#         hs *= 0.95
 #
-#         # Remove anything outside of rpa
-#         keep = hs[0] < rpa[0]
-#         hs = hs[:, keep]
+#         # Move fiducials down 1cm
+#         nas[2] -= 10
+#         lpa[2] -= 10
+#         rpa[2] -= 10
 #
-#         # Remove anything outside of lpa
-#         keep = hs[0] > lpa[0]
-#         hs = hs[:, keep]
+#         # Move fiducials back 1cm
+#         nas[1] -= 10
+#         lpa[1] -= 10
+#         rpa[1] -= 10
 #
-#         # Remove headshape points on the neck
-#         remove = hs[2] < min(lpa[2], rpa[2]) - 4
-#         hs = hs[:, ~remove]
-#
+#         logger.log(f"Overwriting {fns.head_headshape_file}")
+#         np.savetxt(fns.head_nasion_file, nas)
+#         np.savetxt(fns.head_lpa_file, lpa)
+#         np.savetxt(fns.head_rpa_file, rpa)
 #         np.savetxt(fns.head_headshape_file, hs)
 #
 #
 #     def process_session(session, logger):
 #         """Coregister a single session."""
 #
-#         preproc_file = str(output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif")
+#         preproc_file = output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif"
 #         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
 #
 #         fns = OSLFilenames(
 #             outdir=str(output_dir / "osl"),
 #             id=session["id"],
-#             preproc_file=preproc_file,
+#             preproc_file=str(preproc_file),
 #             surfaces_dir=surfaces_dir,
 #         )
 #
 #         logger.log("Extracting fiducials and headshape...")
-#         rhino.extract_fiducials_and_headshape_from_fif(fns)
+#         rhino.extract_fiducials_and_headshape_from_fif(
+#             fns, include_eeg_as_headshape=True,
+#         )
 #
-#         logger.log("Fixing headshape points...")
-#         fix_headshape_points(fns)
+#         logger.log("Fixing headshape and fiducials...")
+#         fix_headshape_fiducials(fns, logger)
 #
-#         logger.log("Coregistering MEG to MRI...")
-#         rhino.coregister_head_and_mri(fns, use_nose=False)
+#         logger.log("Coregistering EEG to MRI...")
+#         rhino.coregister_head_and_mri(
+#             fns, use_nose=False, use_headshape=False,
+#         )
 #
 #         logger.log("Done.")
 #
@@ -318,7 +374,11 @@ The output of this script is written to ``derivatives/``.
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # This step computes the forward model and LCMV beamformer weights for
-# each session.
+# each session. Key differences from MEG:
+#
+# - A Triple Layer forward model is used (instead of Single Layer).
+# - The ``eeg=True`` flag is passed to the forward model.
+# - Only the ``eeg`` channel type is used for the beamformer.
 #
 # .. code-block:: python
 #
@@ -350,10 +410,10 @@ The output of this script is written to ``derivatives/``.
 #         )
 #
 #         logger.log("Computing forward model...")
-#         rhino.forward_model(fns, model="Single Layer", gridstep=8)
+#         rhino.forward_model(fns, model="Triple Layer", gridstep=8, eeg=True)
 #
 #         logger.log("Computing LCMV beamformer...")
-#         source_recon.lcmv_beamformer(fns, chantypes=["mag", "grad"], rank={"meg": 60})
+#         source_recon.lcmv_beamformer(fns, chantypes=["eeg"], rank={"eeg": 54})
 #
 #         logger.log("Done.")
 #
@@ -453,7 +513,7 @@ The output of this script is written to ``derivatives/``.
 #
 # Each step can be run as a standalone script. The ``parallel.run``
 # utility handles multiprocessing, logging, and error recovery. Logs
-# for each session are written to the ``logs/`` directory — check these
+# for each session are written to the ``logs/`` directory -- check these
 # if a session fails.
 #
 # The final parcellated data can be loaded for downstream analysis::
