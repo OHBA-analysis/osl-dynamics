@@ -258,7 +258,8 @@ def extract_surfaces(
     Parameters
     ----------
     mri_file : str
-        Full path to structural MRI in NIfTI format (with .nii.gz extension).
+        Full path to structural MRI in NIfTI format (with .nii.gz, .nii,
+        .hdr or .mgz extension).
         The sform code must be 1 (Scanner Anat) or 4 (MNI), and the sform
         matrix should transform from voxel indices to coordinates in mm. The
         sform defines the native/MRI coordinate system used throughout RHINO.
@@ -302,8 +303,10 @@ def extract_surfaces(
 
     # Check mri_file
     mri_ext = "".join(Path(mri_file).suffixes)
-    if mri_ext not in [".nii", ".nii.gz"]:
-        raise ValueError("mri_file needs to have a .nii or .nii.gz extension")
+    if mri_ext not in [".nii", ".nii.gz", ".hdr", ".mgz"]:
+        raise ValueError(
+            "mri_file needs to have a .nii, .nii.gz, .hdr or .mgz extension"
+        )
 
     # Copy MRI to new file for modification
     img = nib.load(mri_file)
