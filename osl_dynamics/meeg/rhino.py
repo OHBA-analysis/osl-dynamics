@@ -1021,37 +1021,98 @@ def remove_stray_headshape_points(
 ) -> None:
     """Remove stray headshape points.
 
-    Removes headshape points near the nose, on the neck or far away from the head.
+    Removes headshape points near the nose, on the neck or far away from the
+    head. The filtering is done in a coordinate system derived from the
+    fiducial points (nasion, LPA, RPA), so it works regardless of the
+    original coordinate convention (e.g. Elekta/FIF or CTF/.pos).
+
+    The fiducial-derived axes are:
+
+    - **left-right**: LPA to RPA direction.
+    - **anterior**: perpendicular to the left-right axis, pointing towards
+      the nasion.
+    - **superior**: cross product of the above two axes.
 
     Parameters
     ----------
     fns : OSLFilenames
         Container for OSL filenames.
     nose : bool, optional
-        Should we remove headshape points near the nose? Useful to remove these
-        if we have defaced structurals or aren't extracting the nose from the
-        structural.
+        Should we remove headshape points near the nose? Useful to remove
+        these if we have defaced structurals or aren't extracting the nose
+        from the structural.
     """
     fns = fns.coreg
 
-    # Load saved headshape and nasion files
+    # Load saved headshape and fiducial files
     hs = np.loadtxt(fns.head_headshape_file)
     nas = np.loadtxt(fns.head_nasion_file)
     lpa = np.loadtxt(fns.head_lpa_file)
     rpa = np.loadtxt(fns.head_rpa_file)
 
+    # Check the headshape array is 2D (3, n_points)
+    if hs.ndim != 2 or hs.shape[0] != 3:
+        warnings.warn(
+            f"Headshape file {fns.head_headshape_file} has unexpected shape "
+            f"{hs.shape}, skipping stray point removal."
+        )
+        return
+
+    # Build a fiducial-derived coordinate system so the filtering logic
+    # is independent of the original axis convention.
+    #
+    # Origin: midpoint of LPA and RPA
+    # Axis 0 (left-right): LPA -> RPA
+    # Axis 1 (anterior):   perpendicular, towards nasion
+    # Axis 2 (superior):   cross product of the above
+    origin = (lpa + rpa) / 2.0
+    ax_lr = rpa - lpa
+    ax_lr = ax_lr / np.linalg.norm(ax_lr)
+
+    nas_vec = nas - origin
+    ax_ant = nas_vec - np.dot(nas_vec, ax_lr) * ax_lr
+    ax_ant = ax_ant / np.linalg.norm(ax_ant)
+
+    ax_sup = np.cross(ax_lr, ax_ant)
+
+    # Project everything into the fiducial coordinate system
+    def _project(pts):
+        centred = pts - origin[:, np.newaxis]
+        return np.array(
+            [
+                ax_lr @ centred,
+                ax_ant @ centred,
+                ax_sup @ centred,
+            ]
+        )
+
+    hs_proj = _project(hs)
+    nas_proj = _project(nas[:, np.newaxis]).ravel()
+    lpa_proj = _project(lpa[:, np.newaxis]).ravel()
+    rpa_proj = _project(rpa[:, np.newaxis]).ravel()
+
+    # Apply the same filtering logic as before, now in the canonical axes
     if nose:
         # Remove headshape points on the nose
-        remove = np.logical_and(hs[1] > max(lpa[1], rpa[1]), hs[2] < nas[2])
+        remove = np.logical_and(
+            hs_proj[1] > max(lpa_proj[1], rpa_proj[1]),
+            hs_proj[2] < nas_proj[2],
+        )
         hs = hs[:, ~remove]
+        hs_proj = hs_proj[:, ~remove]
 
     # Remove headshape points on the neck
-    remove = hs[2] < min(lpa[2], rpa[2]) - 4
+    remove = hs_proj[2] < min(lpa_proj[2], rpa_proj[2]) - 4
     hs = hs[:, ~remove]
+    hs_proj = hs_proj[:, ~remove]
 
     # Remove headshape points far from the head in any direction
     remove = np.logical_or(
-        hs[0] < lpa[0] - 5, np.logical_or(hs[0] > rpa[0] + 5, hs[1] > nas[1] + 5)
+        hs_proj[0] < lpa_proj[0] - 5,
+        np.logical_or(
+            hs_proj[0] > rpa_proj[0] + 5,
+            hs_proj[1] > nas_proj[1] + 5,
+        ),
     )
     hs = hs[:, ~remove]
 
