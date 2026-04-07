@@ -51,7 +51,7 @@ The output of this script is written to ``derivatives/``.
 #     import pandas as pd
 #
 #     # Raw data directory
-#     raw_dir = "/ohba/pi/mwoolrich/raw_datasets/lemon"
+#     raw_dir = "/path/to/lemon"
 #     localizer_dir = f"{raw_dir}/EEG_MPILMBB_LEMON/EEG_Localizer_BIDS_ID"
 #
 #     # Get subjects that have localizer data

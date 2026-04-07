@@ -55,7 +55,7 @@ The output of this script is written to ``derivatives/``.
 #     import pandas as pd
 #
 #     # Raw data directory
-#     raw_dir = "/ohba/pi/mwoolrich/raw_datasets/camcan/cc700"
+#     raw_dir = "/path/to/cc700"
 #     anat_dir = f"{raw_dir}/mri/pipeline/release004/BIDS_20190411/anat"
 #
 #     # Find MaxFiltered MEG files for all three tasks
