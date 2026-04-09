@@ -37,6 +37,8 @@ extensions = [
     "autoapi.extension",
 ]
 
+autodoc_typehints = "description"
+
 autoapi_dirs = ["../osl_dynamics"]
 autoapi_template_dir = "_templates"
 autoapi_options = [

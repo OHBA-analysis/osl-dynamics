@@ -36,7 +36,7 @@ Standard multistage Maxfiltering with the newest OHBA scanner::
         movecomp=True,
     )
 
-CBU 3-stage pipeline with a single file::
+Cambridge CBU 3-stage pipeline with a single file::
 
     run_maxfilter(
         files="sub-01_task-rest_meg.fif",
