@@ -87,14 +87,20 @@ def _worker(
     """Wrapper that handles logging and error catching for a single item."""
     _limit_onnx_threads()
     func, id, item, log_dir = args
+    ok = True
     with MEEGSessionLogger(id, log_dir) as logger:
         try:
             func(item, logger)
-            return id, True
         except Exception as e:
             logger.error(str(e))
             traceback.print_exc()
-            return id, False
+            ok = False
+    if not ok:
+        log_file = log_dir / f"{id}.log"
+        err_file = log_dir / f"{id}.log.err"
+        if log_file.exists():
+            log_file.rename(err_file)
+    return id, ok
 
 
 def run(
