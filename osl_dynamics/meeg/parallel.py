@@ -1,13 +1,16 @@
 """Run a processing function over multiple items in parallel."""
 
+from __future__ import annotations
+
 import importlib
 import importlib.abc
 import multiprocessing as mp
 import os
 import sys
 import traceback
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from . import report
 from osl_dynamics.utils.logger import MEEGSessionLogger
@@ -21,7 +24,7 @@ _THREAD_LIMIT_VARS = [
 ]
 
 
-def _limit_onnx_threads():
+def _limit_onnx_threads() -> None:
     """Import hook to patch ONNX Runtime to use 1 thread."""
 
     class _OnnxThreadLimiter(importlib.abc.MetaPathFinder, importlib.abc.Loader):
@@ -58,7 +61,7 @@ def _limit_onnx_threads():
     sys.meta_path.insert(0, _OnnxThreadLimiter())
 
 
-def _get_id(item: Any, index: int) -> str:
+def _get_id(item: object, index: int) -> str:
     """Get the ID for an item."""
     if isinstance(item, str):
         return item
@@ -69,7 +72,7 @@ def _get_id(item: Any, index: int) -> str:
     return str(index)
 
 
-def _items_to_sessions_dict(items: list) -> Dict:
+def _items_to_sessions_dict(items: list) -> dict:
     """Convert a list of items to a sessions dict for the report module."""
     sessions = {}
     for i, item in enumerate(items):
@@ -82,8 +85,8 @@ def _items_to_sessions_dict(items: list) -> Dict:
 
 
 def _worker(
-    args: Tuple[Callable, str, Any, Path],
-) -> Tuple[str, bool]:
+    args: tuple[Callable, str, object, Path],
+) -> tuple[str, bool]:
     """Wrapper that handles logging and error catching for a single item."""
     _limit_onnx_threads()
     func, id, item, log_dir = args
@@ -105,11 +108,11 @@ def _worker(
 
 def run(
     func: Callable,
-    items: List[Any],
+    items: list,
     n_workers: int,
-    log_dir: Union[str, Path],
-    output_dir: Optional[Union[str, Path]] = None,
-    plots_dir: Optional[Union[str, Path]] = None,
+    log_dir: str | Path,
+    output_dir: str | Path | None = None,
+    plots_dir: str | Path | None = None,
 ) -> None:
     """Run a function over items in parallel.
 

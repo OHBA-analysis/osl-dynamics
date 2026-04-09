@@ -1,11 +1,12 @@
 """RHINO functions."""
 
+from __future__ import annotations
+
 import os
 import copy
 import shutil
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -228,7 +229,7 @@ def extract_surfaces(
     outdir: str,
     include_nose: bool = True,
     do_mri2mniaxes_xform: bool = True,
-    bet_fval: float = None,
+    bet_fval: float | None = None,
     show: bool = False,
 ) -> None:
     """Extract surfaces.
@@ -1076,7 +1077,7 @@ def remove_stray_headshape_points(
     ax_sup = np.cross(ax_lr, ax_ant)
 
     # Project everything into the fiducial coordinate system
-    def _project(pts):
+    def _project(pts: np.ndarray) -> np.ndarray:
         centred = pts - origin[:, np.newaxis]
         return np.array(
             [
@@ -1209,7 +1210,7 @@ def coregister_head_and_mri(
     use_headshape: bool = True,
     use_nose: bool = True,
     allow_mri_scaling: bool = False,
-    mni_fiducials: Optional[Dict[str, np.ndarray]] = None,
+    mni_fiducials: dict[str, np.ndarray] | None = None,
     n_init: int = 1,
     plot_type: str = "png",
     show: bool = False,
@@ -1589,7 +1590,7 @@ def plot_coregistration(
     display_fiducials: bool = True,
     display_headshape_pnts: bool = True,
     include_nose: bool = True,
-    filename: Optional[str] = None,
+    filename: str | None = None,
     show: bool = False,
 ) -> None:
     """Plot coregistration.
@@ -2107,7 +2108,9 @@ def forward_model(
     print("Forward model complete.")
 
 
-def _setup_volume_source_space(fns, gridstep=5, mindist=5.0, exclude=0.0):
+def _setup_volume_source_space(
+    fns: OSLFilenames, gridstep: int = 5, mindist: float = 5.0, exclude: float = 0.0
+) -> mne.SourceSpaces:
     """Set up a volume source space grid inside the inner skull surface.
 
     This is a RHINO specific version of mne.setup_volume_source_space.
@@ -2256,15 +2259,15 @@ def _setup_volume_source_space(fns, gridstep=5, mindist=5.0, exclude=0.0):
 
 
 def _make_fwd_solution(
-    fns,
-    src,
-    bem,
-    meg=True,
-    eeg=True,
-    mindist=0.0,
-    ignore_ref=False,
-    verbose=None,
-):
+    fns: OSLFilenames,
+    src: mne.SourceSpaces,
+    bem: mne.bem.ConductorModel | str,
+    meg: bool = True,
+    eeg: bool = True,
+    mindist: float = 0.0,
+    ignore_ref: bool = False,
+    verbose: bool | None = None,
+) -> mne.Forward:
     """Calculate a forward solution for a subject.
 
     This is a wrapper for mne.make_forward_solution.
@@ -2372,13 +2375,13 @@ def _make_fwd_solution(
     return fwd
 
 
-def _get_orient(nii_file):
+def _get_orient(nii_file: str) -> str:
     """Get orientation of nii file."""
     cmd = f"fslorient -getorient {nii_file}"
     return os.popen(cmd).read().strip()
 
 
-def _get_sform(nii_file):
+def _get_sform(nii_file: str) -> Transform:
     """Get sform of nii file."""
     sformcode = int(nib.load(nii_file).header["sform_code"])
     if sformcode == 1 or sformcode == 4:
@@ -2410,14 +2413,14 @@ def _get_sform(nii_file):
     return sform
 
 
-def _check_nii_for_nan(filename):
+def _check_nii_for_nan(filename: str) -> bool:
     """Check nii file for nans."""
     img = nib.load(filename)
     data = img.get_fdata()
     return np.isnan(data).any()
 
 
-def _get_flirt_xform_between_axes(from_nii, target_nii):
+def _get_flirt_xform_between_axes(from_nii: str, target_nii: str) -> np.ndarray:
     """
     Computes flirt xform that moves from_nii to have voxel indices on the same
     axis as  the voxel indices for target_nii.
@@ -2459,7 +2462,9 @@ def _get_flirt_xform_between_axes(from_nii, target_nii):
     return from2to
 
 
-def _get_mne_xform_from_flirt_xform(flirt_xform, nii_mesh_file_in, nii_mesh_file_out):
+def _get_mne_xform_from_flirt_xform(
+    flirt_xform: np.ndarray, nii_mesh_file_in: str, nii_mesh_file_out: str
+) -> np.ndarray:
     """
     Returns a mm coordinates to mm coordinates MNE xform that corresponds to
     the passed in flirt xform.
@@ -2476,7 +2481,7 @@ def _get_mne_xform_from_flirt_xform(flirt_xform, nii_mesh_file_in, nii_mesh_file
     )
 
 
-def _get_flirtcoords2native_xform(nii_mesh_file):
+def _get_flirtcoords2native_xform(nii_mesh_file: str) -> np.ndarray:
     """
     Returns xform_flirtcoords2native transform that transforms from flirtcoords
     space in mm into native space in mm, where the passed in nii_mesh_file specifies
@@ -2510,12 +2515,12 @@ def _get_flirtcoords2native_xform(nii_mesh_file):
 
 
 def _transform_vtk_mesh(
-    vtk_mesh_file_in,
-    nii_mesh_file_in,
-    out_vtk_file,
-    nii_mesh_file_out,
-    xform_file,
-):
+    vtk_mesh_file_in: str,
+    nii_mesh_file_in: str,
+    out_vtk_file: str,
+    nii_mesh_file_out: str,
+    xform_file: str | np.ndarray,
+) -> None:
     """
     Outputs mesh to out_vtk_file, which is the result of applying the
     transform xform to vtk_mesh_file_in
@@ -2543,7 +2548,9 @@ def _transform_vtk_mesh(
     data.to_csv(out_vtk_file, sep=" ", index=False)
 
 
-def _get_vtk_mesh_native(vtk_mesh_file, nii_mesh_file):
+def _get_vtk_mesh_native(
+    vtk_mesh_file: str, nii_mesh_file: str
+) -> tuple[np.ndarray, np.ndarray]:
     data = pd.read_csv(vtk_mesh_file, sep=r"\s+")
     num_rrs = int(data.iloc[3, 1])
     rrs_flirtcoords = data.iloc[4 : num_rrs + 4, 0:3].to_numpy().astype(np.float64)
@@ -2556,7 +2563,7 @@ def _get_vtk_mesh_native(vtk_mesh_file, nii_mesh_file):
     return rrs_nii, tris_nii
 
 
-def _xform_points(xform, pnts):
+def _xform_points(xform: np.ndarray, pnts: np.ndarray) -> np.ndarray:
     """Applies homogeneous linear transformation to an array of 3D coordinates.
 
     Parameters
@@ -2581,7 +2588,9 @@ def _xform_points(xform, pnts):
     return newpnts[:3]
 
 
-def _rigid_transform_3D(B, A, compute_scaling=False):
+def _rigid_transform_3D(
+    B: np.ndarray, A: np.ndarray, compute_scaling: bool = False
+) -> tuple[np.ndarray, np.ndarray]:
     """Calculate affine transform from points in A to point in B.
 
     Parameters
@@ -2636,7 +2645,7 @@ def _rigid_transform_3D(B, A, compute_scaling=False):
     return xform, scaling_xform
 
 
-def _niimask2indexpointcloud(nii_fname, volindex=None):
+def _niimask2indexpointcloud(nii_fname: str, volindex: int | None = None) -> np.ndarray:
     """Takes in a nii.gz mask file name (which equals zero for background
     and != zero for the mask) and returns the mask as a 3 x npoints point cloud.
 
@@ -2663,7 +2672,11 @@ def _niimask2indexpointcloud(nii_fname, volindex=None):
     return np.asarray(np.where(vol != 0))
 
 
-def _rhino_icp(mri_headshape_head, polhemus_headshape_head, n_init=10):
+def _rhino_icp(
+    mri_headshape_head: np.ndarray,
+    polhemus_headshape_head: np.ndarray,
+    n_init: int = 10,
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Runs Iterative Closest Point (ICP) with multiple initialisations.
 
     Parameters
@@ -2735,7 +2748,13 @@ def _rhino_icp(mri_headshape_head, polhemus_headshape_head, n_init=10):
     return xform, err, err_old
 
 
-def _icp(A, B, init_pose=None, max_iterations=50, tolerance=0.0001):
+def _icp(
+    A: np.ndarray,
+    B: np.ndarray,
+    init_pose: np.ndarray | None = None,
+    max_iterations: int = 50,
+    tolerance: float = 0.0001,
+) -> tuple[np.ndarray, np.ndarray, int]:
     """The Iterative Closest Point method:
     finds best-fit transform that maps points A on to points B.
 
@@ -2786,7 +2805,7 @@ def _icp(A, B, init_pose=None, max_iterations=50, tolerance=0.0001):
     return T, distances, i
 
 
-def _best_fit_transform(A, B):
+def _best_fit_transform(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     """Calculates the least-squares best-fit transform that maps corresponding
     points A to B in m spatial dimensions.
 
@@ -2821,7 +2840,9 @@ def _best_fit_transform(A, B):
     return T
 
 
-def _create_freesurfer_meshes_from_bet_surfaces(fns, xform_mri_voxel2mri):
+def _create_freesurfer_meshes_from_bet_surfaces(
+    fns: OSLFilenames, xform_mri_voxel2mri: np.ndarray
+) -> None:
     """
     Create sMRI-derived freesurfer surfaces in native/mri space in mm,
     for use by forward modelling
@@ -2847,11 +2868,11 @@ def _create_freesurfer_meshes_from_bet_surfaces(fns, xform_mri_voxel2mri):
 
 
 def _create_freesurfer_mesh_from_bet_surface(
-    infile,
-    surf_outfile,
-    xform_mri_voxel2mri,
-    nii_mesh_file=None,
-):
+    infile: str,
+    surf_outfile: str,
+    xform_mri_voxel2mri: np.ndarray,
+    nii_mesh_file: str | None = None,
+) -> None:
     """Creates surface mesh in .surf format and in native mri space in mm from infile.
 
     Parameters
@@ -2945,7 +2966,7 @@ def _create_freesurfer_mesh_from_bet_surface(
         raise ValueError("Invalid infile. Needs to be a .nii.gz or .vtk file")
 
 
-def _get_vol_info_from_nii(mri):
+def _get_vol_info_from_nii(mri: str) -> dict:
     """Read volume info from an MRI file.
 
     Parameters
@@ -2988,7 +3009,7 @@ def _majority(values_ptr, len_values, result, data):
     return 1
 
 
-def _binary_majority3d(img):
+def _binary_majority3d(img: np.ndarray) -> np.ndarray:
     """
     Set a pixel to 1 if a required majority (default=14) or more pixels
     in its 3x3x3 neighborhood are 1, otherwise, set the pixel to 0. img
@@ -3003,7 +3024,9 @@ def _binary_majority3d(img):
     ).astype(int)
 
 
-def _extract_headshape(preproc_file):
+def _extract_headshape(
+    preproc_file: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Extract headshape points and fiducials from a FIF file.
 
     Parameters

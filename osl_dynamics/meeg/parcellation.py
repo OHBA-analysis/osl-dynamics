@@ -1,10 +1,11 @@
 """Parcellation."""
 
+from __future__ import annotations
+
 import logging
 import os
 import warnings
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
 
 import mne
 import scipy
@@ -31,7 +32,7 @@ class Parcellation:
         Path to parcellation file.
     """
 
-    def __init__(self, file: Union[str, "Parcellation"]) -> None:
+    def __init__(self, file: str | Parcellation) -> None:
         if isinstance(file, Parcellation):
             self.__dict__.update(file.__dict__)
             return
@@ -88,17 +89,17 @@ class Parcellation:
             ]
         )
 
-    def plot(self, **kwargs):
+    def plot(self, **kwargs) -> object:
         return plot_parcellation(self, **kwargs)
 
     @staticmethod
-    def find_files() -> List[str]:
+    def find_files() -> list[str]:
         paths = Path(files.parcellation.directory).glob("*")
         paths = [path.name for path in paths if not path.name.startswith("__")]
         return sorted(paths)
 
 
-def plot_parcellation(parcellation: Union[str, "Parcellation"], **kwargs):
+def plot_parcellation(parcellation: str | Parcellation, **kwargs) -> object:
     """Plot a parcellation.
 
     Parameters
@@ -241,7 +242,7 @@ def parcellate(
     voxel_coords: np.ndarray,
     method: str,
     parcellation_file: str,
-    orthogonalisation: Optional[str] = None,
+    orthogonalisation: str | None = None,
 ) -> np.ndarray:
     """Parcellate data.
 
@@ -312,9 +313,9 @@ def parcellate(
 
 def save_as_fif(
     parcel_data: np.ndarray,
-    raw: Union[mne.io.Raw, mne.Epochs],
+    raw: mne.io.Raw | mne.Epochs,
     filename: str,
-    extra_chans: Optional[Union[str, List[str]]] = None,
+    extra_chans: str | list[str] | None = None,
 ) -> None:
     """Save parcellated data as a fif file.
 
@@ -356,7 +357,7 @@ def plot_psds(
     parcellation_file: str,
     fmin: float = 0.5,
     fmax: float = 45,
-    filename: Optional[str] = None,
+    filename: str | None = None,
 ) -> None:
     """Plot PSD of each parcel time course.
 
@@ -407,7 +408,7 @@ def plot_psds(
 def save_qc_plots(
     parc_fif: str,
     parcellation_file: str,
-    output_dir: Optional[Union[str, Path]] = None,
+    output_dir: str | Path | None = None,
     power_maps: bool = False,
     show: bool = False,
     cmap: str = "hot",
@@ -505,7 +506,9 @@ def save_qc_plots(
         plt.close(composite_fig)
 
 
-def _resample_parcellation(fns, parcellation_file, voxel_coords):
+def _resample_parcellation(
+    fns: OSLFilenames, parcellation_file: str, voxel_coords: np.ndarray
+) -> np.ndarray:
     """Resample parcellation.
 
     Resample the parcellation so that the voxel coords correspond (using nearest
@@ -581,7 +584,11 @@ def _resample_parcellation(fns, parcellation_file, voxel_coords):
     return parcellation_asmatrix
 
 
-def _get_parcel_data_pca(voxel_data, parcellation_asmatrix, method="spatial_basis"):
+def _get_parcel_data_pca(
+    voxel_data: np.ndarray,
+    parcellation_asmatrix: np.ndarray,
+    method: str = "spatial_basis",
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate parcel time courses using PCA over the voxels in each parcel.
 
     Parameters
@@ -825,7 +832,9 @@ def _get_parcel_data_pca(voxel_data, parcellation_asmatrix, method="spatial_basi
     return parcel_data, voxel_weightings, voxel_assignments
 
 
-def _get_parcel_data_centroid(voxel_data, voxel_coords, parcellation_file):
+def _get_parcel_data_centroid(
+    voxel_data: np.ndarray, voxel_coords: np.ndarray, parcellation_file: str
+) -> np.ndarray:
     """Calculate parcel time courses using the voxel nearest to each parcel
     centroid.
 
@@ -871,8 +880,10 @@ def _get_parcel_data_centroid(voxel_data, voxel_coords, parcellation_file):
 
 
 def _symmetric_orthogonalisation(
-    timeseries, maintain_magnitudes=False, compute_weights=False
-):
+    timeseries: np.ndarray,
+    maintain_magnitudes: bool = False,
+    compute_weights: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """Symmetric orthogonalisation.
 
     Returns orthonormal matrix L which is closest to A, as measured by the
@@ -975,8 +986,8 @@ def _symmetric_orthogonalisation(
 def convert_to_mne_raw(
     data: np.ndarray,
     raw: mne.io.Raw,
-    ch_names: Optional[List[str]] = None,
-    extra_chans: Optional[Union[str, List[str]]] = None,
+    ch_names: list[str] | None = None,
+    extra_chans: str | list[str] | None = None,
 ) -> mne.io.Raw:
     """Convert an array to an MNE Raw object, copying metadata from a reference.
 
@@ -1059,7 +1070,9 @@ def convert_to_mne_raw(
     return new_raw
 
 
-def _convert2mne_epochs(parc_data, epochs, parcel_names=None):
+def _convert2mne_epochs(
+    parc_data: np.ndarray, epochs: mne.Epochs, parcel_names: list[str] | None = None
+) -> mne.Epochs:
     """Create and returns an MNE Epochs object that contains parcellated data.
 
     Parameters

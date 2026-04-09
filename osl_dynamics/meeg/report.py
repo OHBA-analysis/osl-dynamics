@@ -1,11 +1,12 @@
 """Generate a QC summary HTML report from pipeline plots."""
 
+from __future__ import annotations
+
 import html
 import json
 import shutil
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple, Union
 
 STEPS = {
     1: {
@@ -446,10 +447,10 @@ def _embed_html(filepath: Path) -> str:
 
 def _build_step_tab(
     step_num: int,
-    step_info: Dict,
+    step_info: dict,
     plots_dir: Path,
-    session_ids: List[str],
-) -> Tuple[str, int, int]:
+    session_ids: list[str],
+) -> tuple[str, int, int]:
     """Build the HTML content for a single step tab."""
     subpanels = step_info["subpanels"]
 
@@ -544,7 +545,7 @@ def _build_step_tab(
 
 def _copy_surface_plots(
     plots_dir: Path,
-    sessions: Dict,
+    sessions: dict,
     output_dir: Path,
 ) -> None:
     """Copy surface extraction PNGs from the derivatives directory.
@@ -577,7 +578,7 @@ def _copy_surface_plots(
 
 def _copy_coreg_plots(
     plots_dir: Path,
-    sessions: Dict,
+    sessions: dict,
     output_dir: Path,
 ) -> None:
     """Copy coregistration PNGs from the derivatives directory.
@@ -605,7 +606,7 @@ def _copy_coreg_plots(
 
 def _copy_parc_plots(
     plots_dir: Path,
-    sessions: Dict,
+    sessions: dict,
     output_dir: Path,
 ) -> None:
     """Copy parcellation QC PNGs from the derivatives directory.
@@ -636,9 +637,9 @@ def _copy_parc_plots(
 
 
 def generate_report(
-    plots_dir: Union[str, Path],
-    sessions: Dict,
-    output_dir: Optional[Union[str, Path]] = None,
+    plots_dir: str | Path,
+    sessions: dict,
+    output_dir: str | Path | None = None,
     output_file: str = "report.html",
 ) -> None:
     """Generate a QC summary HTML report.

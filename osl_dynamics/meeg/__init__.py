@@ -5,6 +5,8 @@ raw sensor recordings to parcellated source-space time courses.
 
 Modules
 -------
+- :py:mod:`~osl_dynamics.meeg.maxfilter` — Wrapper for Elekta Maxfilter
+  (SSS/tSSS).
 - :py:mod:`~osl_dynamics.meeg.amm` — Adaptive Multipole Model (AMM) for
   OPM interference rejection.
 - :py:mod:`~osl_dynamics.meeg.preproc` — Sensor-level preprocessing
