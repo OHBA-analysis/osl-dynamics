@@ -5,6 +5,18 @@ transforms, internal/external harmonic bases, and the AMM denoising pipeline.
 
 Translated from spm_opm_amm.m and supporting SPM functions.
 
+Examples
+--------
+Apply AMM denoising to OPM data::
+
+    import mne
+    from osl_dynamics.meeg.amm import apply_amm
+
+    raw = mne.io.read_raw_fif("sub-01_task-rest_meg.fif", preload=True)
+    raw_clean, info = apply_amm(raw, li=9, le=2)
+
+The returned ``info`` dict contains the harmonic bases and residuals.
+
 References
 ----------
 Tierney, T.M., Seedat, Z., St Pier, K. et al. (2024). Adaptive multipole

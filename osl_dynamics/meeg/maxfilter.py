@@ -7,6 +7,42 @@ Note
 ----
 This module requires a licensed installation of Elekta/MEGIN MaxFilter.
 MaxFilter is proprietary software and is not included with osl-dynamics.
+
+**OHBA users:** The ``scanner`` argument sets the correct calibration
+files for OHBA scanners (``"VectorView"``, ``"VectorView2"`` or
+``"Neo"``).  To check which scanner was used to record a FIF file, run
+the following on an OHBA machine with a MaxFilter license::
+
+    from subprocess import run, PIPE
+
+    cmd = f"/neuro/bin/util/show_fiff -v -t 100:206 {path_to_fif}"
+    result = run(cmd.split(), stdout=PIPE, stderr=PIPE)
+    for line in result.stdout.decode().splitlines():
+        print(line)
+
+The output will show the recording date and scanner description.
+
+Examples
+--------
+Standard multistage Maxfiltering with the newest OHBA scanner::
+
+    run_maxfilter(
+        files="sub-*_task-rest_meg.fif",
+        outdir="derivatives/maxfiltered",
+        scanner="Neo",
+        mode="multistage",
+        tsss=True,
+        headpos=True,
+        movecomp=True,
+    )
+
+CBU 3-stage pipeline with a single file::
+
+    run_maxfilter(
+        files="sub-01_task-rest_meg.fif",
+        outdir="derivatives/maxfiltered",
+        mode="cbu",
+    )
 """
 
 from __future__ import annotations
