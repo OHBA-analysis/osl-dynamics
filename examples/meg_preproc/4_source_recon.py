@@ -1,15 +1,16 @@
-"""Step 3: Coregistration."""
+"""Step 4: Forward Model and Source Reconstruction."""
 
 from pathlib import Path
-from osl_dynamics import files
-from osl_dynamics.meeg import parallel, rhino
+import matplotlib
+matplotlib.use("Agg")
+from osl_dynamics.meeg import parallel, rhino, source_recon
 from osl_dynamics.utils.filenames import OSLFilenames
 
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
 output_dir = Path("derivatives")
 plots_dir = Path("plots")
-log_dir = Path("logs/3_coreg")
+log_dir = Path("logs/4_source_recon")
 
 sessions = [
     {"id": "sub-01_task-rest", "subject": "sub-01", "raw_file": "sub-01_task-rest.fif"},
@@ -18,18 +19,20 @@ sessions = [
     {"id": "sub-04_task-rest", "subject": "sub-04", "raw_file": "sub-04_task-rest.fif"},
 ]
 
-use_nose = False
-allow_mri_scaling = False  # set True if using MNI152 standard brain
-use_mni152 = False  # set True to use standard brain instead of subject MRI
+gridstep = 8  # mm
+chantypes = ["mag", "grad"]
+rank = {"meg": 60}
+use_mni152 = False
 # ----------------------------------------------------------------------------
 
 
 def process_session(session, logger):
-    """Coregister a single session."""
+    """Source reconstruct a single session."""
 
     preproc_file = output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif"
 
     if use_mni152:
+        from osl_dynamics import files
         surfaces_dir = files.mni152_surfaces.directory
     else:
         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
@@ -41,15 +44,11 @@ def process_session(session, logger):
         surfaces_dir=surfaces_dir,
     )
 
-    logger.log("Extracting fiducials and headshape...")
-    rhino.extract_fiducials_and_headshape_from_fif(fns)
+    logger.log("Computing forward model...")
+    rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
 
-    logger.log("Coregistering MEG to MRI...")
-    rhino.coregister_head_and_mri(
-        fns,
-        use_nose=use_nose,
-        allow_mri_scaling=allow_mri_scaling,
-    )
+    logger.log("Computing LCMV beamformer...")
+    source_recon.lcmv_beamformer(fns, chantypes=chantypes, rank=rank)
 
     logger.log("Done.")
 

@@ -25,7 +25,7 @@ os.makedirs("figures", exist_ok=True)  # Directory for plots
 do_bonferroni_correction = True
 
 # We will download example data hosted on osf.io/by2tc.
-get_data("tde_hmm_notts_mrc_meguk_giles", output_dir="notts_tde_hmm")
+get_data("tde_hmm_notts_meguk_giles", output_dir="notts_tde_hmm")
 
 # Get the state time course
 alpha = pickle.load(open("notts_tde_hmm/alpha.pkl", "rb"))

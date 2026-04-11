@@ -1,7 +1,8 @@
 """Source reconstruction."""
 
+from __future__ import annotations
+
 import os
-from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import nibabel as nib
@@ -30,15 +31,15 @@ from . import rhino
 
 def lcmv_beamformer(
     fns: OSLFilenames,
-    data: Optional[Union[str, mne.io.Raw, mne.Epochs]] = None,
-    chantypes: Optional[Union[str, List[str]]] = None,
-    data_cov: Optional[mne.Covariance] = None,
-    noise_cov: Optional[mne.Covariance] = None,
-    pick_ori: Optional[str] = "max-power-pre-weight-norm",
-    rank: Union[str, Dict] = "info",
-    noise_rank: Union[str, Dict] = "info",
+    data: str | mne.io.Raw | mne.Epochs | None = None,
+    chantypes: str | list[str] | None = None,
+    data_cov: mne.Covariance | None = None,
+    noise_cov: mne.Covariance | None = None,
+    pick_ori: str | None = "max-power-pre-weight-norm",
+    rank: str | dict = "info",
+    noise_rank: str | dict = "info",
     reduce_rank: bool = True,
-    frequency_range: Optional[List[float]] = None,
+    frequency_range: list[float] | None = None,
     **kwargs,
 ) -> None:
     """Compute LCMV spatial filter.
@@ -206,11 +207,11 @@ def lcmv_beamformer(
 
 def apply_lcmv_beamformer(
     fns: OSLFilenames,
-    raw: Optional[Union[mne.io.Raw, mne.Epochs]] = None,
-    reject_by_annotation: Optional[Union[str, List[str]]] = "omit",
-    spatial_resolution: Optional[int] = None,
+    raw: mne.io.Raw | mne.Epochs | None = None,
+    reject_by_annotation: str | list[str] | None = "omit",
+    spatial_resolution: int | None = None,
     reference_brain: str = "mni",
-) -> Tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray]:
     """Apply an LCMV beamformer.
 
     Parameters
@@ -333,21 +334,21 @@ def apply_lcmv_beamformer(
 
 
 def _make_lcmv(
-    info,
-    fwd,
-    data_cov,
-    reg=0.05,
-    noise_cov=None,
-    label=None,
-    pick_ori=None,
-    rank="info",
-    noise_rank="info",
-    weight_norm="unit-noise-gain-invariant",
-    reduce_rank=False,
-    depth=None,
-    inversion="matrix",
-    verbose=None,
-):
+    info: mne.Info,
+    fwd: mne.Forward,
+    data_cov: mne.Covariance,
+    reg: float = 0.05,
+    noise_cov: mne.Covariance | None = None,
+    label: mne.Label | None = None,
+    pick_ori: str | None = None,
+    rank: str | dict = "info",
+    noise_rank: str | dict = "info",
+    weight_norm: str | None = "unit-noise-gain-invariant",
+    reduce_rank: bool = False,
+    depth: float | dict | None = None,
+    inversion: str = "matrix",
+    verbose: bool | str | int | None = None,
+) -> Beamformer:
     """Compute LCMV spatial filter.
 
     Modified version of mne.beamformer.make_lcmv.
@@ -505,19 +506,19 @@ def _make_lcmv(
 
 
 def _compute_beamformer(
-    G,
-    Cm,
-    reg,
-    n_orient,
-    weight_norm,
-    pick_ori,
-    reduce_rank,
-    rank,
-    inversion,
-    nn,
-    orient_std,
-    whitener,
-):
+    G: np.ndarray,
+    Cm: np.ndarray,
+    reg: float,
+    n_orient: int,
+    weight_norm: str | None,
+    pick_ori: str | None,
+    reduce_rank: bool,
+    rank: int,
+    inversion: str,
+    nn: np.ndarray,
+    orient_std: np.ndarray,
+    whitener: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray | None]:
     """Compute a spatial beamformer filter (LCMV or DICS).
 
     Modified version of mne.beamformer._compute_beamformer.
@@ -649,7 +650,9 @@ def _compute_beamformer(
     if reduce_rank:
         Gk = _reduce_leadfield_rank(Gk)
 
-    def _compute_bf_terms(Gk, Cm_inv):
+    def _compute_bf_terms(
+        Gk: np.ndarray, Cm_inv: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
         bf_numer = np.matmul(Gk.swapaxes(-2, -1).conj(), Cm_inv)
         bf_denom = np.matmul(bf_numer, Gk)
         return bf_numer, bf_denom
@@ -818,20 +821,29 @@ def _compute_beamformer(
 
 
 def _prepare_beamformer_input(
-    info,
-    forward,
-    label=None,
-    pick_ori=None,
-    noise_cov=None,
-    rank=None,
-    pca=False,
-    loose=None,
-    combine_xyz="fro",
-    exp=None,
-    limit=None,
-    allow_fixed_depth=True,
-    limit_depth_chs=False,
-):
+    info: mne.Info,
+    forward: mne.Forward,
+    label: mne.Label | None = None,
+    pick_ori: str | None = None,
+    noise_cov: mne.Covariance | None = None,
+    rank: str | dict | None = None,
+    pca: bool = False,
+    loose: float | None = None,
+    combine_xyz: str = "fro",
+    exp: float | None = None,
+    limit: float | None = None,
+    allow_fixed_depth: bool = True,
+    limit_depth_chs: bool = False,
+) -> tuple[
+    bool,
+    mne.Info,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+]:
     """Input preparation common for LCMV, DICS, and RAP-MUSIC.
 
     Modified version of mne.beamformer._prepare_beamformer_input.
@@ -969,8 +981,8 @@ def _prepare_beamformer_input(
 
 def _niimask2mmpointcloud(
     nii_mask: str,
-    volindex: Optional[int] = None,
-) -> Tuple[np.ndarray, np.ndarray]:
+    volindex: int | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """Takes in a nii.gz mask (which equals zero for background and neq zero
     for the mask) and returns the mask as a 3 x npoints point cloud in native
     space in mm's.
@@ -1007,7 +1019,7 @@ def _niimask2mmpointcloud(
 def _closest_node(
     node: np.ndarray,
     nodes: np.ndarray,
-) -> Tuple[int, float]:
+) -> tuple[int, float]:
     """Find nearest node in nodes to the passed in node.
 
     Returns

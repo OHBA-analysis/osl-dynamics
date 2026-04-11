@@ -1,8 +1,10 @@
 """Preprocessing functions."""
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any
 
 import mne
 import numpy as np
@@ -19,10 +21,10 @@ from scipy.ndimage.filters import uniform_filter1d
 
 def detect_bad_segments(
     raw: mne.io.Raw,
-    picks: Union[str, List[str]],
-    mode: Optional[str] = None,
+    picks: str | list[str],
+    mode: str | None = None,
     metric: str = "std",
-    window_length: Optional[int] = None,
+    window_length: int | None = None,
     significance_level: float = 0.05,
     maximum_fraction: float = 0.1,
     ref_meg: str = "auto",
@@ -366,7 +368,7 @@ def ica_label(
     method: str = "megnet",
     threshold: float = 0.5,
     random_state: int = 42,
-) -> Tuple[mne.io.Raw, Any, dict]:
+) -> tuple[mne.io.Raw, Any, dict]:
     """Automatic ICA artefact rejection using mne-icalabel.
 
     Fits ICA on a bandpass-filtered copy of the data, labels components
@@ -477,13 +479,13 @@ def ica_ecg_eog_correlation(
     picks: str = "meg",
     n_components: int = 40,
     l_freq: float = 1.0,
-    h_freq: Optional[float] = None,
-    ecg_method: Optional[str] = "ctps",
-    ecg_threshold: Union[str, float] = "auto",
+    h_freq: float | None = None,
+    ecg_method: str | None = "ctps",
+    ecg_threshold: str | float = "auto",
     eog_measure: str = "correlation",
     eog_threshold: float = 0.35,
     random_state: int = 42,
-) -> Tuple[mne.io.Raw, Any, dict]:
+) -> tuple[mne.io.Raw, Any, dict]:
     """ICA artefact rejection using ECG/EOG correlation.
 
     Fits ICA on a high-pass filtered copy of the data, identifies artefact
@@ -644,7 +646,7 @@ def ica_ecg_eog_correlation(
 def plot_ica_components(
     ica: Any,
     ic_labels: dict,
-) -> Optional[plt.Figure]:
+) -> plt.Figure | None:
     """Plot excluded ICA component topographies with labels.
 
     Creates a composite figure showing only the excluded ICA components
@@ -735,12 +737,12 @@ def decimate_headshape_points(
     raw: mne.io.Raw,
     decimate_amount: float = 0.01,
     include_facial_info: bool = True,
-    remove_zlim: Optional[float] = -0.02,
+    remove_zlim: float | None = -0.02,
     angle: float = 0,
     method: str = "gridaverage",
-    face_Z: Optional[List[float]] = None,
-    face_Y: Optional[List[float]] = None,
-    face_X: Optional[List[float]] = None,
+    face_Z: list[float] | None = None,
+    face_Y: list[float] | None = None,
+    face_X: list[float] | None = None,
     decimate_facial_info: bool = True,
     decimate_facial_info_amount: float = 0.01,
 ) -> mne.io.Raw:
@@ -846,12 +848,12 @@ def _decimate_headshape(
     headshape: np.ndarray,
     decimate_amount: float = 0.015,
     include_facial_info: bool = True,
-    remove_zlim: Optional[float] = 0.02,
+    remove_zlim: float | None = 0.02,
     angle: float = 10,
     method: str = "gridaverage",
-    face_Z: Optional[List[float]] = None,
-    face_Y: Optional[List[float]] = None,
-    face_X: Optional[List[float]] = None,
+    face_Z: list[float] | None = None,
+    face_Y: list[float] | None = None,
+    face_X: list[float] | None = None,
     decimate_facial_info: bool = True,
     decimate_facial_info_amount: float = 0.008,
 ) -> np.ndarray:
@@ -1018,10 +1020,10 @@ def _grid_average_decimate(
 
 def save_qc_plots(
     raw: mne.io.Raw,
-    output_dir: Union[str, Path],
+    output_dir: str | Path,
     show: bool = False,
     ica: Any = None,
-    ic_labels: Optional[dict] = None,
+    ic_labels: dict | None = None,
 ) -> None:
     """Save preprocessing QC plots and summary.
 

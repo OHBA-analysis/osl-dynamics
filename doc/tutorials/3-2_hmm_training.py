@@ -31,7 +31,7 @@ This tutorial covers how to train an HMM. We will use MEG data in this tutorial,
 #         return f"Data downloaded to: {rename}"
 #
 #     # Download the dataset (approximately 21 MB)
-#     get_data("notts_mrc_meguk_giles_prepared_1_subject", rename="prepared_data")
+#     get_data("notts_meguk_giles_prepared_1_subject", rename="prepared_data")
 
 #%%
 # Load the data

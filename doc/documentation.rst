@@ -57,7 +57,10 @@ The following tutorials illustrate basic usage and analysis that can be done wit
 **M/EEG processing tutorials**:
 
 - :doc:`tutorials_build/0-1_meg_preprocessing`.
-- See `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ for start-to-end tutorials with Elekta, CTF, OPM and EEG data.
+- :doc:`tutorials_build/0-2_meg_batch_processing`.
+- :doc:`tutorials_build/0-3_eeg_batch_processing`.
+
+Also see `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ for start-to-end tutorials with Elekta, CTF, OPM and EEG data.
 
 **Data tutorials**:
 

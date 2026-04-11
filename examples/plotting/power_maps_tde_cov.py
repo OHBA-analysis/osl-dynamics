@@ -18,7 +18,7 @@ def get_data(name, output_dir):
     print(f"Data downloaded to: {output_dir}")
 
 # We will download example data hosted on osf.io/by2tc.
-get_data("tde_hmm_notts_mrc_meguk_glasser", output_dir="notts_tde_hmm")
+get_data("tde_hmm_notts_meguk_glasser", output_dir="notts_tde_hmm")
 
 # Get the inferred covariances
 #

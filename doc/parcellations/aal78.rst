@@ -189,3 +189,10 @@ Example code for plotting with this parcellation:
         parcellation_file="atlas-AAL_nparc-78_space-MNI_res-8x8x8.nii.gz",
         filename="map_.png",
     )
+
+Reference
+---------
+
+If you use this parcellation, please cite:
+
+    Tzourio-Mazoyer, N., Landeau, B., Papathanassiou, D., Crivello, F., Etard, O., Delcroix, N., Mazoyer, B., & Joliot, M. (2002). Automated Anatomical Labeling of Activations in SPM Using a Macroscopic Anatomical Parcellation of the MNI MRI Single-Subject Brain. *NeuroImage*, 15(1), 273-289. https://doi.org/10.1006/nimg.2001.0978

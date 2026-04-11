@@ -5,6 +5,18 @@ transforms, internal/external harmonic bases, and the AMM denoising pipeline.
 
 Translated from spm_opm_amm.m and supporting SPM functions.
 
+Examples
+--------
+Apply AMM denoising to OPM data::
+
+    import mne
+    from osl_dynamics.meeg.amm import apply_amm
+
+    raw = mne.io.read_raw_fif("sub-01_task-rest_meg.fif", preload=True)
+    raw_clean, info = apply_amm(raw, li=9, le=2)
+
+The returned ``info`` dict contains the harmonic bases and residuals.
+
 References
 ----------
 Tierney, T.M., Seedat, Z., St Pier, K. et al. (2024). Adaptive multipole
@@ -12,12 +24,18 @@ models of optically pumped magnetometer data. Human Brain Mapping, 45,
 e26596. https://doi.org/10.1002/hbm.26596
 """
 
+from __future__ import annotations
+
+from collections.abc import Callable
+
 import mne
 import numpy as np
 from scipy.special import gammaln
 
+from mne._fiff.proj import Projection
 
-def _associated_legendre(x, l, m):
+
+def _associated_legendre(x: np.ndarray, l: int, m: int) -> np.ndarray:
     """Compute associated Legendre polynomial P_l^m(x).
 
     Uses (-1)^m Condon-Shortley phase, matching spm_slm.m lines 64-76.
@@ -58,7 +76,7 @@ def _associated_legendre(x, l, m):
     return pl
 
 
-def _associated_legendre_deriv(theta, l, m):
+def _associated_legendre_deriv(theta: np.ndarray, l: int, m: int) -> np.ndarray:
     """Compute dP_l^m/dtheta.
 
     Translated from spm_slm.m lines 50-62.
@@ -106,7 +124,9 @@ def _associated_legendre_deriv(theta, l, m):
     return dpl
 
 
-def _spherical_harmonics(theta, phi, L):
+def _spherical_harmonics(
+    theta: np.ndarray, phi: np.ndarray, L: int
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Compute real spherical harmonics and angular derivatives.
 
     Parameters
@@ -167,7 +187,7 @@ def _spherical_harmonics(theta, phi, L):
     return slm, dslm_dphi, dslm_dtheta
 
 
-def _spheroid_fit(positions_m):
+def _spheroid_fit(positions_m: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]:
     """Fit a prolate spheroid to sensor positions.
 
     Parameters
@@ -196,7 +216,7 @@ def _spheroid_fit(positions_m):
     return center / 1000.0, radii / 1000.0, longest_axis
 
 
-def _spheroid_fit_axis(X, ax):
+def _spheroid_fit_axis(X: np.ndarray, ax: int) -> tuple[np.ndarray, np.ndarray]:
     """Core spheroid fit for a given longest axis.
 
     Direct translation of MATLAB _spheroid_fit(X, ax).
@@ -290,8 +310,13 @@ def _spheroid_fit_axis(X, ax):
     return o, r
 
 
-def _shrink_spheroid(positions_m, center_m, radii_m):
-    """Iteratively shrink radii by 1 mm until all sensors are outside.
+def _shrink_spheroid(
+    positions_m: np.ndarray, center_m: np.ndarray, radii_m: np.ndarray
+) -> np.ndarray:
+    """Iteratively shrink radii until all sensors are outside.
+
+    Matches spm_opm_amm.m lines 106-118: uses step size of 0.5% of the
+    max radius, counts sensors outside, and loops until all are outside.
 
     Parameters
     ----------
@@ -310,28 +335,47 @@ def _shrink_spheroid(positions_m, center_m, radii_m):
     # Work in mm
     v = (positions_m - center_m) * 1000.0
     r = radii_m.copy() * 1000.0
+    n_sensors = len(v)
+    stepsize = np.max(r * 0.005)
 
     inside = (
         v[:, 0] ** 2 / r[0] ** 2 + v[:, 1] ** 2 / r[1] ** 2 + v[:, 2] ** 2 / r[2] ** 2
     )
-    c = np.sum(inside < 1)
+    c = np.sum(inside > 1)
 
-    while c > 0:
-        rt = r - 1.0
+    while c != n_sensors:
+        rt = r - stepsize
         inside = (
             v[:, 0] ** 2 / rt[0] ** 2
             + v[:, 1] ** 2 / rt[1] ** 2
             + v[:, 2] ** 2 / rt[2] ** 2
         )
-        cc = np.sum(inside < 1)
-        if cc <= c:
-            r = r - 1.0
+        cc = np.sum(inside > 1)
+        if cc >= c:
+            r = r - stepsize
             c = cc
 
     return r / 1000.0
 
 
-def _cartesian_to_prolate(positions_m, orientations, center_m, a_m, b_m, longest_axis):
+def _cartesian_to_prolate(
+    positions_m: np.ndarray,
+    orientations: np.ndarray,
+    center_m: np.ndarray,
+    a_m: float,
+    b_m: float,
+    longest_axis: int,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+]:
     """Convert Cartesian sensor coords to prolate spheroidal coords.
 
     The MATLAB code hardcodes column index 1 (0-based) as the major axis
@@ -433,7 +477,9 @@ def _cartesian_to_prolate(positions_m, orientations, center_m, a_m, b_m, longest
     return major, nabla, phi, emajor, enabla, ephi, hmajor, hnabla, hphi
 
 
-def _compute_radial_functions(major, a, c, L, func):
+def _compute_radial_functions(
+    major: np.ndarray, a: float, c: float, L: int, func: Callable
+) -> np.ndarray:
     """Compute radial function for all (l, m) pairs.
 
     Parameters
@@ -458,7 +504,7 @@ def _compute_radial_functions(major, a, c, L, func):
     return result
 
 
-def _qlm_hat(major, a, c, l, m):
+def _qlm_hat(major: np.ndarray, a: float, c: float, l: int, m: int) -> np.ndarray:
     """Internal radial function via infinite series.
 
     Translated from spm_ipharm.m lines 84-113.
@@ -524,7 +570,9 @@ def _qlm_hat(major, a, c, l, m):
     return qlm
 
 
-def _d_qlm_hat_dmajor(major, a, c, l, m):
+def _d_qlm_hat_dmajor(
+    major: np.ndarray, a: float, c: float, l: int, m: int
+) -> np.ndarray:
     """Derivative of internal radial function w.r.t. major.
 
     Translated from spm_ipharm.m lines 129-182.
@@ -606,7 +654,7 @@ def _d_qlm_hat_dmajor(major, a, c, l, m):
     return dqlm
 
 
-def _plm_hat(major, a, c, l, m):
+def _plm_hat(major: np.ndarray, a: float, c: float, l: int, m: int) -> np.ndarray:
     """External radial function via finite series.
 
     Translated from spm_epharm.m lines 84-107.
@@ -660,7 +708,9 @@ def _plm_hat(major, a, c, l, m):
     return plm
 
 
-def _d_plm_hat_dmajor(major, a, c, l, m):
+def _d_plm_hat_dmajor(
+    major: np.ndarray, a: float, c: float, l: int, m: int
+) -> np.ndarray:
     """Derivative of external radial function w.r.t. major.
 
     Translated from spm_epharm.m lines 122-171.
@@ -742,16 +792,16 @@ def _d_plm_hat_dmajor(major, a, c, l, m):
 
 
 def _compute_harmonic_basis(
-    positions_m,
-    orientations,
-    a_m,
-    b_m,
-    L,
-    center_m,
-    longest_axis,
-    radial_func,
-    radial_deriv_func,
-):
+    positions_m: np.ndarray,
+    orientations: np.ndarray,
+    a_m: float,
+    b_m: float,
+    L: int,
+    center_m: np.ndarray,
+    longest_axis: int,
+    radial_func: Callable,
+    radial_deriv_func: Callable,
+) -> np.ndarray:
     """Compute prolate spheroidal harmonic basis (internal or external).
 
     Parameters
@@ -825,8 +875,14 @@ def _compute_harmonic_basis(
 
 
 def _compute_internal_harmonics(
-    positions_m, orientations, a_m, b_m, L, center_m, longest_axis
-):
+    positions_m: np.ndarray,
+    orientations: np.ndarray,
+    a_m: float,
+    b_m: float,
+    L: int,
+    center_m: np.ndarray,
+    longest_axis: int,
+) -> np.ndarray:
     """Compute internal prolate spheroidal harmonic basis.
 
     Parameters
@@ -865,8 +921,14 @@ def _compute_internal_harmonics(
 
 
 def _compute_external_harmonics(
-    positions_m, orientations, a_m, b_m, L, center_m, longest_axis
-):
+    positions_m: np.ndarray,
+    orientations: np.ndarray,
+    a_m: float,
+    b_m: float,
+    L: int,
+    center_m: np.ndarray,
+    longest_axis: int,
+) -> np.ndarray:
     """Compute external prolate spheroidal harmonic basis.
 
     Parameters
@@ -904,7 +966,7 @@ def _compute_external_harmonics(
     )
 
 
-def _orth(A):
+def _orth(A: np.ndarray) -> np.ndarray:
     """Orthonormal basis for column space.
 
     Uses SVD and keeps columns with singular values > max(size(A)) * eps * s[0].
@@ -915,7 +977,13 @@ def _orth(A):
     return U[:, :rank]
 
 
-def apply_amm(raw, li=9, le=2, window=10.0, corr_lim=0.98):
+def apply_amm(
+    raw: mne.io.Raw,
+    li: int = 9,
+    le: int = 2,
+    window: float = 10.0,
+    corr_lim: float = 0.98,
+) -> tuple[mne.io.Raw, dict]:
     """Apply AMM denoising.
 
     Parameters
@@ -1082,6 +1150,27 @@ def apply_amm(raw, li=9, le=2, window=10.0, corr_lim=0.98):
         data[meg_picks, start:end] = inner
 
     raw_amm._data[meg_picks, :] = data[meg_picks, :]
+
+    # Add SSP projectors for the external harmonic subspace
+    n_ext = external.shape[1]
+    ext_norm = external / np.linalg.norm(external, axis=0, keepdims=True)
+    projs = []
+    count = 0
+    for l in range(1, le + 1):
+        for m in range(-l, l + 1):
+            proj_data = dict(
+                col_names=meg_ch_names,
+                row_names=None,
+                data=ext_norm[:, count][np.newaxis, :],
+                ncol=n_ch,
+                nrow=1,
+            )
+            projs.append(
+                Projection(active=True, data=proj_data, desc=f"AMM: l={l} m={m}")
+            )
+            count += 1
+    raw_amm.add_proj(projs)
+    print(f"  Added {n_ext} SSP projectors for external harmonics.")
     print("  AMM complete.")
 
     info = {

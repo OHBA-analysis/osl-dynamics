@@ -31,7 +31,7 @@ def get_data(name, rename):
     return f"Data downloaded to: {rename}"
 
 # Download the dataset (approximately 52 MB)
-get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
+get_data("notts_meguk_giles_5_subjects", rename="source_data")
 
 #%%
 # Load the data
