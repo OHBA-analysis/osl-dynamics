@@ -1,10 +1,16 @@
 """Run a processing function over multiple items in parallel."""
 
+from __future__ import annotations
+
+import importlib
+import importlib.abc
 import multiprocessing as mp
 import os
+import sys
 import traceback
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from . import report
 from osl_dynamics.utils.logger import MEEGSessionLogger
@@ -18,28 +24,44 @@ _THREAD_LIMIT_VARS = [
 ]
 
 
-def _limit_onnx_threads():
-    """Patch ONNX Runtime to use 1 thread per session."""
-    try:
-        import onnxruntime as ort
+def _limit_onnx_threads() -> None:
+    """Import hook to patch ONNX Runtime to use 1 thread."""
 
-        _OriginalSession = ort.InferenceSession
+    class _OnnxThreadLimiter(importlib.abc.MetaPathFinder, importlib.abc.Loader):
+        def __init__(self):
+            self._patched = False
 
-        class _SingleThreadSession(_OriginalSession):
-            def __init__(self, *args, **kwargs):
-                if "sess_options" not in kwargs or kwargs["sess_options"] is None:
-                    opts = ort.SessionOptions()
-                    opts.intra_op_num_threads = 1
-                    opts.inter_op_num_threads = 1
-                    kwargs["sess_options"] = opts
-                super().__init__(*args, **kwargs)
+        def find_module(self, fullname, path=None):
+            if fullname == "onnxruntime" and not self._patched:
+                return self
+            return None
 
-        ort.InferenceSession = _SingleThreadSession
-    except ImportError:
-        pass
+        def load_module(self, fullname):
+            self._patched = True
+            # Remove ourselves temporarily to avoid recursion
+            sys.meta_path.remove(self)
+            import onnxruntime as ort
+
+            sys.meta_path.insert(0, self)
+
+            _OriginalSession = ort.InferenceSession
+
+            class _SingleThreadSession(_OriginalSession):
+                def __init__(self, *args, **kwargs):
+                    if "sess_options" not in kwargs or kwargs["sess_options"] is None:
+                        opts = ort.SessionOptions()
+                        opts.intra_op_num_threads = 1
+                        opts.inter_op_num_threads = 1
+                        kwargs["sess_options"] = opts
+                    super().__init__(*args, **kwargs)
+
+            ort.InferenceSession = _SingleThreadSession
+            return ort
+
+    sys.meta_path.insert(0, _OnnxThreadLimiter())
 
 
-def _get_id(item: Any, index: int) -> str:
+def _get_id(item: object, index: int) -> str:
     """Get the ID for an item."""
     if isinstance(item, str):
         return item
@@ -50,7 +72,7 @@ def _get_id(item: Any, index: int) -> str:
     return str(index)
 
 
-def _items_to_sessions_dict(items: list) -> Dict:
+def _items_to_sessions_dict(items: list) -> dict:
     """Convert a list of items to a sessions dict for the report module."""
     sessions = {}
     for i, item in enumerate(items):
@@ -63,28 +85,34 @@ def _items_to_sessions_dict(items: list) -> Dict:
 
 
 def _worker(
-    args: Tuple[Callable, str, Any, Path],
-) -> Tuple[str, bool]:
+    args: tuple[Callable, str, object, Path],
+) -> tuple[str, bool]:
     """Wrapper that handles logging and error catching for a single item."""
     _limit_onnx_threads()
     func, id, item, log_dir = args
+    ok = True
     with MEEGSessionLogger(id, log_dir) as logger:
         try:
             func(item, logger)
-            return id, True
         except Exception as e:
             logger.error(str(e))
             traceback.print_exc()
-            return id, False
+            ok = False
+    if not ok:
+        log_file = log_dir / f"{id}.log"
+        err_file = log_dir / f"{id}.log.err"
+        if log_file.exists():
+            log_file.rename(err_file)
+    return id, ok
 
 
 def run(
     func: Callable,
-    items: List[Any],
+    items: list,
     n_workers: int,
-    log_dir: Union[str, Path],
-    output_dir: Optional[Union[str, Path]] = None,
-    plots_dir: Optional[Union[str, Path]] = None,
+    log_dir: str | Path,
+    output_dir: str | Path | None = None,
+    plots_dir: str | Path | None = None,
 ) -> None:
     """Run a function over items in parallel.
 

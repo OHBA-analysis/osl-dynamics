@@ -19,8 +19,8 @@ def get_inf_params(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
-get_inf_params("tde_hmm_notts_mrc_meguk_giles_5_subjects", rename="results/inf_params")
+get_data("notts_meguk_giles_5_subjects", rename="source_data")
+get_inf_params("tde_hmm_notts_meguk_giles_5_subjects", rename="results/inf_params")
 
 data = Data("source_data", n_jobs=5)
 data = data.trim_time_series(n_embeddings=15, sequence_length=2000)

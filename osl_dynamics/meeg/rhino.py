@@ -1,11 +1,12 @@
 """RHINO functions."""
 
+from __future__ import annotations
+
 import os
 import copy
 import shutil
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -228,6 +229,7 @@ def extract_surfaces(
     outdir: str,
     include_nose: bool = True,
     do_mri2mniaxes_xform: bool = True,
+    bet_fval: float | None = None,
     show: bool = False,
 ) -> None:
     """Extract surfaces.
@@ -257,11 +259,14 @@ def extract_surfaces(
     Parameters
     ----------
     mri_file : str
-        Full path to structural MRI in niftii format (with .nii.gz extension).
-        This is assumed to have a valid sform, i.e. the sform code needs to be
-        4 or 1, and the sform should transform from voxel indices to voxel
-        coords in mm. The axis sform used to do this will be the native/MRI
-        axis used throughout RHINO. The qform will be ignored.
+        Full path to structural MRI in NIfTI format (with .nii.gz, .nii,
+        .hdr or .mgz extension).
+        The sform code must be 1 (Scanner Anat) or 4 (MNI), and the sform
+        matrix should transform from voxel indices to coordinates in mm. The
+        sform defines the native/MRI coordinate system used throughout RHINO.
+        The qform is ignored. You can check the sform code with
+        ``fslorient -getsformcode <mri_file>`` and set it with
+        ``fslorient -setsformcode 1 <mri_file>``.
     outdir : str
         Output directory.
     include_nose : bool, optional
@@ -273,6 +278,11 @@ def extract_surfaces(
         Specifies whether to do step (1) above, i.e. transform MRI to be
         aligned with the MNI axes. Sometimes needed when the MRI goes out
         of the MNI FOV after step (1).
+    bet_fval : float, optional
+        Fractional intensity threshold for FSL's BET. Default is None, which
+        uses BET's default (0.5). Higher values (e.g. 0.6-0.7) give more
+        aggressive skull stripping, which can help when the inner skull
+        surface includes non-brain tissue.
     show : bool, optional
         Whether to display the surface plots interactively. Default is
         False (suitable for batch processing).
@@ -294,8 +304,10 @@ def extract_surfaces(
 
     # Check mri_file
     mri_ext = "".join(Path(mri_file).suffixes)
-    if mri_ext not in [".nii", ".nii.gz"]:
-        raise ValueError("mri_file needs to have a .nii or .nii.gz extension")
+    if mri_ext not in [".nii", ".nii.gz", ".hdr", ".mgz"]:
+        raise ValueError(
+            "mri_file needs to have a .nii, .nii.gz, .hdr or .mgz extension"
+        )
 
     # Copy MRI to new file for modification
     img = nib.load(mri_file)
@@ -395,7 +407,10 @@ def extract_surfaces(
 
     # Command: bet <flirt_mri_mniaxes_file> <flirt_mri_mniaxes_bet_file>
     flirt_mri_mniaxes_bet_file = f"{fns.root}/flirt_mri_mniaxes_bet"
-    fsl_wrappers.bet(flirt_mri_mniaxes_file, flirt_mri_mniaxes_bet_file)
+    bet_kwargs = {}
+    if bet_fval is not None:
+        bet_kwargs["fracintensity"] = bet_fval
+    fsl_wrappers.bet(flirt_mri_mniaxes_file, flirt_mri_mniaxes_bet_file, **bet_kwargs)
 
     # ---------------------------------------------------------
     # 3) Use FLIRT to register skull stripped MRI to MNI space
@@ -469,7 +484,7 @@ def extract_surfaces(
     #
     # Command: bet <flirt_mri_mni_file> <flirt_mri_mni_bet_file> -A
     flirt_mri_mni_bet_file = f"{fns.root}/flirt"
-    fsl_wrappers.bet(flirt_mri_mni_file, flirt_mri_mni_bet_file, A=True)
+    fsl_wrappers.bet(flirt_mri_mni_file, flirt_mri_mni_bet_file, A=True, **bet_kwargs)
 
     # ---------------------------------------
     # 5) Add nose to scalp surface (optional)
@@ -936,43 +951,169 @@ def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
     np.savetxt(fns.coreg.head_headshape_file, headshape)
 
 
+def extract_fiducials_and_headshape_from_elc(
+    fns: OSLFilenames,
+    remove_nose: bool = True,
+) -> None:
+    """Extract fiducials and headshape points from an ELC file.
+
+    Reads fiducial locations (nasion, LPA, RPA) and headshape points from
+    an ELC file (ANT Neuro) and saves them in the RHINO file format.
+
+    The ELC file is expected to contain a ``Positions`` section with three
+    fiducial rows (nasion, LPA, RPA) and a ``HeadShapePoints`` section
+    with 3D coordinates. All values are assumed to be in mm.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames. ``fns.elc_file`` must be set.
+    remove_nose : bool, optional
+        Remove headshape points on the nose? A point is considered to be
+        on the nose if it is anterior to both LPA and RPA and inferior to
+        the nasion.
+    """
+    if fns.elc_file is None:
+        raise ValueError("elc_file must have been passed to OSLFilenames")
+
+    print(f"Saving fiducials/headshape points from {fns.elc_file}")
+
+    with open(fns.elc_file, "r") as f:
+        lines = f.readlines()
+
+    # Extract fiducials from the Positions section
+    for i in range(len(lines)):
+        if lines[i] == "Positions\n":
+            nasion = np.array(lines[i + 1].split()[-3:]).astype(np.float64)
+            lpa = np.array(lines[i + 2].split()[-3:]).astype(np.float64)
+            rpa = np.array(lines[i + 3].split()[-3:]).astype(np.float64)
+            break
+
+    # Extract headshape points from the HeadShapePoints section
+    for i in range(len(lines)):
+        if lines[i] == "HeadShapePoints\n":
+            headshape = (
+                np.array([line.split() for line in lines[i + 1 :]]).astype(np.float64).T
+            )
+            break
+
+    # Optionally remove headshape points on the nose
+    if remove_nose:
+        on_nose = np.logical_and(
+            headshape[0] > max(lpa[0], rpa[0]),
+            headshape[2] < nasion[2],
+        )
+        headshape = headshape[:, ~on_nose]
+
+    # Save
+    print(f"Saved: {fns.coreg.head_nasion_file}")
+    np.savetxt(fns.coreg.head_nasion_file, nasion)
+    print(f"Saved: {fns.coreg.head_rpa_file}")
+    np.savetxt(fns.coreg.head_rpa_file, rpa)
+    print(f"Saved: {fns.coreg.head_lpa_file}")
+    np.savetxt(fns.coreg.head_lpa_file, lpa)
+    print(f"Saved: {fns.coreg.head_headshape_file}")
+    np.savetxt(fns.coreg.head_headshape_file, headshape)
+
+
 def remove_stray_headshape_points(
     fns: OSLFilenames,
     nose: bool = True,
 ) -> None:
     """Remove stray headshape points.
 
-    Removes headshape points near the nose, on the neck or far away from the head.
+    Removes headshape points near the nose, on the neck or far away from the
+    head. The filtering is done in a coordinate system derived from the
+    fiducial points (nasion, LPA, RPA), so it works regardless of the
+    original coordinate convention (e.g. Elekta/FIF or CTF/.pos).
+
+    The fiducial-derived axes are:
+
+    - **left-right**: LPA to RPA direction.
+    - **anterior**: perpendicular to the left-right axis, pointing towards
+      the nasion.
+    - **superior**: cross product of the above two axes.
 
     Parameters
     ----------
     fns : OSLFilenames
         Container for OSL filenames.
     nose : bool, optional
-        Should we remove headshape points near the nose? Useful to remove these
-        if we have defaced structurals or aren't extracting the nose from the
-        structural.
+        Should we remove headshape points near the nose? Useful to remove
+        these if we have defaced structurals or aren't extracting the nose
+        from the structural.
     """
     fns = fns.coreg
 
-    # Load saved headshape and nasion files
+    # Load saved headshape and fiducial files
     hs = np.loadtxt(fns.head_headshape_file)
     nas = np.loadtxt(fns.head_nasion_file)
     lpa = np.loadtxt(fns.head_lpa_file)
     rpa = np.loadtxt(fns.head_rpa_file)
 
+    # Check the headshape array is 2D (3, n_points)
+    if hs.ndim != 2 or hs.shape[0] != 3:
+        warnings.warn(
+            f"Headshape file {fns.head_headshape_file} has unexpected shape "
+            f"{hs.shape}, skipping stray point removal."
+        )
+        return
+
+    # Build a fiducial-derived coordinate system so the filtering logic
+    # is independent of the original axis convention.
+    #
+    # Origin: midpoint of LPA and RPA
+    # Axis 0 (left-right): LPA -> RPA
+    # Axis 1 (anterior):   perpendicular, towards nasion
+    # Axis 2 (superior):   cross product of the above
+    origin = (lpa + rpa) / 2.0
+    ax_lr = rpa - lpa
+    ax_lr = ax_lr / np.linalg.norm(ax_lr)
+
+    nas_vec = nas - origin
+    ax_ant = nas_vec - np.dot(nas_vec, ax_lr) * ax_lr
+    ax_ant = ax_ant / np.linalg.norm(ax_ant)
+
+    ax_sup = np.cross(ax_lr, ax_ant)
+
+    # Project everything into the fiducial coordinate system
+    def _project(pts: np.ndarray) -> np.ndarray:
+        centred = pts - origin[:, np.newaxis]
+        return np.array(
+            [
+                ax_lr @ centred,
+                ax_ant @ centred,
+                ax_sup @ centred,
+            ]
+        )
+
+    hs_proj = _project(hs)
+    nas_proj = _project(nas[:, np.newaxis]).ravel()
+    lpa_proj = _project(lpa[:, np.newaxis]).ravel()
+    rpa_proj = _project(rpa[:, np.newaxis]).ravel()
+
+    # Apply the same filtering logic as before, now in the canonical axes
     if nose:
         # Remove headshape points on the nose
-        remove = np.logical_and(hs[1] > max(lpa[1], rpa[1]), hs[2] < nas[2])
+        remove = np.logical_and(
+            hs_proj[1] > max(lpa_proj[1], rpa_proj[1]),
+            hs_proj[2] < nas_proj[2],
+        )
         hs = hs[:, ~remove]
+        hs_proj = hs_proj[:, ~remove]
 
     # Remove headshape points on the neck
-    remove = hs[2] < min(lpa[2], rpa[2]) - 4
+    remove = hs_proj[2] < min(lpa_proj[2], rpa_proj[2]) - 4
     hs = hs[:, ~remove]
+    hs_proj = hs_proj[:, ~remove]
 
     # Remove headshape points far from the head in any direction
     remove = np.logical_or(
-        hs[0] < lpa[0] - 5, np.logical_or(hs[0] > rpa[0] + 5, hs[1] > nas[1] + 5)
+        hs_proj[0] < lpa_proj[0] - 5,
+        np.logical_or(
+            hs_proj[0] > rpa_proj[0] + 5,
+            hs_proj[1] > nas_proj[1] + 5,
+        ),
     )
     hs = hs[:, ~remove]
 
@@ -1069,7 +1210,7 @@ def coregister_head_and_mri(
     use_headshape: bool = True,
     use_nose: bool = True,
     allow_mri_scaling: bool = False,
-    mni_fiducials: Optional[Dict[str, np.ndarray]] = None,
+    mni_fiducials: dict[str, np.ndarray] | None = None,
     n_init: int = 1,
     plot_type: str = "png",
     show: bool = False,
@@ -1449,7 +1590,7 @@ def plot_coregistration(
     display_fiducials: bool = True,
     display_headshape_pnts: bool = True,
     include_nose: bool = True,
-    filename: Optional[str] = None,
+    filename: str | None = None,
     show: bool = False,
 ) -> None:
     """Plot coregistration.
@@ -1967,7 +2108,9 @@ def forward_model(
     print("Forward model complete.")
 
 
-def _setup_volume_source_space(fns, gridstep=5, mindist=5.0, exclude=0.0):
+def _setup_volume_source_space(
+    fns: OSLFilenames, gridstep: int = 5, mindist: float = 5.0, exclude: float = 0.0
+) -> mne.SourceSpaces:
     """Set up a volume source space grid inside the inner skull surface.
 
     This is a RHINO specific version of mne.setup_volume_source_space.
@@ -2116,15 +2259,15 @@ def _setup_volume_source_space(fns, gridstep=5, mindist=5.0, exclude=0.0):
 
 
 def _make_fwd_solution(
-    fns,
-    src,
-    bem,
-    meg=True,
-    eeg=True,
-    mindist=0.0,
-    ignore_ref=False,
-    verbose=None,
-):
+    fns: OSLFilenames,
+    src: mne.SourceSpaces,
+    bem: mne.bem.ConductorModel | str,
+    meg: bool = True,
+    eeg: bool = True,
+    mindist: float = 0.0,
+    ignore_ref: bool = False,
+    verbose: bool | None = None,
+) -> mne.Forward:
     """Calculate a forward solution for a subject.
 
     This is a wrapper for mne.make_forward_solution.
@@ -2232,33 +2375,52 @@ def _make_fwd_solution(
     return fwd
 
 
-def _get_orient(nii_file):
+def _get_orient(nii_file: str) -> str:
     """Get orientation of nii file."""
     cmd = f"fslorient -getorient {nii_file}"
     return os.popen(cmd).read().strip()
 
 
-def _get_sform(nii_file):
+def _get_sform(nii_file: str) -> Transform:
     """Get sform of nii file."""
     sformcode = int(nib.load(nii_file).header["sform_code"])
     if sformcode == 1 or sformcode == 4:
         sform = nib.load(nii_file).header.get_sform()
     else:
         raise ValueError(
-            f"sformcode for {nii_file} is {sformcode}, needs to be 4 or 1."
+            f"sformcode for {nii_file} is {sformcode}, needs to be 1 or 4.\n\n"
+            "The sform code indicates how the sform matrix should be "
+            "interpreted:\n"
+            "  1 = Scanner Anat (native scanner coordinates)\n"
+            "  4 = MNI (MNI-152 standard space)\n\n"
+            "How to fix this:\n\n"
+            "1. If the qform is valid (check with "
+            f"'fslorient -getqformcode {nii_file}'),\n"
+            "   copy it to the sform:\n"
+            f"     fslorient -copyqform2sform {nii_file}\n\n"
+            "2. If the sform matrix is correct but only the code is wrong "
+            "(check with\n"
+            f"   'fslorient -getsform {nii_file}'), set the code directly:\n"
+            f"     fslorient -setsformcode 1 {nii_file}\n\n"
+            "3. If the orientation is non-standard, reorient to standard "
+            "axes:\n"
+            f"     fslreorient2std {nii_file} {nii_file}\n\n"
+            "4. If both sform and qform are invalid, re-convert the "
+            "original DICOMs\n"
+            "   with dcm2niix, which correctly populates both.\n\n"
         )
     sform = mne.Transform("mri_voxel", "mri", sform)
     return sform
 
 
-def _check_nii_for_nan(filename):
+def _check_nii_for_nan(filename: str) -> bool:
     """Check nii file for nans."""
     img = nib.load(filename)
     data = img.get_fdata()
     return np.isnan(data).any()
 
 
-def _get_flirt_xform_between_axes(from_nii, target_nii):
+def _get_flirt_xform_between_axes(from_nii: str, target_nii: str) -> np.ndarray:
     """
     Computes flirt xform that moves from_nii to have voxel indices on the same
     axis as  the voxel indices for target_nii.
@@ -2300,7 +2462,9 @@ def _get_flirt_xform_between_axes(from_nii, target_nii):
     return from2to
 
 
-def _get_mne_xform_from_flirt_xform(flirt_xform, nii_mesh_file_in, nii_mesh_file_out):
+def _get_mne_xform_from_flirt_xform(
+    flirt_xform: np.ndarray, nii_mesh_file_in: str, nii_mesh_file_out: str
+) -> np.ndarray:
     """
     Returns a mm coordinates to mm coordinates MNE xform that corresponds to
     the passed in flirt xform.
@@ -2317,7 +2481,7 @@ def _get_mne_xform_from_flirt_xform(flirt_xform, nii_mesh_file_in, nii_mesh_file
     )
 
 
-def _get_flirtcoords2native_xform(nii_mesh_file):
+def _get_flirtcoords2native_xform(nii_mesh_file: str) -> np.ndarray:
     """
     Returns xform_flirtcoords2native transform that transforms from flirtcoords
     space in mm into native space in mm, where the passed in nii_mesh_file specifies
@@ -2351,12 +2515,12 @@ def _get_flirtcoords2native_xform(nii_mesh_file):
 
 
 def _transform_vtk_mesh(
-    vtk_mesh_file_in,
-    nii_mesh_file_in,
-    out_vtk_file,
-    nii_mesh_file_out,
-    xform_file,
-):
+    vtk_mesh_file_in: str,
+    nii_mesh_file_in: str,
+    out_vtk_file: str,
+    nii_mesh_file_out: str,
+    xform_file: str | np.ndarray,
+) -> None:
     """
     Outputs mesh to out_vtk_file, which is the result of applying the
     transform xform to vtk_mesh_file_in
@@ -2384,7 +2548,9 @@ def _transform_vtk_mesh(
     data.to_csv(out_vtk_file, sep=" ", index=False)
 
 
-def _get_vtk_mesh_native(vtk_mesh_file, nii_mesh_file):
+def _get_vtk_mesh_native(
+    vtk_mesh_file: str, nii_mesh_file: str
+) -> tuple[np.ndarray, np.ndarray]:
     data = pd.read_csv(vtk_mesh_file, sep=r"\s+")
     num_rrs = int(data.iloc[3, 1])
     rrs_flirtcoords = data.iloc[4 : num_rrs + 4, 0:3].to_numpy().astype(np.float64)
@@ -2397,7 +2563,7 @@ def _get_vtk_mesh_native(vtk_mesh_file, nii_mesh_file):
     return rrs_nii, tris_nii
 
 
-def _xform_points(xform, pnts):
+def _xform_points(xform: np.ndarray, pnts: np.ndarray) -> np.ndarray:
     """Applies homogeneous linear transformation to an array of 3D coordinates.
 
     Parameters
@@ -2422,7 +2588,9 @@ def _xform_points(xform, pnts):
     return newpnts[:3]
 
 
-def _rigid_transform_3D(B, A, compute_scaling=False):
+def _rigid_transform_3D(
+    B: np.ndarray, A: np.ndarray, compute_scaling: bool = False
+) -> tuple[np.ndarray, np.ndarray]:
     """Calculate affine transform from points in A to point in B.
 
     Parameters
@@ -2477,7 +2645,7 @@ def _rigid_transform_3D(B, A, compute_scaling=False):
     return xform, scaling_xform
 
 
-def _niimask2indexpointcloud(nii_fname, volindex=None):
+def _niimask2indexpointcloud(nii_fname: str, volindex: int | None = None) -> np.ndarray:
     """Takes in a nii.gz mask file name (which equals zero for background
     and != zero for the mask) and returns the mask as a 3 x npoints point cloud.
 
@@ -2504,7 +2672,11 @@ def _niimask2indexpointcloud(nii_fname, volindex=None):
     return np.asarray(np.where(vol != 0))
 
 
-def _rhino_icp(mri_headshape_head, polhemus_headshape_head, n_init=10):
+def _rhino_icp(
+    mri_headshape_head: np.ndarray,
+    polhemus_headshape_head: np.ndarray,
+    n_init: int = 10,
+) -> tuple[np.ndarray, np.ndarray, float]:
     """Runs Iterative Closest Point (ICP) with multiple initialisations.
 
     Parameters
@@ -2576,7 +2748,13 @@ def _rhino_icp(mri_headshape_head, polhemus_headshape_head, n_init=10):
     return xform, err, err_old
 
 
-def _icp(A, B, init_pose=None, max_iterations=50, tolerance=0.0001):
+def _icp(
+    A: np.ndarray,
+    B: np.ndarray,
+    init_pose: np.ndarray | None = None,
+    max_iterations: int = 50,
+    tolerance: float = 0.0001,
+) -> tuple[np.ndarray, np.ndarray, int]:
     """The Iterative Closest Point method:
     finds best-fit transform that maps points A on to points B.
 
@@ -2627,7 +2805,7 @@ def _icp(A, B, init_pose=None, max_iterations=50, tolerance=0.0001):
     return T, distances, i
 
 
-def _best_fit_transform(A, B):
+def _best_fit_transform(A: np.ndarray, B: np.ndarray) -> np.ndarray:
     """Calculates the least-squares best-fit transform that maps corresponding
     points A to B in m spatial dimensions.
 
@@ -2662,7 +2840,9 @@ def _best_fit_transform(A, B):
     return T
 
 
-def _create_freesurfer_meshes_from_bet_surfaces(fns, xform_mri_voxel2mri):
+def _create_freesurfer_meshes_from_bet_surfaces(
+    fns: OSLFilenames, xform_mri_voxel2mri: np.ndarray
+) -> None:
     """
     Create sMRI-derived freesurfer surfaces in native/mri space in mm,
     for use by forward modelling
@@ -2688,11 +2868,11 @@ def _create_freesurfer_meshes_from_bet_surfaces(fns, xform_mri_voxel2mri):
 
 
 def _create_freesurfer_mesh_from_bet_surface(
-    infile,
-    surf_outfile,
-    xform_mri_voxel2mri,
-    nii_mesh_file=None,
-):
+    infile: str,
+    surf_outfile: str,
+    xform_mri_voxel2mri: np.ndarray,
+    nii_mesh_file: str | None = None,
+) -> None:
     """Creates surface mesh in .surf format and in native mri space in mm from infile.
 
     Parameters
@@ -2786,7 +2966,7 @@ def _create_freesurfer_mesh_from_bet_surface(
         raise ValueError("Invalid infile. Needs to be a .nii.gz or .vtk file")
 
 
-def _get_vol_info_from_nii(mri):
+def _get_vol_info_from_nii(mri: str) -> dict:
     """Read volume info from an MRI file.
 
     Parameters
@@ -2829,7 +3009,7 @@ def _majority(values_ptr, len_values, result, data):
     return 1
 
 
-def _binary_majority3d(img):
+def _binary_majority3d(img: np.ndarray) -> np.ndarray:
     """
     Set a pixel to 1 if a required majority (default=14) or more pixels
     in its 3x3x3 neighborhood are 1, otherwise, set the pixel to 0. img
@@ -2844,7 +3024,9 @@ def _binary_majority3d(img):
     ).astype(int)
 
 
-def _extract_headshape(preproc_file):
+def _extract_headshape(
+    preproc_file: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Extract headshape points and fiducials from a FIF file.
 
     Parameters

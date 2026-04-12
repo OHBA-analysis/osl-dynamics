@@ -27,7 +27,7 @@ def get_spectra(name, rename):
     return f"Data downloaded to: {rename}"
 
 # Download the dataset (approximately 21 MB)
-get_spectra("tde_hmm_notts_mrc_meguk_giles_5_subjects", rename="results/spectra")
+get_spectra("tde_hmm_notts_meguk_giles_5_subjects", rename="results/spectra")
 
 #%%
 # Load multitaper spectra

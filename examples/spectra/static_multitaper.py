@@ -15,7 +15,7 @@ def get_data(name, rename):
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-get_data("notts_mrc_meguk_giles_5_subjects", rename="source_data")
+get_data("notts_meguk_giles_5_subjects", rename="source_data")
 
 data = Data("source_data", n_jobs=5)
 data = data.time_series()

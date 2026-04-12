@@ -104,6 +104,9 @@ class OSLFilenames:
         Path to the surfaces directory.
     pos_file : str, optional
         Path to a .pos file (only needed for CTF data).
+    elc_file : str, optional
+        Path to an .elc file (alternative format for head shape points
+        from CTF data).
     """
 
     def __init__(
@@ -113,6 +116,7 @@ class OSLFilenames:
         preproc_file: str,
         surfaces_dir: str,
         pos_file: Optional[str] = None,
+        elc_file: Optional[str] = None,
     ):
         self.outdir = outdir
         self.id = id
@@ -128,7 +132,8 @@ class OSLFilenames:
         self.coreg_dir = f"{outdir}/{id}/coreg"
         self.coreg = CoregFilenames(self.coreg_dir)
         self.fwd_model = f"{self.coreg_dir}/model-fwd.fif"
-        self.pos_file = pos_file  # only needed for CTF data
+        self.pos_file = pos_file
+        self.elc_file = elc_file
 
         self.src_dir = f"{outdir}/{id}/src"
         os.makedirs(self.src_dir, exist_ok=True)
@@ -149,6 +154,10 @@ class OSLFilenames:
         if self.pos_file is not None:
             lines += [
                 f"  pos file:  {self.pos_file}",
+            ]
+        if self.elc_file is not None:
+            lines += [
+                f"  elc file:  {self.elc_file}",
             ]
         return "\n".join(lines)
 

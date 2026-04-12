@@ -8,7 +8,7 @@ from osl_dynamics.meeg import parallel, preproc
 
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
-output_dir = Path("BIDS/derivatives")
+output_dir = Path("derivatives")
 plots_dir = Path("plots")
 log_dir = Path("logs/1_preproc")
 
@@ -31,14 +31,14 @@ def process_session(session, logger):
     raw = raw.crop(tmax=60)
 
     logger.log("Filtering and downsampling...")
-    raw = raw.resample(sfreq=250)
+    raw = raw.notch_filter([50, 100])
     raw = raw.filter(
         l_freq=1,
         h_freq=45,
         method="iir",
         iir_params={"order": 5, "ftype": "butter"},
     )
-    raw = raw.notch_filter([50, 100])
+    raw = raw.resample(sfreq=250)
 
     logger.log("Detecting bad segments...")
     raw = preproc.detect_bad_segments(raw, picks="mag")
