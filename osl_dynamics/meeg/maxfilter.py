@@ -222,8 +222,10 @@ def _output_name(input_file: str, outdir: str, *labels: str) -> str:
     """Build a BIDS-MEG output filename using the ``proc-`` entity.
 
     Multiple processing labels are joined with ``+`` and inserted into
-    the ``proc-`` entity before the data-type suffix (``_meg``, ``_eeg``,
-    ``_ieeg`` or ``_nirs``).
+    the ``proc-`` entity before the ``_meg`` suffix.
+
+    For non-BIDS inputs (no recognised data-type suffix), the ``proc-``
+    entity is appended at the end of the basename instead.
 
     Examples
     --------
@@ -232,9 +234,6 @@ def _output_name(input_file: str, outdir: str, *labels: str) -> str:
 
     >>> _output_name("sub-01_task-rest_meg.fif", "out", "tsss", "trans")
     'out/sub-01_task-rest_proc-tsss+trans_meg.fif'
-
-    For non-BIDS inputs (no recognised data-type suffix), the ``proc-``
-    entity is appended at the end of the basename instead.
     """
     if not labels:
         raise ValueError("_output_name requires at least one label")
@@ -1369,6 +1368,7 @@ def run_maxfilter(
                     os.path.join(piece_scratch, "autobad"),
                     options,
                 )
+
             # Prevent per-piece pipelines from re-running autobad now that
             # the shared bad-channel list is set.
             piece_options["autobad"] = False
