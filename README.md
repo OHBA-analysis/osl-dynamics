@@ -72,22 +72,20 @@ rm hbaws.yml
 
 #### BMRC (Oxford)
 
-On the Biomedical Research Computing (BMRC) cluster, `conda` and `mamba` are available as a software module:
+On the Biomedical Research Computing (BMRC) cluster, `conda` is available as a software module:
 ```
 module load Miniforge3
 ```
 and osl-dynamics can be installed with:
 ```
 curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/bmrc.yml
-mamba env create -f bmrc.yml
+conda env create -f bmrc.yml
 rm bmrc.yml
 ```
 The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
 ```
 unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
 ```
-
-See [here](https://github.com/OHBA-analysis/osl-dynamics/blob/main/doc/using_bmrc.rst) for useful information regarding how to use the BMRC cluster.
 
 ### Install the latest code from the GitHub repository (optional)
 
