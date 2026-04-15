@@ -64,7 +64,7 @@ def top_eig(M, k):
     a smaller number of eigenvectors) or numpy.linalg.eigh (for smaller matrices
     or full eigendecomposition)
     """
-    from scipy.sparse.linalg import eigsh
+    from scipy.sparse.linalg import eigsh, ArpackNoConvergence
     n = M.shape[0]
     if n > 300 and k < n // 2:
         try:
