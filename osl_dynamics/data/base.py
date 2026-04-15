@@ -12,7 +12,6 @@ from shutil import rmtree
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union
 
-from scipy.sparse.linalg import eigsh
 import numpy as np
 from pqdm.threads import pqdm
 from threadpoolctl import threadpool_limits
@@ -722,7 +721,7 @@ class Data:
                 std_data = processing.standardize(array)
                 covariance += np.transpose(std_data) @ std_data
             # Compute covariance eigenvalues to obtain PCA components
-            s, u = eigsh(covariance, k=n_pca_components, which="LM")
+            s, u = misc.top_eig(covariance, n_pca_components)
             idx = np.argsort(s)[::-1]
             s = s[idx]
             u = u[:, idx]
@@ -870,7 +869,7 @@ class Data:
                 te_std_data = processing.time_embed(std_data, n_embeddings)
                 covariance += te_std_data.T @ te_std_data
             # Compute covariance eigenvalues to obtain PCA components
-            s, u = eigsh(covariance, k=n_pca_components, which="LM")
+            s, u = misc.top_eig(covariance, n_pca_components)
             idx = np.argsort(s)[::-1]
             s = s[idx]
             u = u[:, idx]

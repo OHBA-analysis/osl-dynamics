@@ -57,6 +57,26 @@ def leading_zeros(number: int, largest_number: int) -> str:
     padded_number = str(number).zfill(min_length)
     return padded_number
 
+def top_eig(M, k):
+    """Compute the eigenvalue and eigenvalues of a matrix
+
+    This function uses either scipy.sparse.linalg.eigsh (for large matrices and
+    a smaller number of eigenvectors) or numpy.linalg.eigh (for smaller matrices
+    or full eigendecomposition)
+    """
+    from scipy.sparse.linalg import eigsh
+    n = M.shape[0]
+    if n > 300 and k < n // 2:
+        try:
+            vals, vecs = eigsh(M, k=k, which="LM")
+            idx = np.argsort(-vals)
+            return vals[idx], vecs[:, idx]
+        except (RuntimeError, ArpackNoConvergence):
+            pass
+    vals, vecs = np.linalg.eigh(M)
+    if k < n:
+        return vals[-k:], vecs[:, -k:]
+    return vals, vecs
 
 def override_dict_defaults(
     default_dict: dict, override_dict: Optional[dict] = None
