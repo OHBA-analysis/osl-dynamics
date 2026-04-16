@@ -716,10 +716,11 @@ class Data:
         if n_pca_components is not None:
             # Calculate covariance of the data
             n_channels = arrays[0].shape[-1]
-            covariance = np.zeros([n_channels, n_channels])
+            covariance = np.zeros((n_channels, n_channels), dtype=np.float64)
             for array in tqdm(arrays, desc="Calculating PCA components"):
                 std_data = processing.standardize(array)
-                covariance += np.transpose(std_data) @ std_data
+                covariance += std_data.T @ std_data
+
             # Compute covariance eigenvalues to obtain PCA components
             s, u = misc.top_eig(covariance, n_pca_components)
             idx = np.argsort(s)[::-1]
@@ -863,11 +864,14 @@ class Data:
         # Calculate PCA on TDE data
         if n_pca_components is not None:
             # Calculate covariance of the data
-            covariance = np.zeros((self.n_te_channels, self.n_te_channels), dtype=np.float64)
+            covariance = np.zeros(
+                (self.n_te_channels, self.n_te_channels), dtype=np.float64
+            )
             for array in tqdm(arrays, desc="Calculating PCA components"):
                 std_data = processing.standardize(array)
                 te_std_data = processing.time_embed(std_data, n_embeddings)
                 covariance += te_std_data.T @ te_std_data
+
             # Compute covariance eigenvalues to obtain PCA components
             s, u = misc.top_eig(covariance, n_pca_components)
             idx = np.argsort(s)[::-1]
