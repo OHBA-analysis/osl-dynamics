@@ -720,13 +720,15 @@ class Data:
             for array in tqdm(arrays, desc="Calculating PCA components"):
                 std_data = processing.standardize(array)
                 covariance += np.transpose(std_data) @ std_data
-
-            # Use SVD on the covariance to calculate PCA components
-            u, s, vh = np.linalg.svd(covariance)
-            u = u[:, :n_pca_components].astype(np.float32)
-            self.explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+            # Compute covariance eigenvalues to obtain PCA components
+            s, u = misc.top_eig(covariance, n_pca_components)
+            idx = np.argsort(s)[::-1]
+            s = s[idx]
+            u = u[:, idx]
+            self.explained_variance = np.sum(s) / np.trace(covariance)
             _logger.info(f"Explained variance: {100 * self.explained_variance:.1f}%")
-            s = s[:n_pca_components].astype(np.float32)
+            s = s.astype(np.float32)
+            u = u.astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
             self.pca_components = u
@@ -861,18 +863,20 @@ class Data:
         # Calculate PCA on TDE data
         if n_pca_components is not None:
             # Calculate covariance of the data
-            covariance = np.zeros([self.n_te_channels, self.n_te_channels])
+            covariance = np.zeros((self.n_te_channels, self.n_te_channels), dtype=np.float64)
             for array in tqdm(arrays, desc="Calculating PCA components"):
                 std_data = processing.standardize(array)
                 te_std_data = processing.time_embed(std_data, n_embeddings)
-                covariance += np.transpose(te_std_data) @ te_std_data
-
-            # Use SVD on the covariance to calculate PCA components
-            u, s, vh = np.linalg.svd(covariance)
-            u = u[:, :n_pca_components].astype(np.float32)
-            self.explained_variance = np.sum(s[:n_pca_components]) / np.sum(s)
+                covariance += te_std_data.T @ te_std_data
+            # Compute covariance eigenvalues to obtain PCA components
+            s, u = misc.top_eig(covariance, n_pca_components)
+            idx = np.argsort(s)[::-1]
+            s = s[idx]
+            u = u[:, idx]
+            self.explained_variance = np.sum(s) / np.trace(covariance)
             _logger.info(f"Explained variance: {100 * self.explained_variance:.1f}%")
-            s = s[:n_pca_components].astype(np.float32)
+            s = s.astype(np.float32)
+            u = u.astype(np.float32)
             if whiten:
                 u = u @ np.diag(1.0 / np.sqrt(s))
             self.pca_components = u
