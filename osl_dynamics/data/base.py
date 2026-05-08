@@ -33,12 +33,14 @@ class Data:
 
     Parameters
     ----------
-    inputs : list of str or str or np.ndarray
-        - A path to a directory containing :code:`.npy` files. Each
-          :code:`.npy` file should be a subject or session.
-        - A list of paths to :code:`.npy`, :code:`.mat` or :code:`.fif` files.
-          Each file should be a subject or session. If a :code:`.fif` file is
-          passed is must end with :code:`'raw.fif'` or :code:`'epo.fif'`.
+    inputs : list of str or pathlib.Path or str or pathlib.Path or np.ndarray
+        - A path (:code:`str` or :code:`pathlib.Path`) to a directory
+          containing :code:`.npy` files. Each :code:`.npy` file should be a
+          subject or session.
+        - A list of paths (:code:`str` or :code:`pathlib.Path`) to
+          :code:`.npy`, :code:`.mat` or :code:`.fif` files. Each file should
+          be a subject or session. If a :code:`.fif` file is passed is must
+          end with :code:`'raw.fif'` or :code:`'epo.fif'`.
         - A numpy array. The array will be treated as continuous data from the
           same subject.
         - A list of numpy arrays. Each numpy array should be the data for a
@@ -100,7 +102,13 @@ class Data:
 
     def __init__(
         self,
-        inputs: Union[List[str], str, np.ndarray, List[np.ndarray]],
+        inputs: Union[
+            List[Union[str, pathlib.Path]],
+            str,
+            pathlib.Path,
+            np.ndarray,
+            List[np.ndarray],
+        ],
         data_field: str = "X",
         picks: Optional[Union[str, List[str]]] = None,
         reject_by_annotation: Optional[str] = None,

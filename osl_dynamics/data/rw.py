@@ -2,6 +2,7 @@
 
 import os
 import logging
+from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import mne
@@ -13,13 +14,13 @@ _allowed_ext = [".npy", ".mat", ".txt", ".fif"]
 
 
 def validate_inputs(
-    inputs: Union[List[str], str, np.ndarray],
+    inputs: Union[List[Union[str, Path]], str, Path, np.ndarray],
 ) -> Union[List[str], List[np.ndarray]]:
     """Validates inputs.
 
     Parameters
     ----------
-    inputs : list of str or str or np.ndarray
+    inputs : list of str or pathlib.Path or str or pathlib.Path or np.ndarray
         Inputs files or data.
 
     Returns
@@ -27,6 +28,9 @@ def validate_inputs(
     validated_inputs : list of str or str
         Validated inputs.
     """
+    if isinstance(inputs, Path):
+        inputs = str(inputs)
+
     if isinstance(inputs, str):
         if os.path.isdir(inputs):
             validated_inputs = list_dir(inputs, keep_ext=_allowed_ext)
@@ -44,9 +48,10 @@ def validate_inputs(
     elif isinstance(inputs, list):
         if len(inputs) == 0:
             raise ValueError("Empty list passed.")
-        elif isinstance(inputs[0], str):
+        elif isinstance(inputs[0], (str, Path)):
             validated_inputs = []
             for inp in inputs:
+                inp = str(inp) if isinstance(inp, Path) else inp
                 if os.path.isdir(inp):
                     validated_inputs += list_dir(inp, keep_ext=_allowed_ext)
                 elif os.path.exists(inp):
@@ -57,7 +62,7 @@ def validate_inputs(
             validated_inputs = inputs
 
     else:
-        raise TypeError("inputs must be str, np.ndarray or list.")
+        raise TypeError("inputs must be str, pathlib.Path, np.ndarray or list.")
 
     return validated_inputs
 
