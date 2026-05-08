@@ -1,50 +1,90 @@
-"""Wakeman-Henson: Preprocessing.
+"""Wakeman-Henson: Preprocessing."""
 
-"""
+from pathlib import Path
 
-from dask.distributed import Client
+import matplotlib
+matplotlib.use("Agg")
+import mne
 
-from osl_ephys import preprocessing, utils
+from osl_dynamics.meeg import parallel, preproc
+
+# ----------------------------------------------------------------------------
+rawdir = Path("data/ds117")
+outdir = Path("data/preproc")
+log_dir = Path("logs/1_preprocess")
+n_workers = 6
+n_subjects = 19
+n_runs = 6
+# ----------------------------------------------------------------------------
+
+
+def process_session(session, logger):
+    """Preprocess a single session."""
+
+    logger.log("Loading raw data...")
+    raw = mne.io.read_raw_fif(session["raw_file"], preload=True)
+
+    logger.log("Setting channel types...")
+    raw = raw.set_channel_types(
+        {"EEG061": "eog", "EEG062": "eog", "EEG063": "ecg"}
+    )
+
+    logger.log("Filtering and downsampling...")
+    raw = raw.filter(
+        l_freq=0.5,
+        h_freq=125,
+        method="iir",
+        iir_params={"order": 5, "ftype": "butter"},
+    )
+    raw = raw.notch_filter([50, 100])
+    raw = raw.resample(sfreq=250)
+
+    logger.log("Detecting bad segments...")
+    raw = preproc.detect_bad_segments(raw, picks="mag")
+    raw = preproc.detect_bad_segments(raw, picks="grad")
+    raw = preproc.detect_bad_segments(raw, picks="mag", mode="diff")
+    raw = preproc.detect_bad_segments(raw, picks="grad", mode="diff")
+
+    logger.log("Detecting bad channels...")
+    raw = preproc.detect_bad_channels(raw, picks="mag")
+    raw = preproc.detect_bad_channels(raw, picks="grad")
+
+    logger.log("Running ICA artefact rejection...")
+    raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(
+        raw, picks="meg", n_components=40
+    )
+
+    logger.log("Interpolating bad channels...")
+    raw = raw.interpolate_bads()
+
+    logger.log("Saving preprocessed data...")
+    out_session_dir = outdir / session["id"]
+    out_session_dir.mkdir(parents=True, exist_ok=True)
+    raw.save(
+        out_session_dir / f"{session['id']}_preproc-raw.fif", overwrite=True
+    )
+
+    logger.log("Done.")
+
 
 if __name__ == "__main__":
-    utils.logger.set_up(level="INFO")
+    sessions = []
+    for sub in range(1, n_subjects + 1):
+        for run in range(1, n_runs + 1):
+            session_id = f"sub-{sub:02d}_run-{run:02d}"
+            raw_file = rawdir / f"sub{sub:03d}" / "MEG" / f"run_{run:02d}_sss.fif"
+            if raw_file.exists():
+                sessions.append(
+                    {
+                        "id": session_id,
+                        "subject": f"sub-{sub:02d}",
+                        "raw_file": str(raw_file),
+                    }
+                )
 
-    # Setup parallel workers
-    client = Client(n_workers=6, threads_per_worker=1)
-
-    config = """
-        preproc:
-        - set_channel_types: {EEG061: eog, EEG062: eog, EEG063: ecg}
-        - filter: {l_freq: 0.5, h_freq: 125, method: iir, iir_params: {order: 5, ftype: butter}}
-        - notch_filter: {freqs: 50 100}
-        - resample: {sfreq: 250}
-        - bad_segments: {segment_len: 500, picks: mag}
-        - bad_segments: {segment_len: 500, picks: grad}
-        - bad_segments: {segment_len: 500, picks: mag, mode: diff}
-        - bad_segments: {segment_len: 500, picks: grad, mode: diff}
-        - ica_raw: {picks: meg, n_components: 40}
-        - ica_autoreject: {picks: meg, ecgmethod: correlation, eogthreshold: auto}
-        - interpolate_bads: {}
-    """
-
-    # Directories
-    rawdir = "data/ds117"
-    outdir = "data/preproc"
-
-    for sub in range(1, 20):
-        # Get input files for preprocessing
-        inputs = []
-        subjects = []
-        for run in range(1, 7):
-            inputs.append(f"{rawdir}/sub{sub:03d}/MEG/run_{run:02d}_sss.fif")
-            subjects.append(f"{sub-{sub:02d}}_run-{run:02d}")
-
-        # Run batch preprocessing
-        preprocessing.run_proc_batch(
-            config,
-            inputs,
-            outdir=outdir,
-            subjects=subjects,
-            overwrite=True,
-            dask_client=True,
-        )
+    parallel.run(
+        process_session,
+        items=sessions,
+        n_workers=n_workers,
+        log_dir=log_dir,
+    )

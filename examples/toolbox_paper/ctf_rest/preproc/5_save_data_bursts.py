@@ -1,6 +1,4 @@
-"""Nottingham MRC MEGUK: Save Training Data for Burst Detection Analysis.
-
-"""
+"""Nottingham MEGUK: Save Training Data for Burst Detection Analysis."""
 
 import mne
 from glob import glob
@@ -15,7 +13,7 @@ def get_downsampled_data(filename):
 
 # Source reconstructed data files
 outdir = "data/preproc"
-files = sorted(glob(f"{outdir}/*/*_sflip_parc-raw.fif"))
+files = sorted(glob(f"{outdir}/*/sflip-lcmv-parc-raw.fif"))
 
 # Get data
 time_series = [get_downsampled_data(file) for file in files]

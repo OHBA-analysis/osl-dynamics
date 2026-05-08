@@ -1,4 +1,12 @@
 Elekta Task Dataset Preprocessing and Source Reconstruction
 -----------------------------------------------------------
 
-To run these scripts you need to install the [OSL](https://github.com/OHBA-analysis/osl) python package (which is not part of osl-dynamics).
+These scripts use the `osl_dynamics.meeg` subpackage. FSL is required
+for RHINO surface extraction and coregistration.
+
+Run in order:
+
+1. `1_preprocess.py` — sensor-level preprocessing.
+2. `2_source_reconstruct.py` — coregistration, forward model, LCMV
+   beamforming and parcellation.
+3. `3_sign_flip.py` — align parcel signs across sessions.

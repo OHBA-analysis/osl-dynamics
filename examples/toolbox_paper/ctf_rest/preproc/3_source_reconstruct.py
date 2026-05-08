@@ -1,65 +1,104 @@
-"""Nottingham MRC MEGUK: Source reconstruction.
-
-"""
+"""Nottingham MEGUK: Source reconstruction."""
 
 from glob import glob
 from pathlib import Path
-from dask.distributed import Client
 
-from osl_ephys import source_recon, utils
+import matplotlib
+matplotlib.use("Agg")
+import mne
 
-# Directories
-rawdir = "data/raw/Nottingham"
-outdir = "data/preproc"
+from osl_dynamics.meeg import parallel, parcellation, rhino, source_recon
+from osl_dynamics.utils.filenames import OSLFilenames
 
-# Files
-smri_file = "data/smri/{0}_T1w.nii.gz"
-preproc_file = outdir + "/{0}/{0}_preproc-raw.fif"
-pos_filepath = rawdir + "/{subject}/meg/{subject}_headshape.pos"
+# ----------------------------------------------------------------------------
+rawdir = Path("data/raw/Nottingham")
+outdir = Path("data/preproc")
+smri_dir = Path("data/smri")
+log_dir = Path("logs/3_source_reconstruct")
+n_workers = 16
+
+parcellation_file = "atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz"
+# ----------------------------------------------------------------------------
+
+
+def process_session(session, logger):
+    """Source reconstruct a single session."""
+
+    subject = session["subject"]
+    preproc_file = outdir / subject / f"{subject}_preproc-raw.fif"
+    surfaces_dir = outdir / subject / "surfaces"
+    pos_file = rawdir / subject / "meg" / f"{subject}_headshape.pos"
+
+    fns = OSLFilenames(
+        outdir=str(outdir),
+        id=subject,
+        preproc_file=str(preproc_file),
+        surfaces_dir=str(surfaces_dir),
+        pos_file=str(pos_file),
+    )
+
+    logger.log("Extracting fiducials and headshape from .pos file...")
+    rhino.extract_fiducials_and_headshape_from_pos(fns)
+
+    logger.log("Extracting surfaces...")
+    rhino.extract_surfaces(
+        mri_file=session["smri_file"],
+        outdir=str(surfaces_dir),
+        include_nose=True,
+    )
+
+    logger.log("Coregistering MEG to MRI...")
+    rhino.coregister_head_and_mri(fns, use_nose=True, use_headshape=True)
+
+    logger.log("Computing forward model...")
+    rhino.forward_model(fns, model="Single Layer")
+
+    logger.log("Computing LCMV beamformer...")
+    source_recon.lcmv_beamformer(
+        fns,
+        chantypes="mag",
+        rank={"mag": 120},
+        frequency_range=[1, 45],
+    )
+
+    logger.log("Applying LCMV beamformer...")
+    voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns)
+
+    logger.log("Parcellating...")
+    parcel_data = parcellation.parcellate(
+        fns,
+        voxel_data,
+        voxel_coords,
+        method="spatial_basis",
+        orthogonalisation="symmetric",
+        parcellation_file=parcellation_file,
+    )
+
+    logger.log("Saving parcellated data...")
+    raw = mne.io.read_raw_fif(str(preproc_file), preload=True)
+    parcellation.save_as_fif(
+        parcel_data,
+        raw,
+        filename=str(outdir / subject / "lcmv-parc-raw.fif"),
+        extra_chans="stim",
+    )
+
+    logger.log("Done.")
+
 
 if __name__ == "__main__":
-    utils.logger.set_up(level="INFO")
-
-    # Setup parallel workers
-    client = Client(n_workers=16, threads_per_worker=1)
-
-    # Settings
-    config = f"""
-        source_recon:
-        - extract_polhemus_from_pos:
-            filepath: {pos_filepath}
-        - compute_surfaces:
-            include_nose: true
-        - coregister:
-            use_nose: true
-            use_headshape: true
-        - forward_model:
-            model: Single Layer
-        - beamform_and_parcellate:
-            freq_range: [1, 45]
-            chantypes: mag
-            rank: {{mag: 120}}
-            parcellation_file: atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz
-            method: spatial_basis
-            orthogonalisation: symmetric
-    """
-
-    # Get input files
-    subjects = []
-    smri_files = []
-    preproc_files = []
-    for path in sorted(glob(preproc_file.replace("{0}", "*"))):
+    sessions = []
+    for path in sorted(glob(str(outdir / "*" / "sub-*_preproc-raw.fif"))):
         subject = Path(path).stem.split("_")[0]
-        subjects.append(subject)
-        preproc_files.append(preproc_file.format(subject))
-        smri_files.append(smri_file.format(subject))
+        smri_file = smri_dir / f"{subject}_T1w.nii.gz"
+        if smri_file.exists():
+            sessions.append(
+                {"id": subject, "subject": subject, "smri_file": str(smri_file)}
+            )
 
-    # Run batch source reconstruction
-    source_recon.run_src_batch(
-        config,
-        outdir=outdir,
-        subjects=subjects,
-        preproc_files=preproc_files,
-        smri_files=smri_files,
-        #dask_client=True,
+    parallel.run(
+        process_session,
+        items=sessions,
+        n_workers=n_workers,
+        log_dir=log_dir,
     )
