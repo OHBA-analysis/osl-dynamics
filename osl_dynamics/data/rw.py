@@ -5,8 +5,9 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
-import mne
+import h5py
 import mat73
+import mne
 import numpy as np
 import scipy.io
 
@@ -302,10 +303,10 @@ def loadmat(filename: str, return_dict: bool = False) -> Union[Dict, np.ndarray]
     mat : dict or np.ndarray
         Data in the MATLAB file.
     """
-    try:
-        mat = scipy.io.loadmat(filename, simplify_cells=True)
-    except NotImplementedError:
+    if h5py.is_hdf5(filename):
         mat = mat73.loadmat(filename)
+    else:
+        mat = scipy.io.loadmat(filename, simplify_cells=True)
 
     if not return_dict:
         # Check if there's only one key in the MATLAB file
