@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import mne
+import mat73
 import numpy as np
 import scipy.io
 
@@ -285,7 +286,7 @@ def load_matlab(filename: str, field: str) -> np.ndarray:
 
 
 def loadmat(filename: str, return_dict: bool = False) -> Union[Dict, np.ndarray]:
-    """Wrapper for scipy.io.loadmat
+    """Wrapper for scipy.io.loadmat or mat73.loadmat (for v7.3 files).
 
     Parameters
     ----------
@@ -304,7 +305,7 @@ def loadmat(filename: str, return_dict: bool = False) -> Union[Dict, np.ndarray]
     try:
         mat = scipy.io.loadmat(filename, simplify_cells=True)
     except NotImplementedError:
-        raise NotImplementedError("MATLAB v7.3 files are not supported.")
+        mat = mat73.loadmat(filename)
 
     if not return_dict:
         # Check if there's only one key in the MATLAB file
