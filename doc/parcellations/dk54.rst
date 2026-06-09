@@ -143,6 +143,6 @@ Example code for plotting with this parcellation:
 Reference
 ---------
 
-If you use the this parcellation, please cite:
+If you use this parcellation, please cite:
 
     Gohil, C., Kohl, O., & Woolrich, M. (2026). DK54: a reduced version of the Desikan-Killiany parcellation [Data set]. Zenodo. https://doi.org/10.5281/zenodo.18599127
