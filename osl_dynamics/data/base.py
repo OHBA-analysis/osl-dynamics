@@ -1991,8 +1991,9 @@ class Data:
         ----------
         output_dir : str
             Path to save data files to. Default is the current working
-            directory.
+            directory. Created if it does not already exist.
         """
+        os.makedirs(output_dir, exist_ok=True)
         attributes = list(self.__dict__.keys())
         dont_keep = [
             "_identifier",

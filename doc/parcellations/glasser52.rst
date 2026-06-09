@@ -15,7 +15,7 @@ Parcels
 Labels and MNI coordinates:
 
 +-------+--------------------------------------------------+------------+--------+--------+--------+
-| Index.| Parcel                                           | Hemisphere | X      | Y      | Z      |
+| Index | Parcel                                           | Hemisphere | X      | Y      | Z      |
 +=======+==================================================+============+========+========+========+
 | 0     | Primary and Early Visual Cortex                  | right      | 14.5   | -80.5  | -0.4   |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
@@ -25,11 +25,11 @@ Labels and MNI coordinates:
 +-------+--------------------------------------------------+------------+--------+--------+--------+
 | 3     | MT+ Complex and Neighboring Visual Areas         | right      | 42.2   | -71.5  | 0.0    |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
-| 4     | Superior Somatosnesory and Motor Cortex          | right      | 23.6   | -29.5  | 61.0   |
+| 4     | Superior Somatosensory and Motor Cortex          | right      | 23.6   | -29.5  | 61.0   |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
-| 5     | Inferior Somatosnesory and Motor Cortex          | right      | 49.1   | -13.4  | 38.3   |
+| 5     | Inferior Somatosensory and Motor Cortex          | right      | 49.1   | -13.4  | 38.3   |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
-| 6     | Supplementory Motor Area                         | right      | 12.7   | -2.2   | 62.9   |
+| 6     | Supplementary Motor Area                         | right      | 12.7   | -2.2   | 62.9   |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
 | 7     | Cingulate Motor Areas & Area 5                   | right      | 10.0   | -31.2  | 53.6   |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
@@ -77,11 +77,11 @@ Labels and MNI coordinates:
 +-------+--------------------------------------------------+------------+--------+--------+--------+
 | 29    | MT+ Complex and Neighboring Visual Areas         | left       | -45.2  | -70.3  | -1.4   |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
-| 30    | Superior Somatosnesory and Motor Cortex          | left       | -22.6  | -30.4  | 62.8   |
+| 30    | Superior Somatosensory and Motor Cortex          | left       | -22.6  | -30.4  | 62.8   |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
-| 31    | Inferior Somatosnesory and Motor Cortex          | left       | -48.3  | -18.7  | 41.7   |
+| 31    | Inferior Somatosensory and Motor Cortex          | left       | -48.3  | -18.7  | 41.7   |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
-| 32    | Supplementory Motor Area                         | left       | -14.0  | -2.7   | 62.7   |
+| 32    | Supplementary Motor Area                         | left       | -14.0  | -2.7   | 62.7   |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
 | 33    | Cingulate Motor Areas & Area 5                   | left       | -14.4  | -30.6  | 49.7   |
 +-------+--------------------------------------------------+------------+--------+--------+--------+
@@ -141,7 +141,7 @@ Example code for plotting with this parcellation:
 Reference
 ---------
 
-If you use the this parcellation, please cite:
+If you use this parcellation, please cite:
 
     Kohl, O., Woolrich, M., Nobre, A. C., & Quinn, A. (2023). Glasser52: A parcellation for MEG-Analysis [Data set].
     Zenodo. https://doi.org/10.5281/zenodo.10401793

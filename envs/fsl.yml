@@ -26,6 +26,7 @@ dependencies:
   - pyvista
   - pyvistaqt
   - h5io
+  - mat73
   - nest-asyncio2
   - trame
   - trame-vtk
