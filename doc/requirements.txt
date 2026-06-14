@@ -20,6 +20,7 @@ tqdm
 fslpy
 ipyevents
 numba
+mat73
 tensorflow==2.19
 tensorflow-probability[tf]==0.25
 -e .

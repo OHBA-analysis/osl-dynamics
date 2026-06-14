@@ -1278,7 +1278,7 @@ def plot_matrices(
         titles = [""] * len(matrix)
 
     if isinstance(cmap, str):
-        cmap = matplotlib.cm.get_cmap(cmap)
+        cmap = plt.get_cmap(cmap)
     cmap = cmap.copy()
     cmap.set_bad(color=nan_color)
 
@@ -1382,7 +1382,7 @@ def plot_connections(
     outer = 1.0
 
     if isinstance(cmap, str):
-        cmap = matplotlib.cm.get_cmap(cmap)
+        cmap = plt.get_cmap(cmap)
     cmap = cmap.copy()
     norm = matplotlib.colors.Normalize(vmin=0, vmax=1)
 
@@ -1853,9 +1853,9 @@ def plot_alpha(
             "tab20b",
             "tab20c",
         ]:
-            cmap = plt.cm.get_cmap(name=cmap)
+            cmap = plt.get_cmap(cmap)
         else:
-            cmap = plt.cm.get_cmap(name=cmap, lut=n_modes)
+            cmap = plt.get_cmap(cmap, lut=n_modes)
     cmap = cmap.copy()
     colors = cmap.colors
 
