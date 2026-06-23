@@ -6,7 +6,7 @@ Load tinda output and calculate cycle duration based on best sequence
 Authors: Mats van Es
          Carina Forster
 
-Last update: 10-07-2025
+Last update: 23-06-2026
 
 Important: run in environment with osl_dynamics 2.0.2
 """
@@ -35,7 +35,9 @@ os.makedirs(hmm_dir, exist_ok=True)
 # ------------ Functions -------------#
 
 def get_best_state_sequence(W: int = 16):
-    """Best cycle sequence based on group"""
+    """Best cycle sequence based on group-optimalised sequence. 
+    The FO and FO timecourses (wdata) are also reordered 
+    according to this sequence."""
     # load state time course and tinda output
     # careful: we pickled files in osl dynamics 2.2.1 dev version
     # Load the saved stc from .npz
@@ -48,13 +50,13 @@ def get_best_state_sequence(W: int = 16):
     # Load best sequence with numpy instead of pickle (version conflict)
     best_sequence_group = np.load(f"{home_dir}/best_sequence_group.npy")
 
-    # Calculate FOs
-    fo = modes.fractional_occupancies(stc)
-
     # here we reorder state sequences
     stc_reorder = [istc[:, best_sequence_group] for istc in stc]
+         
+    # Calculate FOs (in the reordered secquence)
+    fo = modes.fractional_occupancies(stc_reorder)
 
-    # create windowed data
+    # create windowed data (in the reordered sequence)
     wdata = []
     for i_stc in stc_reorder:
         n_times = i_stc.shape[0]
@@ -78,7 +80,7 @@ def run_second_level_hmm(
         rundir = f"{hmm_dir}/run{i_run+1}"
         os.makedirs(rundir, exist_ok=True)
 
-        # Because we reordered the states according to (individualised) bestseq
+        # Because we reordered the states according to (group-level) bestseq
         # we can use 1-K1 as bestseq
         seq = np.roll(np.arange(n_states).flatten(), 0)
         W_mean = init_log_rates(n_states, n_states_second_level, seq, fo.mean(axis=0))
