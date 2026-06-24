@@ -53,7 +53,7 @@ def get_best_state_sequence(W: int = 16):
     # here we reorder state sequences
     stc_reorder = [istc[:, best_sequence_group] for istc in stc]
          
-    # Calculate FOs (in the reordered secquence)
+    # Calculate FOs (in the reordered sequence)
     fo = modes.fractional_occupancies(stc_reorder)
 
     # create windowed data (in the reordered sequence)
