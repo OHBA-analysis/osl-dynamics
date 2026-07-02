@@ -220,15 +220,17 @@ def compute_fo_stats(
         interval_weighted_avg_all = []
         interval_sum_all = []
         for j, mask in enumerate(interval_mask):
-            temp_to_flat = np.concatenate([temp_to[k] for k in np.where(mask == 1)[0]])
-            temp_away_flat = np.concatenate(
-                [temp_away[k] for k in np.where(mask == 1)[0]]
-            )
+            temp_to_list = [temp_to[k] for k in np.where(mask == 1)[0]]
+            temp_away_list = [temp_away[k] for k in np.where(mask == 1)[0]]
 
-            interval_weighted_avg[:, 0, j] = np.mean(temp_away_flat, axis=0)
-            interval_weighted_avg[:, 1, j] = np.mean(temp_to_flat, axis=0)
-            interval_sum[:, 0, j] = np.sum(temp_away_flat, axis=0)
-            interval_sum[:, 1, j] = np.sum(temp_to_flat, axis=0)
+            # Originally, we were concatenating the arrays and then taking the mean, 
+            # but the intervals can be of different lengths (equivalent to weight each intervals with its duration?). 
+            # Instead, we take the temporal mean of each interval and then take the mean of those means.
+            interval_weighted_avg[:, 0, j] = np.mean([tmp_to.mean(0) for tmp_to in temp_to_list], axis=0)
+            interval_weighted_avg[:, 1, j] = np.mean([tmp_away.mean(0) for tmp_away in temp_away_list], axis=0)
+            #TODO I am not sure what we should do about the sum.
+            interval_sum[:, 0, j] = np.sum(np.concatenate(temp_away_list, axis = 0), axis=0)
+            interval_sum[:, 1, j] = np.sum(np.concatenate(temp_to_list, axis = 0), axis=0)
             interval_weighted_avg_all.append(
                 np.transpose(
                     np.stack(
@@ -643,6 +645,8 @@ def optimise_sequence(
         List of best sequence of states to plot (in order of counterclockwise
         rotation).
     """
+    from scipy.special import factorial
+    from itertools import permutations
     if len(fo_density.shape) == 5:
         fo_density = np.squeeze(fo_density)
 
@@ -668,18 +672,32 @@ def optimise_sequence(
     for i in range(n_metrics):
         ix = np.arange(K)
         v = np.imag(np.sum(circle_angles(ix) * metric[i]))
-        cnt = 0
-        while cnt < n_perms:
-            cnt += 1
-            swaps = np.random.permutation(K)
-            swaps = swaps[:2]
-            tmpix = ix.copy()
-            tmpix[swaps[0]] = ix[swaps[1]]
-            tmpix[swaps[1]] = ix[swaps[0]]
-            tmpv = np.imag(np.sum(circle_angles(tmpix) * metric[i]))
-            if tmpv < v:
-                v = tmpv
-                ix = tmpix
+        if factorial(K-1) < n_perms:
+            # If the number of permutations is less than n_perms, then we can compute all permutations and find the best one
+            def circular_permutations(arr):
+                arr = np.asarray(arr)
+                first = arr[0]
+                rest = arr[1:]
+                return np.array([[first, *p] for p in permutations(rest)])
+            all_perms = circular_permutations(ix)
+            for p in all_perms:
+                tmpv = np.imag(np.sum(circle_angles(p) * metric[i]))
+                if tmpv < v:
+                    v = tmpv
+                    ix = p
+        else:
+            cnt = 0
+            while cnt < n_perms:
+                cnt += 1
+                swaps = np.random.permutation(K)
+                swaps = swaps[:2]
+                tmpix = ix.copy()
+                tmpix[swaps[0]] = ix[swaps[1]]
+                tmpix[swaps[1]] = ix[swaps[0]]
+                tmpv = np.imag(np.sum(circle_angles(tmpix) * metric[i]))
+                if tmpv < v:
+                    v = tmpv
+                    ix = tmpix
         best_sequence.append(np.roll(ix, -np.where([iix == 0 for iix in ix])[0][0]))
     # Return the best sequence for the chosen metric (in order of counterclockwise
     # rotation)
