@@ -21,9 +21,7 @@ files = sorted(glob(f"{outdir}/*/lcmv-parc-raw.fif"))
 
 data = Data(files, picks="misc", reject_by_annotation="omit", n_jobs=n_jobs)
 data.align_channel_signs(
-    n_init=3,
-    n_iter=3000,
-    max_flips=20,
+    n_random_starts=3,
     n_embeddings=15,
     standardize=True,
 )

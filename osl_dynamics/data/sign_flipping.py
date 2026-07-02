@@ -211,42 +211,12 @@ def _coordinate_ascent(obj: _FlipObjective, f: np.ndarray) -> Tuple[np.ndarray, 
     return f, float(cur)
 
 
-def _stochastic_polish(
-    obj: _FlipObjective,
-    f: np.ndarray,
-    cur: float,
-    n_iter: int,
-    max_flips: int,
-    rng: np.random.Generator,
-) -> Tuple[np.ndarray, float]:
-    """Random multi-flip hill-climb (the previous search) on the reduced objective.
-
-    Keeps the change whenever a random flip of up to ``max_flips`` channels
-    increases the correlation. Cheap in the reduced form, so it acts as a safety
-    net that cannot leave the result worse than the previous search would.
-    """
-    n = obj.n_channels
-    f = f.copy()
-    for _ in range(n_iter):
-        k = int(rng.integers(1, max_flips + 1))
-        idx = rng.choice(n, size=k, replace=False)
-        g = f.copy()
-        g[idx] *= -1
-        m = float(obj.corr(g))
-        if m > cur:
-            f, cur = g, m
-    return f, cur
-
-
 def find_flips(
     cov: np.ndarray,
     template_cov: np.ndarray,
     n_channels: int,
     n_embeddings: int,
-    n_init: int = 3,
-    n_iter: int = 500,
-    max_flips: int = 20,
-    seed: Optional[int] = None,
+    n_random_starts: int = 3,
     n_spectral: int = 2,
 ) -> Tuple[np.ndarray, float]:
     """Find the ``±1`` per-channel flip vector aligning ``cov`` to a template.
@@ -256,12 +226,14 @@ def find_flips(
     the signs is a Z2 (Ising / MAX-CUT) synchronization problem, solved by:
 
     1. warm starts — the sign of the leading eigenvector(s) of the reduced matrix
-       (the spectral relaxation), plus the historical all-``+1`` start and
-       ``n_init`` random restarts;
-    2. exact greedy coordinate ascent on the true correlation from each start;
-    3. a short stochastic polish (the previous random-restart search) from the
-       best local optimum — essentially free in the reduced form, and guarantees
-       the result is no worse than that search.
+       (the spectral relaxation), plus the all-``+1`` start and
+       ``n_random_starts`` random restarts;
+    2. exact greedy coordinate ascent on the true correlation from each start,
+       keeping the best local optimum.
+
+    The spectral warm start plus coordinate ascent are deterministic and do the
+    bulk of the work; the random restarts let the search escape the occasional
+    coordinate-ascent local optimum.
 
     This is the search used by
     :meth:`osl_dynamics.data.base.Data.align_channel_signs`; here it returns the
@@ -277,17 +249,10 @@ def find_flips(
         Number of channels (parcels).
     n_embeddings : int
         Number of time-delay embeddings used to build ``cov``.
-    n_init : int, optional
+    n_random_starts : int, optional
         Number of random restarts (in addition to the spectral and all-``+1``
-        starts).
-    n_iter : int, optional
-        Number of proposals in the stochastic polish.
-    max_flips : int, optional
-        Maximum number of channels flipped in a single polish proposal.
-    seed : int, optional
-        Seed for :func:`numpy.random.default_rng` (random restarts and polish).
-        The spectral warm start and coordinate ascent are deterministic, so the
-        result is largely independent of the seed.
+        starts). The restarts use a fixed internal seed, so the whole search is
+        deterministic and reproducible.
     n_spectral : int, optional
         Number of leading eigenvectors of the reduced matrix used as warm starts.
 
@@ -298,8 +263,9 @@ def find_flips(
     metric : float
         The achieved correlation with ``template_cov``.
     """
-    rng = np.random.default_rng(seed)
-    max_flips = min(max_flips, n_channels)
+    # Fixed seed: the restarts only need to be diverse, not run-to-run random,
+    # so the search stays fully deterministic and reproducible.
+    rng = np.random.default_rng(0)
     obj = _FlipObjective(cov, template_cov, n_channels, n_embeddings)
 
     # Candidate starting points: all-+1, spectral warm starts, random restarts.
@@ -311,7 +277,7 @@ def find_flips(
             s = np.sign(evecs[:, -k])
             s[s == 0] = 1.0
             starts.append(s)
-    for _ in range(n_init):
+    for _ in range(n_random_starts):
         starts.append(rng.choice([-1.0, 1.0], size=n_channels).astype(float))
 
     # Exact coordinate ascent from each start; keep the best local optimum.
@@ -321,12 +287,5 @@ def find_flips(
         flips, metric = _coordinate_ascent(obj, s)
         if metric > best_metric:
             best_flips, best_metric = flips, metric
-
-    # Stochastic polish from the best local optimum, then re-settle.
-    if n_iter > 0 and max_flips > 0:
-        best_flips, best_metric = _stochastic_polish(
-            obj, best_flips, best_metric, n_iter, max_flips, rng
-        )
-        best_flips, best_metric = _coordinate_ascent(obj, best_flips)
 
     return best_flips.astype(int), float(best_metric)

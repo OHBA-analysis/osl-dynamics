@@ -1048,13 +1048,10 @@ class Data:
         self,
         template_data: Optional[Union[np.ndarray, str]] = None,
         template_cov: Optional[Union[np.ndarray, str]] = None,
-        n_init: int = 3,
-        n_iter: int = 500,
-        max_flips: int = 20,
+        n_random_starts: int = 3,
         n_embeddings: int = 1,
         standardize: bool = True,
         use_raw: bool = False,
-        seed: Optional[int] = None,
     ) -> "Data":
         """Align the sign of each channel across sessions.
 
@@ -1070,15 +1067,10 @@ class Data:
             Covariance to align the sign of channels. This must be the
             covariance of the time-delay embedded data.
             If :code:`str`, must be the path to a :code:`.npy` file.
-        n_init : int, optional
+        n_random_starts : int, optional
             Number of random restarts of the search (in addition to the
-            deterministic spectral and all-flips-positive starts).
-        n_iter : int, optional
-            Number of proposals in the stochastic polish that refines the
-            deterministic search. The spectral warm start and coordinate ascent
-            do the main work, so a small value is usually sufficient.
-        max_flips : int, optional
-            Maximum number of channels to flip in a single polish proposal.
+            deterministic spectral and all-flips-positive starts). The restarts
+            use a fixed internal seed, so the search is deterministic.
         n_embeddings : int, optional
             We may want to compare the covariance of time-delay embedded data
             when aligning the signs. This is the number of embeddings. The
@@ -1087,11 +1079,6 @@ class Data:
             Should we standardize the data before comparing across sessions?
         use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
-        seed : int, optional
-            Seed for the sign-flipping search. A per-session offset is added so
-            each session gets a reproducible but distinct random stream. The
-            search is largely deterministic, so this mainly affects the small
-            stochastic polish.
 
         Returns
         -------
@@ -1103,14 +1090,6 @@ class Data:
                 "Only pass one of the arguments template_data or template_cov, "
                 "not both."
             )
-
-        if self.n_channels < max_flips:
-            _logger.warning(
-                f"max_flips={max_flips} cannot be greater than "
-                f"n_channels={self.n_channels}. "
-                f"Setting max_flips={self.n_channels}."
-            )
-            max_flips = self.n_channels
 
         if isinstance(template_data, str):
             template_data = rw.load_data(
@@ -1145,10 +1124,7 @@ class Data:
                 tcov,
                 self.n_channels,
                 n_embeddings,
-                n_init=n_init,
-                n_iter=n_iter,
-                max_flips=max_flips,
-                seed=None if seed is None else seed + ind,
+                n_random_starts=n_random_starts,
             )
             _logger.debug(
                 f"Session {ind}, best correlation with template: {best_metric:.3f}"
