@@ -1049,11 +1049,12 @@ class Data:
         template_data: Optional[Union[np.ndarray, str]] = None,
         template_cov: Optional[Union[np.ndarray, str]] = None,
         n_init: int = 3,
-        n_iter: int = 2500,
+        n_iter: int = 500,
         max_flips: int = 20,
         n_embeddings: int = 1,
         standardize: bool = True,
         use_raw: bool = False,
+        seed: Optional[int] = None,
     ) -> "Data":
         """Align the sign of each channel across sessions.
 
@@ -1070,11 +1071,14 @@ class Data:
             covariance of the time-delay embedded data.
             If :code:`str`, must be the path to a :code:`.npy` file.
         n_init : int, optional
-            Number of initializations.
+            Number of random restarts of the search (in addition to the
+            deterministic spectral and all-flips-positive starts).
         n_iter : int, optional
-            Number of sign flipping iterations per subject to perform.
+            Number of proposals in the stochastic polish that refines the
+            deterministic search. The spectral warm start and coordinate ascent
+            do the main work, so a small value is usually sufficient.
         max_flips : int, optional
-            Maximum number of channels to flip in an iteration.
+            Maximum number of channels to flip in a single polish proposal.
         n_embeddings : int, optional
             We may want to compare the covariance of time-delay embedded data
             when aligning the signs. This is the number of embeddings. The
@@ -1083,6 +1087,11 @@ class Data:
             Should we standardize the data before comparing across sessions?
         use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
+        seed : int, optional
+            Seed for the sign-flipping search. A per-session offset is added so
+            each session gets a reproducible but distinct random stream. The
+            search is largely deterministic, so this mainly affects the small
+            stochastic polish.
 
         Returns
         -------
@@ -1139,11 +1148,12 @@ class Data:
                 n_init=n_init,
                 n_iter=n_iter,
                 max_flips=max_flips,
+                seed=None if seed is None else seed + ind,
             )
-            _logger.info(
+            _logger.debug(
                 f"Session {ind}, best correlation with template: {best_metric:.3f}"
             )
-            return array * flips[np.newaxis, ...].astype(np.float32)
+            return array * flips[np.newaxis, ...].astype(np.float32), best_metric
 
         # What data do we use?
         arrays = self.raw_data_arrays if use_raw else self.arrays
@@ -1178,24 +1188,30 @@ class Data:
             template_cov = _calc_cov(template_data)
 
         # Perform the sign flipping
-        _logger.info("Aligning channel signs across sessions")
         tcovs = [template_cov] * self.n_sessions
         indices = range(self.n_sessions)
         with threadpool_limits(limits=1 if self.n_jobs > 1 else None):
-            self.arrays = pqdm(
+            results = pqdm(
                 array=zip(covs, tcovs, arrays, indices),
                 function=_find_and_apply_flips,
+                desc="Sign flipping",
                 n_jobs=self.n_jobs,
                 argument_type="args",
                 total=self.n_sessions,
-                disable=True,
             )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
+        if any([isinstance(e, Exception) for e in results]):
+            for i, e in enumerate(results):
                 if isinstance(e, Exception):
                     e.args = (f"array {i}: {e}",)
                     _logger.exception(e, exc_info=False)
             raise e
+
+        self.arrays = [array for array, _ in results]
+        corrs = [metric for _, metric in results]
+        _logger.info(
+            f"Mean correlation with template: {np.mean(corrs):.3f} "
+            f"(min: {np.min(corrs):.3f})"
+        )
 
         return self
 
