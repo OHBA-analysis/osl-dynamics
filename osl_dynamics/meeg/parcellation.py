@@ -622,7 +622,7 @@ def _get_parcel_data_pca(
     print(f"Calculating parcel time courses with {method}")
 
     if parcellation_asmatrix.shape[0] != voxel_data.shape[0]:
-        Exception(
+        raise ValueError(
             f"Parcellation has {parcellation_asmatrix.shape[0]} voxels, "
             f"but data has {voxel_data.shape[0]}"
         )
@@ -816,7 +816,7 @@ def _get_parcel_data_pca(
             parcel_data_reshaped[pp, :] = node_ts
 
     else:
-        Exception("Invalid method specified")
+        raise ValueError("Invalid method specified")
 
     # Re-separate the trials and time dimensions
     parcel_data = np.reshape(parcel_data_reshaped, (n_parcels, n_time, n_trials))
