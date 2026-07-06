@@ -20,13 +20,7 @@ n_jobs = 8
 files = sorted(glob(f"{outdir}/*/lcmv-parc-raw.fif"))
 
 data = Data(files, picks="misc", reject_by_annotation="omit", n_jobs=n_jobs)
-data.align_channel_signs(
-    n_init=3,
-    n_iter=3000,
-    max_flips=20,
-    n_embeddings=15,
-    standardize=True,
-)
+data.align_channel_signs(n_embeddings=15, standardize=True)
 
 # Save each aligned session back as a fif. parcellation.save_as_fif copies
 # annotations and the stim channel from the reference raw, and re-inserts
