@@ -225,19 +225,11 @@ def find_flips(
     is exactly the correlation :func:`calc_corr` maximizes. In that form aligning
     the signs is a Z2 (Ising / MAX-CUT) synchronization problem, solved by:
 
-    1. warm starts — the sign of the leading eigenvector(s) of the reduced matrix
+    1. warm starts: the sign of the leading eigenvector(s) of the reduced matrix
        (the spectral relaxation), plus the all-``+1`` start and
        ``n_random_starts`` random restarts;
     2. exact greedy coordinate ascent on the true correlation from each start,
        keeping the best local optimum.
-
-    The spectral warm start plus coordinate ascent are deterministic and do the
-    bulk of the work; the random restarts let the search escape the occasional
-    coordinate-ascent local optimum.
-
-    This is the search used by
-    :meth:`osl_dynamics.data.base.Data.align_channel_signs`; here it returns the
-    vector instead of applying it.
 
     Parameters
     ----------
