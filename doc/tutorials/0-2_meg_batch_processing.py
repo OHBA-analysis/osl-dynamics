@@ -448,6 +448,47 @@ The output of this script is written to ``derivatives/``.
 #         )
 
 #%%
+# Sign Flipping (optional)
+# ^^^^^^^^^^^^^^^^^^^^^^^^
+#
+# Source reconstruction leaves the sign of each parcel time course
+# arbitrary, so the same parcel can have opposite polarity in different
+# sessions. Before pooling sessions to train a model we align these signs
+# against a common **template covariance**. This is a *cross-session* step,
+# so we build the template once (e.g. from a reference session, or the
+# median of a pilot batch) and save it to disk — then every session is
+# flipped to match it. See the :doc:`Sign Flipping tutorial
+# <0-4_sign_flipping>` for how to build and save ``template_cov.npy``.
+#
+# With a saved template, :func:`sign_flipping.sign_flip
+# <osl_dynamics.data.sign_flipping.sign_flip>` flips the ``parcel_data``
+# array directly, so we can align the signs just before saving and the fif
+# we write out is already sign aligned. It takes the parcel data (shape
+# ``(parcels, time)``) and a template covariance (a path or an array), and
+# returns the flipped data:
+#
+# .. code-block:: python
+#
+#     from osl_dynamics.data import sign_flipping
+#
+#     logger.log("Parcellating...")
+#     parcel_data = parcellation.parcellate(...)  # (parcels, time)
+#
+#     logger.log("Sign flipping...")
+#     parcel_data, flips, corr = sign_flipping.sign_flip(
+#         parcel_data,
+#         template_cov="template_cov.npy",
+#     )
+#
+#     logger.log("Saving parcellated data...")
+#     parcellation.save_as_fif(parcel_data, raw, extra_chans="stim", filename=parc_fif)
+#
+# If you have already saved the parcellated fifs, you can instead flip them
+# as a separate step with :func:`sign_flipping.sign_flip_mne_raw
+# <osl_dynamics.data.sign_flipping.sign_flip_mne_raw>`, which reads a fif
+# (or ``mne.io.Raw``) and writes the sign-aligned fif.
+
+#%%
 # Summary
 # ^^^^^^^
 #

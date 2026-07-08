@@ -23,7 +23,7 @@ covers:
 2. Visualising the sign ambiguity across sessions.
 3. Aligning the signs to a fixed template covariance.
 4. Using the median session as a template instead.
-5. The lower-level API used inside a processing pipeline.
+5. Sign flipping arrays and fif files inside a processing pipeline.
 
 Note, sign flipping is a *cross-session* step — it aligns sessions to each
 other — so it is applied to a group of parcellated sessions after
@@ -199,6 +199,39 @@ fig.tight_layout()
 #
 #     data = Data(arrays)
 #     data.align_channel_signs(n_embeddings=15, standardize=True)
+
+#%%
+# Sign flipping arrays
+# ^^^^^^^^^^^^^^^^^^^^
+# In a processing pipeline you often hold a single session's parcel data in
+# memory as a ``(parcels, time)`` array — for example straight out of
+# parcellation, before it is saved to a fif.
+# :func:`sign_flipping.sign_flip <osl_dynamics.data.sign_flipping.sign_flip>`
+# flips such an array directly against a template covariance. It returns the
+# flipped data, the per-parcel ``+1``/``-1`` signs, and the correlation with
+# the template.
+#
+# Here we flip one session against the template we saved earlier, transposing
+# our simulated data to ``(parcels, time)``.
+
+# Parcel data for one session, shape (parcels, time)
+parcel_data = ts[1].T
+
+flipped_data, flips, corr = sign_flipping.sign_flip(
+    parcel_data,
+    template_cov="template_cov.npy",
+    n_embeddings=n_embeddings,
+    standardize=standardize,
+)
+
+print("Correlation with template before flipping:", round(float(before[1]), 3))
+print("Correlation with template after flipping: ", round(float(corr), 3))
+print("Signs applied:", flips)
+
+#%%
+# The correlation jumps from near zero to close to the template, using the
+# same search that :meth:`Data.align_channel_signs
+# <osl_dynamics.data.Data.align_channel_signs>` runs for every session.
 #
 # MNE-Python FIF Files
 # ^^^^^^^^^^^^^^^^^^^^
@@ -206,9 +239,10 @@ fig.tight_layout()
 # parcellated fif independently against a template you saved earlier
 # — for example inside ``osl_dynamics.meeg.parallel.run``.
 # :func:`sign_flipping.sign_flip_mne_raw
-# <osl_dynamics.data.sign_flipping.sign_flip_mne_raw>` does this in one call:
-# pass a parcellated fif (a path or an ``mne.io.Raw``) and a template
-# covariance (a path or an array), and it saves the sign-flipped fif.
+# <osl_dynamics.data.sign_flipping.sign_flip_mne_raw>` wraps ``sign_flip``
+# for this: pass a parcellated fif (a path or an ``mne.io.Raw``) and a
+# template covariance (a path or an array), and it reads the parcel data,
+# flips it, and saves the sign-flipped fif.
 #
 # .. code-block:: python
 #
