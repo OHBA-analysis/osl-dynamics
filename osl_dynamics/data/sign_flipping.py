@@ -5,13 +5,19 @@ same parcel can have opposite polarity across sessions. Before pooling sessions
 we align these signs: for each session we search for the ``+1``/``-1`` per-channel
 vector whose (time-delay embedded, standardized) covariance best matches a
 template.
+
+For the common case of sign flipping a single parcellated fif file (or
+:class:`mne.io.Raw`) to match a saved template covariance, see
+:func:`sign_flip_mne_raw`.
 """
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
+import mne
 import numpy as np
 
 from osl_dynamics.data import processing
+from osl_dynamics.meeg.parcellation import convert_to_mne_raw, save_as_fif
 
 
 def calc_cov(
@@ -281,3 +287,92 @@ def find_flips(
             best_flips, best_metric = flips, metric
 
     return best_flips.astype(int), float(best_metric)
+
+
+def sign_flip_mne_raw(
+    fif,
+    template_cov: Union[str, np.ndarray],
+    output_file: Optional[str] = None,
+    n_embeddings: int = 15,
+    standardize: bool = True,
+    picks: str = "misc",
+    extra_chans: Union[str, list, None] = "stim",
+) -> Union[Tuple[np.ndarray, float], "mne.io.Raw"]:
+    """Sign flip a parcellated fif file to match a template covariance.
+
+    Convenience wrapper that loads parcel time courses from a fif file (or
+    :class:`mne.io.Raw`), finds the per-parcel signs that best align its
+    (time-delay embedded) covariance to ``template_cov``, and applies them.
+    The result is either saved to a new fif file or returned as an
+    :class:`mne.io.Raw` object (see ``output_file``).
+
+    Parameters
+    ----------
+    fif : str or mne.io.Raw
+        Path to a parcellated fif file, or a loaded :class:`mne.io.Raw` object.
+        The parcel time courses are read from the ``picks`` channels.
+    template_cov : str or np.ndarray
+        Template covariance to align to, or the path to a ``.npy`` file
+        containing it. This must be the covariance of the time-delay embedded
+        data (see :func:`calc_cov`), built with the same ``n_embeddings`` and
+        ``standardize`` settings passed here.
+    output_file : str, optional
+        Path to save the sign-flipped fif file to. If ``None`` (the default),
+        nothing is written to disk and the sign-flipped :class:`mne.io.Raw`
+        object is returned instead (see Returns).
+    n_embeddings : int, optional
+        Number of time-delay embeddings used to build the covariances.
+    standardize : bool, optional
+        Standardize the embedded data before computing the covariance.
+    picks : str, optional
+        Channel type holding the parcel time courses. Parcellated fif files
+        written by osl-dynamics store parcels as ``"misc"`` channels.
+    extra_chans : str or list of str, optional
+        Extra channels (e.g. ``"stim"``) to copy from the input to the output.
+        Passed to :func:`osl_dynamics.meeg.parcellation.save_as_fif`.
+
+    Examples
+    --------
+    Save the sign-flipped data to a new fif file::
+
+        from osl_dynamics.data import sign_flipping
+
+        sign_flipping.sign_flip_mne_raw(
+            "lcmv-parc-raw.fif",
+            "template_cov.npy",
+            "sflip-lcmv-parc-raw.fif",
+        )
+
+    Or get the sign-flipped data back as an :class:`mne.io.Raw` without
+    saving::
+
+        raw = sign_flipping.sign_flip_mne_raw("lcmv-parc-raw.fif", "template_cov.npy")
+    """
+    if isinstance(fif, mne.io.BaseRaw):
+        raw = fif
+    else:
+        raw = mne.io.read_raw_fif(str(fif), preload=True)
+
+    if not isinstance(template_cov, np.ndarray):
+        template_cov = np.load(str(template_cov))
+
+    parcel_data = raw.get_data(picks=picks, reject_by_annotation="omit")
+
+    cov = calc_cov(parcel_data.T, n_embeddings, standardize)
+    flips, corr = find_flips(
+        cov,
+        template_cov,
+        n_channels=parcel_data.shape[0],
+        n_embeddings=n_embeddings,
+    )
+    flipped_data = parcel_data * flips[:, np.newaxis]
+
+    if output_file is None:
+        return convert_to_mne_raw(
+            flipped_data,
+            raw,
+            ch_names=[f"parcel_{i}" for i in range(flipped_data.shape[0])],
+            extra_chans="stim" if extra_chans is None else extra_chans,
+        )
+
+    save_as_fif(flipped_data, raw, filename=output_file, extra_chans=extra_chans)
