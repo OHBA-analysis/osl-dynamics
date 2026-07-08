@@ -289,6 +289,58 @@ def find_flips(
     return best_flips.astype(int), float(best_metric)
 
 
+def sign_flip(
+    parcel_data: np.ndarray,
+    template_cov: Union[str, np.ndarray],
+    n_embeddings: int = 15,
+    standardize: bool = True,
+) -> Tuple[np.ndarray, np.ndarray, float]:
+    """Sign flip parcel time courses to match a template covariance.
+
+    Finds the per-parcel ``+1``/``-1`` signs whose (time-delay embedded,
+    standardized) covariance best matches ``template_cov`` and applies them.
+    This is the array-level core shared by :func:`sign_flip_mne_raw` and by
+    scripts that already hold the parcel data in memory.
+
+    Parameters
+    ----------
+    parcel_data : np.ndarray
+        Parcel time courses, shape ``(n_parcels, n_samples)``.
+    template_cov : str or np.ndarray
+        Template covariance to align to, or the path to a ``.npy`` file
+        containing it. This must be the covariance of the time-delay embedded
+        data (see :func:`calc_cov`), built with the same ``n_embeddings`` and
+        ``standardize`` settings passed here.
+    n_embeddings : int, optional
+        Number of time-delay embeddings used to build the covariances.
+    standardize : bool, optional
+        Standardize the embedded data before computing the covariance.
+
+    Returns
+    -------
+    flipped_data : np.ndarray
+        ``parcel_data`` with the per-parcel signs applied, same shape as the
+        input.
+    flips : np.ndarray
+        The per-parcel ``+1``/``-1`` signs that were applied, shape
+        ``(n_parcels,)``.
+    corr : float
+        Correlation between the flipped covariance and ``template_cov`` (the
+        metric maximised by the flip search).
+    """
+    if not isinstance(template_cov, np.ndarray):
+        template_cov = np.load(str(template_cov))
+
+    cov = calc_cov(parcel_data.T, n_embeddings, standardize)
+    flips, corr = find_flips(
+        cov,
+        template_cov,
+        n_channels=parcel_data.shape[0],
+        n_embeddings=n_embeddings,
+    )
+    return parcel_data * flips[:, np.newaxis], flips, corr
+
+
 def sign_flip_mne_raw(
     fif,
     template_cov: Union[str, np.ndarray],
@@ -353,19 +405,9 @@ def sign_flip_mne_raw(
     else:
         raw = mne.io.read_raw_fif(str(fif), preload=True)
 
-    if not isinstance(template_cov, np.ndarray):
-        template_cov = np.load(str(template_cov))
-
     parcel_data = raw.get_data(picks=picks, reject_by_annotation="omit")
 
-    cov = calc_cov(parcel_data.T, n_embeddings, standardize)
-    flips, corr = find_flips(
-        cov,
-        template_cov,
-        n_channels=parcel_data.shape[0],
-        n_embeddings=n_embeddings,
-    )
-    flipped_data = parcel_data * flips[:, np.newaxis]
+    flipped_data, _, _ = sign_flip(parcel_data, template_cov, n_embeddings, standardize)
 
     if output_file is None:
         return convert_to_mne_raw(
