@@ -153,15 +153,17 @@ def load_data(
     data : np.memmap or np.ndarray
         Data.
     """
+    # Create Data.store_dir if we're going to save memory maps to disk
+    if mmap_location is not None:
+        store_dir = os.path.dirname(mmap_location)
+        if store_dir:
+            os.makedirs(store_dir, exist_ok=True, mode=0o700)
+
     if isinstance(data, np.ndarray):
         data = data.astype(np.float32)
         if mmap_location is None:
             return data
         else:
-            # Create Data.store_dir
-            store_dir = os.path.dirname(mmap_location)
-            os.makedirs(store_dir, exist_ok=True, mode=0o700)
-
             # Save to a file so we can load data as a memory map
             np.save(mmap_location, data)
             data = mmap_location
