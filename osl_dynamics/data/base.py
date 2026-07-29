@@ -7,8 +7,8 @@ import logging
 import pathlib
 import pickle
 import random
+import weakref
 from contextlib import contextmanager
-from shutil import rmtree
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -145,8 +145,14 @@ class Data:
             raise ValueError("No valid inputs were passed.")
 
         # Directory to store memory maps created by this class
-        # (created when rw.load_data is called)
-        self.store_dir = pathlib.Path(store_dir)
+        # (created when rw.load_data is called).
+        # Each Data instance gets its own sub-directory
+        # (named by its identifier).
+        self.store_dir = pathlib.Path(store_dir) / str(self._identifier)
+
+        # Finalizer to delete store_dir when this instance is garbage
+        # collected or when the interpreter exits
+        self._finalizer = weakref.finalize(self, misc.delete_dir, self.store_dir)
 
         # Load and validate the raw data
         self.raw_data_arrays, self.raw_data_filenames = self.load_raw_data()
@@ -1958,6 +1964,7 @@ class Data:
         attributes = list(self.__dict__.keys())
         dont_keep = [
             "_identifier",
+            "_finalizer",
             "data_field",
             "picks",
             "reject_by_annotation",
@@ -2056,8 +2063,7 @@ class Data:
 
     def delete_dir(self) -> None:
         """Deletes :code:`store_dir`."""
-        if self.store_dir.exists():
-            rmtree(self.store_dir)
+        self._finalizer()
 
 
 @dataclass

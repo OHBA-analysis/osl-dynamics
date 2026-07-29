@@ -7,6 +7,7 @@ import pickle
 import sys
 from copy import copy
 from pathlib import Path
+from shutil import rmtree
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -508,11 +509,23 @@ def system_call(cmd: str, verbose: bool = True) -> None:
     verbose : bool, optional
         Print the command before executing.
     """
-    import os
-
     if verbose:
         print(cmd)
     os.system(cmd)
+
+
+def delete_dir(directory: Union[str, Path]) -> None:
+    """Delete a directory (and its contents) if it exists.
+
+    Parameters
+    ----------
+    directory : str or pathlib.Path
+        Directory to delete. Does nothing if it does not exist.
+    """
+    directory = Path(directory)
+    if directory.exists():
+        _logger.info(f"Deleting {directory}")
+        rmtree(directory)
 
 
 def setup_fsl(directory):
