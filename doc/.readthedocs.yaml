@@ -7,6 +7,12 @@ build:
   os: ubuntu-22.04
   tools:
     python: "3.12"
+  jobs:
+    post_checkout:
+      # Fetch the full git history and tags so setuptools_scm can derive
+      # the version number
+      - git fetch --unshallow || true
+      - git fetch --all --tags || true
 
 sphinx:
   configuration: doc/conf.py

@@ -2,12 +2,12 @@
 # See https://packaging.python.org/en/latest/guides/writing-pyproject-toml for details
 
 [build-system]
-requires = ["setuptools>=61", "wheel"]
+requires = ["setuptools>=77", "setuptools_scm>=8", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "osl-dynamics"
-version = "3.2.dev4"
+dynamic = ["version"]
 description = "Toolbox for studying dynamic functional brain networks in MEG, EEG and fMRI data"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
@@ -44,6 +44,9 @@ classifiers = [
 
 [project.scripts]
 osl-dynamics = "osl_dynamics.config_api.pipeline:osl_dynamics_cli"
+
+# The version number is derived automatically from git tags
+[tool.setuptools_scm]
 
 [tool.setuptools.packages.find]
 where = ["."]

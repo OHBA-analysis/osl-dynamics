@@ -205,52 +205,19 @@ To skip building the tutorials, comment out `"sphinx_gallery.gen_gallery"` [here
 
 ## Releases
 
-A couple packages are needed to build and upload a project to PyPI, these can be installed in your conda environment with:
+To release a new version:
 
+1. Check the latest commit on `main` has compiled successfully on [readthedocs](https://readthedocs.org/projects/osl-dynamics).
+
+2. Create a new release using the 'Create a new release' link on the right of the GitHub repo webpage. Set the tag to the new version number with a `v` prefix (e.g. `v3.3.0`), write the release notes, the output of the following is a useful starting point:
 ```
-pip install build twine
+git log --oneline <previous tag>..main
 ```
+Select 'Latest' for the release label and click 'Publish release'.
 
-The following steps can be used to release a new version:
+3. Publishing the release triggers a GitHub Actions workflow (`.github/workflows/release.yml`) that builds the package and uploads it to [PyPI](https://pypi.org/project/osl-dynamics/). Check the workflow succeeded under the Actions tab of the GitHub repo.
 
-1. Update the version on line 10 of `pyproject.toml` by removing `dev` from the version number.
-
-2. Commit the updated `pyproject.toml` to the `main` branch of the GitHub repo.
-
-3. Check the latest branch has compiled successfully on [readthedocs](https://readthedocs.org/projects/osl-dynamics).
-
-4. Delete any old distributions that have been built (if there are any):
-```
-rm -r dist
-```
-
-5. Build a distribution in the osl-dynamics root directory with:
-```
-python -m build
-```
-This will create a new directory called `dist`.
-
-6. Test the build by installing with
-```
-pip install dist/<build>.whl
-```
-
-7. Upload the distribution to PyPI with
-```
-twine upload dist/*
-```
-You will need to enter the username and password that you used to register with [https://pypi.org](https://pypi.org). You may need to setup 2FA and/or an API token, see API token instructions in your PyPI account settings.
-
-8. Tag the commit uploaded to PyPI with the version number using the 'Create a new release' link on the right of the GitHub repo webpage. You will need to untick 'Set as a pre-release' and tick 'Set as the latest release'.
-
-9. Change the version to `X.Y.devZ` in `pyproject.toml` and commit the new dev version to `main`.
-
-10. Reinstall your editable development version in your `osld` conda environment:
-```
-pip install -e .
-```
-
-11. Draft a new release (click 'Releases' on the right panel on the GitHub homepage, then 'Draft a new release') to help keep note of changes for the next release.
+Installations from a clone of the repo (`pip install -e .`) automatically get a development version number based on the latest tag, e.g. `3.3.1.dev12` if 12 commits have been made since `v3.3.0`.
 
 ## Citation
 
