@@ -543,9 +543,9 @@ class VariationalInferenceModelBase(ModelBase):
             non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
             if np.any(non_active_states):
                 for _ in range(100):
-                    new_stc = self.sample_state_time_course(data.shape[0])
+                    new_stc = sim.generate_states(data.shape[0])
                     new_active_states = np.sum(new_stc, axis=0) != 0
-                    for j in range(self.config.n_states):
+                    for j in range(self.config.n_states or self.config.n_modes):
                         if non_active_states[j] and new_active_states[j]:
                             stc[:, j] = new_stc[:, j]
                     non_active_states = np.sum(stc, axis=0) < 2 * self.config.n_channels
@@ -1246,7 +1246,7 @@ class MarkovStateInferenceModelBase(ModelBase):
                 p = (
                     log_prob[:, t - 1][..., np.newaxis]
                     + log_P[np.newaxis, ...]
-                    + log_B[:, t][..., np.newaxis]
+                    + log_B[:, t][:, np.newaxis, :]
                 )
                 log_prob[:, t] = np.max(p, axis=-2)
                 prev[:, t] = np.argmax(p, axis=-2)
@@ -1859,8 +1859,9 @@ class MarkovStateInferenceModelBase(ModelBase):
             # log_smoothing_distribution.shape = (batch_size, n_states)
             if log_smoothing_distribution is None:
                 initial_distribution = self.get_initial_state_probs()
+                eps = sys.float_info.epsilon
                 log_prediction_distribution = np.broadcast_to(
-                    np.expand_dims(initial_distribution, axis=0),
+                    np.expand_dims(np.log(initial_distribution + eps), axis=0),
                     (batch_size, self.config.n_states),
                 )
             else:

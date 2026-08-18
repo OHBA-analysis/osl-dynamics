@@ -227,7 +227,7 @@ class Model(MarkovStateInferenceModelBase):
         """
         log_rate = self.get_log_rates()
         ll_layer = self.model.get_layer("ll")
-        return ll_layer([x, [log_rate]]).numpy()
+        return ll_layer([x, log_rate]).numpy()
 
     def set_log_rates(
         self, log_rates: np.ndarray, update_initializer: bool = True

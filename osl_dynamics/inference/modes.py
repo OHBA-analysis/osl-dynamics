@@ -285,10 +285,7 @@ def match_covariances(
             # Find the matrix that is most similar to matrix j
             for k in range(n_matrices):
                 if comparison == "frobenius":
-                    A = abs(
-                        np.diagonal(covariances[i][k]) - np.diagonal(covariances[0][j])
-                    )
-                    F[j, k] = np.linalg.norm(A)
+                    F[j, k] = np.linalg.norm(covariances[i][k] - covariances[0][j])
                 elif comparison == "correlation":
                     F[j, k] = -np.corrcoef(
                         covariances[i][k].flatten(), covariances[0][j].flatten()

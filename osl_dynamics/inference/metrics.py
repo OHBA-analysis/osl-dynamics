@@ -238,7 +238,7 @@ def pairwise_riemannian_distances(
     --------
     riemannian_distance
     """
-    matrices.astype(np.float64)
+    matrices = matrices.astype(np.float64)
     n_matrices = matrices.shape[0]
     riemannian_distances = np.zeros([n_matrices, n_matrices])
     for i in trange(n_matrices, desc="Computing Riemannian distances"):

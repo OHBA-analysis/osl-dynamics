@@ -228,6 +228,7 @@ class ModelBase:
             _logger.warning(
                 "No initialization method specified. Skipping initialization."
             )
+            return
         if "_initialization" not in method:
             method += "_initialization"
         if not hasattr(self, method):
@@ -287,7 +288,8 @@ class ModelBase:
         )
 
         # If step_per_epoch is not passed, calculate it from the dataset
-        if get_argument(self.model.fit, "steps_per_epoch", args, kwargs) is None:
+        steps_per_epoch = get_argument(self.model.fit, "steps_per_epoch", args, kwargs)
+        if steps_per_epoch is None:
             steps_per_epoch = dtf.get_n_batches(x)
 
         args, kwargs = replace_argument(self.model.fit, "x", x.repeat(), args, kwargs)

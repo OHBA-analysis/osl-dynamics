@@ -412,7 +412,7 @@ class Model(MarkovStateInferenceModelBase):
                 shape=(config.n_sessions, config.n_states, 1),
                 learn=config.learn_means,
                 initializer=osld_initializers.RandomWeightInitializer(
-                    tfp.math.softplus_inverse(0.0), 0.1
+                    tfp.math.softplus_inverse(1e-2), 0.1
                 ),
                 name="means_dev_mag_inf_alpha_input",
             )
@@ -511,7 +511,7 @@ class Model(MarkovStateInferenceModelBase):
                 shape=(config.n_sessions, config.n_states, 1),
                 learn=config.learn_covariances,
                 initializer=osld_initializers.RandomWeightInitializer(
-                    tfp.math.softplus_inverse(0.0), 0.1
+                    tfp.math.softplus_inverse(1e-2), 0.1
                 ),
                 name="covs_dev_mag_inf_alpha_input",
             )
@@ -579,14 +579,10 @@ class Model(MarkovStateInferenceModelBase):
                 ),
                 name="covs_dev",
             )
-            covs_dev = tf.broadcast_to(
-                covs_dev_layer(data),
-                (
-                    batch_size,
-                    config.n_states,
-                    config.n_channels * (config.n_channels + 1) // 2,
-                ),
-            )
+            covs_dev = TFBroadcastToLayer(
+                config.n_states,
+                config.n_channels * (config.n_channels + 1) // 2,
+            )([covs_dev_layer(data), batch_size])
 
         # -------- Add deviations to group level parameters -------- #
 
