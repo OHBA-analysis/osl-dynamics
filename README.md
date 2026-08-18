@@ -1,8 +1,64 @@
 # OHBA Software Library: Dynamics Toolbox
 
-osl-dynamics is a Python toolbox for studying brain dynamics using neuroimaging data (M/EEG and fMRI).
+[![PyPI version](https://img.shields.io/pypi/v/osl-dynamics)](https://pypi.org/project/osl-dynamics/)
+[![Documentation](https://readthedocs.org/projects/osl-dynamics/badge/?version=latest)](https://osl-dynamics.readthedocs.io)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green)](https://github.com/OHBA-analysis/osl-dynamics/blob/main/LICENSE)
+[![Paper](https://img.shields.io/badge/paper-eLife-orange)](https://elifesciences.org/articles/91949)
 
-See the readthedocs page for a description of this project: [https://osl-dynamics.readthedocs.io](https://osl-dynamics.readthedocs.io).
+osl-dynamics is a Python toolbox for studying brain dynamics using neuroimaging data: MEG, EEG and fMRI. It provides generative models that decompose data into brain networks — often called brain states or modes — including the Hidden Markov Model (HMM) and Dynamic Network Modes (DyNeMo), along with everything needed for a complete analysis: data loading and preparation, spectral estimation, network visualisation and statistical significance testing.
+
+You can use osl-dynamics to:
+
+- **Infer dynamic functional networks** from resting-state or task M/EEG and fMRI data using the HMM, DyNeMo and related models (M-DyNeMo, HIVE, DIVE, DyNeSTE and more).
+- **Characterise brain states/modes** with summary statistics (fractional occupancy, lifetimes, intervals, switching rates), state-specific power maps, and functional connectivity.
+- **Estimate spectra** using multitaper and regression-based methods, or wavelet transforms.
+- **Detect oscillatory bursts**.
+- **Test for statistical significance** using GLM permutation testing.
+- **Preprocess and source reconstruct M/EEG data**: preprocessing, coregistration, beamforming and parcellation.
+- **Simulate time series data** from HMMs, sinusoidal oscillators and autoregressive models.
+
+osl-dynamics works with [MNE-Python](https://mne.tools): a typical M/EEG workflow preprocesses, source reconstructs and parcellates data first, then models the dynamics of the parcel time courses with osl-dynamics. Data can be loaded from NumPy (`.npy`), MATLAB (`.mat`), text (`.txt`) or MNE (`.fif`) files.
+
+For a full description of the toolbox, see the documentation: [https://osl-dynamics.readthedocs.io](https://osl-dynamics.readthedocs.io).
+
+## Quick example
+
+Train a Time-Delay Embedded Hidden Markov Model (TDE-HMM) on source-space MEG data to infer dynamic functional brain networks:
+
+```python
+from osl_dynamics.data import Data
+from osl_dynamics.models.hmm import Config, Model
+
+# Load data, e.g. parcel time courses (.npy, .mat, .txt or .fif files)
+data = Data("training_data")
+
+# Prepare the data: time-delay embedding + PCA captures spectral structure
+data.prepare({
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+    "standardize": {},
+})
+
+# Train an HMM
+config = Config(
+    n_states=8,
+    n_channels=data.n_channels,
+    sequence_length=200,
+    learn_means=False,
+    learn_covariances=True,
+    batch_size=256,
+    learning_rate=0.01,
+    n_epochs=20,
+)
+model = Model(config)
+model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
+model.fit(data)
+
+# Get inferred state probabilities, then compute summary statistics,
+# spectra, power maps and connectivity networks
+alpha = model.get_alpha(data)
+```
+
+See the [tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.html) for complete walkthroughs and the [examples directory](https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples) for full analysis pipelines.
 
 ## Citation
 

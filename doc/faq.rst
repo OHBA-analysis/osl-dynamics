@@ -90,7 +90,7 @@ See the 'What is time-delay embedding' question for a description of what happen
 
 A choice we have to make is how many lagged versions of each channel we add. The number of lagged channels we add (i.e. the number of embeddings) determines how many points in the auto-correlation function (and therefore power spectrum) we encode into the covariance matrix of the data. I.e. if we include more embeddings, we add more off-diagonal elements into the covariance matrix, which corresponds to specifying more data points in the auto-correlation function and therefore power spectrum. In other words, having more embeddings allows you to be more sensitive to oscillations in your data.
 
-The number of embeddings should be chosen for a particular sampling frequency. See the :doc:`Time-Delay Embedding tutorial <tutorials_build/1-4_data_time_delay_embedding>` for example code comparing different TDE settings. We recommends 15 embeddings for 250 Hz data and 7 embeddings for 100 Hz data.
+The number of embeddings should be chosen for a particular sampling frequency. See the :doc:`Time-Delay Embedding tutorial <tutorials_build/1-4_data_time_delay_embedding>` for example code comparing different TDE settings. We recommend 15 embeddings for 250 Hz data and 7 embeddings for 100 Hz data. Note, both of these correspond to an embedding window of roughly 60-70 ms - if your data has a different sampling frequency, choosing :code:`n_embeddings` to give a similar window duration (i.e. :code:`n_embeddings / sampling_frequency` of roughly 60 ms) is a good starting point.
 
 Why doesn't the number of time points in my inferred alphas match the original data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
