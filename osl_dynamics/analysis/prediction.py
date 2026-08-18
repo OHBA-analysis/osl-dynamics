@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 from tqdm.auto import tqdm
 
+from sklearn.base import clone
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA, FastICA
@@ -21,6 +22,7 @@ from sklearn.linear_model import (
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.metrics import get_scorer
 from sklearn.model_selection import (
     GridSearchCV,
     RandomizedSearchCV,
@@ -28,16 +30,6 @@ from sklearn.model_selection import (
     KFold,
     StratifiedKFold,
 )
-
-
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.decomposition import PCA, FastICA
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
 
 
 class PipelineBuilder:
@@ -164,14 +156,18 @@ class PipelineBuilder:
         predictor = predictor or self.DEFAULT_PREDICTOR
         self.validate_model(scaler, dim_reduction, predictor)
 
+        # Note, we clone each estimator so that separately built pipelines
+        # do not share (and silently refit) the same estimator instances
         steps = []
         if scaler:
-            steps.append(("scaler", self.scaler_dict[scaler]))
+            steps.append(("scaler", clone(self.scaler_dict[scaler])))
 
         if dim_reduction:
-            steps.append(("dim_reduction", self.dim_reduction_dict[dim_reduction]))
+            steps.append(
+                ("dim_reduction", clone(self.dim_reduction_dict[dim_reduction]))
+            )
 
-        steps.append(("predictor", self.predictor_dict[predictor]))
+        steps.append(("predictor", clone(self.predictor_dict[predictor])))
 
         return Pipeline(steps)
 
@@ -391,6 +387,7 @@ class ModelSelection:
         split_type: str = "kfold",
         outer_cv: int = 5,
         shuffle: bool = True,
+        scoring: Optional[str] = None,
     ) -> np.ndarray:
         """Performs nested cross-validation to evaluate model performance.
 
@@ -407,6 +404,9 @@ class ModelSelection:
             Number of outer cross-validation folds. Defaults to 5.
         shuffle : bool, optional
             Whether to shuffle the data before splitting. Defaults to True.
+        scoring : str, optional
+            Scoring metric to use on the outer test folds. If None, the
+            model's default scorer is used.
 
         Returns
         -------
@@ -414,6 +414,11 @@ class ModelSelection:
             Array of test scores for each outer fold.
         """
         self.validate_data(X, y)
+        X = np.asarray(X)
+        y = np.asarray(y)
+
+        if scoring is not None:
+            scorer = get_scorer(scoring)
 
         if split_type == "kfold":
             outer_split = KFold(
@@ -438,7 +443,10 @@ class ModelSelection:
             best_model = self.model_selection(
                 X_train, y_train, override_best_model=False
             )
-            test_score = best_model.score(X_test, y_test)
+            if scoring is not None:
+                test_score = scorer(best_model, X_test, y_test)
+            else:
+                test_score = best_model.score(X_test, y_test)
             outer_scores.append(test_score)
 
         return np.array(outer_scores)
@@ -450,7 +458,7 @@ class ModelSelection:
         cv: Optional[int] = None,
         scoring: Optional[str] = None,
     ) -> np.ndarray:
-        """Computes cross-validation scores for the best model.
+        """Computes nested cross-validation scores.
 
         Parameters
         ----------
@@ -468,10 +476,10 @@ class ModelSelection:
         scores : np.ndarray
             Cross-validation scores.
         """
-        self.validate_data(X, y)
-        model = self.best_model or self.model
+        # Note, we use nested cross-validation: the hyperparameter search
+        # is re-run within each training fold, so the returned scores are
+        # not optimistically biased by hyperparameters that were selected
+        # using the same data
         cv = cv or self.cv
         scoring = scoring or self.scoring
-
-        scores = cross_val_score(model, X, y, cv=cv, scoring=scoring)
-        return scores
+        return self.nested_cross_validation(X, y, outer_cv=cv, scoring=scoring)

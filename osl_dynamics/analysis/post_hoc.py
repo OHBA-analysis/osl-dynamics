@@ -253,6 +253,8 @@ def state_activations(
         if np.issubdtype(stc.dtype, np.integer):
             if np.all(np.isin(stc, [0, 1])):
                 bool_state_time_course.append(stc.astype(bool))
+            else:
+                raise ValueError(error_message)
         elif np.issubdtype(stc.dtype, np.bool_):
             bool_state_time_course.append(stc)
         else:
@@ -552,7 +554,7 @@ def switching_rates(
         n_samples, n_states = array.shape
 
         # Number of activations for each state
-        d = np.diff(array, axis=0)
+        d = np.diff(array.astype(int), axis=0)
         counts = np.array([len(d[:, i][d[:, i] == 1]) for i in range(n_states)])
 
         # Calculate switching rates
@@ -622,7 +624,9 @@ def fano_factor(
         State time course (strictly binary). Shape must be (n_sessions,
         n_samples, n_states) or (n_samples, n_states).
     window_lengths : list or np.ndarray
-        Window lengths to use. Must be in samples.
+        Window lengths to use. Given in seconds if
+        :code:`sampling_frequency` is passed, otherwise (with the default
+        :code:`sampling_frequency=1`) given in samples.
     sampling_frequency : float, optional
         Sampling frequency in Hz.
 
@@ -653,7 +657,7 @@ def fano_factor(
             counts = []
             for window in tc:
                 # Number of activations
-                d = np.diff(window, axis=0)
+                d = np.diff(window.astype(int), axis=0)
                 c = []
                 for i in range(n_states):
                     c.append(len(d[:, i][d[:, i] == 1]))
@@ -688,6 +692,10 @@ def calc_trans_prob_matrix(
     """
     if isinstance(state_time_course, np.ndarray):
         state_time_course = [state_time_course]
+    if n_states is None:
+        # Note, we use the number of columns rather than the states visited
+        # (a session may not visit every state)
+        n_states = state_time_course[0].shape[1]
     trans_prob = []
     for stc in state_time_course:
         stc_argmax = stc.argmax(axis=1)
@@ -696,8 +704,6 @@ def calc_trans_prob_matrix(
             axis=0,
             return_counts=True,
         )
-        if n_states is None:
-            n_states = stc_argmax.max() + 1
         tp = np.zeros((n_states, n_states))
         tp[vals[:, 0], vals[:, 1]] = counts
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -735,11 +741,15 @@ def simple_moving_average(
     n_samples = data.shape[0]
     n_modes = data.shape[1]
 
-    # Pad the data
+    # Pad the data. Note, we keep track of how many real (unpadded)
+    # samples are in each window so the mean at the edges is not biased
+    # towards zero by the padding
+    valid = np.ones(n_samples, dtype=np.float32)
     data = np.pad(data, window_length // 2)[
         :,
         window_length // 2 : window_length // 2 + n_modes,
     ]
+    valid = np.pad(valid, window_length // 2)
 
     # Define indices of time points to calculate a moving average
     time_idx = range(0, n_samples, step_size)
@@ -752,7 +762,8 @@ def simple_moving_average(
     for n in range(n_windows):
         j = time_idx[n]
         mov_window = data[j : j + window_length]
-        mov_avg[n] = np.mean(mov_window, axis=0)
+        n_valid = np.sum(valid[j : j + window_length])
+        mov_avg[n] = np.sum(mov_window, axis=0) / n_valid
 
     return mov_avg
 

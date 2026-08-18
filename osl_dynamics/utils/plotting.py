@@ -997,9 +997,7 @@ def plot_time_series(
     plot_kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
     # Calculate separation
-    separation = (
-        np.maximum(time_series[:n_samples].max(), time_series[:n_samples].min()) * 1.2,
-    )
+    separation = np.abs(time_series[:n_samples]).max() * 1.2
     gaps = np.arange(n_channels)[::-1] * separation
 
     # Create figure
@@ -1408,6 +1406,8 @@ def plot_connections(
         if not ax:
             fig = plt.figure(figsize=(10, 10))
             ax = fig.add_subplot(111, projection="polar")
+        else:
+            fig = ax.get_figure()
 
         for left, right in zip(lefts, rights):
             verts = [
@@ -1979,15 +1979,15 @@ def plot_state_lifetimes(
     """
     from osl_dynamics.analysis import post_hoc
 
-    n_plots = state_time_course.shape[1]
-    short, long, empty = rough_square_axes(n_plots)
-    colors = get_colors(n_plots)
-
     # Validation
     if state_time_course.ndim == 1:
         state_time_course = get_one_hot(state_time_course)
     if state_time_course.ndim != 2:
         raise ValueError("state_time_course must be a 2D array.")
+
+    n_plots = state_time_course.shape[1]
+    short, long, empty = rough_square_axes(n_plots)
+    colors = get_colors(n_plots)
 
     if fig_kwargs is None:
         fig_kwargs = {}
@@ -1998,10 +1998,11 @@ def plot_state_lifetimes(
         plot_kwargs = {}
 
     # Calculate state lifetimes
-    channel_lifetimes = post_hoc.lifetimes(state_time_course)
+    channel_lifetimes = post_hoc.lifetimes(state_time_course, squeeze=False)[0]
 
     # Create figure
     fig, axes = create_figure(short, long, **fig_kwargs)
+    axes = np.array(axes)
 
     # Plot data
     largest_bar = 0
@@ -2134,6 +2135,10 @@ def plot_psd_topo(
     # Which parcels should we plot the PSD for?
     if only_show is None:
         only_show = np.arange(n_parcels)
+    elif parcellation_file is not None:
+        # The PSDs have been re-ordered (anterior -> posterior), so we
+        # need to map the parcel indices to their re-ordered positions
+        only_show = np.argsort(order)[np.asarray(only_show)]
 
     # Create axis
     if ax is None:
@@ -2362,8 +2367,8 @@ def plot_summary_stats_group_diff(
     # Save figure
     if filename is not None:
         _logger.info(f"Saving {filename}")
-        plt.savefig(filename)
-        plt.close()
+        fig.savefig(filename)
+        plt.close(fig)
     elif create_fig:
         return fig, ax
 

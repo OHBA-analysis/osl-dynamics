@@ -73,7 +73,7 @@ def sliding_window_power(
     def _swp(x):
         n_samples = x.shape[0]
         n_channels = x.shape[1]
-        n_windows = (n_samples - window_length - 1) // step_size + 1
+        n_windows = (n_samples - window_length) // step_size + 1
 
         # Preallocate an array fo hold moving average values
         swp = np.empty([n_windows, n_channels], dtype=np.float32)
@@ -244,12 +244,12 @@ def variance_from_spectra(
                     frequencies, frequency_range
                 )
                 if method == "sum":
-                    p = np.sum(psd[..., min_arg:max_arg], axis=-1)
+                    p = np.sum(psd[..., min_arg : max_arg + 1], axis=-1)
                 elif method == "integral":
                     df = frequencies[1] - frequencies[0]
-                    p = np.sum(psd[..., min_arg:max_arg] * df, axis=-1)
+                    p = np.sum(psd[..., min_arg : max_arg + 1] * df, axis=-1)
                 else:
-                    p = np.mean(psd[..., min_arg:max_arg], axis=-1)
+                    p = np.mean(psd[..., min_arg : max_arg + 1], axis=-1)
 
         p = p.reshape(n_components, n_modes, n_channels)
         var.append(p)
@@ -428,7 +428,10 @@ def save(
 
                 # Combine images into a single image
                 fig, axes = plt.subplots(
-                    n_rows, n_columns, figsize=(n_columns * 5, n_rows * 5)
+                    n_rows,
+                    n_columns,
+                    figsize=(n_columns * 5, n_rows * 5),
+                    squeeze=False,
                 )
                 for i, ax in enumerate(axes.flatten()):
                     ax.axis("off")
@@ -544,10 +547,14 @@ def multi_save(
         session_power_map -= mean_group_power[np.newaxis, np.newaxis, ...]
 
     # Save the group power map
-    filename = Path(filename)
-    group_dir = f"{filename.parent}/group"
-    os.makedirs(group_dir, exist_ok=True)
-    group_filename = f"{group_dir}/{filename.stem}{filename.suffix}"
+    if filename is not None:
+        filename = Path(filename)
+        group_dir = f"{filename.parent}/group"
+        os.makedirs(group_dir, exist_ok=True)
+        group_filename = f"{group_dir}/{filename.stem}{filename.suffix}"
+    else:
+        # Show the plot on screen (e.g. for Jupyter notebooks)
+        group_filename = None
 
     _logger.info("Saving group level power map:")
     save(
@@ -564,11 +571,14 @@ def multi_save(
         sessions = np.arange(n_sessions)
 
     for sess in sessions:
-        session_dir = "{fn.parent}/sess_{sess:0{v}d}".format(
-            fn=filename, sess=sess, v=len(str(n_sessions))
-        )
-        os.makedirs(session_dir, exist_ok=True)
-        session_filename = f"{session_dir}/{filename.stem}{filename.suffix}"
+        if filename is not None:
+            session_dir = "{fn.parent}/sess_{sess:0{v}d}".format(
+                fn=filename, sess=sess, v=len(str(n_sessions))
+            )
+            os.makedirs(session_dir, exist_ok=True)
+            session_filename = f"{session_dir}/{filename.stem}{filename.suffix}"
+        else:
+            session_filename = None
 
         _logger.info(f"Saving session {sess} power map:")
         save(

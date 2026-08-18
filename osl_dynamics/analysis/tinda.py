@@ -38,13 +38,14 @@ def find_intervals(tc_hot: np.ndarray) -> Tuple[List[Tuple[int, int]], np.ndarra
     durations : array_like
         Array of durations of intervals (in samples).
     """
-    intervals = []
-    durations = []
-    tc_tmp = np.insert(np.insert(tc_hot, 0, 0, axis=0), -1, 0, axis=0)
+    tc_hot = np.asarray(tc_hot).reshape(-1)
+    tc_tmp = np.concatenate(([0], tc_hot, [0]))
     start = np.where(np.diff(tc_tmp) == 1)[0]
     end = np.where(np.diff(tc_tmp) == -1)[0]
     intervals = list(zip(end[:-1], start[1:]))
-    durations = np.diff(intervals, axis=1).squeeze()
+    if len(intervals) == 0:
+        return intervals, np.array([], dtype=int)
+    durations = np.diff(intervals, axis=1).reshape(-1)
     return intervals, durations
 
 

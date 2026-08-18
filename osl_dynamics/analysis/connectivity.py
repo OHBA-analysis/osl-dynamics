@@ -77,7 +77,7 @@ def sliding_window_connectivity(
     def _swc(x):
         n_samples = x.shape[0]
         n_channels = x.shape[1]
-        n_windows = (n_samples - window_length - 1) // step_size + 1
+        n_windows = (n_samples - window_length) // step_size + 1
 
         # Preallocate an array to hold moving average values
         swc = np.empty([n_windows, n_channels, n_channels], dtype=np.float32)
@@ -197,7 +197,7 @@ def covariance_from_spectra(
                 c = np.sum(csd, axis=-1) * df
             else:
                 [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
-                c = np.sum(csd[..., min_arg:max_arg], axis=-1) * df
+                c = np.sum(csd[..., min_arg : max_arg + 1], axis=-1) * df
 
         c = c.reshape(n_components, n_modes, n_channels, n_channels)
         cov.append(c.real)
@@ -285,7 +285,7 @@ def mean_coherence_from_spectra(
                 c = np.mean(c, axis=-1)
             else:
                 [min_arg, max_arg] = get_frequency_args_range(f, frequency_range)
-                c = np.mean(c[..., min_arg:max_arg], axis=-1)
+                c = np.mean(c[..., min_arg : max_arg + 1], axis=-1)
 
         c = c.reshape(n_components, n_modes, n_channels, n_channels)
         mean_coh.append(c)
@@ -746,19 +746,23 @@ def spectral_reordering(corr_mat: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     # Add one to make all entries positive
     C = corr_mat + 1
 
-    # Compute Q
+    # Compute Q (the graph Laplacian of C, excluding self-connections):
+    # off-diagonal entries are -C and the diagonal is the sum of the
+    # off-diagonal weights (degree)
     Q = -C
     np.fill_diagonal(Q, 0)
-    Q -= np.sum(Q, axis=0)
+    np.fill_diagonal(Q, -np.sum(Q, axis=0))
 
     # Compute t
     t = np.diag(1.0 / np.sqrt(np.sum(C, axis=0)))
 
-    # Compute D
+    # Compute D (normalized Laplacian)
     D = np.dot(np.dot(t, Q), t)
 
-    # Eigevalue decomposition
-    D, W = np.linalg.eig(D)
+    # Eigenvalue decomposition. Note, eigh returns eigenvalues in
+    # ascending order, so W[:, 1] is the Fiedler vector (the eigenvector
+    # corresponding to the second smallest eigenvalue)
+    D, W = np.linalg.eigh(D)
     v = W[:, 1]
 
     # Scale v
@@ -913,7 +917,12 @@ def save(
 
         n_columns = -(n_modes // -n_rows)
         titles = titles or [None] * n_modes
-        fig, axes = plt.subplots(n_rows, n_columns, figsize=(n_columns * 5, n_rows * 5))
+        fig, axes = plt.subplots(
+            n_rows,
+            n_columns,
+            figsize=(n_columns * 5, n_rows * 5),
+            squeeze=False,
+        )
         for i, ax in enumerate(axes.flatten()):
             ax.axis("off")
             if i < n_modes:

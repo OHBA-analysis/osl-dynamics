@@ -232,6 +232,9 @@ def welch_spectra(
         if data.ndim == 2:
             data = [data]
             alpha = [alpha]
+        elif alpha is None:
+            # 3D array passed with no alpha
+            alpha = np.array([None] * len(data))
 
     if window_length is None:
         window_length = 2 * sampling_frequency
@@ -437,6 +440,9 @@ def multitaper_spectra(
         if data.ndim == 2:
             data = [data]
             alpha = [alpha]
+        elif alpha is None:
+            # 3D array passed with no alpha
+            alpha = np.array([None] * len(data))
 
     if window_length is None:
         window_length = 2 * sampling_frequency
@@ -1173,7 +1179,10 @@ def mar_spectra(
         n_channels) or (n_freq, n_channels, n_channels).
     """
     # Validation
-    if covs.shape[-1] != covs.shape[-2]:
+    if covs.ndim == 1:
+        # A vector of diagonal elements was passed
+        covs = np.diag(covs)
+    elif covs.shape[-1] != covs.shape[-2]:
         if covs.ndim == 2:
             covs = [np.diag(c) for c in covs]
         else:

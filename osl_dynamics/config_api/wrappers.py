@@ -828,7 +828,7 @@ def plot_power_maps_from_covariances(
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
-            default_power_save_kwargs["plot_kwargs"],
+            default_power_save_kwargs.get("plot_kwargs", {}),
             power_save_kwargs["plot_kwargs"],
         )
     power_save_kwargs = override_dict_defaults(
@@ -992,12 +992,12 @@ def multitaper_spectra(
         raise ValueError("data must be passed.")
 
     sampling_frequency = kwargs.pop("sampling_frequency", None)
-    if sampling_frequency is None and data.sampling_frequency is None:
+    if sampling_frequency is None:
+        sampling_frequency = data.sampling_frequency
+    if sampling_frequency is None:
         raise ValueError(
             "sampling_frequency must be passed or specified in the Data object."
         )
-    else:
-        sampling_frequency = data.sampling_frequency
 
     default_kwargs = {
         "sampling_frequency": sampling_frequency,
@@ -1110,12 +1110,12 @@ def regression_spectra(data, output_dir: str, kwargs: dict) -> None:
         raise ValueError("data must be passed.")
 
     sampling_frequency = kwargs.pop("sampling_frequency", None)
-    if sampling_frequency is None and data.sampling_frequency is None:
+    if sampling_frequency is None:
+        sampling_frequency = data.sampling_frequency
+    if sampling_frequency is None:
         raise ValueError(
             "sampling_frequency must be passed or specified in the Data object."
         )
-    else:
-        sampling_frequency = data.sampling_frequency
 
     default_kwargs = {
         "sampling_frequency": sampling_frequency,
@@ -1261,7 +1261,7 @@ def plot_group_ae_networks(
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
-            default_power_save_kwargs["plot_kwargs"],
+            default_power_save_kwargs.get("plot_kwargs", {}),
             power_save_kwargs["plot_kwargs"],
         )
     power_save_kwargs = override_dict_defaults(
@@ -1421,7 +1421,7 @@ def plot_group_tde_hmm_networks(
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
-            default_power_save_kwargs["plot_kwargs"],
+            default_power_save_kwargs.get("plot_kwargs", {}),
             power_save_kwargs["plot_kwargs"],
         )
     power_save_kwargs = override_dict_defaults(
@@ -1614,7 +1614,7 @@ def plot_group_nnmf_tde_hmm_networks(
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
-            default_power_save_kwargs["plot_kwargs"],
+            default_power_save_kwargs.get("plot_kwargs", {}),
             power_save_kwargs["plot_kwargs"],
         )
     power_save_kwargs = override_dict_defaults(
@@ -1794,7 +1794,7 @@ def plot_group_tde_dynemo_networks(
     }
     if "plot_kwargs" in power_save_kwargs:
         power_save_kwargs["plot_kwargs"] = override_dict_defaults(
-            default_power_save_kwargs["plot_kwargs"],
+            default_power_save_kwargs.get("plot_kwargs", {}),
             power_save_kwargs["plot_kwargs"],
         )
     power_save_kwargs = override_dict_defaults(

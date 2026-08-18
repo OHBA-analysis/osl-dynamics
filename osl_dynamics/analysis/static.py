@@ -72,7 +72,10 @@ def functional_connectivity(
         raise TypeError("conn_type must be a str, list or callable function.")
 
     if isinstance(data, np.ndarray):
-        data = [data]
+        if data.ndim == 3:
+            data = list(data)
+        else:
+            data = [data]
 
     def _calc_cov(x):
         # Function to calculate covariance

@@ -79,6 +79,8 @@ class FisherKernel:
                 var.name for var in self.model.trainable_weights
             ]
             for name in trainable_variable_names:
+                if "inference" in name:
+                    continue
                 if (
                     "mod" in name
                     or "alpha" in name

@@ -244,7 +244,7 @@ def fit_gaussian_mixture(
         a = np.array(
             [stats.norm.pdf(x, loc, scale) for loc, scale in zip(means, stddevs)]
         ).T
-        a *= gm.weights_
+        a *= gm.weights_[order]
 
         # Find the index of the data point closest to the desired p-value
         # This defines the threshold in the standardised/logit transformed space
