@@ -6,7 +6,7 @@ on time-delay embedded training data.
 import os
 import numpy as np
 
-from osl_dynamics.analysis import power, modes
+from osl_dynamics.analysis import power, post_hoc
 
 def get_data(name, output_dir):
     if os.path.exists(output_dir):
@@ -32,7 +32,7 @@ n_embeddings = 15
 pca_components = np.load("notts_tde_hmm/pca_components.npy")
 
 # Convert from the time-delay embedded/PCA space to the original source space
-power_map = modes.raw_covariances(
+power_map = post_hoc.raw_covariances(
     covs,
     n_embeddings=n_embeddings,
     pca_components=pca_components,

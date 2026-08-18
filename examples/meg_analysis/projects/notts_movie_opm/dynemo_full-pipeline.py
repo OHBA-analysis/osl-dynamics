@@ -111,7 +111,7 @@ if not use_pre_trained_model:
     history = model.fit(
         training_data,
         save_best_after=config.n_kl_annealing_epochs,
-        save_filepath=f"{model_dir}/weights",
+        save_filepath=f"{model_dir}/model.weights.h5",
     )
 
     with open(f"{model_dir}/history.pkl", "wb") as file:
@@ -119,7 +119,7 @@ if not use_pre_trained_model:
 
 else:
     # Load a pre-trained model
-    model.load_weights(f"{model_dir}/weights")
+    model.load_weights(f"{model_dir}/model.weights.h5")
 
     with open(f"{model_dir}/history.pkl", "rb") as file:
         history = pickle.load(file)

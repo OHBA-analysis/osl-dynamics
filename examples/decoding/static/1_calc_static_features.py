@@ -63,7 +63,7 @@ tde_cov = static.functional_connectivity(x, conn_type="cov")
 #%% Save
 
 # Reshape: (frequency_bands, subjects, ...) -> (subjects, frequency_bands, ...)
-power = np.swapaxes(power, 0, 1)
+p = np.swapaxes(p, 0, 1)
 aec = np.swapaxes(aec, 0, 1)
 
 os.makedirs("data/static_features", exist_ok=True)

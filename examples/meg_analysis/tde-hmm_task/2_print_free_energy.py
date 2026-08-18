@@ -16,7 +16,7 @@ best_fe = np.inf
 for run in range(1, 11):
     try:
         history = pickle.load(
-            open(f"results/{n_states}_states/run{run:02d}/model/history.pkl", "rb")
+            open(f"results/{n_states:02d}_states/run{run:02d}/model/history.pkl", "rb")
         )
         free_energy = history["free_energy"]
         print(f"run {run}: {free_energy}")

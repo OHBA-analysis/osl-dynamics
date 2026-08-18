@@ -22,7 +22,7 @@ from osl_dynamics.inference import modes
 from osl_dynamics.analysis import spectral
 
 # Load parcellated data
-files = sorted(glob("/well/woolrich/projects/camcan/spring23/src/*/sflip_parc-raw.fif"))[:20]
+files = sorted(glob("/well/woolrich/projects/camcan/spring23/src/*/sflip_parc-raw.fif"))
 data = Data(files, picks="misc", reject_by_annotation="omit", n_jobs=16)
 x = data.trim_time_series(n_embeddings=15, sequence_length=400)
 

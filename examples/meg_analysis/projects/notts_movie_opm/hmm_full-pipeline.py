@@ -96,7 +96,7 @@ if not use_pre_trained_model:
 
     # Train the model
     history = model.fit(training_data)
-    model.save_weights(f"{model_dir}/weights")
+    model.save_weights(f"{model_dir}/model.weights.h5")
 
     # Save history
     with open(f"{model_dir}/history.pkl", "wb") as file:
@@ -104,7 +104,7 @@ if not use_pre_trained_model:
 
 else:
     # Load a pre-trained model
-    model.load_weights(f"{model_dir}/weights")
+    model.load_weights(f"{model_dir}/model.weights.h5")
 
     with open(f"{model_dir}/history.pkl", "rb") as file:
         history = pickle.load(file)

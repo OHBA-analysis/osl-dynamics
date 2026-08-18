@@ -69,7 +69,7 @@ print("Training model")
 history = model.fit(
     training_data,
     save_best_after=config.n_kl_annealing_epochs,
-    save_filepath="tmp/weights",
+    save_filepath="tmp/model.weights.h5",
 )
 
 # Free energy = Log Likelihood - KL Divergence

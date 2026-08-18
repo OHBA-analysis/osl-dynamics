@@ -14,7 +14,6 @@ mat = scipy.io.loadmat(
     only_include="subject_IDs_unique",
 )
 subject_IDs = mat["subject_IDs_unique"]
-exit()
 # %% Paths to files
 
 # Get paths to files that exist (this takes about 30 seconds)

@@ -16,7 +16,7 @@ import pickle
 import numpy as np
 
 def get_best_run(min_, max_):
-    best_fe = np.Inf
+    best_fe = np.inf
     for run in range(min_, max_ + 1):
         try:
             with open(f"{output_dir}/run{run:02d}/loss.dat") as file:

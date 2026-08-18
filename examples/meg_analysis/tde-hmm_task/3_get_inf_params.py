@@ -32,7 +32,7 @@ os.makedirs(inf_params_dir, exist_ok=True)
 files = sorted(glob("data/src/*/sflip_parc-raw.fif"))
 data = Data(files, picks="misc", reject_by_annotation="omit", n_jobs=8)
 methods = {
-    "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+    "tde_pca": {"n_embeddings": 15, "n_pca_components": 120},
     "standardize": {},
 }
 data.prepare(methods)

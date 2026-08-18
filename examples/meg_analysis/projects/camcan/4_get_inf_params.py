@@ -23,12 +23,17 @@ import numpy as np
 from osl_dynamics.data import load_tfrecord_dataset
 from osl_dynamics.models import load
 
-# Load training data
-dataset = load_tfrecord_dataset("dataset", shuffle=False, concatenate=False)
-
 # Load model
 model = load(model_dir)
 model.summary()
+
+# Load training data
+dataset = load_tfrecord_dataset(
+    "dataset",
+    batch_size=model.config.batch_size,
+    shuffle=False,
+    concatenate=False,
+)
 
 # Get inferred alphas (state probabilities)
 alpha = model.get_alpha(dataset)

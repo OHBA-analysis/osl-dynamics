@@ -5,7 +5,7 @@
 import pickle
 import numpy as np
 
-best_fe = np.Inf
+best_fe = np.inf
 for i in range(1, 11):
     try:
         history = pickle.load(open(f"results/run{i:02d}/model/history.pkl", "rb"))
