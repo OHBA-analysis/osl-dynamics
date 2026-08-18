@@ -45,7 +45,7 @@ class HMM:
         n_states: Optional[int] = None,
     ) -> None:
         if isinstance(trans_prob, list):
-            trans_prob = np.ndarray(trans_prob)
+            trans_prob = np.array(trans_prob)
 
         if isinstance(trans_prob, np.ndarray):
             # Don't need to generate the transition probability matrix
@@ -202,6 +202,8 @@ class HMM_MAR(Simulation):
         return self.state_time_course
 
     def __getattr__(self, attr: str):
+        if attr in ("obs_mod", "hmm"):
+            raise AttributeError(f"No attribute called {attr}.")
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hmm):
@@ -294,6 +296,8 @@ class HMM_MVN(Simulation):
         return self.state_time_course
 
     def __getattr__(self, attr: str):
+        if attr in ("obs_mod", "hmm"):
+            raise AttributeError(f"No attribute called {attr}.")
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hmm):
@@ -418,6 +422,8 @@ class MDyn_HMM_MVN(Simulation):
         return self.state_time_course
 
     def __getattr__(self, attr: str):
+        if attr == "obs_mod":
+            raise AttributeError(f"No attribute called {attr}.")
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         else:
@@ -504,6 +510,8 @@ class HMM_Poi(Simulation):
         return self.state_time_course
 
     def __getattr__(self, attr: str):
+        if attr in ("obs_mod", "hmm"):
+            raise AttributeError(f"No attribute called {attr}.")
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hmm):
@@ -611,7 +619,14 @@ class MSess_HMM_MVN(Simulation):
         self.n_sessions = self.obs_mod.n_sessions
 
         # Construct trans_prob for each session
-        if isinstance(trans_prob, str) or trans_prob is None:
+        if isinstance(trans_prob, np.ndarray):
+            if trans_prob.ndim == 2:
+                # Same transition probability matrix for each session
+                trans_prob = [trans_prob] * self.n_sessions
+            else:
+                # A (n_sessions, n_states, n_states) array was passed
+                trans_prob = list(trans_prob)
+        elif isinstance(trans_prob, str) or trans_prob is None:
             trans_prob = [trans_prob] * self.n_sessions
 
         # Vary the stay probability for each session
@@ -659,6 +674,8 @@ class MSess_HMM_MVN(Simulation):
         return self.state_time_course
 
     def __getattr__(self, attr: str):
+        if attr == "obs_mod":
+            raise AttributeError(f"No attribute called {attr}.")
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         else:
@@ -820,10 +837,10 @@ class HierarchicalHMM_MVN(Simulation):
         return self.state_time_course
 
     def __getattr__(self, attr: str):
+        if attr == "obs_mod":
+            raise AttributeError(f"No attribute called {attr}.")
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
-        elif attr in dir(self.hmm):
-            return getattr(self.hmm, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
 

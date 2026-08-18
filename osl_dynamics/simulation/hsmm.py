@@ -123,7 +123,12 @@ class HSMM:
             )
             current_position += state_lifetime
 
-        return alpha.astype(int)
+        if np.all(np.mod(self.state_vectors, 1) == 0):
+            # One-hot state vectors, return an integer state time course.
+            # We must not cast fractional state vectors (e.g. the mixed
+            # states in MixedHSMM_MVN) as this would truncate them to zero
+            alpha = alpha.astype(int)
+        return alpha
 
 
 class HSMM_MVN(Simulation):
@@ -215,6 +220,8 @@ class HSMM_MVN(Simulation):
         return self.state_time_course
 
     def __getattr__(self, attr: str):
+        if attr in ("obs_mod", "hsmm"):
+            raise AttributeError(f"No attribute called {attr}.")
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hsmm):
@@ -334,6 +341,8 @@ class MixedHSMM_MVN(Simulation):
         return self.state_time_course
 
     def __getattr__(self, attr: str):
+        if attr in ("obs_mod", "hsmm"):
+            raise AttributeError(f"No attribute called {attr}.")
         if attr in dir(self.obs_mod):
             return getattr(self.obs_mod, attr)
         elif attr in dir(self.hsmm):
