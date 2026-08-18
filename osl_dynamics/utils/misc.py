@@ -343,7 +343,7 @@ class MockArray:
             buffer_size = max(16 * 1024**2 // self.dtype.itemsize, 1)
 
         n_chunks, remainder = np.divmod(
-            np.product(self.shape) * self.dtype.itemsize, buffer_size
+            np.prod(self.shape) * self.dtype.itemsize, buffer_size
         )
 
         with open(filename, "wb") as f:
@@ -514,18 +514,26 @@ def system_call(cmd: str, verbose: bool = True) -> None:
     os.system(cmd)
 
 
-def delete_dir(directory: Union[str, Path]) -> None:
+def delete_dir(directory: Union[str, Path], remove_empty_parent: bool = False) -> None:
     """Delete a directory (and its contents) if it exists.
 
     Parameters
     ----------
     directory : str or pathlib.Path
         Directory to delete. Does nothing if it does not exist.
+    remove_empty_parent : bool, optional
+        Should we also delete the parent directory if it is empty?
     """
     directory = Path(directory)
     if directory.exists():
         _logger.info(f"Deleting {directory}")
         rmtree(directory)
+    if remove_empty_parent:
+        try:
+            directory.parent.rmdir()
+        except OSError:
+            # Parent does not exist or is not empty
+            pass
 
 
 def setup_fsl(directory):
@@ -538,7 +546,8 @@ def setup_fsl(directory):
     """
     if "FSLDIR" not in os.environ:
         os.environ["FSLDIR"] = directory
-    if "{:s}/bin" not in os.getenv("PATH"):
-        os.environ["PATH"] = "{:s}/bin:{:s}".format(directory, os.getenv("PATH"))
+    path = os.environ.get("PATH", "")
+    if f"{directory}/bin" not in path.split(os.pathsep):
+        os.environ["PATH"] = f"{directory}/bin{os.pathsep}{path}"
     if "FSLOUTPUTTYPE" not in os.environ:
         os.environ["FSLOUTPUTTYPE"] = "NIFTI_GZ"

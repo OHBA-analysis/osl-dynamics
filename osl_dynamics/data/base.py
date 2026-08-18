@@ -1,5 +1,6 @@
 """Base class for handling data."""
 
+import atexit
 import math
 import os
 import re
@@ -7,8 +8,9 @@ import logging
 import pathlib
 import pickle
 import random
-import weakref
+import uuid
 from contextlib import contextmanager
+from functools import partial
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union
 
@@ -21,6 +23,23 @@ from osl_dynamics.data import processing, rw, sign_flipping, tf as dtf
 from osl_dynamics.utils import misc
 
 _logger = logging.getLogger("osl-dynamics")
+
+
+def _raise_exceptions(results: list, what: str = "array") -> None:
+    """Log all exceptions in a list of pqdm results and raise the first.
+
+    pqdm returns exceptions raised in worker threads as items in the
+    results list rather than raising them.
+    """
+    first_exception = None
+    for i, e in enumerate(results):
+        if isinstance(e, Exception):
+            e.args = (f"{what} {i}: {e}",)
+            _logger.exception(e, exc_info=False)
+            if first_exception is None:
+                first_exception = e
+    if first_exception is not None:
+        raise first_exception
 
 
 class Data:
@@ -83,7 +102,10 @@ class Data:
     store_dir : str, optional
         If `load_memmaps=True`, then we save data to disk and load it as
         a memory map. This is the directory to save the memory maps to.
-        Default is :code:`./tmp`.
+        Each Data instance saves to its own unique sub-directory of
+        :code:`store_dir`, which is automatically deleted when the script
+        ends (or when :code:`delete_dir` is called). Default is
+        :code:`./tmp`.
     buffer_size : int, optional
         Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
         to less random shuffling but will be quicker. Default is 100000.
@@ -124,7 +146,11 @@ class Data:
         extra_channels: Optional[Dict] = None,
         n_jobs: int = 1,
     ) -> None:
-        self._identifier = id(self)
+        # Unique identifier for this Data instance. We use a UUID rather
+        # than id(self) because id(self) is a memory address, which can
+        # be identical across different processes running the same script
+        # (e.g. cluster array jobs sharing a store_dir)
+        self._identifier = uuid.uuid4().hex
         self.data_field = data_field
         self.picks = picks
         self.reject_by_annotation = reject_by_annotation
@@ -150,9 +176,14 @@ class Data:
         # (named by its identifier).
         self.store_dir = pathlib.Path(store_dir) / str(self._identifier)
 
-        # Finalizer to delete store_dir when this instance is garbage
-        # collected or when the interpreter exits
-        self._finalizer = weakref.finalize(self, misc.delete_dir, self.store_dir)
+        # Delete store_dir automatically when the interpreter exits.
+        # Note, we must not delete on garbage collection: TensorFlow
+        # datasets open files in store_dir lazily (at iteration time)
+        # and can outlive this object
+        self._finalizer = partial(
+            misc.delete_dir, self.store_dir, remove_empty_parent=True
+        )
+        atexit.register(self._finalizer)
 
         # Load and validate the raw data
         self.raw_data_arrays, self.raw_data_filenames = self.load_raw_data()
@@ -183,6 +214,8 @@ class Data:
         # Extra session labels
         if session_labels is None:
             self.session_labels = []
+        else:
+            self.session_labels = session_labels
 
         # Extra channels
         if extra_channels is None:
@@ -373,6 +406,7 @@ class Data:
             argument_type="args",
             total=len(self.inputs),
         )
+        _raise_exceptions(memmaps, "file")
 
         return memmaps, raw_data_filenames
 
@@ -612,12 +646,7 @@ class Data:
             argument_type="args",
             total=self.n_sessions,
         )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
+        _raise_exceptions(self.arrays)
 
         return self
 
@@ -669,12 +698,7 @@ class Data:
             argument_type="args",
             total=self.n_sessions,
         )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
+        _raise_exceptions(self.arrays)
 
         # Update sampling_frequency attributes
         self.sampling_frequency = freq
@@ -767,12 +791,7 @@ class Data:
                 argument_type="args",
                 total=self.n_sessions,
             )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
+        _raise_exceptions(self.arrays)
 
         return self
 
@@ -780,6 +799,10 @@ class Data:
         """Time-delay embedding (TDE).
 
         This is an in-place operation.
+
+        See the :doc:`Time-Delay Embedding tutorial
+        </tutorials_build/1-4_data_time_delay_embedding>` for advice on
+        choosing :code:`n_embeddings`.
 
         Parameters
         ----------
@@ -814,12 +837,7 @@ class Data:
             argument_type="args",
             total=self.n_sessions,
         )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
+        _raise_exceptions(self.arrays)
 
         return self
 
@@ -837,6 +855,18 @@ class Data:
         PCA. It is useful to do both operations in a single methods because
         it avoids having to save the time-embedded data. This is an in-place
         operation.
+
+        How to choose the parameters: :code:`n_embeddings` should be chosen
+        based on the sampling frequency - we recommend
+        :code:`n_embeddings=15` for 250 Hz data and :code:`n_embeddings=7`
+        for 100 Hz data (both correspond to an embedding window of roughly
+        60-70 ms). :code:`n_pca_components` should be at least twice the
+        number of original channels to retain the high-frequency content of
+        the data. We advise plotting the power spectrum of the prepared data
+        for different parameters to check the frequency range you are
+        interested in is retained - see the :doc:`Time-Delay Embedding
+        tutorial </tutorials_build/1-4_data_time_delay_embedding>` for
+        example code and the :doc:`FAQ </faq>` for further discussion.
 
         Parameters
         ----------
@@ -919,12 +949,7 @@ class Data:
                 argument_type="args",
                 total=self.n_sessions,
             )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
+        _raise_exceptions(self.arrays)
 
         return self
 
@@ -959,12 +984,7 @@ class Data:
             argument_type="args",
             total=self.n_sessions,
         )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
+        _raise_exceptions(self.arrays)
 
         return self
 
@@ -1005,12 +1025,7 @@ class Data:
             argument_type="args",
             total=self.n_sessions,
         )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
+        _raise_exceptions(self.arrays)
 
         return self
 
@@ -1028,25 +1043,24 @@ class Data:
         """
 
         # Function to apply standardisation to a single array
-        def _apply(array):
-            return processing.standardize(array, create_copy=False)
+        def _apply(array, prepared_data_file):
+            array = processing.standardize(array, create_copy=False)
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array
 
         # Apply standardisation to each array in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
         self.arrays = pqdm(
-            array=zip(arrays),
+            array=args,
             function=_apply,
             desc="Standardize",
             n_jobs=self.n_jobs,
             argument_type="args",
             total=self.n_sessions,
         )
-        if any([isinstance(e, Exception) for e in self.arrays]):
-            for i, e in enumerate(self.arrays):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
+        _raise_exceptions(self.arrays)
 
         return self
 
@@ -1150,12 +1164,7 @@ class Data:
                 argument_type="args",
                 total=self.n_sessions,
             )
-        if any([isinstance(e, Exception) for e in covs]):
-            for i, e in enumerate(self.arrays):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
+        _raise_exceptions(covs)
 
         # Calculate/get template covariances
         if template_cov is None and template_data is None:
@@ -1181,12 +1190,7 @@ class Data:
                 argument_type="args",
                 total=self.n_sessions,
             )
-        if any([isinstance(e, Exception) for e in results]):
-            for i, e in enumerate(results):
-                if isinstance(e, Exception):
-                    e.args = (f"array {i}: {e}",)
-                    _logger.exception(e, exc_info=False)
-            raise e
+        _raise_exceptions(results)
 
         self.arrays = [array for array, _ in results]
         corrs = [metric for _, metric in results]
@@ -1408,18 +1412,40 @@ class Data:
         return X
 
     def _validation_split(
-        self, X: List[np.ndarray], extra_channels: Dict, validation_split: float
+        self,
+        X: List[np.ndarray],
+        extra_channels: Dict,
+        validation_split: float,
+        validation_split_seed: Optional[int] = None,
     ) -> Tuple[List[np.ndarray], List[np.ndarray], Dict, Dict]:
         """Split the data into training and validation sets."""
+        if self.step_size != self.sequence_length:
+            raise ValueError(
+                "validation_split cannot be used with overlapping sequences "
+                f"(step_size={self.step_size} != "
+                f"sequence_length={self.sequence_length}). The split is "
+                "performed on non-overlapping sequences, so overlapping "
+                "windows would leak data between the training and "
+                "validation sets."
+            )
+
+        rng = np.random.default_rng(validation_split_seed)
 
         def _split_data(d, val_indx, train_indx):
+            # 1D (extra channel) input is temporarily given a channel axis,
+            # which we remove again before returning. Note, we must not
+            # squeeze 2D input as this would corrupt single-channel data
+            original_ndim = d.ndim
             if d.ndim == 1:
                 d = d[:, None]
             n_channels = d.shape[-1]
             d = d.reshape(-1, self.sequence_length, n_channels)
             d_train = d[train_indx].reshape(-1, n_channels)
             d_val = d[val_indx].reshape(-1, n_channels)
-            return np.squeeze(d_train), np.squeeze(d_val)
+            if original_ndim == 1:
+                d_train = d_train[:, 0]
+                d_val = d_val[:, 0]
+            return d_train, d_val
 
         n_sequences = self.count_sequences(self.sequence_length)
 
@@ -1439,7 +1465,7 @@ class Data:
 
         for i in range(self.n_sessions):
             # Randomly pick sequences
-            val_indx = np.random.choice(
+            val_indx = rng.choice(
                 n_sequences[i], size=n_val_sequences[i], replace=False
             )
             train_indx = np.setdiff1d(np.arange(n_sequences[i]), val_indx)
@@ -1465,6 +1491,7 @@ class Data:
         concatenate: bool = True,
         step_size: Optional[int] = None,
         drop_last_batch: bool = False,
+        validation_split_seed: Optional[int] = None,
     ):
         """Create a Tensorflow Dataset for training or evaluation.
 
@@ -1486,6 +1513,9 @@ class Data:
             Default is no overlap.
         drop_last_batch : bool, optional
             Should we drop the last batch if it is smaller than the batch size?
+        validation_split_seed : int, optional
+            Seed for the training/validation split, pass to make the split
+            reproducible. Only used if :code:`validation_split` is passed.
 
         Returns
         -------
@@ -1590,7 +1620,9 @@ class Data:
 
         if validation_split is not None:
             X_train, X_val, extra_channels_train, extra_channels_val = (
-                self._validation_split(X, extra_channels, validation_split)
+                self._validation_split(
+                    X, extra_channels, validation_split, validation_split_seed
+                )
             )
 
             return _create_dataset(X_train, extra_channels_train), _create_dataset(
@@ -1607,6 +1639,7 @@ class Data:
         step_size: Optional[int] = None,
         validation_split: Optional[float] = None,
         overwrite: bool = False,
+        validation_split_seed: Optional[int] = None,
     ) -> None:
         """Save the data as TFRecord files.
 
@@ -1623,12 +1656,16 @@ class Data:
             Ratio to split the dataset into a training and validation set.
         overwrite : bool, optional
             Should we overwrite the existing TFRecord datasets if there is a need?
+        validation_split_seed : int, optional
+            Seed for the training/validation split, pass to make the split
+            reproducible. Only used if :code:`validation_split` is passed.
         """
         os.makedirs(tfrecord_dir, exist_ok=True, mode=0o700)
 
         self.sequence_length = sequence_length
         self.step_size = step_size or sequence_length
         self.validation_split = validation_split
+        self.validation_split_seed = validation_split_seed
 
         def _check_rewrite():
             if not os.path.exists(f"{tfrecord_dir}/tfrecord_config.pkl"):
@@ -1637,14 +1674,23 @@ class Data:
                 )
                 return True
 
-            if not overwrite:
-                return False
+            if overwrite:
+                _logger.info("overwrite=True. Rewriting TFRecords.")
+                return True
 
-            # Check if we need to rewrite the TFRecord datasets
+            # Check the existing TFRecord datasets are consistent with the
+            # current settings. If they are, we can reuse them, otherwise
+            # we need to rewrite them.
             tfrecord_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
 
-            if tfrecord_config["identifier"] != self._identifier:
-                _logger.warning("Identifier has changed. Rewriting TFRecords.")
+            if "identifier" in tfrecord_config:
+                # This directory was created by an older version of
+                # osl-dynamics (which used a unique identifier in the
+                # filenames), rewrite it in the new format
+                _logger.warning(
+                    "TFRecords were created by an older version of "
+                    "osl-dynamics. Rewriting TFRecords."
+                )
                 return True
 
             if tfrecord_config["sequence_length"] != self.sequence_length:
@@ -1661,6 +1707,15 @@ class Data:
 
             if tfrecord_config["validation_split"] != self.validation_split:
                 _logger.warning("Validation split has changed. Rewriting TFRecords.")
+                return True
+
+            if (
+                tfrecord_config.get("validation_split_seed")
+                != self.validation_split_seed
+            ):
+                _logger.warning(
+                    "Validation split seed has changed. Rewriting TFRecords."
+                )
                 return True
 
             if tfrecord_config["n_sessions"] != self.n_sessions:
@@ -1688,14 +1743,19 @@ class Data:
         # Path to TFRecord file
         tfrecord_path = (
             f"{tfrecord_dir}"
-            "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}"
-            f"_{self._identifier}.tfrecord"
+            "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}.tfrecord"
         )
 
         # TFRecords we need to save
         tfrecord_filenames = []
         tfrecords_to_save = []
         rewrite = _check_rewrite()
+        if rewrite:
+            # Delete existing TFRecord files, they may be from an older
+            # version of osl-dynamics or a different configuration (e.g.
+            # one with more sessions), and would otherwise be orphaned
+            for old_file in pathlib.Path(tfrecord_dir).glob("dataset-*.tfrecord"):
+                old_file.unlink()
         for i in self.keep:
             filepath = tfrecord_path.format(
                 array=i,
@@ -1724,7 +1784,9 @@ class Data:
 
         if validation_split is not None:
             X_train, X_val, extra_channels_train, extra_channels_val = (
-                self._validation_split(X, extra_channels, validation_split)
+                self._validation_split(
+                    X, extra_channels, validation_split, validation_split_seed
+                )
             )
 
         # Function for saving a single TFRecord
@@ -1753,7 +1815,7 @@ class Data:
 
         # Save TFRecords
         if len(tfrecords_to_save) > 0:
-            pqdm(
+            results = pqdm(
                 array=tfrecords_to_save,
                 function=_save_tfrecord,
                 n_jobs=self.n_jobs,
@@ -1761,15 +1823,16 @@ class Data:
                 argument_type="args",
                 total=len(tfrecords_to_save),
             )
+            _raise_exceptions(results, "TFRecord")
 
         # Save tfrecords config
         if rewrite:
             tfrecord_config = {
-                "identifier": self._identifier,
                 "sequence_length": self.sequence_length,
                 "n_channels": self.n_channels,
                 "step_size": self.step_size,
                 "validation_split": self.validation_split,
+                "validation_split_seed": self.validation_split_seed,
                 "n_sessions": self.n_sessions,
                 "input_shapes": self.input_shapes,
             }
@@ -1786,6 +1849,7 @@ class Data:
         drop_last_batch: bool = False,
         tfrecord_dir: Optional[str] = None,
         overwrite: bool = False,
+        validation_split_seed: Optional[int] = None,
     ):
         """Create a TFRecord Dataset for training or evaluation.
 
@@ -1811,6 +1875,9 @@ class Data:
             :code:`Data.store_dir` is used.
         overwrite : bool, optional
             Should we overwrite the existing TFRecord datasets if there is a need?
+        validation_split_seed : int, optional
+            Seed for the training/validation split, pass to make the split
+            reproducible. Only used if :code:`validation_split` is passed.
 
         Returns
         -------
@@ -1836,6 +1903,7 @@ class Data:
             step_size=step_size,
             validation_split=validation_split,
             overwrite=overwrite,
+            validation_split_seed=validation_split_seed,
         )
         return dtf.load_tfrecord_dataset(
             tfrecord_dir=tfrecord_dir,
@@ -2050,19 +2118,21 @@ class Data:
             np.save(filename, self.arrays[i])
 
         # Save arrays in parallel
-        pqdm(
+        results = pqdm(
             range(self.n_sessions),
             _save,
             desc="Saving data",
             n_jobs=self.n_jobs,
             total=self.n_sessions,
         )
+        _raise_exceptions(results)
 
         # Save preparation settings
         self.save_preparation(output_dir)
 
     def delete_dir(self) -> None:
         """Deletes :code:`store_dir`."""
+        atexit.unregister(self._finalizer)
         self._finalizer()
 
 

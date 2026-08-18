@@ -1,6 +1,7 @@
 """Function related to TensorFlow datasets."""
 
 import logging
+import os
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -197,7 +198,6 @@ def load_tfrecord_dataset(
     import tensorflow as tf  # moved here to avoid slow imports
 
     tfrecord_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
-    identifier = tfrecord_config["identifier"]
     validation_split = tfrecord_config["validation_split"]
     n_sessions = tfrecord_config["n_sessions"]
     input_shapes = tfrecord_config["input_shapes"]
@@ -288,12 +288,32 @@ def load_tfrecord_dataset(
 
             return full_datasets
 
-    # Path to TFRecord files
+    # Path to TFRecord files.
+    # Note, directories created by older versions of osl-dynamics included
+    # a unique identifier in the filenames, which is stored in the config,
+    # so we can still load them
+    identifier = tfrecord_config.get("identifier")
+    if identifier is not None:
+        filename_suffix = f"_{identifier}.tfrecord"
+    else:
+        filename_suffix = ".tfrecord"
     tfrecord_path = (
         f"{tfrecord_dir}"
-        "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}"
-        f"_{identifier}.tfrecord"
+        "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}" + filename_suffix
     )
+
+    # Check the first TFRecord file exists
+    first_file = tfrecord_path.format(
+        array=keep[0],
+        val=0,
+        n_session=n_sessions - 1,
+        v=len(str(n_sessions - 1)),
+    )
+    if not os.path.exists(first_file):
+        raise FileNotFoundError(
+            f"{first_file} not found. Please regenerate the TFRecords "
+            "with Data.save_tfrecord_dataset."
+        )
 
     if validation_split is None:
         # Only create one dataset

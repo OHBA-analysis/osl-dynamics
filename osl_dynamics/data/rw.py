@@ -59,7 +59,7 @@ def validate_inputs(
                 elif os.path.exists(inp):
                     validated_inputs.append(inp)
                 else:
-                    _logger.warn(f"{inp} not found")
+                    _logger.warning(f"{inp} not found")
         else:
             validated_inputs = inputs
 
@@ -218,9 +218,12 @@ def load_data(
                 np.save(mmap_location, data)
                 data = mmap_location
 
-    # Load data as memmap
+    # Load data as memmap.
+    # Note, we use copy=False in astype, otherwise the data would be
+    # loaded into memory (defeating the purpose of a memmap). The data
+    # was saved as float32 above so no copy is made
     data = np.load(mmap_location, mmap_mode=mmap_mode)
-    data = data.astype(np.float32)
+    data = data.astype(np.float32, copy=False)
 
     return data
 
