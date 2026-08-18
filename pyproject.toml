@@ -8,10 +8,35 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "osl-dynamics"
 version = "3.2.dev4"
-description = "OHBA Software Library: Dynamics Toolbox"
+description = "Toolbox for studying dynamic functional brain networks in MEG, EEG and fMRI data"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
 requires-python = ">=3.8"
+keywords = [
+    "neuroimaging",
+    "neuroscience",
+    "MEG",
+    "EEG",
+    "fMRI",
+    "electrophysiology",
+    "brain dynamics",
+    "brain networks",
+    "dynamic functional connectivity",
+    "hidden markov model",
+    "resting state",
+    "burst detection",
+    "spectral analysis",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
 
 [project.urls]
 "Homepage" = "https://github.com/OHBA-analysis/osl-dynamics"

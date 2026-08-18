@@ -25,11 +25,11 @@ A Typical Workflow
 
 Once you have parcellated source-space data (or fMRI data), a typical analysis follows these steps:
 
-1. **Load data** — Load your parcellated (or sensor) M/EEG or fMRI data.
-2. **Prepare data** — Standardize, and optionally apply time-delay embedding (TDE) and PCA.
-3. **Train a model** — Fit an HMM, DyNeMo, or DyNeSte to infer dynamic brain states/modes.
-4. **Post-hoc analysis** — Estimate state/mode spectra, compute summary statistics, and visualize networks.
-5. **Group analysis** — Compare dynamics across groups or conditions using statistical testing.
+1. **Load data**: Load your parcellated (or sensor) M/EEG or fMRI data.
+2. **Prepare data**: Standardize, and optionally apply time-delay embedding (TDE) and PCA.
+3. **Train a model**: Fit an HMM, DyNeMo, or DyNeSte to infer dynamic brain states/modes.
+4. **Post-hoc analysis**: Estimate state/mode spectra, compute summary statistics, and visualize networks.
+5. **Group analysis**: Compare dynamics across groups or conditions using statistical testing.
 
 Quick Example
 -------------

@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+message: "If you find this toolbox useful, please cite the paper referenced below."
+title: "osl-dynamics"
+abstract: "Toolbox for studying dynamic functional brain networks in MEG, EEG and fMRI data."
+authors:
+  - family-names: "Gohil"
+    given-names: "C."
+  - family-names: "Huang"
+    given-names: "R."
+  - family-names: "Roberts"
+    given-names: "E."
+  - family-names: "van Es"
+    given-names: "M. W."
+  - family-names: "Quinn"
+    given-names: "A. J."
+  - family-names: "Vidaurre"
+    given-names: "D."
+  - family-names: "Woolrich"
+    given-names: "M. W."
+license: Apache-2.0
+repository-code: "https://github.com/OHBA-analysis/osl-dynamics"
+url: "https://osl-dynamics.readthedocs.io"
+preferred-citation:
+  type: article
+  title: "osl-dynamics, a toolbox for modeling fast dynamic brain activity"
+  authors:
+    - family-names: "Gohil"
+      given-names: "C."
+    - family-names: "Huang"
+      given-names: "R."
+    - family-names: "Roberts"
+      given-names: "E."
+    - family-names: "van Es"
+      given-names: "M. W."
+    - family-names: "Quinn"
+      given-names: "A. J."
+    - family-names: "Vidaurre"
+      given-names: "D."
+    - family-names: "Woolrich"
+      given-names: "M. W."
+  journal: "Elife"
+  volume: 12
+  start: "RP91949"
+  year: 2024
+  doi: "10.7554/eLife.91949"

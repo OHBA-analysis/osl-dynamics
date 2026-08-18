@@ -1,0 +1,28 @@
+# osl-dynamics
+
+> osl-dynamics is a Python toolbox for studying brain dynamics using neuroimaging data (MEG, EEG and fMRI). It provides generative models that decompose data into dynamic functional brain networks, often called brain states or modes, including the Hidden Markov Model (HMM) and Dynamic Network Modes (DyNeMo). It also provides everything needed for a complete analysis: data loading and preparation, spectral estimation, power maps, functional connectivity, burst detection and statistical significance testing.
+
+osl-dynamics was developed by the OHBA Methods Group at the University of Oxford. It works hand in hand with MNE-Python: a typical workflow preprocesses and source reconstructs M/EEG data first, then models the dynamics of the parcel time courses with osl-dynamics. Data can be loaded from NumPy (.npy), MATLAB (.mat), text (.txt) or MNE (.fif) files.
+
+If you use osl-dynamics, please cite: Gohil, C., Huang, R., Roberts, E., van Es, M. W., Quinn, A. J., Vidaurre, D., and Woolrich, M. W. (2024). osl-dynamics, a toolbox for modeling fast dynamic brain activity. eLife, 12, RP91949.
+
+## Documentation
+
+- [Installation](https://osl-dynamics.readthedocs.io/en/latest/install.html): conda environment files for Linux, Mac and HPC clusters.
+- [Getting started](https://osl-dynamics.readthedocs.io/en/latest/getting_started.html): a minimal pipeline for training an HMM on M/EEG data.
+- [Tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.html): step by step walkthroughs covering data loading and preparation, time-delay embedding, HMM and DyNeMo training, spectral estimation, power maps, connectivity and statistical testing.
+- [FAQ](https://osl-dynamics.readthedocs.io/en/latest/faq.html): guidance on preprocessing, time-delay embedding, choosing parameters and interpreting results.
+- [API reference](https://osl-dynamics.readthedocs.io/en/latest/autoapi/index.html): documentation for every module, class and function.
+
+## Models
+
+- HMM: Hidden Markov Model with multivariate normal observations, used to infer discrete dynamic brain states and their summary statistics (fractional occupancy, lifetimes, intervals, switching rates).
+- DyNeMo: Dynamic Network Modes, a deep generative model that infers co-existing network modes with time varying mixing coefficients.
+- M-DyNeMo, DyNeSTE, HIVE, DIVE and HMM-Poisson: further models for multi-dynamic data, session specific variability and spike count data.
+
+## Source and community
+
+- [GitHub repository](https://github.com/OHBA-analysis/osl-dynamics)
+- [PyPI package](https://pypi.org/project/osl-dynamics/)
+- [Paper in eLife](https://elifesciences.org/articles/91949)
+- [Issue tracker](https://github.com/OHBA-analysis/osl-dynamics/issues)

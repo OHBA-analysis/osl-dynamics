@@ -5,7 +5,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](https://github.com/OHBA-analysis/osl-dynamics/blob/main/LICENSE)
 [![Paper](https://img.shields.io/badge/paper-eLife-orange)](https://elifesciences.org/articles/91949)
 
-osl-dynamics is a Python toolbox for studying brain dynamics using neuroimaging data: MEG, EEG and fMRI. It provides generative models that decompose data into brain networks — often called brain states or modes — including the Hidden Markov Model (HMM) and Dynamic Network Modes (DyNeMo), along with everything needed for a complete analysis: data loading and preparation, spectral estimation, network visualisation and statistical significance testing.
+osl-dynamics is a Python toolbox for studying brain dynamics using neuroimaging data: MEG, EEG and fMRI. It provides generative models that decompose data into brain networks (often called brain states or modes), including the Hidden Markov Model (HMM) and Dynamic Network Modes (DyNeMo), along with everything needed for a complete analysis: data loading and preparation, spectral estimation, network visualisation and statistical significance testing.
 
 You can use osl-dynamics to:
 
@@ -19,7 +19,7 @@ You can use osl-dynamics to:
 
 osl-dynamics works with [MNE-Python](https://mne.tools): a typical M/EEG workflow preprocesses, source reconstructs and parcellates data first, then models the dynamics of the parcel time courses with osl-dynamics. Data can be loaded from NumPy (`.npy`), MATLAB (`.mat`), text (`.txt`) or MNE (`.fif`) files.
 
-For a full description of the toolbox, see the documentation: [https://osl-dynamics.readthedocs.io](https://osl-dynamics.readthedocs.io).
+For a full description of the toolbox, see the [documentation](https://osl-dynamics.readthedocs.io).
 
 ## Quick example
 
@@ -29,7 +29,7 @@ Train a Time-Delay Embedded Hidden Markov Model (TDE-HMM) on source-space MEG da
 from osl_dynamics.data import Data
 from osl_dynamics.models.hmm import Config, Model
 
-# Load data, e.g. parcel time courses (.npy, .mat, .txt or .fif files)
+# Load data, e.g. parcel time courses
 data = Data("training_data")
 
 # Prepare the data: time-delay embedding + PCA captures spectral structure
@@ -60,12 +60,6 @@ alpha = model.get_alpha(data)
 
 See the [tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.html) for complete walkthroughs and the [examples directory](https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples) for full analysis pipelines.
 
-## Citation
-
-If you find this toolbox useful, please cite the [paper](https://elifesciences.org/articles/91949):
-
-> **Gohil, C., Huang, R., Roberts, E., van Es, M. W., Quinn, A. J., Vidaurre, D., & Woolrich, M. W. (2024). osl-dynamics, a toolbox for modeling fast dynamic brain activity. Elife, 12, RP91949.**
-
 ## Installation
 
 We recommend installing osl-dynamics using the conda environment files in `/envs`, which can be installed using [Miniforge](https://conda-forge.org/download/).
@@ -81,7 +75,7 @@ rm Miniforge3-$(uname)-$(uname -m).sh
 
 ### osl-dynamics installation
 
-Different computers have their own environment files. For more information see the envs [readme](https://github.com/OHBA-analysis/osl-dynamics/tree/main/envs#readme).
+Different computers have their own environment files. For more information see the envs [README](https://github.com/OHBA-analysis/osl-dynamics/tree/main/envs#readme).
 
 #### Linux
 ```
@@ -257,3 +251,10 @@ pip install -e .
 ```
 
 11. Draft a new release (click 'Releases' on the right panel on the GitHub homepage, then 'Draft a new release') to help keep note of changes for the next release.
+
+## Citation
+
+If you find this toolbox useful, please cite the [paper](https://elifesciences.org/articles/91949):
+
+> **Gohil, C., Huang, R., Roberts, E., van Es, M. W., Quinn, A. J., Vidaurre, D., & Woolrich, M. W. (2024). osl-dynamics, a toolbox for modeling fast dynamic brain activity. Elife, 12, RP91949.**
+

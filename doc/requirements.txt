@@ -2,6 +2,7 @@ sphinx
 sphinx-rtd-theme
 sphinx-gallery
 sphinx-autoapi
+sphinx-sitemap
 pydata-sphinx-theme
 matplotlib
 mne

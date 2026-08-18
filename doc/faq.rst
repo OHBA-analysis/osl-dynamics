@@ -34,14 +34,14 @@ Data
 How do I optimally preprocess my data for training an HMM or DyNeMo?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-For electrophysiological data we have found preprocessing the sensor-level data by downsampling to 250 Hz and bandpass filtering 1-45 Hz works well. Additionally, we do some bad segment detection based on the variance of non-overlapping windows. Following this, we use a volumetric linearly constrained minimum variance (LCMV) beamformer to estimate source space data. Usually the beamformed (voxel) data is parcellated to ~50 regions of interest and an orthogonalisation technique is used to correct for spatial leakage. Additionally, the sign of parcel time courses is adjusted to align different subjects. All of these steps can be done directly within osl-dynamics — see the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>` for a step-by-step walkthrough and the `batch processing scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for processing multiple sessions in parallel. Alternatively, the `osl-ephys <https://github.com/OHBA-analysis/osl-ephys>`_ package can also be used for these steps.
+For electrophysiological data we have found preprocessing the sensor-level data by downsampling to 250 Hz and bandpass filtering 1-45 Hz works well. Additionally, we do some bad segment detection based on the variance of non-overlapping windows. Following this, we use a volumetric linearly constrained minimum variance (LCMV) beamformer to estimate source space data. Usually the beamformed (voxel) data is parcellated to ~50 regions of interest and an orthogonalisation technique is used to correct for spatial leakage. Additionally, the sign of parcel time courses is adjusted to align different subjects. All of these steps can be done directly within osl-dynamics, see the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>` for a step-by-step walkthrough and the `batch processing scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for processing multiple sessions in parallel. Alternatively, the `osl-ephys <https://github.com/OHBA-analysis/osl-ephys>`_ package can also be used for these steps.
 
 The OSL workshop had a session on dynamic network modelling. The OSF project hosting workshop materials (`here <https://osf.io/zxb6c/>`_) has jupyter notebooks with recommended preprocessing and source reconstruction for fitting the HMM/DyNeMo.
 
 Can I use a structural parcellation (e.g. the AAL or Desikan-Killiany atlas)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Yes, you can. There’s nothing stopping you from using the parcellation you want during source reconstruction. Source reconstruction and parcellation can be done directly within osl-dynamics — see the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>`. Alternatively, the `osl-ephys <https://github.com/OHBA-analysis/osl-ephys>`_ package can also be used.
+Yes, you can. There’s nothing stopping you from using the parcellation you want during source reconstruction. Source reconstruction and parcellation can be done directly within osl-dynamics, see the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>`. Alternatively, the `osl-ephys <https://github.com/OHBA-analysis/osl-ephys>`_ package can also be used.
 
 You want the number of parcels to be a good amount less than the rank of the sensor space data in order to estimate your parcel time courses well. The rank is at most equal to the number of sensors you have. With Maxfiltered data (e.g. Elekta/MEGIN data), the default rank of the sensor data is ~64, and so it is sensible to require the number of parcels to be less than 64. Even with non-maxfiltered data with hundreds of sensors (e.g. CTF, OPMs) the effective amount of information in the sensor data typically corresponds to a rank of about 100. You can look at the eigenspectrum of your sensor space data to check this.
 
@@ -50,7 +50,7 @@ Also note, the requirement to have the number of parcels less than the rank is a
 Why do I need to sign flip my data before training a model?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The sign of the off-diagonal elements in the covariance matrix of source reconstructed M/EEG data may not be the same across sessions. I.e. channels i and j maybe positively correlated for one session but negatively correlated for another. The sessions can be aligned by flipping the sign of channel i or j for one of the sessions - this is the 'sign flipping'. This is important because the HMM/DyNeMo models dynamic changes in the covariance of the data, we do not want dynamics in the covariance simply due to misaligned signs.
+The sign of the off-diagonal elements in the covariance matrix of source reconstructed M/EEG data may not be the same across sessions. I.e. channels i and j maybe positively correlated for one session but negatively correlated for another. The sessions can be aligned by flipping the sign of channel i or j for one of the sessions. This is the 'sign flipping'. This is important because the HMM/DyNeMo models dynamic changes in the covariance of the data, we do not want dynamics in the covariance simply due to misaligned signs.
 
 Note, the sign ambiguity is an identifiability problem in the source reconstruction of M/EEG that cannot be avoided.
 
@@ -65,7 +65,7 @@ There are three common choices for preparing the data:
 
 #. **Calculate time-delay embedded data, followed by principal component analysis and standardization**. Time-delay embedding is described in the 'What is time-delay embedding?' section below. **This is the recommended approach for studying source-space M/EEG data**.
 
-#. **Calculate amplitude envelope data and standardize**. This is common approach for overcoming the dipole sign ambiguity problem in MEG - where the sign of source reconstructed channels can be misaligned cross different subjects or sessions. Here, we apply a Hilbert transform to the 'raw' data and apply a short sliding window to smooth the data. This was an approach that was previously common. Nowadays, time-delay embedding is preferred.
+#. **Calculate amplitude envelope data and standardize**. This is common approach for overcoming the dipole sign ambiguity problem in MEG, where the sign of source reconstructed channels can be misaligned cross different subjects or sessions. Here, we apply a Hilbert transform to the 'raw' data and apply a short sliding window to smooth the data. This was an approach that was previously common. Nowadays, time-delay embedding is preferred.
 
 The :doc:`Preparing M/EEG Data <tutorials_build/1-2_data_prepare_meg>` and :doc:`Preparing fMRI Data <tutorials_build/1-3_data_prepare_fmri>` tutorials cover how to prepare data.
 
@@ -90,7 +90,7 @@ See the 'What is time-delay embedding' question for a description of what happen
 
 A choice we have to make is how many lagged versions of each channel we add. The number of lagged channels we add (i.e. the number of embeddings) determines how many points in the auto-correlation function (and therefore power spectrum) we encode into the covariance matrix of the data. I.e. if we include more embeddings, we add more off-diagonal elements into the covariance matrix, which corresponds to specifying more data points in the auto-correlation function and therefore power spectrum. In other words, having more embeddings allows you to be more sensitive to oscillations in your data.
 
-The number of embeddings should be chosen for a particular sampling frequency. See the :doc:`Time-Delay Embedding tutorial <tutorials_build/1-4_data_time_delay_embedding>` for example code comparing different TDE settings. We recommend 15 embeddings for 250 Hz data and 7 embeddings for 100 Hz data. Note, both of these correspond to an embedding window of roughly 60-70 ms - if your data has a different sampling frequency, choosing :code:`n_embeddings` to give a similar window duration (i.e. :code:`n_embeddings / sampling_frequency` of roughly 60 ms) is a good starting point.
+The number of embeddings should be chosen for a particular sampling frequency. See the :doc:`Time-Delay Embedding tutorial <tutorials_build/1-4_data_time_delay_embedding>` for example code comparing different TDE settings. We recommend 15 embeddings for 250 Hz data and 7 embeddings for 100 Hz data. Note, both of these correspond to an embedding window of roughly 60-70 ms. If your data has a different sampling frequency, choosing :code:`n_embeddings` to give a similar window duration (i.e. :code:`n_embeddings / sampling_frequency` of roughly 60 ms) is a good starting point.
 
 Why doesn't the number of time points in my inferred alphas match the original data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -163,7 +163,7 @@ If we are interested in modelling transient bursts of oscillations (spectral eve
 
 Note, when we train on TDE data, because the differences we want to model are reflected in the covariance of the data, we don't need to model the state means (we can just fix them to zero). Whereas, when we train on AE data, the differences we want to model are contained in the mean, so we learn the state means.
 
-Also note, once we have inferred a latent description, such as HMM states or DyNeMo modes, we can go back to the original unprepared data (i.e. before the AE/TDE) and re-estimate properties of this time series based on the inferred latent description. This is what's done when we estimate post-hoc spectra - see the 'Spectral Analysis' section in the model descriptions: :doc:`HMM <models/hmm>` and :doc:`DyNeMo <models/dynemo>`.
+Also note, once we have inferred a latent description, such as HMM states or DyNeMo modes, we can go back to the original unprepared data (i.e. before the AE/TDE) and re-estimate properties of this time series based on the inferred latent description. This is what's done when we estimate post-hoc spectra, see the 'Spectral Analysis' section in the model descriptions: :doc:`HMM <models/hmm>` and :doc:`DyNeMo <models/dynemo>`.
 
 What are hyperparameters?
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -264,7 +264,7 @@ It is common to look at four summary statistics for dynamics when using the HMM:
 
 Summary statistics can be calculated for individual subjects or for a group. See the :doc:`HMM Summary Statistics tutorial <tutorials_build/4-3_hmm_summary_stats>` for example code of how to calculate these quantities.
 
-Often, we are interested in comparing two groups or conditions. E.g. we might find static alpha (8-12 Hz) power is increased for one group/condition. Let's speculate there are segments in our data where alpha power bursts occur - this would be identified by the HMM as a state with high alpha power that only activates for particular segments. The increase in alpha power seen for a group/condition can arise in many ways, maybe the alpha bursts are longer in duration, maybe they're more frequent, maybe the dynamics are unchanged but the alpha state just has more alpha power in it. The different summary statistics can potentially help interpret which of these options it is.
+Often, we are interested in comparing two groups or conditions. E.g. we might find static alpha (8-12 Hz) power is increased for one group/condition. Let's speculate there are segments in our data where alpha power bursts occur. This would be identified by the HMM as a state with high alpha power that only activates for particular segments. The increase in alpha power seen for a group/condition can arise in many ways, maybe the alpha bursts are longer in duration, maybe they're more frequent, maybe the dynamics are unchanged but the alpha state just has more alpha power in it. The different summary statistics can potentially help interpret which of these options it is.
 
 Generally, it's difficult to say whether or not one summary statistic is more important than another. The recommended approach is to calculate all four of the above as a summary of dynamics for each subject/group/condition.
 

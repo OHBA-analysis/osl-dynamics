@@ -35,6 +35,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_gallery.gen_gallery",
     "autoapi.extension",
+    "sphinx_sitemap",
 ]
 
 autodoc_typehints = "description"
@@ -82,8 +83,15 @@ html_logo = "https://avatars.githubusercontent.com/u/15248840?s=200&v=4"
 
 htmlhelp_basename = "osl-dynamics-doc"
 
+# Base URL for the sitemap (used by sphinx_sitemap)
+html_baseurl = "https://osl-dynamics.readthedocs.io/en/latest/"
+sitemap_url_scheme = "{link}"
+
+# Extra files to copy to the root of the documentation site
+html_extra_path = ["llms.txt"]
+
 html_theme_options = {
-    "gitlab_url": "https://github.com/OHBA-analysis/osl-dynamics",
+    "github_url": "https://github.com/OHBA-analysis/osl-dynamics",
     "show_nav_level": 2,
     "logo": {"text": "OSL Dynamics"},
 }

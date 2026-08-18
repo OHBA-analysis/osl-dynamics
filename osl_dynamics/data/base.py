@@ -857,14 +857,14 @@ class Data:
         operation.
 
         How to choose the parameters: :code:`n_embeddings` should be chosen
-        based on the sampling frequency - we recommend
+        based on the sampling frequency. We recommend
         :code:`n_embeddings=15` for 250 Hz data and :code:`n_embeddings=7`
         for 100 Hz data (both correspond to an embedding window of roughly
         60-70 ms). :code:`n_pca_components` should be at least twice the
         number of original channels to retain the high-frequency content of
         the data. We advise plotting the power spectrum of the prepared data
         for different parameters to check the frequency range you are
-        interested in is retained - see the :doc:`Time-Delay Embedding
+        interested in is retained, see the :doc:`Time-Delay Embedding
         tutorial </tutorials_build/1-4_data_time_delay_embedding>` for
         example code and the :doc:`FAQ </faq>` for further discussion.
 
