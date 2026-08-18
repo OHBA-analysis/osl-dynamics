@@ -113,6 +113,7 @@ def run(
     log_dir: str | Path,
     output_dir: str | Path | None = None,
     plots_dir: str | Path | None = None,
+    maxtasksperchild: int | None = 50,
 ) -> None:
     """Run a function over items in parallel.
 
@@ -135,6 +136,13 @@ def run(
         copying surface extraction plots.
     plots_dir : str or Path, optional
         If provided, generate a QC report after processing.
+    maxtasksperchild : int, optional
+        Number of items a worker processes before it is replaced by a fresh
+        one. Some steps (e.g. rhino coregistration and forward modelling) leak
+        on the order of tens of MB per item, which over a large dataset is
+        enough to exhaust memory in a long-lived worker. Recycling caps that at
+        :code:`maxtasksperchild` times the per-item leak. Pass :code:`None` to
+        let workers live for the whole run.
     """
     log_dir = Path(log_dir)
     worker_args = [
@@ -149,8 +157,8 @@ def run(
         os.environ[var] = "1"
 
     ctx = mp.get_context("spawn")
-    with ctx.Pool(processes=n_workers) as pool:
-        results = pool.map(_worker, worker_args)
+    with ctx.Pool(processes=n_workers, maxtasksperchild=maxtasksperchild) as pool:
+        results = pool.map(_worker, worker_args, chunksize=1)
 
     # Restore original environment
     for var, val in old_env.items():
