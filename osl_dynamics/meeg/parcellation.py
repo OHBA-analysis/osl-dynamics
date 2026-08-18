@@ -375,18 +375,20 @@ def plot_psds(
         Output filename.
     """
     if "epo.fif" in parc_fif:
-        raw = mne.Epochs(parc_fif)
+        epochs = mne.read_epochs(parc_fif)
+        fs = epochs.info["sfreq"]
+        parc_ts = epochs.get_data(picks="misc")
     else:
         raw = mne.io.read_raw_fif(parc_fif)
-
-    fs = raw.info["sfreq"]
-    parc_ts = raw.get_data(picks="misc", reject_by_annotation="omit")
+        fs = raw.info["sfreq"]
+        parc_ts = raw.get_data(picks="misc", reject_by_annotation="omit")
 
     if parc_ts.ndim == 3:
-        # Calculate PSD for each epoch individually and average
+        # Calculate PSD for each epoch individually and average.
+        # parc_ts shape is (n_epochs, n_channels, n_samples)
         psd = []
-        for i in range(parc_ts.shape[-1]):
-            f, p = scipy.signal.welch(parc_ts[..., i], fs=fs, nperseg=fs, nfft=fs * 2)
+        for i in range(parc_ts.shape[0]):
+            f, p = scipy.signal.welch(parc_ts[i], fs=fs, nperseg=fs, nfft=fs * 2)
             psd.append(p)
         psd = np.mean(psd, axis=0)
     else:

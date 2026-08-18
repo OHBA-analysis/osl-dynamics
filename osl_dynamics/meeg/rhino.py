@@ -2665,7 +2665,7 @@ def _niimask2indexpointcloud(nii_fname: str, volindex: int | None = None) -> np.
     if len(vol.shape) == 4 and volindex is not None:
         vol = vol[:, :, :, volindex]
     if not len(vol.shape) == 3:
-        Exception(
+        raise ValueError(
             "nii_mask must be a 3D volume, or nii_mask must be a 4D volume "
             "with volindex specifying a volume index"
         )

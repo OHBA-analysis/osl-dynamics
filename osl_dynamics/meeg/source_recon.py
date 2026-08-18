@@ -21,7 +21,7 @@ from mne.minimum_norm.inverse import (
     _get_vertno,
     _prepare_forward,
 )
-from mne.utils import logger as mne_logger
+from mne.utils import logger as mne_logger, warn
 
 from osl_dynamics.utils.filenames import OSLFilenames
 from osl_dynamics.utils.misc import system_call
@@ -1006,7 +1006,7 @@ def _niimask2mmpointcloud(
     if len(vol.shape) == 4 and volindex is not None:
         vol = vol[:, :, :, volindex]
     if not len(vol.shape) == 3:
-        Exception(
+        raise ValueError(
             "nii_mask must be a 3D volume, or nii_mask must be a 4D volume "
             "with volindex specifying a volume index"
         )

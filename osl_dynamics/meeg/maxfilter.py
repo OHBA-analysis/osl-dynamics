@@ -259,12 +259,13 @@ def _parse_bad_channels(log_file: str) -> str | None:
     bads : str or None
         Space-separated channel numbers, or ``None`` if not found.
     """
+    bads = None
     with open(log_file, "r") as f:
         for line in f:
             if line.startswith("Static bad channels"):
                 parts = line.split(": ")[1].split()
-                return " ".join(p.strip() for p in parts)
-    return None
+                bads = " ".join(p.strip() for p in parts)
+    return bads
 
 
 def _quick_load_dig(fname: str) -> list:

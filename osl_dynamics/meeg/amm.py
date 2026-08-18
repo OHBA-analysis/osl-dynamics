@@ -343,7 +343,17 @@ def _shrink_spheroid(
     )
     c = np.sum(inside > 1)
 
+    # Note, we bound the number of iterations so degenerate sensor
+    # positions (e.g. NaNs) raise an error rather than hanging forever
+    max_iter = 100000
+    n_iter = 0
     while c != n_sensors:
+        n_iter += 1
+        if n_iter > max_iter:
+            raise RuntimeError(
+                "Failed to shrink the spheroid to contain all sensors. "
+                "Please check the sensor positions are valid."
+            )
         rt = r - stepsize
         inside = (
             v[:, 0] ** 2 / rt[0] ** 2

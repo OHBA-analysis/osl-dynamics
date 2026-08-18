@@ -14,10 +14,6 @@ from mne_icalabel import label_components
 from scipy import stats
 from scipy.ndimage.filters import uniform_filter1d
 
-# -------------------------------------------------------------------------
-# Artefact detection
-# -------------------------------------------------------------------------
-
 
 def detect_bad_segments(
     raw: mne.io.Raw,
@@ -216,10 +212,16 @@ def detect_bad_channels(
     data = raw.get_data(picks=ch_inds)
     std = np.std(data, axis=-1)
     if log10:
-        std = np.log10(std)
+        with np.errstate(divide="ignore"):
+            std = np.log10(std)
 
-    # Detect outliers
-    mask = _gesd(std, alpha=significance_level)
+    # Detect outliers. Note, we only pass finite values to the GESD
+    # algorithm - a flat/dead channel has zero standard deviation, which
+    # gives -inf under log10, and is always marked as bad
+    finite = np.isfinite(std)
+    mask = ~finite
+    if np.any(finite):
+        mask[finite] = _gesd(std[finite], alpha=significance_level)
     chs = np.array(raw.ch_names)[ch_inds]
     bads = list(chs[mask])
 
@@ -354,11 +356,6 @@ def _gesd(
     out_mask = np.zeros_like(X, dtype=bool)
     out_mask[np.where(finite_mask)[0]] = out_mask_finite
     return out_mask
-
-
-# -------------------------------------------------------------------------
-# ICA artefact rejection
-# -------------------------------------------------------------------------
 
 
 def ica_label(
@@ -728,11 +725,6 @@ def plot_ica_components(
     return fig
 
 
-# -------------------------------------------------------------------------
-# Headshape decimation
-# -------------------------------------------------------------------------
-
-
 def decimate_headshape_points(
     raw: mne.io.Raw,
     decimate_amount: float = 0.01,
@@ -1011,11 +1003,6 @@ def _grid_average_decimate(
             voxel_dict[key] = []
         voxel_dict[key].append(point)
     return np.array([np.mean(voxel_dict[key], axis=0) for key in voxel_dict])
-
-
-# -------------------------------------------------------------------------
-# QC plots
-# -------------------------------------------------------------------------
 
 
 def save_qc_plots(
