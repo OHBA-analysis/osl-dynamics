@@ -6,13 +6,13 @@ import os
 
 import numpy as np
 import nibabel as nib
+import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
 
 import mne
 from mne.beamformer._compute_beamformer import (
     Beamformer,
     _reduce_leadfield_rank,
-    _sym_inv_sm,
 )
 from mne.beamformer._lcmv import _apply_lcmv
 from mne.minimum_norm.inverse import (
@@ -40,6 +40,9 @@ def lcmv_beamformer(
     noise_rank: str | dict = "info",
     reduce_rank: bool = True,
     frequency_range: list[float] | None = None,
+    use_bilateral_pairs: bool = False,
+    bilateral_tol: float | None = None,
+    bilateral_tol_midline: float | None = None,
     **kwargs,
 ) -> None:
     """Compute LCMV spatial filter.
@@ -91,6 +94,21 @@ def lcmv_beamformer(
     frequency_range : list
         Lower and upper range (in Hz) for frequency range to bandpass filter.
         If None, no filtering is performed.
+    use_bilateral_pairs : bool
+        Should we compute joint beamformer weights for pairs of bilaterally
+        symmetric dipoles? This avoids the suppression of correlated bilateral
+        sources (e.g. left and right auditory cortex responding to the same
+        stimulus) that occurs with a standard LCMV beamformer. Requires
+        pick_ori='max-power' or 'max-power-pre-weight-norm' and is
+        incompatible with weight_norm='unit-noise-gain-invariant'
+        (weight_norm='unit-noise-gain' is used if weight_norm is not passed).
+    bilateral_tol : float
+        Distance threshold (in mm) for pairing dipoles mirrored across the
+        midline. If None, half the gridstep of the dipole grid is used.
+        Recommended value: gridstep / 2.
+    bilateral_tol_midline : float
+        Dipoles closer (in mm) than this to the midline (x = 0 in MNI space)
+        are not paired. If None, bilateral_tol is used.
     **kwargs : keyword arguments
         Keyword arguments that will be passed to mne.beamformer.make_lcmv.
 
@@ -186,6 +204,49 @@ def lcmv_beamformer(
             nfree=1e10,
         )
 
+    # Find pairs of bilaterally symmetric dipoles to beamform jointly
+    multi_dipoles = None
+    single_dipoles = None
+    if use_bilateral_pairs:
+        if pick_ori not in ("max-power", "max-power-pre-weight-norm"):
+            raise ValueError(
+                "use_bilateral_pairs=True requires pick_ori='max-power' or "
+                "'max-power-pre-weight-norm'."
+            )
+        if kwargs.get("weight_norm") == "unit-noise-gain-invariant":
+            raise ValueError(
+                "use_bilateral_pairs=True is not compatible with "
+                "weight_norm='unit-noise-gain-invariant', which computes "
+                "the weights from the leadfields alone and would discard "
+                "the joint beamformer denominator of each bilateral pair. "
+                "Use weight_norm='unit-noise-gain' instead."
+            )
+        if "weight_norm" not in kwargs:
+            # The default (unit-noise-gain-invariant) is incompatible with
+            # bilateral pairs. For a scalar beamformer unit-noise-gain gives
+            # identical weights (up to sign).
+            print("Using weight_norm='unit-noise-gain' for bilateral pairs")
+            kwargs["weight_norm"] = "unit-noise-gain"
+
+        src_coords_mni = _get_source_coords_mni(fns, fwd)
+        multi_dipoles, single_dipoles, midline_points = _find_bilateral_pairs(
+            src_coords_mni, bilateral_tol, bilateral_tol_midline
+        )
+        single_dipoles = np.concatenate([single_dipoles, midline_points]).astype(int)
+        if len(multi_dipoles) == 0:
+            warn(
+                "No bilateral pairs found, using a standard beamformer. "
+                "Consider increasing bilateral_tol."
+            )
+            multi_dipoles = None
+            single_dipoles = None
+        else:
+            plot_bilateral_pairs(
+                fns,
+                bilateral_tol=bilateral_tol,
+                bilateral_tol_midline=bilateral_tol_midline,
+            )
+
     # Make filters
     filters = _make_lcmv(
         data.info,
@@ -196,6 +257,8 @@ def lcmv_beamformer(
         rank=rank,
         noise_rank=noise_rank,
         reduce_rank=reduce_rank,
+        multi_dipoles=multi_dipoles,
+        single_dipoles=single_dipoles,
         **kwargs,
     )
 
@@ -278,21 +341,8 @@ def apply_lcmv_beamformer(
     if reference_brain == "head":
         return voxel_data_head, voxel_coords_head
 
-    # ------------------------------------------
     # Convert coordinates from head space to MNI
-    # ------------------------------------------
-
-    # Convert voxel_coords_head to unscaled MRI
-    # head_mri_t_file xform is to unscaled MRI
-    head_mri_t = mne.transforms.read_trans(fns.coreg.head_mri_t_file)
-    voxel_coords_mri = rhino._xform_points(head_mri_t["trans"], voxel_coords_head.T).T
-
-    # Convert voxel_coords_mri to MNI
-    # mni_mri_t_file xform is to unscaled MRI
-    mni_mri_t = mne.transforms.read_trans(fns.surfaces.mni_mri_t_file)
-    voxel_coords_mni = rhino._xform_points(
-        np.linalg.inv(mni_mri_t["trans"]), voxel_coords_mri.T
-    ).T
+    voxel_coords_mni = _head_to_mni(fns, voxel_coords_head)
 
     if spatial_resolution is None:
         # Estimate gridstep from forward model
@@ -333,6 +383,96 @@ def apply_lcmv_beamformer(
     return voxel_data_mni_resampled, voxel_coords_mni_resampled
 
 
+def plot_bilateral_pairs(
+    fns: OSLFilenames,
+    bilateral_tol: float | None = None,
+    bilateral_tol_midline: float | None = None,
+    filename: str | None = None,
+    show: bool = False,
+) -> None:
+    """Plot the dipole pairs used by the bilateral beamformer.
+
+    The pairing is recomputed from the forward model, so the tolerances passed
+    here must match those passed to lcmv_beamformer.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    bilateral_tol : float, optional
+        Distance threshold (in mm) for pairing dipoles mirrored across the
+        midline. If None, half the gridstep of the dipole grid is used.
+    bilateral_tol_midline : float, optional
+        Dipoles closer (in mm) than this to the midline are not paired.
+        If None, bilateral_tol is used.
+    filename : str, optional
+        Output filename. If None, {fns.src_dir}/bilateral_dipoles.png is used.
+    show : bool, optional
+        Should we show the plot?
+    """
+    if filename is None:
+        filename = f"{fns.src_dir}/bilateral_dipoles.png"
+
+    fwd = mne.read_forward_solution(fns.fwd_model, verbose=False)
+    src_coords_mni = _get_source_coords_mni(fns, fwd)
+    multi_dipoles, single_dipoles, midline_points = _find_bilateral_pairs(
+        src_coords_mni, bilateral_tol, bilateral_tol_midline
+    )
+    pairs = np.array(multi_dipoles, dtype=int).reshape(-1, 2)
+
+    views = [("Axial", 0, 1), ("Coronal", 0, 2), ("Sagittal", 1, 2)]
+    labels = ["x (mm)", "y (mm)", "z (mm)"]
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    for ax, (view, i, j) in zip(axes, views):
+        ax.scatter(
+            src_coords_mni[single_dipoles, i],
+            src_coords_mni[single_dipoles, j],
+            s=4,
+            c="grey",
+        )
+        ax.scatter(
+            src_coords_mni[midline_points, i],
+            src_coords_mni[midline_points, j],
+            s=4,
+            c="tab:blue",
+        )
+        ax.plot(
+            src_coords_mni[pairs, i].T,
+            src_coords_mni[pairs, j].T,
+            c="tab:red",
+            lw=0.4,
+        )
+        ax.set_title(view)
+        ax.set_xlabel(labels[i])
+        ax.set_ylabel(labels[j])
+        ax.set_aspect("equal")
+
+    # Dummy handles for the legend
+    handles = [
+        plt.Line2D([], [], ls="", marker="o", ms=4, c="grey"),
+        plt.Line2D([], [], ls="", marker="o", ms=4, c="tab:blue"),
+        plt.Line2D([], [], c="tab:red"),
+    ]
+    fig.legend(
+        handles,
+        ["Single", "Midline", "Bilateral pair"],
+        loc="lower center",
+        ncol=3,
+    )
+    fig.suptitle(
+        f"{len(pairs)} bilateral pairs, {len(single_dipoles)} single dipoles, "
+        f"{len(midline_points)} midline dipoles"
+    )
+    fig.tight_layout(rect=[0, 0.05, 1, 1])
+
+    print(f"Saving {filename}")
+    fig.savefig(filename, dpi=150)
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+
 def _make_lcmv(
     info: mne.Info,
     fwd: mne.Forward,
@@ -347,6 +487,8 @@ def _make_lcmv(
     reduce_rank: bool = False,
     depth: float | dict | None = None,
     inversion: str = "matrix",
+    multi_dipoles: list[list[int]] | None = None,
+    single_dipoles: np.ndarray | None = None,
     verbose: bool | str | int | None = None,
 ) -> Beamformer:
     """Compute LCMV spatial filter.
@@ -399,6 +541,15 @@ def _make_lcmv(
         How to weight (or normalize) the forward using a depth prior (see Notes).
     inversion : 'matrix' | 'single'
         The inversion scheme to compute the weights.
+    multi_dipoles : list of list of int
+        Groups of dipoles (indices with respect to the in-use sources of the
+        forward model) to compute joint beamformer weights for, e.g. pairs of
+        bilaterally symmetric dipoles. If None, a standard beamformer is
+        computed.
+    single_dipoles : np.ndarray
+        Indices (with respect to the in-use sources of the forward model) of
+        the dipoles not part of a multi-dipole. Only used if multi_dipoles is
+        passed.
     verbose : bool, str, int, or None
         If not None, override default verbose level (see mne.verbose).
 
@@ -408,6 +559,12 @@ def _make_lcmv(
         Dictionary containing filter weights from LCMV beamformer. See MNE docs.
 
     """
+    if multi_dipoles is not None and label is not None:
+        raise ValueError(
+            "multi_dipoles cannot be used with label, the dipole indices "
+            "assume the full source space."
+        )
+
     # Check number of sensor types present in the data and ensure a noise cov
     info = mne._fiff.meas_info._simplify_info(info)
     noise_cov, _, allow_mismatch = mne.utils._check_one_ch_type(
@@ -468,6 +625,8 @@ def _make_lcmv(
         nn=nn,
         orient_std=orient_std,
         whitener=whitener,
+        multi_dipoles=multi_dipoles,
+        single_dipoles=single_dipoles,
     )
 
     # Get src type to store with filters for _make_stc
@@ -505,6 +664,53 @@ def _make_lcmv(
     return filters
 
 
+def _sym_inv_sm(
+    x: np.ndarray,
+    reduce_rank: bool,
+    inversion: str,
+    sk: np.ndarray,
+) -> np.ndarray:
+    """Symmetric inversion with single- or matrix-style inversion.
+
+    Modified version of mne.beamformer._compute_beamformer._sym_inv_sm that
+    additionally supports the 2D joint denominator of a multi-dipole, e.g.
+    (2, 2) for a bilateral pair of scalar dipoles. Note, the source covariance
+    (sk) is not reapplied in this case (it is all ones for a volumetric source
+    space).
+    """
+    if x.shape[1:] == (1, 1):
+        with np.errstate(divide="ignore", invalid="ignore"):
+            x_inv = 1.0 / x
+        x_inv[~np.isfinite(x_inv)] = 1.0
+    elif x.shape[1:] == (3, 3):
+        if inversion == "matrix":
+            x_inv = mne.utils._sym_mat_pow(x, -1, reduce_rank=reduce_rank)
+            # Reapply source covariance after inversion
+            x_inv *= sk[:, :, np.newaxis]
+            x_inv *= sk[:, np.newaxis, :]
+        else:
+            # Invert for each dipole separately using plain division
+            diags = np.diagonal(x, axis1=1, axis2=2)
+            assert not reduce_rank  # guaranteed earlier
+            with np.errstate(divide="ignore"):
+                diags = 1.0 / diags
+            # set the diagonal of each 3x3
+            x_inv = np.zeros_like(x)
+            for k in range(x.shape[0]):
+                this = diags[k]
+                # Reapply source covariance after inversion
+                this *= sk[k] * sk[k]
+                x_inv[k].flat[::4] = this
+    else:
+        if inversion != "matrix":
+            raise ValueError(
+                "inversion must be 'matrix' when inverting the joint "
+                "denominator of a multi-dipole."
+            )
+        x_inv = mne.utils._sym_mat_pow(x, -1, reduce_rank=reduce_rank)
+    return x_inv
+
+
 def _compute_beamformer(
     G: np.ndarray,
     Cm: np.ndarray,
@@ -518,6 +724,8 @@ def _compute_beamformer(
     nn: np.ndarray,
     orient_std: np.ndarray,
     whitener: np.ndarray,
+    multi_dipoles: list[list[int]] | None = None,
+    single_dipoles: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Compute a spatial beamformer filter (LCMV or DICS).
 
@@ -549,6 +757,13 @@ def _compute_beamformer(
         The std of the orientation prior used in weighting the lead fields.
     whitener : (n_channels, n_channels) numpy.ndarray
         The whitener.
+    multi_dipoles : list of list of int
+        Groups of dipoles (indices with respect to the sources in G) to
+        compute joint beamformer weights for, e.g. pairs of bilaterally
+        symmetric dipoles. If None, a standard beamformer is computed.
+    single_dipoles : (n_single_dipoles,) numpy.ndarray
+        Indices (with respect to the sources in G) of the dipoles not part
+        of a multi-dipole. Only used if multi_dipoles is passed.
 
     For more detailed information on the parameters, see the docstrings of
     `make_lcmv` and `make_dics`.
@@ -565,6 +780,14 @@ def _compute_beamformer(
         weight_norm,
         ["unit-noise-gain-invariant", "unit-noise-gain", "nai", None],
     )
+
+    if multi_dipoles is not None and weight_norm == "unit-noise-gain-invariant":
+        raise ValueError(
+            "multi_dipoles cannot be used with "
+            "weight_norm='unit-noise-gain-invariant', which computes the "
+            "weights from the leadfields alone and would discard the joint "
+            "beamformer denominator of each multi-dipole."
+        )
 
     # Whiten the data covariance
     Cm = whitener @ Cm @ whitener.T.conj()
@@ -720,31 +943,97 @@ def _compute_beamformer(
             Gk = Gk[..., 2:3]
             n_orient = 1
 
-    # ----------------------------------------------------------------------
-    # 3. Compute numerator and denominator of beamformer formula (unit-gain)
-    # ----------------------------------------------------------------------
+    if multi_dipoles is not None:
+        # MWW
+        #
+        # Compute joint beamformer weights for each multi-dipole (e.g. a
+        # bilateral pair of dipoles) by concatenating their leadfields.
+        # This avoids the suppression of correlated sources that occurs
+        # with a standard beamformer.
+        if n_orient != 1:
+            raise ValueError(
+                "multi_dipoles requires pick_ori='max-power' or "
+                "'max-power-pre-weight-norm'."
+            )
 
-    bf_numer, bf_denom = _compute_bf_terms(Gk, Cm_inv)
+        W_multi = []
+        for multi_dipole in multi_dipoles:
+            # Concatenate the leadfields of the dipoles in this multi-dipole
+            Gk_multi = np.zeros([n_channels, n_orient * len(multi_dipole)])
+            for dd in range(len(multi_dipole)):
+                Gk_multi[:, dd * n_orient : (dd + 1) * n_orient] = Gk[
+                    multi_dipole[dd], :, :
+                ]
 
-    assert bf_denom.shape == (n_sources,) + (n_orient,) * 2
-    assert bf_numer.shape == (n_sources, n_orient, n_channels)
+            # 3. Compute numerator and denominator of beamformer formula
+            bf_numer_multi, bf_denom_multi = _compute_bf_terms(Gk_multi, Cm_inv)
 
-    del Gk  # lead field has been adjusted and should not be used anymore
+            # 4. Invert the (joint) denominator
+            #
+            # Note, reduce_rank is not passed on here: a rank-reduced
+            # pseudo-inverse of the joint denominator would make the weights
+            # of the dipoles in the multi-dipole collinear (i.e. their
+            # reconstructed time courses would be perfectly correlated)
+            bf_denom_multi_inv = _sym_inv_sm(
+                bf_denom_multi, reduce_rank=False, inversion="matrix", sk=sk
+            )
+            W_multi.append(np.matmul(bf_denom_multi_inv, bf_numer_multi))
 
-    # -------------------------
-    # 4. Invert the denominator
-    # -------------------------
+        # Standard beamformer weights for the remaining dipoles
+        if single_dipoles is not None:
+            Gk_single = Gk[single_dipoles]
 
-    # Here W is W_ug, i.e.: G.T @ Cm_inv / (G.T @ Cm_inv @ G)
-    bf_denom_inv = _sym_inv_sm(bf_denom, reduce_rank, inversion, sk)
+            # 3. Compute numerator and denominator of beamformer formula
+            bf_numer_single, bf_denom_single = _compute_bf_terms(Gk_single, Cm_inv)
 
-    assert bf_denom_inv.shape == (n_sources, n_orient, n_orient)
+            # 4. Invert the denominator
+            bf_denom_single_inv = _sym_inv_sm(
+                bf_denom_single, reduce_rank, "matrix", sk[single_dipoles]
+            )
+            W_single = np.matmul(bf_denom_single_inv, bf_numer_single)
 
-    W = np.matmul(bf_denom_inv, bf_numer)
+        del Gk  # lead field has been adjusted and should not be used anymore
 
-    assert W.shape == (n_sources, n_orient, n_channels)
+        # Build W from W_multi and W_single
+        W = np.zeros((n_sources, n_orient, n_channels))
+        for mm, multi_dipole in enumerate(multi_dipoles):
+            for dd in range(len(multi_dipole)):
+                W[multi_dipole[dd]] = W_multi[mm][dd * n_orient : (dd + 1) * n_orient]
+        if single_dipoles is not None:
+            W[single_dipoles] = W_single
 
-    del bf_denom_inv, sk
+        assert W.shape == (n_sources, n_orient, n_channels)
+
+        del sk
+        # MWW end
+
+    else:
+        # ------------------------------------------------------------------
+        # 3. Compute numerator and denominator of beamformer formula
+        #    (unit-gain)
+        # ------------------------------------------------------------------
+
+        bf_numer, bf_denom = _compute_bf_terms(Gk, Cm_inv)
+
+        assert bf_denom.shape == (n_sources,) + (n_orient,) * 2
+        assert bf_numer.shape == (n_sources, n_orient, n_channels)
+
+        del Gk  # lead field has been adjusted and should not be used anymore
+
+        # -------------------------
+        # 4. Invert the denominator
+        # -------------------------
+
+        # Here W is W_ug, i.e.: G.T @ Cm_inv / (G.T @ Cm_inv @ G)
+        bf_denom_inv = _sym_inv_sm(bf_denom, reduce_rank, inversion, sk)
+
+        assert bf_denom_inv.shape == (n_sources, n_orient, n_orient)
+
+        W = np.matmul(bf_denom_inv, bf_numer)
+
+        assert W.shape == (n_sources, n_orient, n_channels)
+
+        del bf_denom_inv, sk
 
     # ----------------------------------------------------------------
     # 5. Re-scale filter weights according to the selected weight_norm
@@ -1054,3 +1343,160 @@ def _get_gridstep(coords: np.ndarray) -> int:
         store.append(np.sqrt(np.sum(np.square(coords[ii, :] - coords[0, :]))))
     store = np.asarray(store)
     return int(np.round(np.min(store[np.where(store > 0)]) * 1000))
+
+
+def _head_to_mni(fns: OSLFilenames, coords_head: np.ndarray) -> np.ndarray:
+    """Transform points from head space to MNI space.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    coords_head : np.ndarray
+        (n, 3) coordinates in head space in mm.
+
+    Returns
+    -------
+    coords_mni : np.ndarray
+        (n, 3) coordinates in MNI space in mm.
+    """
+    # Convert coords_head to unscaled MRI
+    # head_mri_t_file xform is to unscaled MRI
+    head_mri_t = mne.transforms.read_trans(fns.coreg.head_mri_t_file)
+    coords_mri = rhino._xform_points(head_mri_t["trans"], coords_head.T).T
+
+    # Convert coords_mri to MNI
+    # mni_mri_t_file xform is to unscaled MRI
+    mni_mri_t = mne.transforms.read_trans(fns.surfaces.mni_mri_t_file)
+    coords_mni = rhino._xform_points(np.linalg.inv(mni_mri_t["trans"]), coords_mri.T).T
+
+    return coords_mni
+
+
+def _get_source_coords_mni(fns: OSLFilenames, fwd: mne.Forward) -> np.ndarray:
+    """Get the coordinates of the in-use dipoles in MNI space.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    fwd : mne.Forward
+        Forward solution.
+
+    Returns
+    -------
+    src_coords_mni : np.ndarray
+        (n_sources, 3) dipole coordinates in MNI space in mm. Ordering
+        matches the in-use sources of the forward model (fwd["src"][0]).
+    """
+    if fwd["coord_frame"] != mne.io.constants.FIFF.FIFFV_COORD_HEAD:
+        raise ValueError("Forward solution must be in head coordinates.")
+    vs = fwd["src"][0]
+    if vs["type"] != "vol":
+        raise ValueError("Forward solution must have a volumetric source space.")
+    coords_head = vs["rr"][vs["vertno"]] * 1000  # in mm
+    return _head_to_mni(fns, coords_head)
+
+
+def _find_bilateral_pairs(
+    src_coords_mni: np.ndarray,
+    bilateral_tol: float | None = None,
+    bilateral_tol_midline: float | None = None,
+) -> tuple[list[list[int]], np.ndarray, np.ndarray]:
+    """Find pairs of bilaterally symmetric dipoles.
+
+    Parameters
+    ----------
+    src_coords_mni : np.ndarray
+        (n_sources, 3) dipole coordinates in MNI space in mm. The x-axis
+        indexes left vs right hemisphere.
+    bilateral_tol : float, optional
+        Distance threshold (in mm) for pairing dipoles mirrored across the
+        midline. If None, half the gridstep of the dipole grid is used.
+    bilateral_tol_midline : float, optional
+        Dipoles closer (in mm) than this to the midline are not paired.
+        If None, bilateral_tol is used.
+
+    Returns
+    -------
+    multi_dipoles : list of list of int
+        Each entry contains the indices (with respect to src_coords_mni) of
+        the two dipoles that make up a bilateral pair.
+    single_dipoles : np.ndarray
+        Indices (with respect to src_coords_mni) of dipoles that could not
+        be paired.
+    midline_points : np.ndarray
+        Indices (with respect to src_coords_mni) of dipoles close to the
+        midline.
+    """
+    if bilateral_tol is None:
+        gridstep = _get_gridstep(src_coords_mni / 1000)
+        bilateral_tol = gridstep / 2
+        print(f"Setting bilateral_tol = {bilateral_tol} mm")
+
+    if bilateral_tol <= 0:
+        raise ValueError("bilateral_tol must be a positive scalar.")
+
+    if bilateral_tol_midline is None:
+        bilateral_tol_midline = bilateral_tol
+        print(f"Setting bilateral_tol_midline = {bilateral_tol_midline} mm")
+
+    # Dipoles close to the midline are not paired
+    x = src_coords_mni[:, 0]
+    midline_points = np.where(np.abs(x) < bilateral_tol_midline)[0]
+    non_midline_points = np.where(np.abs(x) >= bilateral_tol_midline)[0]
+    coords = src_coords_mni[non_midline_points]
+
+    # Mirror the right-hemisphere dipoles onto the left hemisphere
+    left_points = np.where(coords[:, 0] < 0)[0]
+    right_points = np.where(coords[:, 0] >= 0)[0]
+    left_coords = coords[left_points]
+    right_coords = coords[right_points].copy()
+    right_coords[:, 0] = -right_coords[:, 0]
+
+    # Mean absolute difference between all cross-hemisphere dipole pairs
+    dist_matrix = np.abs(left_coords[:, np.newaxis] - right_coords[np.newaxis]).mean(
+        axis=-1
+    )
+
+    # Greedily pair the closest left/right dipoles
+    pairs = []
+    while dist_matrix.size > 0:
+        min_idx = np.unravel_index(np.argmin(dist_matrix), dist_matrix.shape)
+        if dist_matrix[min_idx] > bilateral_tol:
+            break
+        pairs.append(min_idx)
+        dist_matrix[min_idx[0], :] = np.inf
+        dist_matrix[:, min_idx[1]] = np.inf
+
+    # Unpaired dipoles, in src_coords_mni indexing
+    used_left = np.zeros(len(left_points), dtype=bool)
+    used_right = np.zeros(len(right_points), dtype=bool)
+    for ll, rr in pairs:
+        used_left[ll] = True
+        used_right[rr] = True
+    single_dipoles = np.concatenate(
+        [
+            non_midline_points[left_points[~used_left]],
+            non_midline_points[right_points[~used_right]],
+        ]
+    ).astype(int)
+
+    # Pairs in src_coords_mni indexing
+    multi_dipoles = [
+        [
+            int(non_midline_points[left_points[ll]]),
+            int(non_midline_points[right_points[rr]]),
+        ]
+        for ll, rr in pairs
+    ]
+
+    n_used = 2 * len(multi_dipoles) + len(single_dipoles) + len(midline_points)
+    print(
+        f"Found {len(multi_dipoles)} bilateral pairs, "
+        f"{len(single_dipoles)} single dipoles and "
+        f"{len(midline_points)} midline dipoles "
+        f"({n_used} of {src_coords_mni.shape[0]} dipoles)"
+    )
+
+    return multi_dipoles, single_dipoles, midline_points

@@ -448,13 +448,23 @@ def save_qc_plots(
 
     # Load data and compute PSD once
     if "epo.fif" in parc_fif:
-        parc_raw = mne.Epochs(parc_fif)
+        parc_raw = mne.read_epochs(parc_fif)
+        parc_ts = parc_raw.get_data(picks="misc")
     else:
         parc_raw = mne.io.read_raw_fif(parc_fif)
+        parc_ts = parc_raw.get_data(picks="misc", reject_by_annotation="omit")
 
     fs = parc_raw.info["sfreq"]
-    parc_ts = parc_raw.get_data(picks="misc", reject_by_annotation="omit")
-    f, psd = scipy.signal.welch(parc_ts, fs=fs, nperseg=fs, nfft=fs * 2)
+    if parc_ts.ndim == 3:
+        # Calculate PSD for each epoch individually and average.
+        # parc_ts shape is (n_epochs, n_channels, n_samples)
+        psd = []
+        for i in range(parc_ts.shape[0]):
+            f, p = scipy.signal.welch(parc_ts[i], fs=fs, nperseg=fs, nfft=fs * 2)
+            psd.append(p)
+        psd = np.mean(psd, axis=0)
+    else:
+        f, psd = scipy.signal.welch(parc_ts, fs=fs, nperseg=fs, nfft=fs * 2)
 
     # PSD topography
     plot_psd_topo(
@@ -1108,7 +1118,13 @@ def _convert2mne_epochs(
     parc_events = epochs.events
 
     # Parcellated data Epochs object
-    parc_epo = mne.EpochsArray(np.swapaxes(parc_data.T, 1, 2), parc_info, parc_events)
+    parc_epo = mne.EpochsArray(
+        np.swapaxes(parc_data.T, 1, 2),
+        parc_info,
+        events=parc_events,
+        tmin=epochs.tmin,
+        event_id=epochs.event_id,
+    )
 
     # Copy the description from the sensor-level Epochs object
     parc_epo.info["description"] = epochs.info["description"]

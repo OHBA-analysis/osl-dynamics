@@ -17,13 +17,13 @@ You can use osl-dynamics to:
 - **Preprocess and source reconstruct M/EEG data**: preprocessing, coregistration, beamforming and parcellation.
 - **Simulate time series data** from HMMs, sinusoidal oscillators and autoregressive models.
 
-osl-dynamics works with [MNE-Python](https://mne.tools): a typical M/EEG workflow preprocesses, source reconstructs and parcellates data first, then models the dynamics of the parcel time courses with osl-dynamics. Data can be loaded from NumPy (`.npy`), MATLAB (`.mat`), text (`.txt`) or MNE (`.fif`) files.
+osl-dynamics works with [MNE-Python](https://mne.tools): a typical M/EEG workflow preprocesses, source reconstructs and parcellates data first, then models the dynamics of the parcel time courses. Data can be loaded from NumPy (`.npy`), MATLAB (`.mat`), text (`.txt`) or MNE (`.fif`) files.
 
 For a full description of the toolbox, see the [documentation](https://osl-dynamics.readthedocs.io).
 
 ## Quick example
 
-Train a Time-Delay Embedded Hidden Markov Model (TDE-HMM) on source-space MEG data to infer dynamic functional brain networks:
+Train a Time-Delay Embedded Hidden Markov Model (TDE-HMM) on parcellated MEG data to infer dynamic functional brain networks:
 
 ```python
 from osl_dynamics.data import Data
@@ -53,8 +53,7 @@ model = Model(config)
 model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
 model.fit(data)
 
-# Get inferred state probabilities, then compute summary statistics,
-# spectra, power maps and connectivity networks
+# Get inferred state probabilities
 alpha = model.get_alpha(data)
 ```
 

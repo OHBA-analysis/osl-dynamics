@@ -24,6 +24,10 @@ Modules
 Tutorials
 ---------
 - :doc:`MEG Preprocessing </tutorials_build/0-1_meg_preprocessing>`
+- :doc:`MEG Source Reconstruction of the MNE Sample Dataset
+  </tutorials_build/0-5_mne_sample_data>`
+- :doc:`MEG Bilateral Beamformer for Correlated Sources
+  </tutorials_build/0-6_bilateral_beamformer>`
 
 Python example scripts
 ----------------------
