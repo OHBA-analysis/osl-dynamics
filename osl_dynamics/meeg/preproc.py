@@ -73,10 +73,20 @@ def detect_bad_segments(
         window_length = int(raw.info["sfreq"] * 2)
 
     # Pick channels
-    if picks == "eeg":
-        chs = mne.pick_types(raw.info, eeg=True, exclude="bads")
-    else:
+    if (picks == "mag") or (picks == "grad"):
         chs = mne.pick_types(raw.info, meg=picks, ref_meg=ref_meg, exclude="bads")
+    elif picks == "meg":
+        chs = mne.pick_types(raw.info, meg=True, ref_meg=ref_meg, exclude="bads")
+    elif picks == "eeg":
+        chs = mne.pick_types(raw.info, eeg=True, exclude="bads")
+    elif picks == "eog":
+        chs = mne.pick_types(raw.info, eog=True, ref_meg=ref_meg, exclude="bads")
+    elif picks == "ecg":
+        chs = mne.pick_types(raw.info, ecg=True, ref_meg=ref_meg, exclude="bads")
+    elif picks == "misc":
+        chs = mne.pick_types(raw.info, misc=True, exclude="bads")
+    else:
+        raise NotImplementedError(f"picks={picks} not available.")
 
     # Get data
     data, times = raw.get_data(
