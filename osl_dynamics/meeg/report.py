@@ -671,12 +671,11 @@ def generate_report(
         _copy_coreg_plots(plots_dir, sessions, Path(output_dir))
         _copy_parc_plots(plots_dir, sessions, Path(output_dir))
 
-    steps = {k: dict(v) for k, v in STEPS.items()}
-
     # Add power maps to step 5 if any session has them
     has_power_maps = any(
         (plots_dir / sid / "5_power_maps.png").exists() for sid in session_ids
     )
+    steps = {k: dict(v) for k, v in STEPS.items()}
     if has_power_maps:
         steps[5] = dict(steps[5])
         steps[5]["subpanels"] = list(steps[5]["subpanels"]) + [

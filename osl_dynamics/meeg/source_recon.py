@@ -232,7 +232,6 @@ def lcmv_beamformer(
         multi_dipoles, single_dipoles, midline_points = _find_bilateral_pairs(
             src_coords_mni, bilateral_tol, bilateral_tol_midline
         )
-        single_dipoles = np.concatenate([single_dipoles, midline_points]).astype(int)
         if len(multi_dipoles) == 0:
             warn(
                 "No bilateral pairs found, using a standard beamformer. "
@@ -241,11 +240,15 @@ def lcmv_beamformer(
             multi_dipoles = None
             single_dipoles = None
         else:
-            plot_bilateral_pairs(
-                fns,
-                bilateral_tol=bilateral_tol,
-                bilateral_tol_midline=bilateral_tol_midline,
+            _plot_bilateral_pairs(
+                src_coords_mni,
+                multi_dipoles,
+                single_dipoles,
+                midline_points,
+                filename=f"{fns.src_dir}/bilateral_dipoles.png",
             )
+            # Midline dipoles get standard single-dipole weights
+            single_dipoles = np.concatenate([single_dipoles, midline_points])
 
     # Make filters
     filters = _make_lcmv(
@@ -418,59 +421,9 @@ def plot_bilateral_pairs(
     multi_dipoles, single_dipoles, midline_points = _find_bilateral_pairs(
         src_coords_mni, bilateral_tol, bilateral_tol_midline
     )
-    pairs = np.array(multi_dipoles, dtype=int).reshape(-1, 2)
-
-    views = [("Axial", 0, 1), ("Coronal", 0, 2), ("Sagittal", 1, 2)]
-    labels = ["x (mm)", "y (mm)", "z (mm)"]
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    for ax, (view, i, j) in zip(axes, views):
-        ax.scatter(
-            src_coords_mni[single_dipoles, i],
-            src_coords_mni[single_dipoles, j],
-            s=4,
-            c="grey",
-        )
-        ax.scatter(
-            src_coords_mni[midline_points, i],
-            src_coords_mni[midline_points, j],
-            s=4,
-            c="tab:blue",
-        )
-        ax.plot(
-            src_coords_mni[pairs, i].T,
-            src_coords_mni[pairs, j].T,
-            c="tab:red",
-            lw=0.4,
-        )
-        ax.set_title(view)
-        ax.set_xlabel(labels[i])
-        ax.set_ylabel(labels[j])
-        ax.set_aspect("equal")
-
-    # Dummy handles for the legend
-    handles = [
-        plt.Line2D([], [], ls="", marker="o", ms=4, c="grey"),
-        plt.Line2D([], [], ls="", marker="o", ms=4, c="tab:blue"),
-        plt.Line2D([], [], c="tab:red"),
-    ]
-    fig.legend(
-        handles,
-        ["Single", "Midline", "Bilateral pair"],
-        loc="lower center",
-        ncol=3,
+    _plot_bilateral_pairs(
+        src_coords_mni, multi_dipoles, single_dipoles, midline_points, filename, show
     )
-    fig.suptitle(
-        f"{len(pairs)} bilateral pairs, {len(single_dipoles)} single dipoles, "
-        f"{len(midline_points)} midline dipoles"
-    )
-    fig.tight_layout(rect=[0, 0.05, 1, 1])
-
-    print(f"Saving {filename}")
-    fig.savefig(filename, dpi=150)
-    if show:
-        plt.show()
-    else:
-        plt.close(fig)
 
 
 def _make_lcmv(
@@ -1500,3 +1453,83 @@ def _find_bilateral_pairs(
     )
 
     return multi_dipoles, single_dipoles, midline_points
+
+
+def _plot_bilateral_pairs(
+    src_coords_mni: np.ndarray,
+    multi_dipoles: list[list[int]],
+    single_dipoles: np.ndarray,
+    midline_points: np.ndarray,
+    filename: str,
+    show: bool = False,
+) -> None:
+    """Plot bilateral dipole pairs.
+
+    Parameters
+    ----------
+    src_coords_mni : np.ndarray
+        (n_sources, 3) dipole coordinates in MNI space in mm.
+    multi_dipoles : list of list of int
+        Bilateral pairs, as returned by _find_bilateral_pairs.
+    single_dipoles : np.ndarray
+        Unpaired dipoles, as returned by _find_bilateral_pairs.
+    midline_points : np.ndarray
+        Midline dipoles, as returned by _find_bilateral_pairs.
+    filename : str
+        Output filename.
+    show : bool, optional
+        Should we show the plot?
+    """
+    pairs = np.array(multi_dipoles, dtype=int).reshape(-1, 2)
+
+    views = [("Axial", 0, 1), ("Coronal", 0, 2), ("Sagittal", 1, 2)]
+    labels = ["x (mm)", "y (mm)", "z (mm)"]
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    for ax, (view, i, j) in zip(axes, views):
+        ax.scatter(
+            src_coords_mni[single_dipoles, i],
+            src_coords_mni[single_dipoles, j],
+            s=4,
+            c="grey",
+        )
+        ax.scatter(
+            src_coords_mni[midline_points, i],
+            src_coords_mni[midline_points, j],
+            s=4,
+            c="tab:blue",
+        )
+        ax.plot(
+            src_coords_mni[pairs, i].T,
+            src_coords_mni[pairs, j].T,
+            c="tab:red",
+            lw=0.4,
+        )
+        ax.set_title(view)
+        ax.set_xlabel(labels[i])
+        ax.set_ylabel(labels[j])
+        ax.set_aspect("equal")
+
+    # Dummy handles for the legend
+    handles = [
+        plt.Line2D([], [], ls="", marker="o", ms=4, c="grey"),
+        plt.Line2D([], [], ls="", marker="o", ms=4, c="tab:blue"),
+        plt.Line2D([], [], c="tab:red"),
+    ]
+    fig.legend(
+        handles,
+        ["Single", "Midline", "Bilateral pair"],
+        loc="lower center",
+        ncol=3,
+    )
+    fig.suptitle(
+        f"{len(pairs)} bilateral pairs, {len(single_dipoles)} single dipoles, "
+        f"{len(midline_points)} midline dipoles"
+    )
+    fig.tight_layout(rect=[0, 0.05, 1, 1])
+
+    print(f"Saving {filename}")
+    fig.savefig(filename, dpi=150)
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)

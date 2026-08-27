@@ -455,16 +455,10 @@ def save_qc_plots(
         parc_ts = parc_raw.get_data(picks="misc", reject_by_annotation="omit")
 
     fs = parc_raw.info["sfreq"]
-    if parc_ts.ndim == 3:
-        # Calculate PSD for each epoch individually and average.
-        # parc_ts shape is (n_epochs, n_channels, n_samples)
-        psd = []
-        for i in range(parc_ts.shape[0]):
-            f, p = scipy.signal.welch(parc_ts[i], fs=fs, nperseg=fs, nfft=fs * 2)
-            psd.append(p)
-        psd = np.mean(psd, axis=0)
-    else:
-        f, psd = scipy.signal.welch(parc_ts, fs=fs, nperseg=fs, nfft=fs * 2)
+    f, psd = scipy.signal.welch(parc_ts, fs=fs, nperseg=fs, nfft=fs * 2)
+    if psd.ndim == 3:
+        # Average over epochs
+        psd = psd.mean(axis=0)
 
     # PSD topography
     plot_psd_topo(
