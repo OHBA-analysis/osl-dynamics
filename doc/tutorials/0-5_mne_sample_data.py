@@ -334,10 +334,9 @@ Prerequisites
 
 #%%
 # The beamformer prints how many pairs were found and saves a QC plot of the
-# dipole pairing to ``fns.src_dir/bilateral_dipoles.png`` (this also appears
-# in the QC report under the "Beamforming" tab). Red lines connect paired
-# dipoles, blue dots are midline dipoles, grey dots are unpaired dipoles. You
-# can also generate this plot manually with
+# dipole pairing to ``fns.src_dir/bilateral_dipoles.png``. Red lines connect
+# paired dipoles, blue dots are midline dipoles, grey dots are unpaired
+# dipoles. You can also generate this plot manually with
 # ``source_recon.plot_bilateral_pairs(fns, show=True)``.
 #
 # A few things to be aware of:
@@ -444,5 +443,4 @@ Prerequisites
 #   spacing, which is usually what you want.
 # - Use ``orthogonalisation=None`` when analysing zero-lag correlated
 #   responses — symmetric orthogonalisation would remove them.
-# - Check the dipole pairing QC plot (``bilateral_dipoles.png``, or the
-#   "Beamforming" tab of the QC report).
+# - Check the dipole pairing QC plot (``bilateral_dipoles.png``).

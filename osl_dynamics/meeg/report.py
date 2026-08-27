@@ -64,15 +64,6 @@ STEPS = {
             },
         ],
     },
-    4: {
-        "name": "Beamforming",
-        "subpanels": [
-            {
-                "name": "Bilateral Dipole Pairs",
-                "files": ["4_bilateral_dipoles.png"],
-            },
-        ],
-    },
     5: {
         "name": "Parcellation",
         "subpanels": [
@@ -613,34 +604,6 @@ def _copy_coreg_plots(
         shutil.copy(coreg_png, session_plots_dir / "3_coreg.png")
 
 
-def _copy_src_plots(
-    plots_dir: Path,
-    sessions: dict,
-    output_dir: Path,
-) -> None:
-    """Copy beamforming QC PNGs from the derivatives directory.
-
-    Copies ``bilateral_dipoles.png`` from ``output_dir/osl/<session_id>/src/``
-    into the session's plots directory as ``4_bilateral_dipoles.png``.
-
-    Parameters
-    ----------
-    plots_dir : Path
-        Path to the plots directory.
-    sessions : dict
-        Sessions dictionary mapping session IDs to info dicts.
-    output_dir : Path
-        Path to the derivatives directory.
-    """
-    for session_id in sessions:
-        dipoles_png = output_dir / "osl" / session_id / "src" / "bilateral_dipoles.png"
-        if not dipoles_png.exists():
-            continue
-        session_plots_dir = plots_dir / session_id
-        session_plots_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy(dipoles_png, session_plots_dir / "4_bilateral_dipoles.png")
-
-
 def _copy_parc_plots(
     plots_dir: Path,
     sessions: dict,
@@ -706,18 +669,9 @@ def generate_report(
     if output_dir is not None:
         _copy_surface_plots(plots_dir, sessions, Path(output_dir))
         _copy_coreg_plots(plots_dir, sessions, Path(output_dir))
-        _copy_src_plots(plots_dir, sessions, Path(output_dir))
         _copy_parc_plots(plots_dir, sessions, Path(output_dir))
 
     steps = {k: dict(v) for k, v in STEPS.items()}
-
-    # Only include the beamforming step if any session has a bilateral
-    # dipoles plot
-    has_bilateral_dipoles = any(
-        (plots_dir / sid / "4_bilateral_dipoles.png").exists() for sid in session_ids
-    )
-    if not has_bilateral_dipoles:
-        steps.pop(4)
 
     # Add power maps to step 5 if any session has them
     has_power_maps = any(
