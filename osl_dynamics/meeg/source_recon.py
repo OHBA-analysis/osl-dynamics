@@ -47,6 +47,8 @@ def lcmv_beamformer(
 ) -> None:
     """Compute LCMV spatial filter.
 
+    The filters are saved to fns.filters.
+
     Parameters
     ----------
     fns : OSLFilenames
@@ -111,12 +113,6 @@ def lcmv_beamformer(
         are not paired. If None, bilateral_tol is used.
     **kwargs : keyword arguments
         Keyword arguments that will be passed to mne.beamformer.make_lcmv.
-
-    Returns
-    -------
-    filters : instance of mne.beamformer.Beamformer
-        Dictionary containing filter weights from LCMV beamformer.
-        See: https://mne.tools/stable/generated/mne.beamformer.make_lcmv.html
     """
     print("")
     print("Making LCMV beamformer")
@@ -183,17 +179,15 @@ def lcmv_beamformer(
         # variance of each sensor type (e.g. mag, grad, eeg).
         n_channels = data_cov.data.shape[0]
         noise_cov_diag = np.zeros(n_channels)
-        for type in chantypes:
+        for chantype in chantypes:
             # Indices of this channel type
-            type_data = data.copy().pick(type, exclude="bads")
-            inds = []
-            for chan in type_data.info["ch_names"]:
-                inds.append(data_cov.ch_names.index(chan))
+            type_data = data.copy().pick(chantype, exclude="bads")
+            inds = [data_cov.ch_names.index(c) for c in type_data.info["ch_names"]]
 
             # Mean variance of channels of this type
             variance = np.mean(np.diag(data_cov.data)[inds])
             noise_cov_diag[inds] = variance
-            print(f"Variance for chantype {type} is {variance}")
+            print(f"Variance for chantype {chantype} is {variance}")
 
         bads = [b for b in data.info["bads"] if b in data_cov.ch_names]
         noise_cov = mne.Covariance(
@@ -371,15 +365,14 @@ def apply_lcmv_beamformer(
     )
     voxel_coords_mni_resampled, _ = _niimask2mmpointcloud(reference_brain_resampled)
 
-    # For each voxel_coords_mni find nearest coordinate in voxel_coords_head
+    # For each resampled MNI coordinate find the nearest reconstructed voxel
     print("Finding nearest neighbour in resampled MNI space")
+    distances, indices = KDTree(voxel_coords_mni).query(voxel_coords_mni_resampled.T)
     voxel_data_mni_resampled = np.zeros(
         np.insert(voxel_data_head.shape[1:], 0, voxel_coords_mni_resampled.shape[1])
     )
-    for cc in range(voxel_coords_mni_resampled.shape[1]):
-        index, dist = _closest_node(voxel_coords_mni_resampled[:, cc], voxel_coords_mni)
-        if dist < spatial_resolution:
-            voxel_data_mni_resampled[cc] = voxel_data_head[index]
+    near = distances < spatial_resolution
+    voxel_data_mni_resampled[near] = voxel_data_head[indices[near]]
 
     print("Applying LCMV beamformer complete.")
 
@@ -1258,26 +1251,6 @@ def _niimask2mmpointcloud(
     return pc, values
 
 
-def _closest_node(
-    node: np.ndarray,
-    nodes: np.ndarray,
-) -> tuple[int, float]:
-    """Find nearest node in nodes to the passed in node.
-
-    Returns
-    -------
-    index : int
-        Index to the nearest node in nodes.
-    distance : float
-        Distance.
-    """
-    if len(nodes) == 1:
-        nodes = np.reshape(nodes, [-1, 1])
-    kdtree = KDTree(nodes)
-    distance, index = kdtree.query(node)
-    return index, distance
-
-
 def _get_gridstep(coords: np.ndarray) -> int:
     """Get gridstep (i.e. spatial resolution of dipole grid) in mm.
 
@@ -1291,11 +1264,8 @@ def _get_gridstep(coords: np.ndarray) -> int:
     gridstep: int
         Spatial resolution of dipole grid in mm.
     """
-    store = []
-    for ii in range(coords.shape[0]):
-        store.append(np.sqrt(np.sum(np.square(coords[ii, :] - coords[0, :]))))
-    store = np.asarray(store)
-    return int(np.round(np.min(store[np.where(store > 0)]) * 1000))
+    dists = np.linalg.norm(coords - coords[0], axis=-1)
+    return int(np.round(dists[dists > 0].min() * 1000))
 
 
 def _head_to_mni(fns: OSLFilenames, coords_head: np.ndarray) -> np.ndarray:
