@@ -1,6 +1,6 @@
 """
-Sign Flipping
-=============
+M/EEG: Sign Flipping
+====================
 
 Source reconstruction leaves the sign of each parcel (channel) time course
 arbitrary: the same parcel can have opposite polarity in different sessions.
