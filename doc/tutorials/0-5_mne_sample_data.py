@@ -71,8 +71,8 @@ Prerequisites
 #     t1_mgz = data_path / "subjects" / "sample" / "mri" / "T1.mgz"
 
 #%%
-# Setup and Configuration
-# ^^^^^^^^^^^^^^^^^^^^^^^
+# Setup
+# ^^^^^
 #
 # .. code-block:: python
 #
@@ -94,18 +94,6 @@ Prerequisites
 #     # Paths
 #     output_dir = Path("derivatives")
 #     plots_dir = Path("plots")
-#
-#     # Preprocessing parameters
-#     resample_freq = 250  # Hz
-#     bandpass = (1, 45)  # Hz
-#     notch_freqs = [60]  # Hz (US mains frequency)
-#
-#     # Source reconstruction parameters
-#     gridstep = 8  # dipole grid resolution in mm
-#     chantypes = ["mag", "grad"]  # Elekta has both magnetometers and gradiometers
-#
-#     # Parcellation
-#     parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
 
 #%%
 # Step 1: Preprocessing
@@ -123,14 +111,14 @@ Prerequisites
 #     raw = raw.pick(["meg", "stim"])
 #
 #     # Filter and resample
-#     raw = raw.notch_filter(notch_freqs)
+#     raw = raw.notch_filter([60])  # 60 Hz is the US mains frequency
 #     raw = raw.filter(
-#         l_freq=bandpass[0],
-#         h_freq=bandpass[1],
+#         l_freq=1,
+#         h_freq=45,
 #         method="iir",
 #         iir_params={"order": 5, "ftype": "butter"},
 #     )
-#     raw = raw.resample(sfreq=resample_freq)
+#     raw = raw.resample(sfreq=250)
 #
 #     # Bad segment detection
 #     raw = preproc.detect_bad_segments(raw, picks="mag")
@@ -222,7 +210,7 @@ Prerequisites
 #
 # .. code-block:: python
 #
-#     rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
+#     rhino.forward_model(fns, model="Single Layer", gridstep=8)  # gridstep in mm
 
 #%%
 # Step 6: Source Reconstruction
@@ -235,7 +223,7 @@ Prerequisites
 #
 # .. code-block:: python
 #
-#     source_recon.lcmv_beamformer(fns, raw, chantypes=chantypes)
+#     source_recon.lcmv_beamformer(fns, raw, chantypes=["mag", "grad"])
 #     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns, raw)
 #     print(f"Voxel data shape: {voxel_data.shape} (voxels x time)")
 
@@ -272,7 +260,7 @@ Prerequisites
 #         voxel_coords,
 #         method="spatial_basis",
 #         orthogonalisation=None,
-#         parcellation_file=parcellation_file,
+#         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
 #     )
 #     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
 #
@@ -291,7 +279,11 @@ Prerequisites
 #
 # .. code-block:: python
 #
-#     parcellation.save_qc_plots(parc_fif, parcellation_file, output_dir=plots_dir / id)
+#     parcellation.save_qc_plots(
+#         parc_fif,
+#         "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
+#         output_dir=plots_dir / id,
+#     )
 
 #%%
 # Step 8: Bilateral Beamformer
@@ -320,7 +312,7 @@ Prerequisites
 #     source_recon.lcmv_beamformer(
 #         fns,
 #         raw,
-#         chantypes=chantypes,
+#         chantypes=["mag", "grad"],
 #         use_bilateral_pairs=True,
 #     )
 #     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns, raw)
@@ -330,7 +322,7 @@ Prerequisites
 #         voxel_coords,
 #         method="spatial_basis",
 #         orthogonalisation=None,
-#         parcellation_file=parcellation_file,
+#         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
 #     )
 #     bilateral_parc_fif = str(output_dir / "osl" / id / "lcmv-bilateral-parc-raw.fif")
 #     parcellation.save_as_fif(
@@ -397,7 +389,9 @@ Prerequisites
 # .. code-block:: python
 #
 #     # Find the auditory parcels
-#     parc = parcellation.Parcellation(parcellation_file)
+#     parc = parcellation.Parcellation(
+#         "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
+#     )
 #     centers = np.array(parc.roi_centers())
 #     left_parcel = np.argmin(np.linalg.norm(centers - [-52, -19, 7], axis=1))
 #     right_parcel = np.argmin(np.linalg.norm(centers - [52, -19, 7], axis=1))
