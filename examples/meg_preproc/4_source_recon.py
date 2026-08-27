@@ -23,11 +23,6 @@ gridstep = 8  # mm
 chantypes = ["mag", "grad"]
 rank = {"meg": 60}
 use_mni152 = False
-
-# Compute joint weights for pairs of bilaterally symmetric dipoles. Use this
-# to avoid suppressing correlated bilateral sources, e.g. the left and right
-# auditory cortex response in an auditory task
-use_bilateral_pairs = False
 # ----------------------------------------------------------------------------
 
 
@@ -53,12 +48,7 @@ def process_session(session, logger):
     rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
 
     logger.log("Computing LCMV beamformer...")
-    source_recon.lcmv_beamformer(
-        fns,
-        chantypes=chantypes,
-        rank=rank,
-        use_bilateral_pairs=use_bilateral_pairs,
-    )
+    source_recon.lcmv_beamformer(fns, chantypes=chantypes, rank=rank)
 
     logger.log("Done.")
 
