@@ -23,7 +23,10 @@ Modules
 
 Tutorials
 ---------
-- :doc:`MEG Preprocessing </tutorials_build/0-1_meg_preprocessing>`
+- :doc:`MEG: Preprocessing, Source Reconstruction, Parcellation
+  </tutorials_build/0-1_meg_preprocessing>`
+- :doc:`MNE Sample Data: Bilateral Beamformer
+  </tutorials_build/0-5_mne_sample_data>`
 
 Python example scripts
 ----------------------
