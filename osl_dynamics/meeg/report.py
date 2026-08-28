@@ -595,10 +595,19 @@ def _copy_coreg_plots(
     output_dir : Path
         Path to the derivatives directory.
     """
-    for session_id in sessions:
+    for session_id, info in sessions.items():
         coreg_png = output_dir / "osl" / session_id / "coreg" / "coreg.png"
         if not coreg_png.exists():
-            continue
+            # The coregistration may be a property of the subject rather than
+            # the session, and so shared by all of a subject's sessions (this
+            # is the case when the head shape does not vary between sessions,
+            # e.g. EEG with a template montage). Fall back to the subject.
+            subject = info.get("subject") if isinstance(info, dict) else None
+            if subject is None:
+                continue
+            coreg_png = output_dir / "osl" / subject / "coreg" / "coreg.png"
+            if not coreg_png.exists():
+                continue
         session_plots_dir = plots_dir / session_id
         session_plots_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy(coreg_png, session_plots_dir / "3_coreg.png")
