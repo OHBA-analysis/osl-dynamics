@@ -300,6 +300,7 @@ def extract_surfaces(
     print("Extracting surfaces")
     print("-------------------")
 
+    os.makedirs(outdir, exist_ok=True)
     fns = SurfaceFilenames(outdir)
 
     # Check mri_file
@@ -2088,7 +2089,7 @@ def forward_model(
 
     model = mne.make_bem_model(
         subjects_dir=fns.outdir,
-        subject=fns.id,
+        subject=fns.head_model_id,
         ico=None,
         conductivity=conductivity,
         verbose=verbose,
@@ -2245,7 +2246,7 @@ def _setup_volume_source_space(
     # Save and return result
     # ----------------------
 
-    sp = mne.source_space._source_space._complete_vol_src(sp, fns.id)
+    sp = mne.source_space._source_space._complete_vol_src(sp, fns.head_model_id)
 
     # Add dummy mri_ras_t and vox_mri_t transforms as these are needed
     # for the forward model to be saved (for some reason)
