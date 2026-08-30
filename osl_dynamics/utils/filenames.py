@@ -112,14 +112,6 @@ class OSLFilenames:
         session of a subject the same head shape points, so that the
         coregistration and forward model are computed once and every session
         reads them.
-
-    Notes
-    -----
-    Directories are created when a path inside them is asked for, not here, so
-    a run that fails before it writes anything leaves nothing behind. Use
-    :code:`_coreg_dir`, :code:`_bem_dir` and :code:`_src_dir` to inspect a path
-    without creating it. :code:`surfaces_dir` is an input, written by
-    :func:`rhino.extract_surfaces`, and is never created here.
     """
 
     def __init__(
