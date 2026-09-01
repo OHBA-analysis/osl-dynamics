@@ -14,7 +14,7 @@ See Also
 
 import logging
 import math
-from itertools import permutations
+from itertools import islice, permutations
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -649,13 +649,8 @@ def optimise_sequence(
         Best sequence of states to plot (in order of counterclockwise
         rotation).
     """
-    if fo_density.ndim == 5:
-        if fo_density.shape[3] != 1:
-            raise ValueError(
-                "fo_density contains multiple interval ranges, please select "
-                "one, e.g. fo_density[:, :, :, i, :]."
-            )
-        fo_density = np.squeeze(fo_density, axis=3)
+    if len(fo_density.shape) == 5:
+        fo_density = np.squeeze(fo_density)
 
     # Make sure there are no nans (without modifying the input array):
     fo_density = np.where(np.isnan(fo_density), 0, fo_density)
@@ -689,20 +684,48 @@ def optimise_sequence(
         return np.imag(np.sum(circle_angles(order) * metric))
 
     ix = np.arange(K)
-    v = score(ix)
     if math.factorial(K - 1) <= n_perms:
         # There are fewer distinct circular orderings than n_perms, so we can
         # evaluate all of them and find the best one. Fixing the first state
         # removes rotational duplicates, leaving (K-1)! orderings.
-        for p in permutations(range(1, K)):
-            candidate = np.array((0, *p))
-            tmpv = score(candidate)
-            if tmpv < v:
-                v = tmpv
-                ix = candidate
+        #
+        # For a real metric M the score Im(sum(circle_angles(order) * M))
+        # expands to sum_ij sin(theta_j - theta_i) M_ij = c^T M s - s^T M c,
+        # where theta_i is the circle position assigned to state i,
+        # c = cos(theta) and s = sin(theta). This means a whole block of
+        # orderings can be scored with two matrix products. Evaluating in
+        # blocks keeps peak memory to a few tens of MB.
+        phi = 2 * np.pi * np.arange(1, K + 1) / K  # circle positions
+        cos_phi = np.cos(phi)
+        sin_phi = np.sin(phi)
+
+        block_size = 100_000
+        best_v = np.inf
+        all_perms = permutations(range(1, K))
+        while True:
+            block = list(islice(all_perms, block_size))
+            if not block:
+                break
+            perms = np.zeros((len(block), K), dtype=int)
+            perms[:, 1:] = block
+            # State perms[p, a] sits at circle position a, i.e.
+            # theta[perms[p, a]] = phi[a]
+            rows = np.arange(len(block))[:, np.newaxis]
+            c = np.empty((len(block), K))
+            s = np.empty((len(block), K))
+            c[rows, perms] = cos_phi
+            s[rows, perms] = sin_phi
+            v_block = np.einsum("pi,pi->p", c, s @ metric.T) - np.einsum(
+                "pi,pi->p", s, c @ metric.T
+            )
+            best_in_block = np.argmin(v_block)
+            if v_block[best_in_block] < best_v:
+                best_v = v_block[best_in_block]
+                ix = perms[best_in_block].copy()
     else:
         # Too many orderings to evaluate exhaustively, do a random
         # pairwise-swap search
+        v = score(ix)
         for _ in range(n_perms):
             swaps = np.random.permutation(K)[:2]
             candidate = ix.copy()
