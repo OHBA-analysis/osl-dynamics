@@ -13,6 +13,8 @@ See Also
 """
 
 import logging
+import math
+from itertools import islice, permutations
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -214,17 +216,27 @@ def compute_fo_stats(
         temp_to = []
         temp_away = []
         for i in intervals:
-            d = int(np.floor((np.diff(i) - 1) / 2))
+            d = (i[1] - i[0] - 1) // 2
             temp_away.append(tc_sec[i[0] : i[0] + d + 1, :])
             temp_to.append(tc_sec[i[1] - d - 1 : i[1], :])
 
         interval_weighted_avg_all = []
         interval_sum_all = []
         for j, mask in enumerate(interval_mask):
-            temp_to_flat = np.concatenate([temp_to[k] for k in np.where(mask == 1)[0]])
-            temp_away_flat = np.concatenate(
-                [temp_away[k] for k in np.where(mask == 1)[0]]
-            )
+            selected = np.where(mask == 1)[0]
+            if len(selected) == 0:
+                _logger.warning(
+                    f"No intervals with a duration in interval range {j}, "
+                    "returning NaNs for this range."
+                )
+                interval_weighted_avg[:, :, j] = np.nan
+                interval_sum[:, :, j] = np.nan
+                interval_weighted_avg_all.append(np.zeros((tc_sec.shape[1], 2, 0)))
+                interval_sum_all.append(np.zeros((tc_sec.shape[1], 2, 0)))
+                continue
+
+            temp_to_flat = np.concatenate([temp_to[k] for k in selected])
+            temp_away_flat = np.concatenate([temp_away[k] for k in selected])
 
             interval_weighted_avg[:, 0, j] = np.mean(temp_away_flat, axis=0)
             interval_weighted_avg[:, 1, j] = np.mean(temp_to_flat, axis=0)
@@ -235,17 +247,11 @@ def compute_fo_stats(
                     np.stack(
                         [
                             np.stack(
-                                [
-                                    temp_away[k].mean(axis=0)
-                                    for k in np.where(mask == 1)[0]
-                                ],
+                                [temp_away[k].mean(axis=0) for k in selected],
                                 axis=-1,
                             ),
                             np.stack(
-                                [
-                                    temp_to[k].mean(axis=0)
-                                    for k in np.where(mask == 1)[0]
-                                ],
+                                [temp_to[k].mean(axis=0) for k in selected],
                                 axis=-1,
                             ),
                         ]
@@ -258,17 +264,11 @@ def compute_fo_stats(
                     np.stack(
                         [
                             np.stack(
-                                [
-                                    temp_away[k].sum(axis=0)
-                                    for k in np.where(mask == 1)[0]
-                                ],
+                                [temp_away[k].sum(axis=0) for k in selected],
                                 axis=-1,
                             ),
                             np.stack(
-                                [
-                                    temp_to[k].sum(axis=0)
-                                    for k in np.where(mask == 1)[0]
-                                ],
+                                [temp_to[k].sum(axis=0) for k in selected],
                                 axis=-1,
                             ),
                         ]
@@ -629,7 +629,7 @@ def optimise_sequence(
     fo_density : array_like
         Time-in-state densities array of shape (n_interval_states,
         n_density_states, 2, n_sessions).
-    metric : int, optional
+    metric_to_use : int, optional
         Metric to use for optimisation:
 
         - :code:`0`: mean FO asymmetry.
@@ -637,54 +637,108 @@ def optimise_sequence(
           of a baseline - which time spend in the state).
         - :code:`2`: proportional FO asymmetry using global baseline FO, rather
           than a individual-specific baseline.
+    n_perms : int, optional
+        Maximum number of permutations to evaluate. If the number of distinct
+        circular orderings of the K states, (K-1)!, does not exceed
+        :code:`n_perms`, all of them are evaluated and the returned sequence
+        is exact. Otherwise, a random pairwise-swap search with
+        :code:`n_perms` iterations is used.
 
     Returns
     -------
-    best_sequence : list
-        List of best sequence of states to plot (in order of counterclockwise
+    best_sequence : array_like
+        Best sequence of states to plot (in order of counterclockwise
         rotation).
     """
     if len(fo_density.shape) == 5:
         fo_density = np.squeeze(fo_density)
 
-    # make sure there are no nans:
-    fo_density[np.isnan(fo_density)] = 0
+    # Make sure there are no nans (without modifying the input array):
+    fo_density = np.where(np.isnan(fo_density), 0, fo_density)
 
     # Compute different metrics to optimise
-    metric = []
-    metric.append(np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2))
+    metrics = []
+    metrics.append(np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2))
     temp = (fo_density[:, :, 0, :] - fo_density[:, :, 1, :]) / np.mean(
         fo_density, axis=2
     )
-    temp[np.isnan(temp)] = 0
-    metric.append(np.mean(temp, axis=2))
-    metric.append(
+    temp[~np.isfinite(temp)] = 0
+    metrics.append(np.mean(temp, axis=2))
+    metrics.append(
         np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2)
         / np.mean(fo_density, axis=(2, 3))
     )
-    n_metrics = len(metric)
-    K = fo_density.shape[0]
+    metric = metrics[metric_to_use]
+    if not np.all(np.isfinite(metric)):
+        _logger.warning(
+            "The metric contains non-finite values (e.g. for states that are "
+            "never active), setting them to zero."
+        )
+        metric[~np.isfinite(metric)] = 0
 
-    best_sequence = []
-    for i in range(n_metrics):
-        ix = np.arange(K)
-        v = np.imag(np.sum(circle_angles(ix) * metric[i]))
-        cnt = 0
-        while cnt < n_perms:
-            cnt += 1
-            swaps = np.random.permutation(K)
-            swaps = swaps[:2]
-            tmpix = ix.copy()
-            tmpix[swaps[0]] = ix[swaps[1]]
-            tmpix[swaps[1]] = ix[swaps[0]]
-            tmpv = np.imag(np.sum(circle_angles(tmpix) * metric[i]))
+    K = fo_density.shape[0]
+    if K < 3:
+        # There is only one circular ordering
+        return np.arange(K)
+
+    def score(order):
+        return np.imag(np.sum(circle_angles(order) * metric))
+
+    ix = np.arange(K)
+    if math.factorial(K - 1) <= n_perms:
+        # There are fewer distinct circular orderings than n_perms, so we can
+        # evaluate all of them and find the best one. Fixing the first state
+        # removes rotational duplicates, leaving (K-1)! orderings.
+        #
+        # For a real metric M the score Im(sum(circle_angles(order) * M))
+        # expands to sum_ij sin(theta_j - theta_i) M_ij = c^T M s - s^T M c,
+        # where theta_i is the circle position assigned to state i,
+        # c = cos(theta) and s = sin(theta). This means a whole block of
+        # orderings can be scored with two matrix products. Evaluating in
+        # blocks keeps peak memory to a few tens of MB.
+        phi = 2 * np.pi * np.arange(1, K + 1) / K  # circle positions
+        cos_phi = np.cos(phi)
+        sin_phi = np.sin(phi)
+
+        block_size = 100_000
+        best_v = np.inf
+        all_perms = permutations(range(1, K))
+        while True:
+            block = list(islice(all_perms, block_size))
+            if not block:
+                break
+            perms = np.zeros((len(block), K), dtype=int)
+            perms[:, 1:] = block
+            # State perms[p, a] sits at circle position a, i.e.
+            # theta[perms[p, a]] = phi[a]
+            rows = np.arange(len(block))[:, np.newaxis]
+            c = np.empty((len(block), K))
+            s = np.empty((len(block), K))
+            c[rows, perms] = cos_phi
+            s[rows, perms] = sin_phi
+            v_block = np.einsum("pi,pi->p", c, s @ metric.T) - np.einsum(
+                "pi,pi->p", s, c @ metric.T
+            )
+            best_in_block = np.argmin(v_block)
+            if v_block[best_in_block] < best_v:
+                best_v = v_block[best_in_block]
+                ix = perms[best_in_block].copy()
+    else:
+        # Too many orderings to evaluate exhaustively, do a random
+        # pairwise-swap search
+        v = score(ix)
+        for _ in range(n_perms):
+            swaps = np.random.permutation(K)[:2]
+            candidate = ix.copy()
+            candidate[swaps[0]], candidate[swaps[1]] = ix[swaps[1]], ix[swaps[0]]
+            tmpv = score(candidate)
             if tmpv < v:
                 v = tmpv
-                ix = tmpix
-        best_sequence.append(np.roll(ix, -np.where([iix == 0 for iix in ix])[0][0]))
-    # Return the best sequence for the chosen metric (in order of counterclockwise
-    # rotation)
-    return best_sequence[metric_to_use]
+                ix = candidate
+
+    # Return the best sequence (in order of counterclockwise rotation),
+    # rotated so it starts with state 0
+    return np.roll(ix, -np.where(ix == 0)[0][0])
 
 
 def compute_cycle_strength(
