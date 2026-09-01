@@ -99,6 +99,13 @@ model.summary()
 #     init_history = model.random_state_time_course_initialization(data, n_epochs=1, n_init=3)
 
 #%%
+# If you are training on a particularly large dataset, initializing on the full dataset can be slow. In this case, you can pass the `take` argument to initialize on a random subset of the data. This is the fraction of the dataset to use, e.g. `take=0.25` will use a quarter of the data for each initialization.
+#
+# .. code-block:: python
+#
+#     init_history = model.random_state_time_course_initialization(data, n_epochs=1, n_init=3, take=0.25)
+
+#%%
 # The `init_history` variable is `dict` that contains the training history (`rho`, `learning_rate`, `loss`) for the best initialization.
 #
 # **Full training**

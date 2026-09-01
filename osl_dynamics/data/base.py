@@ -98,17 +98,17 @@ class Data:
         :code:`time_axis_first=False`.
     load_memmaps : bool, optional
         Should we load the data as memory maps (memmaps)? If :code:`True`, we
-        will load store the data on disk rather than loading it into memory.
+        will store the data on disk rather than loading it into memory.
     store_dir : str, optional
-        If `load_memmaps=True`, then we save data to disk and load it as
-        a memory map. This is the directory to save the memory maps to.
-        Each Data instance saves to its own unique sub-directory of
-        :code:`store_dir`, which is automatically deleted when the script
-        ends (or when :code:`delete_dir` is called). Default is
-        :code:`./tmp`.
+        Directory to write temporary files to. This is used for memory maps
+        (if :code:`load_memmaps=True`) and TFRecord files (if
+        :code:`use_tfrecord=True`). Each Data instance writes to its own
+        unique sub-directory of :code:`store_dir`, which is deleted
+        automatically when the script ends (or when :code:`delete_dir` is
+        called). Default is :code:`./tmp`.
     buffer_size : int, optional
         Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
-        to less random shuffling but will be quicker. Default is 100000.
+        to less random shuffling but will be quicker. Default is 4000.
     use_tfrecord : bool, optional
         Should we save the data as a TensorFlow Record? This is recommended for
         training on large datasets. Default is :code:`False`.

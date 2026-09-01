@@ -117,6 +117,8 @@ model.summary()
 #     init_history = model.random_subset_initialization(data, n_epochs=2, n_init=5, take=0.25)
 
 #%%
+# The `take` argument is the fraction of the dataset to use for each initialization. If you are training on a particularly large dataset, initializing on the full dataset can be slow, so it is worth reducing this value further, e.g. `take=0.1`.
+#
 # The `init_history` variable is `dict` that contains the training history (`rho`, `lr`, `loss`) for the best initialization.
 #
 # **Full training**
