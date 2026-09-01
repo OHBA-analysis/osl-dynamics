@@ -15,7 +15,6 @@ class SurfaceFilenames:
 
     def __init__(self, root: str):
         self.root = root
-        os.makedirs(root, exist_ok=True)
         self.fsl_dir = os.environ["FSLDIR"]
 
         # Nifti files
@@ -50,7 +49,6 @@ class CoregFilenames:
 
     def __init__(self, root: str):
         self.root = root
-        os.makedirs(root, exist_ok=True)
 
         # Nifti files
         self.mri_file = f"{root}/scaled_mri.nii.gz"
@@ -107,6 +105,13 @@ class OSLFilenames:
     elc_file : str, optional
         Path to an .elc file (alternative format for head shape points
         from CTF data).
+    head_model_id : str, optional
+        Identifier owning the head model: the coregistration, BEM and forward
+        model. Defaults to :code:`id`. Pass a subject when the head model is
+        shared by several sessions, e.g. a template montage that gives every
+        session of a subject the same head shape points, so that the
+        coregistration and forward model are computed once and every session
+        reads them.
     """
 
     def __init__(
@@ -117,27 +122,58 @@ class OSLFilenames:
         surfaces_dir: str,
         pos_file: Optional[str] = None,
         elc_file: Optional[str] = None,
+        head_model_id: Optional[str] = None,
     ):
         self.outdir = outdir
         self.id = id
+        self.head_model_id = head_model_id if head_model_id is not None else id
 
         self.preproc_file = preproc_file
 
         self.surfaces_dir = surfaces_dir
         self.surfaces = SurfaceFilenames(surfaces_dir)
 
-        self.bem_dir = f"{outdir}/{id}/bem"
-        os.makedirs(self.bem_dir, exist_ok=True)
+        self._bem_dir = f"{outdir}/{self.head_model_id}/bem"
+        self._coreg_dir = f"{outdir}/{self.head_model_id}/coreg"
+        self._coreg = CoregFilenames(self._coreg_dir)
+        self._src_dir = f"{outdir}/{id}/src"
 
-        self.coreg_dir = f"{outdir}/{id}/coreg"
-        self.coreg = CoregFilenames(self.coreg_dir)
-        self.fwd_model = f"{self.coreg_dir}/model-fwd.fif"
         self.pos_file = pos_file
         self.elc_file = elc_file
 
-        self.src_dir = f"{outdir}/{id}/src"
-        os.makedirs(self.src_dir, exist_ok=True)
-        self.filters = f"{self.src_dir}/filters-lcmv.h5"
+    @property
+    def bem_dir(self) -> str:
+        """BEM directory, created on first use."""
+        os.makedirs(self._bem_dir, exist_ok=True)
+        return self._bem_dir
+
+    @property
+    def coreg_dir(self) -> str:
+        """Coregistration directory, created on first use."""
+        os.makedirs(self._coreg_dir, exist_ok=True)
+        return self._coreg_dir
+
+    @property
+    def coreg(self) -> CoregFilenames:
+        """Coregistration file paths. Creates the coregistration directory."""
+        os.makedirs(self._coreg_dir, exist_ok=True)
+        return self._coreg
+
+    @property
+    def fwd_model(self) -> str:
+        """Forward model file. Creates the coregistration directory."""
+        return f"{self.coreg_dir}/model-fwd.fif"
+
+    @property
+    def src_dir(self) -> str:
+        """Source reconstruction directory, created on first use."""
+        os.makedirs(self._src_dir, exist_ok=True)
+        return self._src_dir
+
+    @property
+    def filters(self) -> str:
+        """LCMV filters file. Creates the source directory."""
+        return f"{self.src_dir}/filters-lcmv.h5"
 
     def __str__(self) -> str:
         lines = [
@@ -145,11 +181,11 @@ class OSLFilenames:
             f"  Output directory:  {self.outdir}",
             f"  Preprocessed file: {self.preproc_file}",
             f"  Surfaces directory: {self.surfaces_dir}",
-            f"  BEM directory:     {self.bem_dir}",
-            f"  Coreg directory:   {self.coreg_dir}",
-            f"    \u2514\u2500 Forward model: {self.fwd_model}",
-            f"  Source directory:  {self.src_dir}",
-            f"    \u2514\u2500 lcmv filters:  {self.filters}",
+            f"  BEM directory:     {self._bem_dir}",
+            f"  Coreg directory:   {self._coreg_dir}",
+            f"    \u2514\u2500 Forward model: {self._coreg_dir}/model-fwd.fif",
+            f"  Source directory:  {self._src_dir}",
+            f"    \u2514\u2500 lcmv filters:  {self._src_dir}/filters-lcmv.h5",
         ]
         if self.pos_file is not None:
             lines += [

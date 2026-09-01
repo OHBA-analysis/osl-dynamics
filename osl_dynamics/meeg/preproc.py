@@ -375,6 +375,7 @@ def ica_label(
     method: str = "megnet",
     threshold: float = 0.5,
     random_state: int = 42,
+    max_iter: int | str = "auto",
 ) -> tuple[mne.io.Raw, Any, dict]:
     """Automatic ICA artefact rejection using mne-icalabel.
 
@@ -402,6 +403,9 @@ def ica_label(
         removed.
     random_state : int, optional
         Random seed for ICA reproducibility.
+    max_iter : int or str, optional
+        Maximum number of ICA iterations. ``"auto"`` uses MNE's default of
+        500 for infomax.
 
     Returns
     -------
@@ -443,9 +447,11 @@ def ica_label(
         method="infomax",
         fit_params=dict(extended=True),
         random_state=random_state,
+        max_iter=max_iter,
         verbose=False,
     )
     ica.fit(raw_fit, picks=picks)
+    print(f"Fitted in {ica.n_iter_}/{ica.max_iter} iterations.")
 
     # Label components
     print("Labelling components...")
@@ -492,6 +498,7 @@ def ica_ecg_eog_correlation(
     eog_measure: str = "correlation",
     eog_threshold: float = 0.35,
     random_state: int = 42,
+    max_iter: int | str = "auto",
 ) -> tuple[mne.io.Raw, Any, dict]:
     """ICA artefact rejection using ECG/EOG correlation.
 
@@ -530,6 +537,9 @@ def ica_ecg_eog_correlation(
         a z-score threshold (e.g. 3.0).
     random_state : int, optional
         Random seed for ICA reproducibility.
+    max_iter : int or str, optional
+        Maximum number of ICA iterations. ``"auto"`` uses MNE's default of
+        1000 for fastica.
 
     Returns
     -------
@@ -567,9 +577,11 @@ def ica_ecg_eog_correlation(
         n_components=n_components,
         method="fastica",
         random_state=random_state,
+        max_iter=max_iter,
         verbose=False,
     )
     ica.fit(raw_fit, picks=picks)
+    print(f"Fitted in {ica.n_iter_}/{ica.max_iter} iterations.")
 
     # Detect ECG components
     ecg_indices = []
