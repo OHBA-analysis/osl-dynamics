@@ -829,6 +829,7 @@ def extract_fiducials_and_headshape_from_fif(
     fns: OSLFilenames,
     include_eeg_as_headshape: bool = False,
     include_hpi_as_headshape: bool = True,
+    include_extra_as_headshape: bool = True,
 ) -> None:
     """Extract headshape points and fiducials from FIF info.
 
@@ -847,6 +848,9 @@ def extract_fiducials_and_headshape_from_fif(
         Should we include EEG locations as headshape points?
     include_hpi_as_headshape : bool, optional
         Should we include HPI locations as headshape points?
+    include_extra_as_headshape : bool, optional
+        Should we include the extra locations as headshape points?
+        These are the unnamed points digitised over the scalp.
     """
     print()
     print("Extracting fiducials/headshape points from fif info")
@@ -877,7 +881,7 @@ def extract_fiducials_and_headshape_from_fif(
                 nasion = dig["r"]
             else:
                 raise ValueError(f"Unknown fiducial: {dig['ident']}")
-        elif dig["kind"] == FIFF.FIFFV_POINT_EXTRA:
+        elif dig["kind"] == FIFF.FIFFV_POINT_EXTRA and include_extra_as_headshape:
             headshape.append(dig["r"])
         elif dig["kind"] == FIFF.FIFFV_POINT_EEG and include_eeg_as_headshape:
             headshape.append(dig["r"])
