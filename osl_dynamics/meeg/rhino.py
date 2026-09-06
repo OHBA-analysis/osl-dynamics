@@ -1057,6 +1057,8 @@ def extract_fiducials_and_headshape_from_elc(
 def remove_stray_headshape_points(
     fns: OSLFilenames,
     nose: bool = True,
+    neck: bool = True,
+    far: bool = True,
 ) -> None:
     """Remove stray headshape points.
 
@@ -1080,6 +1082,13 @@ def remove_stray_headshape_points(
         Should we remove headshape points near the nose? Useful to remove
         these if we have defaced structurals or aren't extracting the nose
         from the structural.
+    neck : bool, optional
+        Should we remove headshape points on the neck?
+    far : bool, optional
+        Should we remove headshape points far from the head, i.e. outside
+        the left-right extent of the fiducials or in front of the nasion?
+        Worth turning off for sparse headshapes, where it can remove
+        scalp points that are useful for the coregistration.
     """
     fns = fns.coreg
 
@@ -1140,20 +1149,22 @@ def remove_stray_headshape_points(
         hs = hs[:, ~remove]
         hs_proj = hs_proj[:, ~remove]
 
-    # Remove headshape points on the neck
-    remove = hs_proj[2] < min(lpa_proj[2], rpa_proj[2]) - 4
-    hs = hs[:, ~remove]
-    hs_proj = hs_proj[:, ~remove]
+    if neck:
+        # Remove headshape points on the neck
+        remove = hs_proj[2] < min(lpa_proj[2], rpa_proj[2]) - 4
+        hs = hs[:, ~remove]
+        hs_proj = hs_proj[:, ~remove]
 
-    # Remove headshape points far from the head in any direction
-    remove = np.logical_or(
-        hs_proj[0] < lpa_proj[0] - 5,
-        np.logical_or(
-            hs_proj[0] > rpa_proj[0] + 5,
-            hs_proj[1] > nas_proj[1] + 5,
-        ),
-    )
-    hs = hs[:, ~remove]
+    if far:
+        # Remove headshape points far from the head in any direction
+        remove = np.logical_or(
+            hs_proj[0] < lpa_proj[0] - 5,
+            np.logical_or(
+                hs_proj[0] > rpa_proj[0] + 5,
+                hs_proj[1] > nas_proj[1] + 5,
+            ),
+        )
+        hs = hs[:, ~remove]
 
     # Overwrite headshape file
     print(f"Overwriting: {fns.head_headshape_file}")
