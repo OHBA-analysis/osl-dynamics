@@ -224,6 +224,43 @@ def scale_surfaces_to_headshape(
     return outdir
 
 
+def align_smri_to_mni(
+    mri_file: str,
+    output_file: str,
+    xform_file: str | None = None,
+) -> None:
+    """Rigidly align a structural MRI to the MNI template.
+
+    For structural MRIs that RHINO cannot use as they are, most commonly a
+    image with an "aligned anat" sform code (2), which :py:func:`extract_surfaces
+    <osl_dynamics.meeg.rhino.extract_surfaces>` rejects. Registering to the MNI
+    template gives a well defined header (sform code 4) to use in its place.
+
+    The registration is rigid, so the head keeps its true size and shape.
+
+    Parameters
+    ----------
+    mri_file : str
+        Full path to the structural MRI to align, in NIfTI format.
+    output_file : str
+        Full path to write the aligned structural MRI to.
+    xform_file : str, optional
+        Full path to write the MRI to MNI transform to. Default is None,
+        which means the transform is not saved.
+    """
+    std_brain = f"{os.environ['FSLDIR']}/data/standard/MNI152_T1_1mm.nii.gz"
+    kwargs = {} if xform_file is None else {"omat": xform_file}
+    fsl_wrappers.flirt(
+        mri_file,
+        std_brain,
+        out=output_file,
+        cost="corratio",
+        dof=6,
+        interp="trilinear",
+        **kwargs,
+    )
+
+
 def extract_surfaces(
     mri_file: str,
     outdir: str,
@@ -2395,18 +2432,24 @@ def _get_sform(nii_file: str) -> Transform:
             "  1 = Scanner Anat (native scanner coordinates)\n"
             "  4 = MNI (MNI-152 standard space)\n\n"
             "How to fix this:\n\n"
-            "1. If the qform is valid (check with "
+            "1. Align the structural to the MNI template, which replaces the "
+            "header\n"
+            "   with a well defined one (sform code 4). This is the usual fix "
+            "for a\n"
+            "   defaced structural:\n"
+            "     rhino.align_smri_to_mni(mri_file, output_file)\n\n"
+            "2. If the qform is valid (check with "
             f"'fslorient -getqformcode {nii_file}'),\n"
             "   copy it to the sform:\n"
             f"     fslorient -copyqform2sform {nii_file}\n\n"
-            "2. If the sform matrix is correct but only the code is wrong "
+            "3. If the sform matrix is correct but only the code is wrong "
             "(check with\n"
             f"   'fslorient -getsform {nii_file}'), set the code directly:\n"
             f"     fslorient -setsformcode 1 {nii_file}\n\n"
-            "3. If the orientation is non-standard, reorient to standard "
+            "4. If the orientation is non-standard, reorient to standard "
             "axes:\n"
             f"     fslreorient2std {nii_file} {nii_file}\n\n"
-            "4. If both sform and qform are invalid, re-convert the "
+            "5. If both sform and qform are invalid, re-convert the "
             "original DICOMs\n"
             "   with dcm2niix, which correctly populates both.\n\n"
         )
