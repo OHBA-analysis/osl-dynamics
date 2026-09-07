@@ -33,6 +33,7 @@ from mne.transforms import (
     rotation,
     _get_trans,
 )
+from mne.bem import _get_solids
 from mne.io.constants import FIFF
 from mne.viz.backends.renderer import _get_renderer
 
@@ -2072,6 +2073,98 @@ def plot_coregistration(
 
         else:
             raise ValueError("Extension must be png or html.")
+
+
+def repair_bem_surfaces(fns: OSLFilenames, max_iter: int = 50) -> None:
+    """Pull stray vertices of the BEM surfaces back inside the surface outside them.
+
+    A boundary element model needs each surface to lie strictly inside the one
+    outside it: brain inside inner skull, inner skull inside scalp. BET
+    occasionally leaves a handful of vertices spiking through the surface
+    outside them, and :func:`mne.make_bem_model` then refuses to build the
+    model at all. This only matters for the multi-layer models, i.e. EEG - a
+    single layer model uses one surface, so nothing can intersect.
+
+    Each offending vertex is replaced by the mean of its neighbours in the
+    mesh, repeated until the surfaces nest. The vertices that are already
+    inside are left untouched, so the repair is local to the spikes: it is
+    fixing a defect in the segmentation, not reshaping the head.
+
+    The surface files are overwritten, so call this after
+    :func:`coregister_head_and_mri` (which writes the copies in the coreg
+    directory) and before :func:`forward_model`.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    max_iter : int, optional
+        Maximum number of smoothing passes per surface pair. A spike normally
+        clears in a few passes; needing many suggests the segmentation is
+        wrong rather than spiky.
+
+    Raises
+    ------
+    RuntimeError
+        If a surface still intersects after ``max_iter`` passes.
+    """
+    fns = fns.coreg
+
+    # Outside to inside. Note RHINO's names are offset from what they hold:
+    # bet_outskin is the scalp, bet_outskull the inner skull and bet_inskull
+    # the brain surface.
+    pairs = [
+        (fns.bet_outskin_surf_file, fns.bet_outskull_surf_file),
+        (fns.bet_outskull_surf_file, fns.bet_inskull_surf_file),
+    ]
+
+    for outer_file, inner_file in pairs:
+        outer_verts, outer_tris = mne.surface.read_surface(outer_file)
+        verts, tris = mne.surface.read_surface(inner_file)
+
+        # The test mne.make_bem_model applies: a point is inside a closed
+        # surface if the solid angle it subtends is 4*pi. Scale invariant, so
+        # it doesn't matter that these surfaces are in mm rather than metres.
+        def _outside(points):
+            solids = _get_solids(outer_verts[outer_tris], points)
+            return np.abs(solids / (2 * np.pi) - 1.0) > 1e-5
+
+        stray = _outside(verts)
+        if not stray.any():
+            continue
+
+        # Neighbours of each vertex in the mesh
+        neighbours = [[] for _ in range(len(verts))]
+        for a, b, c in tris:
+            neighbours[a] += [b, c]
+            neighbours[b] += [a, c]
+            neighbours[c] += [a, b]
+        neighbours = [np.unique(n) for n in neighbours]
+
+        original = verts.copy()
+        n_stray = int(stray.sum())
+        for _ in range(max_iter):
+            (indices,) = np.nonzero(stray)
+            if not len(indices):
+                break
+            for index in indices:
+                verts[index] = verts[neighbours[index]].mean(axis=0)
+            stray = _outside(verts)
+
+        if stray.any():
+            raise RuntimeError(
+                f"{stray.sum()} vertices of {inner_file} are still outside "
+                f"{outer_file} after {max_iter} passes. The segmentation is "
+                f"likely to be wrong, check the surfaces."
+            )
+
+        moved = np.linalg.norm(verts - original, axis=1).max()
+        print(
+            f"Overwriting: {inner_file} "
+            f"(repaired {n_stray} of {len(verts)} vertices, "
+            f"moved by up to {moved:.2f} mm)"
+        )
+        mne.write_surface(inner_file, verts, tris, overwrite=True)
 
 
 def forward_model(
