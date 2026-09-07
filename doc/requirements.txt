@@ -1,27 +1,9 @@
+# Packages needed to build the documentation
+
 sphinx
-sphinx-rtd-theme
 sphinx-gallery
 sphinx-autoapi
 sphinx-sitemap
 pydata-sphinx-theme
-matplotlib
-mne
-nibabel
-nilearn
-numpy
-osfclient
-pandas
-pyyaml
-pqdm
-scipy
-scikit-learn
-scikit-image
-seaborn
-tqdm
-fslpy
-ipyevents
-numba
-mat73
-tensorflow==2.19
-tensorflow-probability[tf]==0.25
--e .
+
+-e .[tf]

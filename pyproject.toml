@@ -53,6 +53,7 @@ dependencies = [
     "nilearn",
     "numba",
     "numpy",
+    "osfclient",
     "packaging",
     "pandas",
     "pqdm",
