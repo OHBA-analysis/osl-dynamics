@@ -103,19 +103,56 @@ Python example scripts
 - `fMRI analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/fmri>`_
 """
 
+import re
+
 import yaml
 
-from osl_dynamics.models import (
-    dynemo,
-    mdynemo,
-    sc_dynemo,
-    hmm,
-    hmm_poi,
-    hive,
-    dive,
-    dyneste,
-)
-from osl_dynamics.utils import misc
+_TENSORFLOW_PACKAGES = ("tensorflow", "tensorflow_probability", "tf_keras", "keras")
+
+_TENSORFLOW_INSTALL_MESSAGE = """\
+Could not import '{package}', which osl-dynamics needs to build and train \
+models. The rest of osl-dynamics (data loading, preprocessing, analysis and \
+simulation) can be used without it.
+
+To install the packages needed for model training:
+
+    pip install "osl-dynamics[tf]"
+
+or, if you have an NVIDIA GPU:
+
+    pip install "osl-dynamics[tf-cuda]"
+
+Alternatively, use one of the conda environment files described here:
+https://osl-dynamics.readthedocs.io/en/latest/install.html\
+"""
+
+
+def _missing_tensorflow_package(error):
+    name = getattr(error, "name", None) or ""
+    if not name:
+        match = re.search(r"No module named '([^']+)'", str(error))
+        name = match.group(1) if match else ""
+    name = name.split(".")[0]
+    return name if name in _TENSORFLOW_PACKAGES else None
+
+
+try:
+    from osl_dynamics.models import (
+        dynemo,
+        mdynemo,
+        sc_dynemo,
+        hmm,
+        hmm_poi,
+        hive,
+        dive,
+        dyneste,
+    )
+except ImportError as error:
+    _package = _missing_tensorflow_package(error)
+    if _package is None:
+        raise
+    raise ImportError(_TENSORFLOW_INSTALL_MESSAGE.format(package=_package)) from error
+
 
 models = {
     "DyNeMo": dynemo.Model,
@@ -127,6 +164,9 @@ models = {
     "DIVE": dive.Model,
     "DyNeStE": dyneste.Model,
 }
+
+
+from osl_dynamics.utils import misc
 
 
 def load(dirname, single_gpu=True):

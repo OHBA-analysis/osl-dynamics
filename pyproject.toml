@@ -11,7 +11,7 @@ dynamic = ["version"]
 description = "Toolbox for studying dynamic functional brain networks in MEG, EEG and fMRI data"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 keywords = [
     "neuroimaging",
     "neuroscience",
@@ -33,9 +33,53 @@ classifiers = [
     "Operating System :: MacOS",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+
+# Note: TensorFlow is deliberately not a required dependency
+dependencies = [
+    "fslpy",
+    "h5py",
+    "mat73",
+    "matplotlib",
+    "mne",
+    "mne-icalabel[onnx]",
+    "nibabel",
+    "nilearn",
+    "numba",
+    "numpy",
+    "packaging",
+    "pandas",
+    "pqdm",
+    "pyvista",
+    "pyyaml",
+    "scikit-image",
+    "scikit-learn",
+    "scipy",
+    "seaborn",
+    "threadpoolctl",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+tf = [
+    "tensorflow==2.16.1; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "tensorflow-probability==0.24.*; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "tf-keras==2.16.*; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "tensorflow==2.19.*; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "tensorflow-probability[tf]==0.25.*; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+]
+# As above, but with the NVIDIA CUDA libraries needed to train models on a GPU
+tf-cuda = [
+    "tensorflow[and-cuda]==2.19.*; sys_platform == 'linux'",
+    "tensorflow-probability[tf]==0.25.*; sys_platform == 'linux'",
+    # CUDA is only available on Linux, so fall back to the CPU packages
+    "osl-dynamics[tf]; sys_platform != 'linux'",
 ]
 
 [project.urls]
