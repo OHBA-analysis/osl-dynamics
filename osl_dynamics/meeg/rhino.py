@@ -1626,14 +1626,101 @@ def coregister_head_and_mri(
     mrivoxel_scaledmri_t = Transform("mri_voxel", "mri", nativeindex_scalednative_t)
     _create_freesurfer_meshes_from_bet_surfaces(cfns, mrivoxel_scaledmri_t["trans"])
 
-    # -----------------------
-    # Plot the coregistration
-    # -----------------------
+    # ----------------------------------
+    # Report and plot the coregistration
+    # ----------------------------------
+
+    dist = coreg_error(fns, include_nose=use_nose)
+    print(
+        f"Headshape points to scalp: rms {np.sqrt(np.mean(dist**2)):.1f} mm, "
+        f"max {np.max(np.abs(dist)):.1f} mm"
+    )
+
     if plot_type is not None:
         filename = f"{fns.coreg_dir}/coreg.{plot_type}"
         plot_coregistration(fns, include_nose=use_nose, filename=filename, show=show)
 
     print("Coregistration complete.")
+
+
+def coreg_error(fns: OSLFilenames, include_nose: bool = False) -> np.ndarray:
+    """Distance from each headshape point to the scalp after coregistration.
+
+    The quantitative companion to :func:`plot_coregistration`: how far the
+    digitised head points land from the MRI-derived scalp once the head has
+    been coregistered to the MRI. Use this when you want the individual points,
+    e.g. to find which electrodes are displaced; :func:`coreg_rms` is the usual
+    single number summary.
+
+    What the distances mean depends on how the coregistration was run. With
+    ``use_headshape=True`` the ICP fits the headshape points to this surface,
+    so they are a goodness-of-fit residual. With ``use_headshape=False`` the
+    fit is driven by the fiducials alone, so they are an independent check on
+    the digitised positions.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    include_nose : bool, optional
+        Should we measure against the outskin surface with the nose? Pass the
+        same value used for ``use_nose`` in :func:`coregister_head_and_mri`.
+
+    Returns
+    -------
+    dist : np.ndarray
+        Signed distance in mm from each headshape point to the nearest point
+        on the scalp surface. Positive is outside the scalp, negative inside.
+    """
+
+    # RHINO does everything in mm
+
+    cfns = fns.coreg
+
+    if include_nose:
+        outskin_surf_file = cfns.bet_outskin_plus_nose_surf_file
+    else:
+        outskin_surf_file = cfns.bet_outskin_surf_file
+
+    # Headshape points are in mm in HEAD space
+    headshape_head = np.loadtxt(cfns.head_headshape_file)
+    head_scaledmri_t = read_trans(cfns.head_scaledmri_t_file)
+    headshape_mri = _xform_points(head_scaledmri_t["trans"], headshape_head).T
+
+    vertices, _ = nib.freesurfer.read_geometry(outskin_surf_file)
+    dist, index = KDTree(vertices).query(headshape_mri)
+
+    # Sign each distance by whether the point sits further from the centre of
+    # the scalp than the scalp surface does
+    centre = vertices.mean(axis=0)
+    outside = np.linalg.norm(headshape_mri - centre, axis=1) > np.linalg.norm(
+        vertices[index] - centre, axis=1
+    )
+    return np.where(outside, dist, -dist)
+
+
+def coreg_rms(fns: OSLFilenames, include_nose: bool = False) -> float:
+    """How far the headshape points are from the scalp after coregistration.
+
+    The root mean square of :func:`coreg_error`, as a single number per
+    session so batches can be ranked and the bad fits dropped. See
+    :func:`coreg_error` for what the number means.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    include_nose : bool, optional
+        Should we measure against the outskin surface with the nose? Pass the
+        same value used for ``use_nose`` in :func:`coregister_head_and_mri`.
+
+    Returns
+    -------
+    rms : float
+        Root mean square distance in mm.
+    """
+    dist = coreg_error(fns, include_nose=include_nose)
+    return float(np.sqrt(np.mean(dist**2)))
 
 
 def plot_coregistration(
@@ -1684,6 +1771,8 @@ def plot_coregistration(
 
     if filename is None:
         filename = f"{fns.coreg_dir}/coreg.png"
+
+    rms = coreg_rms(fns, include_nose=include_nose)
 
     fns = fns.coreg
 
@@ -2064,6 +2153,11 @@ def plot_coregistration(
                 ax.imshow(img)
                 ax.axis("off")
                 ax.set_title(name, fontsize=22)
+            fig.suptitle(
+                f"headshape to scalp: rms {rms:.1f} mm",
+                fontsize=18,
+                y=1.02,
+            )
             fig.tight_layout()
             print(f"Saving {filename}")
             fig.savefig(filename, dpi=150, bbox_inches="tight")
