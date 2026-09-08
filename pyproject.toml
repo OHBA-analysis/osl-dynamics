@@ -44,11 +44,15 @@ classifiers = [
 # Note: TensorFlow is deliberately not a required dependency
 dependencies = [
     "fslpy",
+    "h5io",
     "h5py",
+    "ipyevents",
+    "ipywidgets",
     "mat73",
     "matplotlib",
     "mne",
     "mne-icalabel[onnx]",
+    "nest-asyncio2",
     "nibabel",
     "nilearn",
     "numba",
@@ -58,6 +62,7 @@ dependencies = [
     "pandas",
     "pqdm",
     "pyvista",
+    "pyvistaqt",
     "pyyaml",
     "scikit-image",
     "scikit-learn",
@@ -65,20 +70,25 @@ dependencies = [
     "seaborn",
     "threadpoolctl",
     "tqdm",
+    "trame",
+    "trame-vtk",
+    "trame-vuetify",
 ]
 
 [project.optional-dependencies]
 tf = [
     "tensorflow==2.16.1; sys_platform == 'darwin' and platform_machine == 'x86_64'",
-    "tensorflow-probability==0.24.*; sys_platform == 'darwin' and platform_machine == 'x86_64'",
-    "tf-keras==2.16.*; sys_platform == 'darwin' and platform_machine == 'x86_64'",
-    "tensorflow==2.19.*; sys_platform != 'darwin' or platform_machine != 'x86_64'",
-    "tensorflow-probability[tf]==0.25.*; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "tensorflow-probability==0.24.0; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "tf-keras==2.16.0; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "tensorflow==2.19.1; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "tensorflow-probability==0.25.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "tf-keras==2.19.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
 ]
 # As above, but with the NVIDIA CUDA libraries needed to train models on a GPU
 tf-cuda = [
-    "tensorflow[and-cuda]==2.19.*; sys_platform == 'linux'",
-    "tensorflow-probability[tf]==0.25.*; sys_platform == 'linux'",
+    "tensorflow[and-cuda]==2.19.1; sys_platform == 'linux'",
+    "tensorflow-probability==0.25.0; sys_platform == 'linux'",
+    "tf-keras==2.19.0; sys_platform == 'linux'",
     # CUDA is only available on Linux, so fall back to the CPU packages
     "osl-dynamics[tf]; sys_platform != 'linux'",
 ]
