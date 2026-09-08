@@ -8,7 +8,7 @@ The main conda environment files for installing osl-dynamics are:
 
 Older Macs with an Intel chip need to use:
 
-- `osld-tf-macos.yml` - install osl-dynamics and tensorflow-macos 2.16.1.
+- `osld-tf-macos.yml` - install osl-dynamics and TensorFlow 2.18.
 
 For Oxford-specific computers use:
 

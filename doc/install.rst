@@ -86,7 +86,7 @@ If you want to install osl-dynamics without TensorFlow, then use the :code:`osld
     mamba env create -f osld.yml
     rm osld.yml
 
-This environment file will only install the osl-dynamics package. You will have to install the dependencies (numpy, scipy, etc) yourself.
+This environment file installs osl-dynamics and its dependencies, but not TensorFlow. You will be able to load, prepare and analyse data, but not train models.
 
 Install the latest development code (optional)
 ----------------------------------------------
