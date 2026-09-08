@@ -606,8 +606,9 @@ class Model(VariationalInferenceModelBase):
         alpha = []
         means = []
         covariances = []
-        with self.set_trainable(fixed_layers, False), set_logging_level(
-            _logger, logging.WARNING
+        with (
+            self.set_trainable(fixed_layers, False),
+            set_logging_level(_logger, logging.WARNING),
         ):
             for i in trange(training_data.n_sessions, desc="Fine tuning"):
                 # Train on this session
