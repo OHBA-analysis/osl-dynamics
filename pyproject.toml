@@ -41,7 +41,7 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 
-# Note: TensorFlow is deliberately not a required dependency
+# Note: TensorFlow is deliberately not a required dependency.
 dependencies = [
     "fslpy",
     "h5io",
@@ -61,6 +61,7 @@ dependencies = [
     "packaging",
     "pandas",
     "pqdm",
+    "pyside6",
     "pyvista",
     "pyvistaqt",
     "pyyaml",

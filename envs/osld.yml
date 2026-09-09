@@ -25,6 +25,7 @@ dependencies:
   - vtk=*=*osmesa*
   - pyvista
   - pyvistaqt
+  - pyside6
   - h5io
   - mat73
   - nest-asyncio2
