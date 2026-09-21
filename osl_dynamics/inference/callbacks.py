@@ -167,7 +167,8 @@ class GumbelSoftmaxAnnealingCallback(tf.keras.callbacks.Callback):
 
     def on_epoch_begin(self, epoch: int, logs: Optional[Dict] = None) -> None:
         if self.curve == "linear":
-            temperature = self.temperatures[epoch]
+            # Hold the final temperature after the annealing period
+            temperature = self.temperatures[min(epoch, self.n_epochs - 1)]
         if self.curve == "exp":
             temperature = max(
                 self.end_temperature,
