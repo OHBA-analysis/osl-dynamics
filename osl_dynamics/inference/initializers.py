@@ -8,8 +8,6 @@ import tensorflow_probability as tfp
 from tensorflow.keras import Model, layers, initializers
 from tensorflow.keras.initializers import Initializer
 
-from osl_dynamics import inference
-
 tfb = tfp.bijectors
 
 
@@ -214,20 +212,26 @@ def reinitialize_layer_weights(layer: tf.keras.layers.Layer) -> None:
         initializer = init_container.__dict__[key]
         initializer_type = type(initializer)
 
-        if initializer_type.__name__ in dir(inference.initializers):
-            # We have an osl-dynamics initializer
+        if initializer_type.__module__ == __name__:
+            # We have an osl-dynamics initializer (i.e. one defined in
+            # this module)
             #
             # By default these will return new random values when
             # called, so we don't need to create a new initializer
             new_initializer = initializer
 
-        elif isinstance(init_container.__dict__[key], Initializer):
+        elif isinstance(initializer, Initializer):
             # We have a standard TensorFlow initializer
             #
             # We need to create a new initializer to get new
             # random values
             config = initializer.get_config()
             new_initializer = initializer_type.from_config(config)
+
+        else:
+            # This attribute's not an initializer object (e.g. it's None),
+            # so there's nothing we can re-initialize the weights with
+            continue
 
         # Get the variable (i.e. weights) we want to re-initialize
         if key == "recurrent_initializer":
@@ -272,4 +276,4 @@ def reinitialize_model_weights(
         # If the layer consists of multiple layers pass the layer back
         # to this function recursively
         else:
-            reinitialize_model_weights(layer)
+            reinitialize_model_weights(layer, keep=keep)

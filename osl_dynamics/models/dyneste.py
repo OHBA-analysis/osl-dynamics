@@ -453,6 +453,26 @@ class Model(VariationalInferenceModelBase):
 
         return super().fit(*args, **kwargs)
 
+    def reset_weights(self, keep: Optional[List[str]] = None) -> None:
+        """Reset the model weights.
+
+        Parameters
+        ----------
+        keep : list of str, optional
+            Layer names to NOT reset.
+        """
+        super().reset_weights(keep=keep)
+        self.reset_gs_temperature()
+
+    def reset_gs_temperature(self) -> None:
+        """Sets the Gumbel-Softmax temperature to its initial value.
+
+        This method assumes there is a keras layer named :code:`'states'`
+        in the model.
+        """
+        states_layer = self.model.get_layer("states")
+        states_layer.temperature.assign(self.config.initial_gs_temperature)
+
     def random_subset_initialization(
         self,
         training_data,
@@ -512,6 +532,9 @@ class Model(VariationalInferenceModelBase):
         # Reset Gumbel-Softmax annealing flag
         self.config.do_gs_annealing = original_gs_flag
 
+        # The initialization may have annealed the Gumbel-Softmax temperature
+        self.reset_gs_temperature()
+
         return history
 
     def single_subject_initialization(
@@ -561,6 +584,9 @@ class Model(VariationalInferenceModelBase):
 
         # Reset Gumbel-Softmax annealing flag
         self.config.do_gs_annealing = original_gs_flag
+
+        # The initialization may have annealed the Gumbel-Softmax temperature
+        self.reset_gs_temperature()
 
     def random_state_time_course_initialization(
         self,
@@ -621,6 +647,9 @@ class Model(VariationalInferenceModelBase):
 
         # Reset Gumbel-Softmax annealing flag
         self.config.do_gs_annealing = original_gs_flag
+
+        # The initialization may have annealed the Gumbel-Softmax temperature
+        self.reset_gs_temperature()
 
         return history
 

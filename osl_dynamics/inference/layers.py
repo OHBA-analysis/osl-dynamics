@@ -229,6 +229,9 @@ class DummyLayer(layers.Layer):
     def call(self, inputs: tf.Tensor, **kwargs) -> tf.Tensor:
         return inputs
 
+    def compute_output_shape(self, input_shape: tf.TensorShape) -> tf.TensorShape:
+        return input_shape
+
 
 class InverseCholeskyLayer(layers.Layer):
     """Layer for getting Cholesky vectors from positive definite symmetric matrices.
@@ -489,6 +492,12 @@ class LearnableTensorLayer(layers.Layer):
         self.initial_value = initial_value
         if self.initial_value is not None:
             self.initial_value = np.array(initial_value).astype(np.float32)
+            if not np.all(np.isfinite(self.initial_value)):
+                raise ValueError(
+                    f"initial_value for {self.name} contains NaNs or infs. "
+                    "If this is a covariance or correlation matrix, make sure "
+                    "it is positive definite."
+                )
 
         # Setup the tensor initializer
         if initializer is None:
@@ -673,9 +682,12 @@ class CovarianceMatricesLayer(layers.Layer):
                 raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
 
             # Calculate the flattened cholesky factors
+            #
+            # We remove epsilon because it's added to the diagonal of the
+            # matrices when we call the layer
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(
-                initial_value,
+                add_epsilon(initial_value, -self.epsilon, diag=True),
             )
 
             # We don't need an initializer
@@ -780,9 +792,12 @@ class CorrelationMatricesLayer(layers.Layer):
                 raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
 
             # Calculate the flattened cholesky factors
+            #
+            # We remove epsilon because it's added to the diagonal of the
+            # matrices when we call the layer
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(
-                initial_value,
+                add_epsilon(initial_value, -self.epsilon, diag=True),
             )
 
             # We don't need an initializer
@@ -797,7 +812,10 @@ class CorrelationMatricesLayer(layers.Layer):
                 )
             else:
                 # Use the identity matrix for each mode/state
-                initializer = osld_initializers.IdentityCholeskyInitializer()
+                identity = np.broadcast_to(np.eye(m, dtype=np.float32), (n, m, m))
+                initializer = osld_initializers.WeightInitializer(
+                    self.bijector.inverse(identity)
+                )
 
         # Create a layer to learn the correlation matrices
         #
@@ -888,8 +906,11 @@ class DiagonalMatricesLayer(layers.Layer):
                 )
 
             # Calculate the initial value of the learnable tensor
+            #
+            # We remove epsilon because it's added to the diagonal when we
+            # call the layer
             initial_value = initial_value.astype("float32")
-            initial_diagonals = self.bijector.inverse(initial_value)
+            initial_diagonals = self.bijector.inverse(initial_value - self.epsilon)
 
             # We don't need an initializer
             initializer = None
@@ -903,7 +924,9 @@ class DiagonalMatricesLayer(layers.Layer):
                 )
             else:
                 # Use the identity matrix for each mode/state
-                initializer = osld_initializers.IdentityCholeskyInitializer()
+                initializer = osld_initializers.WeightInitializer(
+                    self.bijector.inverse(np.ones([n, m], dtype=np.float32))
+                )
 
         # Create a layer to learn the matrices
         #

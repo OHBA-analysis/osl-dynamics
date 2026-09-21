@@ -97,7 +97,22 @@ def set_observation_model_parameter(
     learnable_tensor_layer = obs_layer.layers[0]
 
     if layer_name not in ["means", "group_means", "log_rates"]:
-        obs_parameter = obs_layer.bijector.inverse(obs_parameter)
+        # Remove epsilon because the layer adds it to the diagonal
+        if obs_parameter.ndim == 3:
+            n_channels = obs_parameter.shape[-1]
+            obs_parameter = obs_parameter - obs_layer.epsilon * np.eye(n_channels)
+        else:
+            obs_parameter = obs_parameter - obs_layer.epsilon
+        obs_parameter = obs_layer.bijector.inverse(obs_parameter.astype(np.float32))
+        obs_parameter = obs_parameter.numpy()
+
+    if not np.all(np.isfinite(obs_parameter)):
+        raise ValueError(
+            f"Could not set {layer_name}, the value contains NaNs or infs "
+            "after transforming it. Covariance and correlation matrices "
+            "must be positive definite and standard deviations must be "
+            "positive."
+        )
 
     learnable_tensor_layer.tensor.assign(obs_parameter)
 

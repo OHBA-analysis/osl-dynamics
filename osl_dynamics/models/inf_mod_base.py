@@ -590,14 +590,27 @@ class VariationalInferenceModelBase(ModelBase):
         """Sets the KL annealing factor to zero.
 
         This method assumes there is a keras layer named :code:`'kl_loss'`
-        in the model.
+        in the model. The annealing factor of the :code:`'means_dev_mag'`
+        and :code:`'covs_dev_mag'` layers (in DIVE) is also reset.
         """
         if self.config.do_kl_annealing:
             kl_loss_layer = self.model.get_layer("kl_loss")
             kl_loss_layer.annealing_factor.assign(0.0)
 
+            layer_names = [layer.name for layer in self.model.layers]
+            if "means_dev_mag" in layer_names:
+                means_dev_mag_layer = self.model.get_layer("means_dev_mag")
+                means_dev_mag_layer.annealing_factor.assign(0.0)
+
+            if "covs_dev_mag" in layer_names:
+                covs_dev_mag_layer = self.model.get_layer("covs_dev_mag")
+                covs_dev_mag_layer.annealing_factor.assign(0.0)
+
     def reset_weights(self, keep: Optional[List[str]] = None) -> None:
-        """Reset the model as if you've built a new model.
+        """Re-initialize the model weights and reset the KL annealing factor.
+
+        See :code:`ModelBase.reset_weights` for how the weights are
+        re-initialized.
 
         Parameters
         ----------
