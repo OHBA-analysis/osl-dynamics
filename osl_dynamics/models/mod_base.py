@@ -4,6 +4,8 @@ import logging
 import os
 import pickle
 import re
+import types
+import uuid
 import warnings
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -129,7 +131,7 @@ class ModelBase:
     config_type = None
 
     def __init__(self, config: BaseModelConfig) -> None:
-        self._identifier = np.random.randint(100000)
+        self._identifier = uuid.uuid4().hex
         self.config = config
 
         # Build and compile the model
@@ -182,15 +184,26 @@ class ModelBase:
         """Add a metric for each model output loss."""
 
         # Create metric for each model output that is a loss
-        loss_metric = []
-        for name in self.output_names:
-            if "loss" in name:
-                metric = tf.keras.metrics.Mean(name=name)
-                loss_metric.append(metric)
-        self.model.loss_metric = loss_metric
+        #
+        # We only do this once because compile() is called every time
+        # we reset the model and the model keeps track of every metric
+        # we add
+        if getattr(self.model, "loss_metric", None) is None:
+            loss_metric = []
+            for name in self.output_names:
+                if "loss" in name:
+                    metric = tf.keras.metrics.Mean(name=name)
+                    loss_metric.append(metric)
+            self.model.loss_metric = loss_metric
 
         # Get the original compute_metrics methods
-        old_compute_metrics = self.model.compute_metrics
+        #
+        # We get this from the class because we override the method of
+        # the instance below. If we got it from the instance we would
+        # wrap our own method again each time we compile
+        old_compute_metrics = types.MethodType(
+            type(self.model).compute_metrics, self.model
+        )
 
         # New method for calculating metrics
         def compute_metrics(x, y, y_pred, sample_weight=None):
@@ -267,7 +280,10 @@ class ModelBase:
         checkpoint_freq : int, optional
             Frequency (in epochs) at which to create checkpoints.
         save_filepath : str, optional
-            Path to save the best model to.
+            Path to save the best model to (if :code:`save_best_after` is
+            passed) or directory to save the checkpoints to (if
+            :code:`checkpoint_freq` is passed). Can't be passed if both
+            :code:`save_best_after` and :code:`checkpoint_freq` are passed.
         additional_callbacks : list, optional
             List of keras callback objects.
         kwargs : keyword arguments, optional
@@ -307,8 +323,20 @@ class ModelBase:
         # less than the total number of epochs
         if save_best_after is not None:
             epochs = get_argument(self.model.fit, "epochs", args, kwargs)
-            if epochs < save_best_after:
+            if epochs <= save_best_after:
                 raise ValueError("save_best_after must be less than epochs.")
+
+        # save_filepath is a file for the best model and a directory for
+        # checkpoints, so it can't be used for both
+        if (
+            save_best_after is not None
+            and checkpoint_freq is not None
+            and save_filepath is not None
+        ):
+            raise ValueError(
+                "save_filepath can't be passed if both save_best_after and "
+                "checkpoint_freq are passed."
+            )
 
         # Callbacks to add to the ones the user passed
         additional_callbacks = []
@@ -321,21 +349,22 @@ class ModelBase:
 
         # Callback to save the best model after a certain number of epochs
         if save_best_after is not None:
-            if save_filepath is None:
-                save_filepath = f"/tmp/model_weights/best_{self._identifier}.weights.h5"
+            best_filepath = (
+                save_filepath
+                or f"/tmp/model_weights/best_{self._identifier}.weights.h5"
+            )
             save_best_callback = callbacks.SaveBestCallback(
                 save_best_after=save_best_after,
-                filepath=save_filepath,
+                filepath=best_filepath,
             )
             additional_callbacks.append(save_best_callback)
 
         if checkpoint_freq is not None:
-            if save_filepath is None:
-                save_filepath = f"tmp"
-            self.save_config(save_filepath)
+            checkpoint_dir = save_filepath or "tmp"
+            self.save_config(checkpoint_dir)
             checkpoint_callback = callbacks.CheckpointCallback(
                 save_freq=checkpoint_freq,
-                checkpoint_dir=f"{save_filepath}/checkpoints",
+                checkpoint_dir=f"{checkpoint_dir}/checkpoints",
             )
             additional_callbacks.append(checkpoint_callback)
 
@@ -426,6 +455,12 @@ class ModelBase:
                 pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
                 pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
 
+        if best_run is None:
+            raise ValueError(
+                "No valid training runs were found. "
+                "The free energy was NaN for every run."
+            )
+
         # Use the best model weights
         _logger.info(f"Best run: {best_run}")
         self.reset()
@@ -447,11 +482,27 @@ class ModelBase:
                 self.model.load_weights(filepath)
 
     def reset_weights(self, keep: Optional[List[str]] = None) -> None:
-        """Resets trainable variables in the model to their initial value."""
+        """Re-initialize the weights of the model using their initializers.
+
+        Weights with a random initializer are given new random values.
+        Note, if a parameter has been set with :code:`update_initializer=True`
+        (e.g. :code:`set_means`, :code:`set_covariances` or an initialization
+        method such as :code:`random_state_time_course_initialization`), its
+        initializer is replaced by the value that was set. This parameter is
+        then reset to that value rather than a new random value.
+
+        Parameters
+        ----------
+        keep : list of str, optional
+            Layer names to NOT reset.
+        """
         initializers.reinitialize_model_weights(self.model, keep=keep)
 
     def reset(self) -> None:
-        """Reset the model as if you've built a new model."""
+        """Reset the model weights and re-compile (creating a new optimizer).
+
+        See :code:`reset_weights` for how the weights are re-initialized.
+        """
         with self.config.strategy.scope():
             self.reset_weights()
             self.compile()
@@ -788,7 +839,9 @@ class ModelBase:
         dirname : str
             Directory where :code:`config.yml` and weights are stored.
         from_checkpoint : bool, optional
-            Should we load the model from a checkpoint?
+            Should we load the model from the latest checkpoint in
+            :code:`<dirname>/checkpoints`? Note, the optimizer state is not
+            restored.
         single_gpu : bool, optional
             Should we compile the model on a single GPU?
 
@@ -814,10 +867,9 @@ class ModelBase:
 
         # Restore model
         if from_checkpoint:
-            checkpoint = tf.train.Checkpoint(
-                model=model.model, optimizer=model.model.optimizer
-            )
-            checkpoint.restore(tf.train.latest_checkpoint(f"{dirname}/checkpoints"))
+            filepath = callbacks.latest_checkpoint(f"{dirname}/checkpoints")
+            _logger.info(f"Loading checkpoint: {filepath}")
+            cls.load_weights(model, filepath)
         else:
             cls.load_weights(model, f"{dirname}/model.weights.h5")
 

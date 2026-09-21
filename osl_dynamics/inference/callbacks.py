@@ -1,6 +1,8 @@
 """Custom Tensorflow callbacks."""
 
+import logging
 import os
+import re
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -9,6 +11,8 @@ from tensorflow import tanh
 from tensorflow.keras import callbacks
 
 from osl_dynamics.inference import metrics, modes
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 class DiceCoefficientCallback(callbacks.Callback):
@@ -163,7 +167,8 @@ class GumbelSoftmaxAnnealingCallback(tf.keras.callbacks.Callback):
 
     def on_epoch_begin(self, epoch: int, logs: Optional[Dict] = None) -> None:
         if self.curve == "linear":
-            temperature = self.temperatures[epoch]
+            # Hold the final temperature after the annealing period
+            temperature = self.temperatures[min(epoch, self.n_epochs - 1)]
         if self.curve == "exp":
             temperature = max(
                 self.end_temperature,
@@ -248,11 +253,12 @@ class KLAnnealingCallback(callbacks.Callback):
         kl_loss_layer.annealing_factor.assign(new_value)
 
         # Annealing factor for gamma sampling
-        if "means_dev_mag" in self.model.layers:
+        layer_names = [layer.name for layer in self.model.layers]
+        if "means_dev_mag" in layer_names:
             means_dev_mag_layer = self.model.get_layer("means_dev_mag")
             means_dev_mag_layer.annealing_factor.assign(new_value)
 
-        if "covs_dev_mag" in self.model.layers:
+        if "covs_dev_mag" in layer_names:
             covs_dev_mag_layer = self.model.get_layer("covs_dev_mag")
             covs_dev_mag_layer.annealing_factor.assign(new_value)
 
@@ -340,18 +346,12 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
         """
         if epoch < self.save_best_after:
             return
-        elif epoch == self.save_best_after:
+
+        if not self._activated:
             # Reset the best value when activating the callback
-            if not self._activated:
-                if self.monitor_op == np.less:
-                    self.best = np.inf
-                elif self.monitor_op == np.greater:
-                    self.best = -np.inf
-                else:
-                    print(
-                        "Unknown monitor operation. Monitoring for minimum loss/metric."
-                    )
-                    self.best = np.inf  # fallback to min mode
+            #
+            # Note, we always monitor the loss in "min" mode
+            self.best = np.inf
             self._activated = True
             print(
                 f"\nEpoch {epoch + 1}: SaveBestCallback activated. "
@@ -369,32 +369,77 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
             Results for this training epoch, and for the validation epoch if
             validation is performed.
         """
-        self.model.load_weights(self.filepath)
+        # Only load the weights if we saved a model during this training.
+        # Otherwise, the file might not exist or could be from another run
+        if self._activated and np.isfinite(self.best):
+            self.model.load_weights(self.filepath)
+        else:
+            _logger.warning(
+                "SaveBestCallback did not save a model (was the loss NaN?). "
+                "Keeping the weights from the final epoch."
+            )
 
 
 class CheckpointCallback(callbacks.Callback):
     """Callback to create checkpoints during training.
 
+    The model weights are saved to
+    :code:`<checkpoint_dir>/ckpt-<epoch>.weights.h5`.
+
+    Note, we use Keras to save the weights rather than
+    :code:`tf.train.Checkpoint` because :code:`tf.train.Checkpoint` does not
+    find the weights of layers held in a :code:`self.layers` list, which
+    is how osl-dynamics layers store their learnable parameters.
+
     Parameters
     ----------
     save_freq : int
         Frequency (in epochs) at which to save the model.
+    checkpoint_dir : str
+        Directory to save the checkpoints to.
     """
 
     def __init__(self, save_freq: int, checkpoint_dir: str) -> None:
         super().__init__()
         self.save_freq = save_freq
-        self.checkpoint = None
         self.checkpoint_dir = checkpoint_dir
-        self.checkpoint_prefix = f"{checkpoint_dir}/ckpt"
 
     def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
-        if self.checkpoint is None:
-            self.checkpoint = tf.train.Checkpoint(
-                model=self.model, optimizer=self.model.optimizer
-            )
         if (epoch + 1) % self.save_freq == 0:
-            self.checkpoint.save(file_prefix=self.checkpoint_prefix)
+            os.makedirs(self.checkpoint_dir, exist_ok=True)
+            self.model.save_weights(
+                f"{self.checkpoint_dir}/ckpt-{epoch + 1}.weights.h5"
+            )
+
+
+def latest_checkpoint(checkpoint_dir: str) -> str:
+    """Get the path to the latest checkpoint saved by :code:`CheckpointCallback`.
+
+    Parameters
+    ----------
+    checkpoint_dir : str
+        Directory containing the checkpoints.
+
+    Returns
+    -------
+    filepath : str
+        Path to the checkpoint from the latest epoch.
+    """
+    epochs = {}
+    if os.path.isdir(checkpoint_dir):
+        for filename in os.listdir(checkpoint_dir):
+            match = re.fullmatch(r"ckpt-(\d+)\.weights\.h5", filename)
+            if match:
+                epochs[int(match.group(1))] = f"{checkpoint_dir}/{filename}"
+
+    if len(epochs) == 0:
+        raise FileNotFoundError(
+            f"No checkpoints found in {checkpoint_dir}. Note, checkpoints "
+            "created with earlier versions of osl-dynamics did not contain "
+            "the model weights and can't be loaded."
+        )
+
+    return epochs[max(epochs)]
 
 
 class TensorBoardCallback(callbacks.TensorBoard):
