@@ -682,12 +682,9 @@ class CovarianceMatricesLayer(layers.Layer):
                 raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
 
             # Calculate the flattened cholesky factors
-            #
-            # We remove epsilon because it's added to the diagonal of the
-            # matrices when we call the layer
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(
-                add_epsilon(initial_value, -self.epsilon, diag=True),
+                initial_value,
             )
 
             # We don't need an initializer
@@ -792,12 +789,9 @@ class CorrelationMatricesLayer(layers.Layer):
                 raise ValueError(f"initial_value shape must be ({n}, {m}, {m}).")
 
             # Calculate the flattened cholesky factors
-            #
-            # We remove epsilon because it's added to the diagonal of the
-            # matrices when we call the layer
             initial_value = initial_value.astype("float32")
             initial_flattened_cholesky_factors = self.bijector.inverse(
-                add_epsilon(initial_value, -self.epsilon, diag=True),
+                initial_value,
             )
 
             # We don't need an initializer
@@ -906,11 +900,8 @@ class DiagonalMatricesLayer(layers.Layer):
                 )
 
             # Calculate the initial value of the learnable tensor
-            #
-            # We remove epsilon because it's added to the diagonal when we
-            # call the layer
             initial_value = initial_value.astype("float32")
-            initial_diagonals = self.bijector.inverse(initial_value - self.epsilon)
+            initial_diagonals = self.bijector.inverse(initial_value)
 
             # We don't need an initializer
             initializer = None
