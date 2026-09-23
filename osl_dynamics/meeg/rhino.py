@@ -33,7 +33,7 @@ from mne.transforms import (
     rotation,
     _get_trans,
 )
-from mne.bem import _get_solids
+from mne.surface import _points_outside_surface
 from mne.io.constants import FIFF
 from mne.viz.backends.renderer import _get_renderer
 
@@ -2219,9 +2219,10 @@ def repair_bem_surfaces(fns: OSLFilenames, max_iter: int = 50) -> None:
         # The test mne.make_bem_model applies: a point is inside a closed
         # surface if the solid angle it subtends is 4*pi. Scale invariant, so
         # it doesn't matter that these surfaces are in mm rather than metres.
+        outer_surf = {"rr": outer_verts, "tris": outer_tris}
+
         def _outside(points):
-            solids = _get_solids(outer_verts[outer_tris], points)
-            return np.abs(solids / (2 * np.pi) - 1.0) > 1e-5
+            return _points_outside_surface(points, outer_surf)
 
         stray = _outside(verts)
         if not stray.any():
