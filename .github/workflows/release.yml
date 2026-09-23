@@ -51,3 +51,7 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          # Skip files that are already on PyPI, so a partially failed
+          # upload can be finished by re-running the job
+          skip-existing: true
