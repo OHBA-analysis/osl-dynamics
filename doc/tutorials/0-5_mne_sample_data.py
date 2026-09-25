@@ -333,11 +333,14 @@ Prerequisites
 #     )
 
 #%%
-# The beamformer prints how many pairs were found and saves a QC plot of the
-# dipole pairing to ``fns.src_dir/bilateral_dipoles.png``. Red lines connect
+# The beamformer prints how many pairs were found. To check the pairing, we
+# plot it (saved to ``fns.src_dir/bilateral_dipoles.png``). Red lines connect
 # paired dipoles, blue dots are midline dipoles, grey dots are unpaired
-# dipoles. You can also generate this plot manually with
-# ``source_recon.plot_bilateral_pairs(fns, show=True)``.
+# dipoles.
+#
+# .. code-block:: python
+#
+#     source_recon.plot_bilateral_pairs(fns, show=True)
 #
 # A few things to be aware of:
 #

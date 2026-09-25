@@ -137,6 +137,7 @@ class OSLFilenames:
         self._coreg_dir = f"{outdir}/{self.head_model_id}/coreg"
         self._coreg = CoregFilenames(self._coreg_dir)
         self._src_dir = f"{outdir}/{id}/src"
+        self._filters = f"{self._src_dir}/filters-lcmv.h5"
 
         self.pos_file = pos_file
         self.elc_file = elc_file
@@ -172,8 +173,17 @@ class OSLFilenames:
 
     @property
     def filters(self) -> str:
-        """LCMV filters file. Creates the source directory."""
-        return f"{self.src_dir}/filters-lcmv.h5"
+        """LCMV filters file. Creates the source directory.
+
+        Defaults to {src_dir}/filters-lcmv.h5. Assign a different path to keep
+        several sets of filters for the same session.
+        """
+        os.makedirs(self._src_dir, exist_ok=True)
+        return self._filters
+
+    @filters.setter
+    def filters(self, filters: str) -> None:
+        self._filters = filters
 
     def __str__(self) -> str:
         lines = [
@@ -185,7 +195,7 @@ class OSLFilenames:
             f"  Coreg directory:   {self._coreg_dir}",
             f"    \u2514\u2500 Forward model: {self._coreg_dir}/model-fwd.fif",
             f"  Source directory:  {self._src_dir}",
-            f"    \u2514\u2500 lcmv filters:  {self._src_dir}/filters-lcmv.h5",
+            f"    \u2514\u2500 lcmv filters:  {self._filters}",
         ]
         if self.pos_file is not None:
             lines += [

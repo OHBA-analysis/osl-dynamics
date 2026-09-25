@@ -234,13 +234,6 @@ def lcmv_beamformer(
             multi_dipoles = None
             single_dipoles = None
         else:
-            _plot_bilateral_pairs(
-                src_coords_mni,
-                multi_dipoles,
-                single_dipoles,
-                midline_points,
-                filename=f"{fns.src_dir}/bilateral_dipoles.png",
-            )
             # Midline dipoles get standard single-dipole weights
             single_dipoles = np.concatenate([single_dipoles, midline_points])
 
@@ -299,7 +292,7 @@ def apply_lcmv_beamformer(
         Shape is (voxels, time) for a Raw object or (voxels, time, epochs) for
         an Epochs object.
     coords : np.ndarray
-        Coordinates for each voxel in the reference brain space.
+        Coordinates (in mm) for each voxel in the reference brain space.
         Shape is (voxels, 3).
     """
     print()
@@ -363,13 +356,13 @@ def apply_lcmv_beamformer(
         f"-out {reference_brain_resampled} -applyisoxfm {spatial_resolution}",
         verbose=False,
     )
-    voxel_coords_mni_resampled, _ = _niimask2mmpointcloud(reference_brain_resampled)
+    voxel_coords_mni_resampled = _niimask2mmpointcloud(reference_brain_resampled)[0].T
 
     # For each resampled MNI coordinate find the nearest reconstructed voxel
     print("Finding nearest neighbour in resampled MNI space")
-    distances, indices = KDTree(voxel_coords_mni).query(voxel_coords_mni_resampled.T)
+    distances, indices = KDTree(voxel_coords_mni).query(voxel_coords_mni_resampled)
     voxel_data_mni_resampled = np.zeros(
-        np.insert(voxel_data_head.shape[1:], 0, voxel_coords_mni_resampled.shape[1])
+        np.insert(voxel_data_head.shape[1:], 0, len(voxel_coords_mni_resampled))
     )
     near = distances < spatial_resolution
     voxel_data_mni_resampled[near] = voxel_data_head[indices[near]]
@@ -377,6 +370,44 @@ def apply_lcmv_beamformer(
     print("Applying LCMV beamformer complete.")
 
     return voxel_data_mni_resampled, voxel_coords_mni_resampled
+
+
+def extract_voxel_data(
+    voxel_data: np.ndarray,
+    voxel_coords: np.ndarray,
+    coords: list | np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Extract the time course of the voxel nearest to each MNI coordinate.
+
+    Voxels without source reconstructed data (all zeros, i.e. no dipole within
+    the spatial resolution in apply_lcmv_beamformer) are skipped.
+
+    Parameters
+    ----------
+    voxel_data : np.ndarray
+        Voxel data from apply_lcmv_beamformer. Shape is (voxels, time) or
+        (voxels, time, epochs).
+    voxel_coords : np.ndarray
+        MNI coordinates (in mm) from apply_lcmv_beamformer. Shape is
+        (voxels, 3).
+    coords : list | np.ndarray
+        MNI coordinates (in mm) to extract. Shape is (3,) for a single
+        coordinate or (n_coords, 3).
+
+    Returns
+    -------
+    data : np.ndarray
+        Time course of the nearest voxel to each coordinate. Shape is
+        (n_coords, time) or (n_coords, time, epochs), without the first axis
+        if a single coordinate is passed.
+    nearest_coords : np.ndarray
+        MNI coordinates (in mm) of the voxels used. Shape is (n_coords, 3),
+        or (3,) if a single coordinate is passed.
+    """
+    valid = np.flatnonzero(np.any(voxel_data.reshape(len(voxel_data), -1), axis=1))
+    _, indices = KDTree(voxel_coords[valid]).query(coords)
+    indices = valid[indices]
+    return voxel_data[indices], voxel_coords[indices]
 
 
 def plot_bilateral_pairs(

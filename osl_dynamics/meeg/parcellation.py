@@ -536,7 +536,7 @@ def _resample_parcellation(
     parcellation_asmatrix : np.ndarray
         (nvoxels x n_parcels) resampled parcellation
     """
-    gridstep = source_recon._get_gridstep(voxel_coords.T / 1000)
+    gridstep = source_recon._get_gridstep(voxel_coords / 1000)
     print(f"gridstep = {gridstep} mm")
 
     path, name = os.path.split(
@@ -567,7 +567,7 @@ def _resample_parcellation(
     print(f"Resampled parcellation: {parcellation_resampled}")
 
     n_parcels = nib.load(parcellation_resampled).get_fdata().shape[3]
-    n_voxels = voxel_coords.shape[1]
+    n_voxels = len(voxel_coords)
 
     # parcellation_asmatrix will be the parcels mapped onto the same dipole
     # grid as voxel_coords
@@ -580,7 +580,7 @@ def _resample_parcellation(
         # Find each voxel_coords best matching coords and assign
         # the corresponding parcel value to
         for j in range(n_voxels):
-            distance, index = kdtree.query(voxel_coords[:, j])
+            distance, index = kdtree.query(voxel_coords[j])
 
             # Exclude from parcel any voxel_coords that are further than
             # gridstep away from the best matching coords
@@ -850,7 +850,7 @@ def _get_parcel_data_centroid(
         (n_voxels, n_time) or (n_voxels, n_time, n_trials) and is assumed to be
         on the same grid as voxel_coords.
     voxel_coords : np.ndarray
-        (3, n_voxels) voxel coordinates in mm in the same space as the
+        (n_voxels, 3) voxel coordinates in mm in the same space as the
         parcellation.
     parcellation_file : str
         Path to parcellation file.
@@ -865,9 +865,9 @@ def _get_parcel_data_centroid(
     parcellation = Parcellation(parcellation_file)
     centers = parcellation.roi_centers()  # (n_parcels, 3) in mm
 
-    gridstep = source_recon._get_gridstep(voxel_coords.T / 1000)
+    gridstep = source_recon._get_gridstep(voxel_coords / 1000)
 
-    kdtree = scipy.spatial.KDTree(voxel_coords.T)
+    kdtree = scipy.spatial.KDTree(voxel_coords)
     distances, indices = kdtree.query(centers)
 
     far = distances > gridstep
