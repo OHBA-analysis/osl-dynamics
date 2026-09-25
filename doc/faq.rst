@@ -307,4 +307,4 @@ And use osl-dynamics as normal.
 I found a bug, what do I do?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Create an issue `here <https://github.com/OHBA-analysis/osl-dynamics/issues>`_ or email chetan.gohil@psych.ox.ac.uk.
+Create an issue `here <https://github.com/OHBA-analysis/osl-dynamics/issues>`_ or email chetan.gohil@ndcn.ox.ac.uk.
