@@ -82,18 +82,25 @@ def top_eig(M: np.ndarray, k: int) -> Tuple[np.ndarray, np.ndarray]:
         Corresponding eigenvectors as columns. Shape is (n, k).
     """
     n = M.shape[0]
+    vals = None
     if n > 300 and k < n // 2:
         from scipy.sparse.linalg import eigsh, ArpackNoConvergence
 
         try:
             vals, vecs = eigsh(M, k=k, which="LM")
             idx = np.argsort(-vals)
-            return vals[idx], vecs[:, idx]
+            vals, vecs = vals[idx], vecs[:, idx]
         except (RuntimeError, ArpackNoConvergence):
-            pass
-    vals, vecs = np.linalg.eigh(M)
-    if k < n:
-        return vals[-k:], vecs[:, -k:]
+            vals = None
+    if vals is None:
+        vals, vecs = np.linalg.eigh(M)
+        if k < n:
+            vals, vecs = vals[-k:], vecs[:, -k:]
+
+    # Make the largest element of each eigenvector positive.
+    # This is to make the result reproducible.
+    largest = np.argmax(np.abs(vecs), axis=0)
+    vecs = vecs * np.sign(vecs[largest, np.arange(vecs.shape[1])])
     return vals, vecs
 
 
