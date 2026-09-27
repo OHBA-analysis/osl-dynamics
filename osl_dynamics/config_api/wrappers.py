@@ -40,7 +40,7 @@ def load_data(
     kwargs : dict, optional
         Keyword arguments to pass to the :class:`osl_dynamics.data.Data` class.
         Useful keyword arguments to pass are :code:`sampling_frequency`,
-        :code:`mask_file` and :code:`parcellation_file`.
+        :code:`parcellation_file`.
     prepare : dict, optional
         Methods dict to pass to the prepare method. See docstring for
         :class:`osl_dynamics.data.Data`.
@@ -737,7 +737,6 @@ def get_inf_params(data, output_dir: str, observation_model_only: bool = False) 
 def plot_power_maps_from_covariances(
     data,
     output_dir: str,
-    mask_file: Optional[str] = None,
     parcellation_file: Optional[str] = None,
     power_save_kwargs: Optional[dict] = None,
 ) -> None:
@@ -762,9 +761,6 @@ def plot_power_maps_from_covariances(
         Data object.
     output_dir : str
         Path to output directory.
-    mask_file : str, optional
-        Mask file used to preprocess the training data. If :code:`None`,
-        we use :code:`data.mask_file`.
     parcellation_file : str, optional
         Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
@@ -773,20 +769,11 @@ def plot_power_maps_from_covariances(
         Defaults to::
 
             {'filename': '<inf_params_dir>/covs_.png',
-             'mask_file': data.mask_file,
              'parcellation_file': data.parcellation_file,
              'plot_kwargs': {'symmetric_cbar': True}}
     """
     # Validation
     power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
-
-    if mask_file is None:
-        if data is None or data.mask_file is None:
-            raise ValueError(
-                "mask_file must be passed or specified in the Data object."
-            )
-        else:
-            mask_file = data.mask_file
 
     if parcellation_file is None:
         if data is None or data.parcellation_file is None:
@@ -822,7 +809,6 @@ def plot_power_maps_from_covariances(
 
     default_power_save_kwargs = {
         "filename": f"{inf_params_dir}/covs_.png",
-        "mask_file": mask_file,
         "parcellation_file": parcellation_file,
         "plot_kwargs": {"symmetric_cbar": True},
     }
@@ -1172,7 +1158,6 @@ def regression_spectra(data, output_dir: str, kwargs: dict) -> None:
 def plot_group_ae_networks(
     data,
     output_dir: str,
-    mask_file: Optional[str] = None,
     parcellation_file: Optional[str] = None,
     aec_abs: bool = True,
     power_save_kwargs: Optional[dict] = None,
@@ -1195,9 +1180,6 @@ def plot_group_ae_networks(
         Data object.
     output_dir : str
         Path to output directory.
-    mask_file : str, optional
-        Mask file used to preprocess the training data. If :code:`None`,
-        we use :code:`data.mask_file`.
     parcellation_file : str, optional
         Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
@@ -1209,7 +1191,6 @@ def plot_group_ae_networks(
         Defaults to::
 
             {'filename': '<output_dir>/networks/mean_.png',
-             'mask_file': data.mask_file,
              'parcellation_file': data.parcellation_file}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to :func:`osl_dynamics.analysis.connectivity.save`. Defaults to::
@@ -1223,14 +1204,6 @@ def plot_group_ae_networks(
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
 
     # Validation
-    if mask_file is None:
-        if data is None or data.mask_file is None:
-            raise ValueError(
-                "mask_file must be passed or specified in the Data object."
-            )
-        else:
-            mask_file = data.mask_file
-
     if parcellation_file is None:
         if data is None or data.parcellation_file is None:
             raise ValueError(
@@ -1256,7 +1229,6 @@ def plot_group_ae_networks(
 
     default_power_save_kwargs = {
         "filename": f"{networks_dir}/mean_.png",
-        "mask_file": mask_file,
         "parcellation_file": parcellation_file,
     }
     if "plot_kwargs" in power_save_kwargs:
@@ -1289,7 +1261,6 @@ def plot_group_ae_networks(
 def plot_group_tde_hmm_networks(
     data,
     output_dir: str,
-    mask_file: Optional[str] = None,
     parcellation_file: Optional[str] = None,
     frequency_range: Optional[list] = None,
     percentile: float = 97,
@@ -1318,9 +1289,6 @@ def plot_group_tde_hmm_networks(
         Data object.
     output_dir : str
         Path to output directory.
-    mask_file : str, optional
-        Mask file used to preprocess the training data. If :code:`None`,
-        we use :code:`data.mask_file`.
     parcellation_file : str, optional
         Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
@@ -1334,8 +1302,7 @@ def plot_group_tde_hmm_networks(
         Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::
 
-            {'mask_file': mask_file,
-             'parcellation_file': parcellation_file,
+            {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
              'subtract_mean': True}
     conn_save_kwargs : dict, optional
@@ -1349,14 +1316,6 @@ def plot_group_tde_hmm_networks(
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
 
     # Validation
-    if mask_file is None:
-        if data is None or data.mask_file is None:
-            raise ValueError(
-                "mask_file must be passed or specified in the Data object."
-            )
-        else:
-            mask_file = data.mask_file
-
     if parcellation_file is None:
         if data is None or data.parcellation_file is None:
             raise ValueError(
@@ -1414,7 +1373,6 @@ def plot_group_tde_hmm_networks(
 
     # Save power maps
     default_power_save_kwargs = {
-        "mask_file": mask_file,
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,
@@ -1459,7 +1417,6 @@ def plot_group_nnmf_tde_hmm_networks(
     data,
     output_dir: str,
     nnmf_file: str,
-    mask_file: Optional[str] = None,
     parcellation_file: Optional[str] = None,
     component: int = 0,
     percentile: float = 97,
@@ -1491,9 +1448,6 @@ def plot_group_nnmf_tde_hmm_networks(
     nnmf_file : str
         Path relative to :code:`output_dir` for a npy file (with the output of
         :func:`osl_dynamics.analysis.spectral.decompose_spectra`) containing the NNMF components.
-    mask_file : str, optional
-        Mask file used to preprocess the training data. If :code:`None`,
-        we use :code:`data.mask_file`.
     parcellation_file : str, optional
         Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
@@ -1506,8 +1460,7 @@ def plot_group_nnmf_tde_hmm_networks(
         Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::
 
-            {'mask_file': mask_file,
-             'parcellation_file': parcellation_file,
+            {'parcellation_file': parcellation_file,
              'component': component,
              'filename': '<output_dir>/networks/pow_.png',
              'subtract_mean': True}
@@ -1523,14 +1476,6 @@ def plot_group_nnmf_tde_hmm_networks(
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
 
     # Validation
-    if mask_file is None:
-        if data is None or data.mask_file is None:
-            raise ValueError(
-                "mask_file must be passed or specified in the Data object."
-            )
-        else:
-            mask_file = data.mask_file
-
     if parcellation_file is None:
         if data is None or data.parcellation_file is None:
             raise ValueError(
@@ -1606,7 +1551,6 @@ def plot_group_nnmf_tde_hmm_networks(
 
     # Save power maps
     default_power_save_kwargs = {
-        "mask_file": mask_file,
         "parcellation_file": parcellation_file,
         "component": component,
         "filename": f"{networks_dir}/pow_.png",
@@ -1653,7 +1597,6 @@ def plot_group_nnmf_tde_hmm_networks(
 def plot_group_tde_dynemo_networks(
     data,
     output_dir: str,
-    mask_file: Optional[str] = None,
     parcellation_file: Optional[str] = None,
     frequency_range: Optional[list] = None,
     percentile: float = 97,
@@ -1682,9 +1625,6 @@ def plot_group_tde_dynemo_networks(
         Data object.
     output_dir : str
         Path to output directory.
-    mask_file : str, optional
-        Mask file used to preprocess the training data. If :code:`None`,
-        we use :code:`data.mask_file`.
     parcellation_file : str, optional
         Parcellation file used to parcellate the training data. If
         :code:`None`, we use :code:`data.parcellation_file`.
@@ -1698,8 +1638,7 @@ def plot_group_tde_dynemo_networks(
         Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::
 
-            {'mask_file': mask_file,
-             'parcellation_file': parcellation_file,
+            {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
              'subtract_mean': True,
              'plot_kwargs': {'symmetric_cbar': True}}
@@ -1714,14 +1653,6 @@ def plot_group_tde_dynemo_networks(
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
 
     # Validation
-    if mask_file is None:
-        if data is None or data.mask_file is None:
-            raise ValueError(
-                "mask_file must be passed or specified in the Data object."
-            )
-        else:
-            mask_file = data.mask_file
-
     if parcellation_file is None:
         if data is None or data.parcellation_file is None:
             raise ValueError(
@@ -1786,7 +1717,6 @@ def plot_group_tde_dynemo_networks(
 
     # Save power maps
     default_power_save_kwargs = {
-        "mask_file": mask_file,
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
         "subtract_mean": True,

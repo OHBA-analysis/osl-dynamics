@@ -96,7 +96,6 @@ print(mean_p.shape)
 # Display the power maps (takes a few seconds to appear)
 fig, ax = power.save(
     mean_p,
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     subtract_mean=True,  # just for visualisation
 )
@@ -147,7 +146,6 @@ mean_c_map = connectivity.mean_connections(mean_c)
 
 fig, ax = power.save(
     mean_c_map,
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     subtract_mean=True,  # just for visualisation
 )

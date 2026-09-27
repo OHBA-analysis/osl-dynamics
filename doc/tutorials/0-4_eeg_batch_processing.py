@@ -443,7 +443,7 @@ The output of this script is written to ``derivatives/``.
 #     import mne
 #     import matplotlib
 #     matplotlib.use("Agg")
-#     from osl_dynamics.meeg import parallel, source_recon, parcellation
+#     from osl_dynamics.meeg import parallel, parcellation
 #     from osl_dynamics.utils.filenames import OSLFilenames
 #
 #     output_dir = Path("derivatives")
@@ -466,19 +466,14 @@ The output of this script is written to ``derivatives/``.
 #             surfaces_dir=surfaces_dir,
 #         )
 #
-#         logger.log("Applying LCMV beamformer...")
-#         voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns)
-#
 #         parcellation_file = "atlas-DK_nparc-54_space-MNI_res-8x8x8.nii.gz"
 #
 #         logger.log("Parcellating...")
-#         parcel_data = parcellation.parcellate(
+#         parcel_data = parcellation.parcellate_lcmv(
 #             fns,
-#             voxel_data,
-#             voxel_coords,
+#             parcellation_file=parcellation_file,
 #             method="spatial_basis",
 #             orthogonalisation="symmetric",
-#             parcellation_file=parcellation_file,
 #         )
 #
 #         logger.log("Saving parcellated data...")

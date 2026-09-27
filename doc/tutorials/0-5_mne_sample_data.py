@@ -217,15 +217,12 @@ Prerequisites
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
 # We use an LCMV (Linearly Constrained Minimum Variance) beamformer to project
-# the sensor data into source space. First we compute the beamformer weights
-# (spatial filters), then we apply them to the sensor data to get voxel time
-# courses in MNI space.
+# the sensor data into source space. Here we compute the beamformer weights
+# (spatial filters), which we apply to the sensor data in the next step.
 #
 # .. code-block:: python
 #
 #     source_recon.lcmv_beamformer(fns, raw, chantypes=["mag", "grad"])
-#     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns, raw)
-#     print(f"Voxel data shape: {voxel_data.shape} (voxels x time)")
 
 #%%
 # .. note::
@@ -239,7 +236,7 @@ Prerequisites
 # Step 7: Parcellation
 # ^^^^^^^^^^^^^^^^^^^^
 #
-# We reduce the voxel data to 52 parcel time courses using the Glasser
+# We reduce the source space to 52 parcel time courses using the Glasser
 # parcellation, and save them as a FIF file. The ``extra_chans="stim"`` option
 # carries the stimulus channels over to the parcellated data, so we can epoch
 # it later.
@@ -254,13 +251,12 @@ Prerequisites
 #
 # .. code-block:: python
 #
-#     parcel_data = parcellation.parcellate(
+#     parcel_data = parcellation.parcellate_lcmv(
 #         fns,
-#         voxel_data,
-#         voxel_coords,
+#         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
 #         method="spatial_basis",
 #         orthogonalisation=None,
-#         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
+#         raw=raw,
 #     )
 #     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
 #
@@ -315,14 +311,12 @@ Prerequisites
 #         chantypes=["mag", "grad"],
 #         use_bilateral_pairs=True,
 #     )
-#     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns, raw)
-#     parcel_data = parcellation.parcellate(
+#     parcel_data = parcellation.parcellate_lcmv(
 #         fns,
-#         voxel_data,
-#         voxel_coords,
+#         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
 #         method="spatial_basis",
 #         orthogonalisation=None,
-#         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
+#         raw=raw,
 #     )
 #     bilateral_parc_fif = str(output_dir / "osl" / id / "lcmv-bilateral-parc-raw.fif")
 #     parcellation.save_as_fif(
@@ -433,6 +427,43 @@ Prerequisites
 # correlated.
 
 #%%
+# Virtual Electrodes
+# ^^^^^^^^^^^^^^^^^^
+#
+# Parcel time courses summarise large regions. To look at the activity at a
+# specific location we can compute a 'virtual electrode': the beamformer
+# weights for a dipole at the exact MNI coordinate (rather than taking the
+# nearest dipole of the 8 mm grid). The weights are computed with the same
+# data covariance and settings as the filters in ``fns.filters`` — here the
+# bilateral filters, so each coordinate is paired with its mirror image.
+#
+# Passing an Epochs object gives the virtual electrode time course for each
+# epoch.
+#
+# .. code-block:: python
+#
+#     events = mne.find_events(raw, min_duration=0.005)
+#     epochs = mne.Epochs(
+#         raw,
+#         events,
+#         event_id={"auditory/left": 1, "auditory/right": 2},
+#         tmin=-0.2,
+#         tmax=0.5,
+#         baseline=(None, 0),
+#         preload=True,
+#     )
+#     ve_data = source_recon.virtual_electrodes(
+#         fns, [[-52, -19, 7], [52, -19, 7]], raw=epochs
+#     )
+#     print(f"Virtual electrode data shape: {ve_data.shape} (coords x time x epochs)")
+#
+#     fig, ax = plt.subplots(figsize=(6, 4))
+#     for evoked, label in zip(ve_data.mean(axis=-1), ["Left", "Right"]):
+#         ax.plot(epochs.times, evoked, label=label)
+#     ax.set_xlabel("Time (s)")
+#     ax.legend()
+
+#%%
 # Wrap Up
 # ^^^^^^^
 #
@@ -447,3 +478,5 @@ Prerequisites
 # - Use ``orthogonalisation=None`` when analysing zero-lag correlated
 #   responses — symmetric orthogonalisation would remove them.
 # - Check the dipole pairing QC plot (``bilateral_dipoles.png``).
+# - Use ``source_recon.virtual_electrodes`` to get the time course at a
+#   specific MNI coordinate.

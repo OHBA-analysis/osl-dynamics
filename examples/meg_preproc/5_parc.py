@@ -4,7 +4,7 @@ from pathlib import Path
 import mne
 import matplotlib
 matplotlib.use("Agg")
-from osl_dynamics.meeg import parallel, source_recon, parcellation
+from osl_dynamics.meeg import parallel, parcellation
 from osl_dynamics.utils.filenames import OSLFilenames
 
 # ----------------------------------------------------------------------------
@@ -45,17 +45,12 @@ def process_session(session, logger):
         surfaces_dir=surfaces_dir,
     )
 
-    logger.log("Applying LCMV beamformer...")
-    voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns)
-
     logger.log("Parcellating...")
-    parcel_data = parcellation.parcellate(
+    parcel_data = parcellation.parcellate_lcmv(
         fns,
-        voxel_data,
-        voxel_coords,
+        parcellation_file=parcellation_file,
         method=parcellation_method,
         orthogonalisation=orthogonalisation,
-        parcellation_file=parcellation_file,
     )
 
     logger.log("Saving parcellated data...")

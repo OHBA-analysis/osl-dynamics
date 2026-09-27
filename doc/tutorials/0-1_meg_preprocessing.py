@@ -346,37 +346,37 @@ Output is written to ``derivatives/``.
 #     source_recon.lcmv_beamformer(fns, raw, chantypes=chantypes, rank=rank)
 
 #%%
-# Apply beamformer
-# ****************
+# Step 6: Parcellation
+# ^^^^^^^^^^^^^^^^^^^^
 #
-# This applies the spatial filters to the sensor data to produce voxel time courses in MNI space. Bad segments are automatically excluded.
+# We reduce the source space to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis. See the :ref:`parcellations <parcellations>` page for the full list of available parcellations.
+#
+# ``parcellate_lcmv`` assigns each dipole of the forward model to parcels using its MNI coordinate and calculates each parcel time course from the sensor data with the beamformer weights. Bad segments are automatically excluded.
+#
+# - ``method="spatial_basis"`` — Weight dipoles by their loading on each parcel (from the atlas) before calculating the PCA.
+# - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels.
+#
+# .. code-block:: python
+#
+#     parcel_data = parcellation.parcellate_lcmv(
+#         fns,
+#         parcellation_file,
+#         method="spatial_basis",
+#         orthogonalisation="symmetric",
+#         raw=raw,
+#     )
+#     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
+
+#%%
+# If you need the voxel time courses (on a regular MNI grid), you can apply the beamformer with ``apply_lcmv_beamformer``. These can also be parcellated with ``parcellation.parcellate``. To get the time course at a specific MNI coordinate, use ``virtual_electrodes``, which computes the beamformer weights for a dipole at the exact location:
 #
 # .. code-block:: python
 #
 #     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns, raw)
 #     print(f"Voxel data shape: {voxel_data.shape} (voxels x time)")
-#     print(f"Voxel coords shape: {voxel_coords.shape} (voxels x 3, in MNI mm)")
-
-#%%
-# Step 6: Parcellation
-# ^^^^^^^^^^^^^^^^^^^^
 #
-# We reduce the high-dimensional voxel data to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis. See the :ref:`parcellations <parcellations>` page for the full list of available parcellations.
-#
-# - ``method="spatial_basis"`` — Weight voxels by their loading on each parcel (from the atlas) because calculate PCA.
-# - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels.
-#
-# .. code-block:: python
-#
-#     parcel_data = parcellation.parcellate(
-#         fns,
-#         voxel_data,
-#         voxel_coords,
-#         method="spatial_basis",
-#         orthogonalisation="symmetric",
-#         parcellation_file=parcellation_file,
-#     )
-#     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
+#     # Time courses at MNI coordinates (in mm)
+#     ve_data = source_recon.virtual_electrodes(fns, [[-42, -22, 10], [42, -22, 10]], raw=raw)
 
 #%%
 # Save parcellated data

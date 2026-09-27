@@ -227,7 +227,6 @@ Example code for plotting with this parcellation:
 
     power.save(
         ...,
-        mask_file="MNI152_T1_8mm_brain.nii.gz",
         parcellation_file="atlas-Schaefer_nparc-100_space-MNI_res-8x8x8.nii.gz",
         filename="map_.png",
     )

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import warnings
 from pathlib import Path
 
@@ -12,10 +11,10 @@ import scipy
 import numpy as np
 import nibabel as nib
 import matplotlib.pyplot as plt
-from nilearn import image, plotting as nilearn_plotting
-from fsl import wrappers as fsl_wrappers
+from nilearn import plotting as nilearn_plotting
 
 from osl_dynamics import files
+from osl_dynamics.utils import misc
 from osl_dynamics.utils.filenames import OSLFilenames
 
 from . import source_recon
@@ -122,17 +121,17 @@ def plot_parcellation(parcellation: str | Parcellation, **kwargs) -> object:
 
 
 def parcel_vector_to_voxel_grid(
-    mask_file: str,
     parcellation_file: str,
     vector: np.ndarray,
     remove_subcortical_voxels: bool = False,
 ) -> np.ndarray:
     """Takes a vector of parcel values and return a 3D voxel grid.
 
+    The voxel grid is the grid of the parcellation file, see
+    :func:`parcel_vector_to_nifti` to also get the affine.
+
     Parameters
     ----------
-    mask_file : str
-        Mask file for the voxel grid. Must be a NIFTI file.
     parcellation_file : str
         Parcellation file. Must be a NIFTI file.
     vector : np.ndarray
@@ -146,94 +145,89 @@ def parcel_vector_to_voxel_grid(
         Value at each voxel. Shape is (x, y, z), where :code:`x`,
         :code:`y` and :code:`z` correspond to 3D voxel locations.
     """
+    return parcel_vector_to_nifti(
+        vector, parcellation_file, remove_subcortical_voxels
+    ).get_fdata()
+
+
+def parcel_vector_to_nifti(
+    vector: np.ndarray,
+    parcellation_file: str,
+    remove_subcortical_voxels: bool = False,
+) -> nib.Nifti1Image:
+    """Takes a vector of parcel values and return a NIFTI image.
+
+    The image is on the voxel grid of the parcellation file. The value at
+    each voxel is the sum of the parcel values weighted by the (normalised)
+    weight of the voxel for each parcel.
+
+    Parameters
+    ----------
+    vector : np.ndarray
+        Value at each parcel. Shape must be (n_parcels,).
+    parcellation_file : str
+        Parcellation file. Must be a NIFTI file.
+    remove_subcortical_voxels : bool, optional
+        Should we set the subcortical voxels to np.nan?
+
+    Returns
+    -------
+    img : nib.Nifti1Image
+        3D image with the value at each voxel.
+    """
     # Suppress INFO messages from nibabel
     logging.getLogger("nibabel.global").setLevel(logging.ERROR)
 
-    # Validation
-    mask_file = files.check_exists(mask_file, files.mask.directory)
+    # Load the parcellation (4D with the weight of each voxel for each parcel)
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
     )
-
-    # Load the mask
-    mask = nib.load(mask_file)
-    mask_grid = mask.get_fdata()
-    mask_grid = mask_grid.ravel(order="F")
-
-    # Get indices of non-zero elements, i.e. those which contain the brain
-    non_zero_voxels = mask_grid != 0
-
-    # Load the parcellation
-    parc = nib.load(parcellation_file)
-
-    # Make sure parcellation is 4D and contains 1 for voxel assignment
-    # to a parcel and 0 otherwise
-    parcellation_grid = parc.get_fdata()
-    if parcellation_grid.ndim == 3:
-        unique_values = np.unique(parcellation_grid)[1:]
-        parcellation_grid = np.array(
-            [(parcellation_grid == value).astype(int) for value in unique_values]
-        )
-        parcellation_grid = np.rollaxis(parcellation_grid, 0, 4)
-        parc = nib.Nifti1Image(parcellation_grid, parc.affine, parc.header)
-
-    # Make sure the parcellation grid matches the mask file
-    parc = image.resample_to_img(
-        parc,
-        mask,
-        interpolation="nearest",
-        force_resample=True,
-        copy_header=True,
-    )
-    parcellation_grid = parc.get_fdata()
-
-    # Make a 2D array of voxel weights for each parcel
+    parc = Parcellation(parcellation_file).parcellation
+    grid_shape = parc.shape[:3]
+    affine = parc.affine
     n_parcels = parc.shape[-1]
 
     # Check parcellation is compatible
+    vector = np.asarray(vector)
     if vector.shape[0] != n_parcels:
-        _logger.error(
-            "parcellation_file has a different number of parcels to the vector"
+        raise ValueError(
+            f"parcellation_file has {n_parcels} parcels, "
+            f"but vector has {vector.shape[0]} values."
         )
 
-    voxel_weights = parcellation_grid.reshape(-1, n_parcels, order="F")[non_zero_voxels]
+    # 2D array of voxel weights for each parcel
+    voxel_weights = parc.get_fdata().reshape(-1, n_parcels)
 
     # Normalise the voxels weights
-    voxel_weights /= voxel_weights.max(axis=0, keepdims=True)
+    max_weights = voxel_weights.max(axis=0, keepdims=True)
+    voxel_weights /= np.where(max_weights > 0, max_weights, 1)
 
     # Generate a vector containing value at each voxel
     voxel_values = voxel_weights @ vector
 
     # Final 3D voxel grid
-    voxel_grid = np.zeros(mask_grid.shape[0])
-    voxel_grid[non_zero_voxels] = voxel_values
-    voxel_grid = voxel_grid.reshape(
-        mask.shape[0], mask.shape[1], mask.shape[2], order="F"
-    )
+    voxel_grid = voxel_values.reshape(grid_shape)
 
     if remove_subcortical_voxels:
-        if voxel_grid.shape != (23, 27, 23):
-            raise ValueError(
-                "remove_subcortical_voxels=True is only compatible with "
-                "8x8x8 mm voxel grids."
-            )
-
-        # We guess which voxels are subcortical and set them to nan (if zero)
-        for xx in range(10, 13):
-            for yy in range(12, 19):
-                if yy > 15 or yy < 13:
-                    for zz in range(10, 11):
-                        if voxel_grid[xx, yy, zz] == 0:
-                            voxel_grid[xx, yy, zz] = np.nan
-                else:
-                    for zz in range(7, 12):
-                        if voxel_grid[xx, yy, zz] == 0:
-                            voxel_grid[xx, yy, zz] = np.nan
+        # We guess which voxels are subcortical and set them to nan (if zero).
+        # The subcortical voxels are defined on the 8 mm MNI152 grid, we find
+        # the voxel of this grid that contains each voxel
+        ijk = np.indices(grid_shape).reshape(3, -1).T
+        coords = nib.affines.apply_affine(affine, ijk)
+        xx, yy, zz = np.rint((coords - [90, -126, -72]) / [-8, 8, 8]).astype(int).T
+        subcortical = (
+            (xx >= 10)
+            & (xx <= 12)
+            & (yy >= 12)
+            & (yy <= 18)
+            & np.where((yy > 15) | (yy < 13), zz == 10, (zz >= 7) & (zz <= 11))
+        ).reshape(grid_shape)
+        voxel_grid[subcortical & (voxel_grid == 0)] = np.nan
 
         # Suppress warning when plotting
         warnings.filterwarnings("ignore", message="Mean of empty slice")
 
-    return voxel_grid
+    return nib.Nifti1Image(voxel_grid, affine)
 
 
 def parcellate(
@@ -246,15 +240,20 @@ def parcellate(
 ) -> np.ndarray:
     """Parcellate data.
 
+    See :func:`parcellate_lcmv` to calculate parcel time courses directly from
+    the sensor data (without the voxel data).
+
     Parameters
     ----------
     fns : OSLFilenames
         Container for OSL filenames.
     voxel_data : np.ndarray
-        (nvoxels x n_time) or (nvoxels x n_time x n_trials) and is assumed to be
-        on the same grid as parcellation.
+        (nvoxels x n_time) or (nvoxels x n_time x n_trials).
     voxel_coords :
-        (nvoxels x 3) coordinates in mm in same space as parcellation.
+        (nvoxels x 3) coordinates in mm in same space as parcellation. Each
+        voxel is assigned the parcel weights of the parcellation voxel that
+        contains it, so the voxels do not need to be on the same grid as the
+        parcellation.
     method : str, optional
         'pca'           - take 1st PC of voxels.
         'spatial_basis' - The parcel time-course for each spatial map is the
@@ -294,13 +293,122 @@ def parcellate(
             voxel_data, voxel_coords, parcellation_file
         )
     else:
-        # Resample parcellation to match the mask
-        parcellation = _resample_parcellation(fns, parcellation_file, voxel_coords)
+        # Parcel weights at each voxel
+        parcellation = _sample_parcellation(parcellation_file, voxel_coords)
 
         # Calculate parcel time courses
         parcel_data, _, _ = _get_parcel_data_pca(
             voxel_data, parcellation, method=method
         )
+
+    # Orthogonalisation
+    if orthogonalisation == "symmetric":
+        parcel_data = _symmetric_orthogonalisation(
+            parcel_data, maintain_magnitudes=True
+        )
+
+    return parcel_data
+
+
+def parcellate_lcmv(
+    fns: OSLFilenames,
+    parcellation_file: str,
+    method: str = "spatial_basis",
+    orthogonalisation: str | None = None,
+    raw: mne.io.Raw | mne.Epochs | None = None,
+    reject_by_annotation: str | list[str] | None = "omit",
+) -> np.ndarray:
+    """Calculate parcel time courses from sensor data with the LCMV filters.
+
+    This gives the parcel time courses without calculating the voxel data.
+    Each dipole of the forward model is assigned to parcels using its MNI
+    coordinate, the parcel time course (the rescaled 1st PC of the dipoles in
+    the parcel) is calculated from the covariance of the dipoles (estimated
+    from the sensor data) and applied to the sensor data as a spatial filter.
+
+    This is equivalent to :func:`source_recon.apply_lcmv_beamformer` followed
+    by :func:`parcellate` except the dipoles are used directly rather than
+    being resampled onto a regular MNI grid first, and it is much faster and
+    uses much less memory.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    parcellation_file : str
+        Path to parcellation file (in MNI space).
+    method : str, optional
+        'pca' or 'spatial_basis', see :func:`parcellate`.
+    orthogonalisation : str, optional
+        Method for orthogonalising the data. Can be None or 'symmetric'.
+    raw : mne.io.Raw or mne.Epochs, optional
+        The data to calculate parcel time courses for.
+        If None, fns.preproc_file is used.
+    reject_by_annotation : str | list of str | None
+        Annotation descriptions to omit when getting the data from a Raw
+        object. If None, all time points are used.
+
+    Returns
+    -------
+    parcel_data : np.ndarray
+        Parcellated data. Shape is (parcels, time) or (parcels, time, epochs).
+    """
+    print("")
+    print("Parcellating data")
+    print("-----------------")
+
+    if orthogonalisation not in [None, "symmetric"]:
+        raise ValueError("orthogonalisation must be None or 'symmetric'.")
+
+    if method not in ["pca", "spatial_basis"]:
+        raise ValueError("method must be 'pca' or 'spatial_basis'.")
+
+    parcellation_file = files.check_exists(
+        parcellation_file, files.parcellation.directory
+    )
+
+    # Sensor data after projection/whitening, shape is (channels, samples)
+    data, filters, epochs_shape = source_recon._get_filter_input_data(
+        fns, raw, reject_by_annotation
+    )
+    if filters["is_free_ori"]:
+        raise ValueError(
+            "parcellate_lcmv requires a scalar beamformer, "
+            "e.g. pick_ori='max-power-pre-weight-norm'."
+        )
+    # (dipoles, channels), the weights can be complex with zero imaginary
+    # part (from the eigendecomposition used to find the orientation)
+    W = np.real(filters["weights"])
+
+    # Parcel weights for each dipole
+    fwd = mne.read_forward_solution(fns.fwd_model, verbose=False)
+    dipole_coords = source_recon._get_source_coords_mni(fns, fwd)
+    if len(dipole_coords) != W.shape[0]:
+        raise ValueError(
+            f"{fns.filters} has {W.shape[0]} dipoles, but {fns.fwd_model} has "
+            f"{len(dipole_coords)}."
+        )
+    parcellation = _sample_parcellation(parcellation_file, dipole_coords)
+    print(
+        f"{int(np.any(parcellation > 0, axis=1).sum())} of {len(dipole_coords)} "
+        "dipoles are in a parcel"
+    )
+
+    # Covariance of the dipoles is W @ C @ W.T
+    data_mean = np.mean(data, axis=1)
+    data_cov = np.cov(data, bias=True)
+
+    def voxel_cov(inds):
+        return W[inds] @ data_cov @ W[inds].T
+
+    voxel_weightings = _get_parcel_weights(voxel_cov, parcellation, method)
+
+    # Spatial filter for each parcel, shape is (parcels, channels)
+    parcel_filters = voxel_weightings.T @ W
+    parcel_data = parcel_filters @ data - (parcel_filters @ data_mean)[:, None]
+
+    if epochs_shape is not None:
+        parcel_data = parcel_data.reshape(-1, *epochs_shape)
 
     # Orthogonalisation
     if orthogonalisation == "symmetric":
@@ -475,7 +583,6 @@ def save_qc_plots(
         return
 
     # Band power maps — render each band and composite into a single image
-    mask_file = f"{files.mask.path}/MNI152_T1_8mm_brain.nii.gz"
     bands = {
         "delta": [1, 4],
         "theta": [4, 8],
@@ -488,7 +595,6 @@ def save_qc_plots(
         band_power = power.variance_from_spectra(f, psd, frequency_range=freq_range)
         fig, ax = plot_brain_surface(
             band_power,
-            mask_file=mask_file,
             parcellation_file=parcellation_file,
             title=f"{band_name} ({freq_range[0]}-{freq_range[1]} Hz)",
             cmap=cmap,
@@ -512,82 +618,154 @@ def save_qc_plots(
         plt.close(composite_fig)
 
 
-def _resample_parcellation(
-    fns: OSLFilenames, parcellation_file: str, voxel_coords: np.ndarray
-) -> np.ndarray:
-    """Resample parcellation.
+def _sample_parcellation(parcellation_file: str, coords: np.ndarray) -> np.ndarray:
+    """Sample a parcellation at a set of coordinates.
 
-    Resample the parcellation so that the voxel coords correspond (using nearest
-    neighbour) to the passed in coords. Passed in voxel_coords and parcellation
-    must be in the same space, e.g. MNI.
-
-    Used to make sure that the parcellation's voxel coords are the same as the
-    voxel coords for some time series data.
+    Each coordinate is given the parcel weights of the parcellation voxel that
+    contains it (nearest neighbour sampling). The coordinates do not need to be
+    on the same grid as the parcellation.
 
     Parameters
     ----------
     parcellation_file : str
-        Path to parcellation file. In same space as voxel_coords.
-    voxel_coords :
-        (nvoxels x 3) coordinates in mm in same space as parcellation.
+        Path to parcellation file. In same space as coords.
+    coords : np.ndarray
+        (n_coords, 3) coordinates in mm in the same space as the parcellation.
 
     Returns
     -------
     parcellation_asmatrix : np.ndarray
-        (nvoxels x n_parcels) resampled parcellation
+        (n_coords, n_parcels) parcel weights at each coordinate. Coordinates
+        outside the parcellation's field of view are given zero weights.
     """
-    gridstep = source_recon._get_gridstep(voxel_coords / 1000)
-    print(f"gridstep = {gridstep} mm")
-
-    path, name = os.path.split(
-        os.path.splitext(os.path.splitext(parcellation_file)[0])[0]
-    )
-
-    parcellation_resampled = f"{fns.src_dir}/{name}_{gridstep}mm.nii.gz"
-
-    # Create standard brain of the required resolution
-    #
-    # Command: flirt -in <parcellation_file> -ref <parcellation_file> \
-    #          -out <parcellation_resampled> -applyisoxfm <gridstep>
-    #
-    # Note, this call raises:
-    #
-    #   Warning: An input intended to be a single 3D volume has multiple
-    #   timepoints. Input will be truncated to first volume, but this
-    #   functionality is deprecated and will be removed in a future release.
-    #
-    # However, it doesn't look like the input be being truncated, the
-    # resampled parcellation appears to be a 4D volume.
-    fsl_wrappers.flirt(
-        parcellation_file,
-        parcellation_file,
-        out=parcellation_resampled,
-        applyisoxfm=gridstep,
-    )
-    print(f"Resampled parcellation: {parcellation_resampled}")
-
-    n_parcels = nib.load(parcellation_resampled).get_fdata().shape[3]
-    n_voxels = len(voxel_coords)
-
-    # parcellation_asmatrix will be the parcels mapped onto the same dipole
-    # grid as voxel_coords
-    print("Finding nearest neighbour voxel")
-    parcellation_asmatrix = np.zeros([n_voxels, n_parcels])
-    for i in range(n_parcels):
-        coords, vals = source_recon._niimask2mmpointcloud(parcellation_resampled, i)
-        kdtree = scipy.spatial.KDTree(coords.T)
-
-        # Find each voxel_coords best matching coords and assign
-        # the corresponding parcel value to
-        for j in range(n_voxels):
-            distance, index = kdtree.query(voxel_coords[j])
-
-            # Exclude from parcel any voxel_coords that are further than
-            # gridstep away from the best matching coords
-            if distance < gridstep:
-                parcellation_asmatrix[j, i] = vals[index]
-
+    parcellation = Parcellation(parcellation_file)
+    img = parcellation.parcellation
+    ijk = np.rint(
+        nib.affines.apply_affine(np.linalg.inv(img.affine), coords)
+    ).astype(int)
+    inside = np.all((ijk >= 0) & (ijk < img.shape[:3]), axis=1)
+    parcellation_asmatrix = np.zeros([len(coords), parcellation.n_parcels])
+    parcellation_asmatrix[inside] = np.asarray(img.dataobj)[tuple(ijk[inside].T)]
     return parcellation_asmatrix
+
+
+def _get_parcel_weights(
+    voxel_cov: callable,
+    parcellation_asmatrix: np.ndarray,
+    method: str = "spatial_basis",
+) -> np.ndarray:
+    """Calculate the voxel weights that give each parcel time course.
+
+    The parcel time course is the (rescaled) 1st PC of the voxels in the
+    parcel. This only depends on the covariance of the voxels in each parcel,
+    so the voxel time courses are not needed.
+
+    Parameters
+    ----------
+    voxel_cov : callable
+        Function that takes an array of voxel indices and returns the
+        (len(inds), len(inds)) covariance (normalised by n_samples) of these
+        voxels.
+    parcellation_asmatrix: np.ndarray
+        (nvoxels x n_parcels) parcel weights for each voxel.
+    method : str, optional
+        'pca' or 'spatial_basis', see :code:`_get_parcel_data_pca`.
+
+    Returns
+    -------
+    voxel_weightings : np.ndarray
+        (nvoxels x n_parcels) such that the parcel time courses are
+        voxel_weightings.T @ (voxel_data - voxel_data.mean(axis=1)).
+    """
+    print(f"Calculating parcel time courses with {method}")
+
+    if method not in ["pca", "spatial_basis"]:
+        raise ValueError("Invalid method specified")
+
+    n_parcels = parcellation_asmatrix.shape[1]
+    voxel_weightings = np.zeros(parcellation_asmatrix.shape)
+
+    if method == "pca":
+        print(
+            "PCA assumes a binary parcellation.\n"
+            "Parcellation will be binarised if it is not already "
+            "(any voxels >0 are set to 1, otherwise voxels are set to 0), "
+            "i.e. any weightings will be ignored.\n"
+        )
+
+        # Check that each voxel is only a member of one parcel
+        if any(np.sum(parcellation_asmatrix, axis=1) > 1):
+            print(
+                "WARNING: Each voxel is meant to be a member of at most one "
+                "parcel, when using the PCA method.\nResults may not be sensible"
+            )
+
+    def warn_empty(pp):
+        print(
+            f"WARNING: An empty parcel mask was found for parcel {pp} "
+            "when calculating its time-courses\n"
+            "The parcel will have a flat zero time-course.\n"
+            "Check this does not cause further problems with the analysis.\n"
+        )
+
+    for pp in range(n_parcels):
+        if not np.any(parcellation_asmatrix[:, pp] != 0):
+            warn_empty(pp)
+            continue
+
+        if method == "spatial_basis":
+            # Scale group maps so all have a positive peak of height 1 in case
+            # there is a very noisy outlier, choose the sign from the top 5%
+            # of magnitudes
+            thresh = np.percentile(np.abs(parcellation_asmatrix[:, pp]), 95)
+            mapsign = np.sign(
+                np.mean(
+                    parcellation_asmatrix[parcellation_asmatrix[:, pp] > thresh, pp]
+                )
+            )
+            scaled_parcellation = (
+                mapsign
+                * parcellation_asmatrix[:, pp]
+                / np.max(np.abs(parcellation_asmatrix[:, pp]))
+            )
+
+            # Weight all voxels by the spatial map in question
+            inds = np.where(scaled_parcellation > 0)[0]
+            spatial_map = scaled_parcellation[inds]
+
+            # 0.5 is a decent arbitrary threshold used in fslnets after
+            # playing with various maps
+            this_mask = spatial_map > 0.5
+        else:
+            inds = np.where(parcellation_asmatrix[:, pp] > 0)[0]
+            spatial_map = np.ones(len(inds))
+            this_mask = np.ones(len(inds), dtype=bool)
+
+        if not np.any(this_mask):
+            warn_empty(pp)
+            continue
+
+        # Covariance of the (weighted) voxels in the parcel
+        cov = voxel_cov(inds)
+        temporal_std = np.maximum(np.sqrt(np.diag(cov)), np.finfo(float).eps)
+        weighted_cov = spatial_map[:, None] * cov * spatial_map[None, :]
+
+        # 1st PC of the weighted voxels. The PCA scores are U.T @ weighted_ts
+        # and their standard deviation is the square root of the eigenvalue
+        d, U = misc.top_eig(weighted_cov, k=1)
+        U = U[:, 0]
+        pca_std = np.maximum(np.sqrt(np.abs(d[0])), np.finfo(float).eps)
+
+        # Restore sign and scaling of parcel time-series
+        # U indicates the weight with which each voxel in the parcel
+        # contributes to the 1st PC
+        relative_weighting = np.abs(U[this_mask]) / np.sum(np.abs(U[this_mask]))
+        ts_sign = np.sign(np.mean(U[this_mask]))
+        ts_scale = np.dot(relative_weighting, temporal_std[this_mask])
+
+        voxel_weightings[inds, pp] = ts_sign * ts_scale / pca_std * U * spatial_map
+
+    return voxel_weightings
 
 
 def _get_parcel_data_pca(
@@ -625,215 +803,35 @@ def _get_parcel_data_pca(
         Boolean assignments indicating for each voxel the winner takes all
         parcel it belongs to
     """
-    print(f"Calculating parcel time courses with {method}")
-
     if parcellation_asmatrix.shape[0] != voxel_data.shape[0]:
         raise ValueError(
             f"Parcellation has {parcellation_asmatrix.shape[0]} voxels, "
             f"but data has {voxel_data.shape[0]}"
         )
 
-    if len(voxel_data.shape) == 2:
-        # Add dim for trials
-        voxel_data = np.expand_dims(voxel_data, axis=2)
-        added_dim = True
-    else:
-        added_dim = False
-
-    n_parcels = parcellation_asmatrix.shape[1]
-    n_time = voxel_data.shape[1]
-    n_trials = voxel_data.shape[2]
-
     # Combine the trials and time dimensions together, we will
-    # re-separate them after the parcel times eries are computed
-    voxel_data_reshaped = np.reshape(
-        voxel_data, (voxel_data.shape[0], n_time * n_trials)
+    # re-separate them after the parcel time series are computed
+    voxel_data_reshaped = np.reshape(voxel_data, (voxel_data.shape[0], -1))
+    voxel_mean = np.mean(voxel_data_reshaped, axis=1)
+
+    def voxel_cov(inds):
+        x = voxel_data_reshaped[inds] - voxel_mean[inds, None]
+        return x @ x.T / x.shape[1]
+
+    voxel_weightings = _get_parcel_weights(voxel_cov, parcellation_asmatrix, method)
+
+    parcel_data = (
+        voxel_weightings.T @ voxel_data_reshaped
+        - (voxel_weightings.T @ voxel_mean)[:, None]
     )
-    parcel_data_reshaped = np.zeros((n_parcels, n_time * n_trials))
-
-    voxel_weightings = np.zeros(parcellation_asmatrix.shape)
-
-    if method == "spatial_basis":
-        # estimate temporal-STD of data for normalisation
-        temporal_std = np.maximum(
-            np.std(voxel_data_reshaped, axis=1), np.finfo(float).eps
-        )
-
-        for pp in range(n_parcels):
-            # Scale group maps so all have a positive peak of height 1 in case
-            # there is a very noisy outlier, choose the sign from the top 5%
-            # of magnitudes
-            thresh = np.percentile(np.abs(parcellation_asmatrix[:, pp]), 95)
-            mapsign = np.sign(
-                np.mean(
-                    parcellation_asmatrix[parcellation_asmatrix[:, pp] > thresh, pp]
-                )
-            )
-            scaled_parcellation = (
-                mapsign
-                * parcellation_asmatrix[:, pp]
-                / np.max(np.abs(parcellation_asmatrix[:, pp]))
-            )
-
-            # Weight all voxels by the spatial map in question.
-            # Apply the mask first then weight to reduce memory use
-            weighted_ts = voxel_data_reshaped[scaled_parcellation > 0, :]
-            weighted_ts = np.multiply(
-                weighted_ts,
-                np.reshape(scaled_parcellation[scaled_parcellation > 0], [-1, 1]),
-            )
-            weighted_ts = weighted_ts - np.reshape(
-                np.mean(weighted_ts, axis=1), [-1, 1]
-            )
-
-            # Perform SVD and take scores of 1st PC as the node time-series
-            #
-            # U is nVoxels by nComponents - the basis transformation
-            # S*V holds nComponents by time sets of PCA scores
-            # - the time series data in the new basis
-            d, U = scipy.sparse.linalg.eigs(weighted_ts @ weighted_ts.T, k=1)
-            U = np.real(U)
-            d = np.real(d)
-            S = np.sqrt(np.abs(np.real(d)))
-            V = weighted_ts.T @ U / S
-            pca_scores = S @ V.T
-
-            # 0.5 is a decent arbitrary threshold used in fslnets after
-            # playing with various maps
-            this_mask = scaled_parcellation[scaled_parcellation > 0] > 0.5
-
-            if np.any(this_mask):  # the mask is non-zero
-                # U is the basis by which voxels in the mask are weighted to
-                # form the scores of the 1st PC
-                relative_weighting = np.abs(U[this_mask]) / np.sum(np.abs(U[this_mask]))
-                ts_sign = np.sign(np.mean(U[this_mask]))
-                ts_scale = np.dot(
-                    np.reshape(relative_weighting, [-1]),
-                    temporal_std[scaled_parcellation > 0][this_mask],
-                )
-
-                node_ts = (
-                    ts_sign
-                    * (ts_scale / np.maximum(np.std(pca_scores), np.finfo(float).eps))
-                    * pca_scores
-                )
-
-                inds = np.where(scaled_parcellation > 0)[0]
-                voxel_weightings[inds, pp] = (
-                    ts_sign
-                    * ts_scale
-                    / np.maximum(np.std(pca_scores), np.finfo(float).eps)
-                    * (
-                        np.reshape(U, [-1])
-                        * scaled_parcellation[scaled_parcellation > 0].T
-                    )
-                )
-
-            else:
-                print(
-                    f"WARNING: An empty parcel mask was found for parcel {pp} "
-                    "when calculating its time-courses\n"
-                    "The parcel will have a flat zero time-course.\n"
-                    "Check this does not cause further problems with the analysis.\n"
-                )
-
-                node_ts = np.zeros(n_time * n_trials)
-                inds = np.where(scaled_parcellation > 0)[0]
-                voxel_weightings[inds, pp] = 0
-
-            parcel_data_reshaped[pp, :] = node_ts
-
-    elif method == "pca":
-        print(
-            "PCA assumes a binary parcellation.\n"
-            "Parcellation will be binarised if it is not already "
-            "(any voxels >0 are set to 1, otherwise voxels are set to 0), "
-            "i.e. any weightings will be ignored.\n"
-        )
-
-        # Check that each voxel is only a member of one parcel
-        if any(np.sum(parcellation_asmatrix, axis=1) > 1):
-            print(
-                "WARNING: Each voxel is meant to be a member of at most one "
-                "parcel, when using the PCA method.\nResults may not be sensible"
-            )
-
-        # Estimate temporal-STD of data for normalisation
-        temporal_std = np.maximum(
-            np.std(voxel_data_reshaped, axis=1), np.finfo(float).eps
-        )
-
-        # Perform PCA on each parcel and select 1st PC scores to represent parcel
-        for pp in range(n_parcels):
-            if any(parcellation_asmatrix[:, pp]):  # non-zero
-                parcel_data = voxel_data_reshaped[parcellation_asmatrix[:, pp] > 0, :]
-                parcel_data = parcel_data - np.reshape(
-                    np.mean(parcel_data, axis=1), [-1, 1]
-                )
-
-                # Perform svd and take scores of 1st PC as the node time-series
-                #
-                # U is nVoxels by nComponents - the basis transformation
-                # S*V holds nComponents by time sets of PCA scores
-                # - the time series data in the new basis
-                d, U = scipy.sparse.linalg.eigs(parcel_data @ parcel_data.T, k=1)
-                U = np.real(U)
-                d = np.real(d)
-                S = np.sqrt(np.abs(np.real(d)))
-                V = parcel_data.T @ U / S
-                pca_scores = S @ V.T
-
-                # Restore sign and scaling of parcel time-series
-                # U indicates the weight with which each voxel in the parcel
-                # contributes to the 1st PC
-                relative_weighting = np.abs(U) / np.sum(np.abs(U))
-                ts_sign = np.sign(np.mean(U))
-                ts_scale = np.dot(
-                    np.reshape(relative_weighting, [-1]),
-                    temporal_std[parcellation_asmatrix[:, pp] > 0],
-                )
-
-                node_ts = (
-                    ts_sign
-                    * ts_scale
-                    / np.maximum(np.std(pca_scores), np.finfo(float).eps)
-                ) * pca_scores
-
-                inds = np.where(parcellation_asmatrix[:, pp] > 0)[0]
-                voxel_weightings[inds, pp] = (
-                    ts_sign
-                    * ts_scale
-                    / np.maximum(np.std(pca_scores), np.finfo(float).eps)
-                    * np.reshape(U, [-1])
-                )
-
-            else:
-                print(
-                    f"WARNING: An empty parcel mask was found for parcel {pp} "
-                    "when calculating its time-courses\n"
-                    "The parcel will have a flat zero time-course.\n"
-                    "Check this does not cause further problems with the analysis.\n"
-                )
-
-                node_ts = np.zeros(n_time * n_trials)
-                inds = np.where(parcellation_asmatrix[:, pp] > 0)[0]
-                voxel_weightings[inds, pp] = 0
-
-            parcel_data_reshaped[pp, :] = node_ts
-
-    else:
-        raise ValueError("Invalid method specified")
 
     # Re-separate the trials and time dimensions
-    parcel_data = np.reshape(parcel_data_reshaped, (n_parcels, n_time, n_trials))
-    if added_dim:
-        parcel_data = np.squeeze(parcel_data, axis=2)
+    parcel_data = np.reshape(parcel_data, (-1,) + voxel_data.shape[1:])
 
     # Compute voxel_assignments using winner takes all
     voxel_assignments = np.zeros(voxel_weightings.shape)
-    for ivoxel in range(voxel_weightings.shape[0]):
-        winning_parcel = np.argmax(voxel_weightings[ivoxel, :])
-        voxel_assignments[ivoxel, winning_parcel] = 1
+    winning_parcel = np.argmax(voxel_weightings, axis=1)
+    voxel_assignments[np.arange(voxel_weightings.shape[0]), winning_parcel] = 1
 
     return parcel_data, voxel_weightings, voxel_assignments
 

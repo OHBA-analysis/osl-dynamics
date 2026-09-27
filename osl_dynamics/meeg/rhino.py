@@ -2301,12 +2301,7 @@ def forward_model(
     print("Calculating forward model")
     print("-------------------------")
 
-    # Compute MNE bem solution
-    if model == "Single Layer":
-        conductivity = (0.3,)  # for single layer
-    elif model == "Triple Layer":
-        conductivity = (0.3, 0.006, 0.3)  # for three layers
-    else:
+    if model not in ["Single Layer", "Triple Layer"]:
         raise ValueError(f"{model} is an invalid model choice")
 
     vol_src = _setup_volume_source_space(
@@ -2316,25 +2311,11 @@ def forward_model(
         exclude=exclude,
     )
 
-    # The BEM solution requires a BEM model which describes the geometry of the
-    # head the conductivities of the different tissues.
-    # See: https://mne.tools/stable/auto_tutorials/forward/30_forward.html#sphx-glr-auto-tutorials-forward-30-forward-py
-    #
-    # Note that the BEM does not involve any use of transforms between spaces.
-    # The BEM only depends on the head geometry and conductivities.
-    # It is therefore independent from the MEG data and the head position.
-    #
-    # This will get the surfaces from: subjects_dir/subject/bem/inner_skull.surf,
-    # which is where rhino.setup_volume_source_space will have put it.
+    # Save the BEM solution so we can compute the forward model for other
+    # dipole locations later, see source_recon.virtual_electrodes
+    bem = _make_bem_solution(fns, model, verbose=verbose)
+    mne.write_bem_solution(fns.bem_solution, bem, overwrite=True, verbose=verbose)
 
-    model = mne.make_bem_model(
-        subjects_dir=fns.outdir,
-        subject=fns.head_model_id,
-        ico=None,
-        conductivity=conductivity,
-        verbose=verbose,
-    )
-    bem = mne.make_bem_solution(model)
     fwd = _make_fwd_solution(
         fns,
         src=vol_src,
@@ -2347,6 +2328,52 @@ def forward_model(
     mne.write_forward_solution(fns.fwd_model, fwd, overwrite=True)
 
     print("Forward model complete.")
+
+
+def _make_bem_solution(
+    fns: OSLFilenames, model: str, verbose: bool = False
+) -> mne.bem.ConductorModel:
+    """Compute the BEM solution.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    model : str
+        'Single Layer' or 'Triple Layer'.
+    verbose : bool, optional
+        Should we print info to the screen?
+
+    Returns
+    -------
+    bem : mne.bem.ConductorModel
+        BEM solution.
+    """
+    if model == "Single Layer":
+        conductivity = (0.3,)  # for single layer
+    elif model == "Triple Layer":
+        conductivity = (0.3, 0.006, 0.3)  # for three layers
+    else:
+        raise ValueError(f"{model} is an invalid model choice")
+
+    # The BEM solution requires a BEM model which describes the geometry of the
+    # head the conductivities of the different tissues.
+    # See: https://mne.tools/stable/auto_tutorials/forward/30_forward.html#sphx-glr-auto-tutorials-forward-30-forward-py
+    #
+    # Note that the BEM does not involve any use of transforms between spaces.
+    # The BEM only depends on the head geometry and conductivities.
+    # It is therefore independent from the MEG data and the head position.
+    #
+    # This will get the surfaces from: subjects_dir/subject/bem/inner_skull.surf,
+    # which is where rhino.setup_volume_source_space will have put it.
+    bem_model = mne.make_bem_model(
+        subjects_dir=fns.outdir,
+        subject=fns.head_model_id,
+        ico=None,
+        conductivity=conductivity,
+        verbose=verbose,
+    )
+    return mne.make_bem_solution(bem_model, verbose=verbose)
 
 
 def _setup_volume_source_space(

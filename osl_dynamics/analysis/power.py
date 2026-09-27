@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from osl_dynamics import files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
 from osl_dynamics.utils import array_ops, plotting
-from osl_dynamics.meeg.parcellation import parcel_vector_to_voxel_grid
+from osl_dynamics.meeg.parcellation import parcel_vector_to_nifti
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -259,7 +259,6 @@ def variance_from_spectra(
 
 def save(
     power_map: np.ndarray,
-    mask_file: str,
     parcellation_file: str,
     filename: Optional[str] = None,
     component: int = 0,
@@ -279,8 +278,6 @@ def save(
         (n_modes, n_channels) or (n_channels,). A (..., n_channels, n_channels)
         array can also be passed. Warning: this function
         cannot be used if :code:`n_modes=n_channels`.
-    mask_file : str
-        Mask file used to preprocess the training data.
     parcellation_file : str
         Parcellation file used to parcellate the training data.
     filename : str, optional
@@ -327,7 +324,6 @@ def save(
                 "filename must have one of following extensions: "
                 f"{' '.join(allowed_extensions)}."
             )
-    mask_file = files.check_exists(mask_file, files.mask.directory)
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
     )
@@ -382,7 +378,6 @@ def save(
         for i in trange(n_modes, desc="Saving images"):
             fig, ax = plotting.plot_brain_surface(
                 power_map[i],
-                mask_file=mask_file,
                 parcellation_file=parcellation_file,
                 title=titles[i],
                 **plot_kwargs,
@@ -394,16 +389,12 @@ def save(
     else:
         if ".nii" in filename:
             # Convert parcel values to voxel values
-            power_map = [
-                parcel_vector_to_voxel_grid(mask_file, parcellation_file, p)
-                for p in power_map
-            ]
-            power_map = np.moveaxis(power_map, 0, -1)
+            niis = [parcel_vector_to_nifti(p, parcellation_file) for p in power_map]
+            power_map = np.moveaxis([nii.get_fdata() for nii in niis], 0, -1)
 
             # Save as nii file
             _logger.info(f"Saving {filename}")
-            mask = nib.load(mask_file)
-            nii = nib.Nifti1Image(power_map, mask.affine, mask.header)
+            nii = nib.Nifti1Image(power_map, niis[0].affine)
             nib.save(nii, filename)
 
         else:
@@ -415,7 +406,6 @@ def save(
                 )
                 plotting.plot_brain_surface(
                     power_map[i],
-                    mask_file=mask_file,
                     parcellation_file=parcellation_file,
                     title=titles[i],
                     filename=output_file,
@@ -448,7 +438,6 @@ def save(
 def multi_save(
     group_power_map: np.ndarray,
     session_power_map: np.ndarray,
-    mask_file: str,
     parcellation_file: str,
     filename: Optional[str] = None,
     sessions: Optional[List[int]] = None,
@@ -476,8 +465,6 @@ def multi_save(
         n_channels) or (n_channels,). A (..., n_channels, n_channels) array can
         also be passed. Warning: this function cannot be used if
         :code:`n_modes=n_channels`.
-    mask_file : str
-        Mask file used to preprocess the training data.
     parcellation_file : str
         Parcellation file used to parcellate the training data.
     filename : str, optional
@@ -560,7 +547,6 @@ def multi_save(
     save(
         group_power_map,
         filename=group_filename,
-        mask_file=mask_file,
         parcellation_file=parcellation_file,
         plot_kwargs=plot_kwargs,
     )
@@ -584,7 +570,6 @@ def multi_save(
         save(
             session_power_map[sess],
             filename=session_filename,
-            mask_file=mask_file,
             parcellation_file=parcellation_file,
             plot_kwargs=plot_kwargs,
         )

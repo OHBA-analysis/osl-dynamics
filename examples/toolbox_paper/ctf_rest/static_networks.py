@@ -61,7 +61,6 @@ pow_map = np.swapaxes(pow_map, 0, 1)  # (freq_bands, subjects, ...) -> (subjects
 mean_pow_map = np.mean(pow_map, axis=0)  # average over subjects
 power.save(
     mean_pow_map,
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     plot_kwargs={
         "views": ["lateral"],
@@ -138,13 +137,11 @@ pow_diff, pvalues = statistics.group_diff_max_stat_perm(
 # Plot significant power map differences
 power.save(
     pow_diff,
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     filename=f"{output_dir}/pow_diff_.png",
 )
 power.save(
     pvalues,
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     plot_kwargs={
         "cmap": "Greens_r",

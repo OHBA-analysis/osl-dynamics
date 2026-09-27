@@ -41,7 +41,6 @@ means = np.load(f"{results_dir}/inf_params/means.npy")
 # Plot
 power.save(
     means,
-    mask_file="MNI152_T1_2mm_brain.nii.gz",
     parcellation_file="melodic_IC.nii.gz",
     filename=f"{plots_dir}/means_.png",
 )
