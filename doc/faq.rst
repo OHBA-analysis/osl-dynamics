@@ -250,7 +250,7 @@ I've encountered a NaN when I tried to train a model? Why did this happen and ho
 
 Models in osl-dynamics are trained using 'stochastic gradient decent'. We believe the NaN values in the loss function arise from a bad update to the model parameters.
 
-A training step whose loss or gradients contain a NaN or inf is skipped: the model parameters are not updated and the batch is left out of the loss reported for the epoch. A warning is logged at the end of each epoch in which a step was skipped. An occasional skipped step does not affect the model. Training only stops if every step in an epoch was skipped.
+A training step whose loss or gradients contain a NaN or inf is skipped: the model parameters are not updated and the batch is left out of the loss reported for the epoch. A warning is logged at the end of each epoch in which a step was skipped, and the number of skipped steps in each epoch is saved in the training history (:code:`history["skipped_steps"]`). An occasional skipped step does not affect the model. Training only stops if every step in an epoch was skipped.
 
 If many steps are skipped, or training stops, there a few things you can do to help resolve this:
 

@@ -445,10 +445,13 @@ def latest_checkpoint(checkpoint_dir: str) -> str:
 class SkippedStepsCallback(callbacks.Callback):
     """Callback to report training steps skipped because they were not finite.
 
-    Logs a warning at the end of each epoch in which a step was skipped (see
-    :code:`ModelBase.skip_non_finite_steps`). If every step in an epoch was
-    skipped the model can't learn, so an error is raised as it would have
-    been before steps were skipped.
+    The number of steps skipped in each epoch (see
+    :code:`ModelBase.skip_non_finite_steps`) is added to the training
+    history as :code:`skipped_steps`, and a warning is logged at the end of
+    each epoch in which a step was skipped. The warning suggests what to
+    change if more than :code:`warn_fraction` of the steps were skipped. If
+    every step in an epoch was skipped the model can't learn, so an error
+    is raised as it would have been before steps were skipped.
 
     Parameters
     ----------
@@ -457,6 +460,10 @@ class SkippedStepsCallback(callbacks.Callback):
     steps_per_epoch : int
         Number of steps in an epoch.
     """
+
+    # Fraction of the steps in an epoch above which the skipped steps are
+    # more than occasional
+    warn_fraction = 0.01
 
     def __init__(self, n_skipped_steps: tf.Variable, steps_per_epoch: int) -> None:
         super().__init__()
@@ -468,6 +475,11 @@ class SkippedStepsCallback(callbacks.Callback):
 
     def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
         n_skipped = int(self.n_skipped_steps.numpy()) - self.n_skipped_before
+
+        # Add to the training history
+        if logs is not None:
+            logs["skipped_steps"] = n_skipped
+
         if n_skipped >= self.steps_per_epoch:
             raise tf.errors.InvalidArgumentError(
                 None,
@@ -476,10 +488,17 @@ class SkippedStepsCallback(callbacks.Callback):
                 "in the loss or gradients.",
             )
         if n_skipped > 0:
-            _logger.warning(
+            message = (
                 f"Skipped {n_skipped} of {self.steps_per_epoch} training steps "
                 f"in epoch {epoch + 1}: the loss or gradients had a NaN or inf."
             )
+            if n_skipped > self.warn_fraction * self.steps_per_epoch:
+                message += (
+                    f" This is more than {100 * self.warn_fraction:g}% of the "
+                    "steps: check the data for bad segments, lower the "
+                    "learning rate or increase the batch size (see the FAQ)."
+                )
+            _logger.warning(message)
 
 
 class TensorBoardCallback(callbacks.TensorBoard):
