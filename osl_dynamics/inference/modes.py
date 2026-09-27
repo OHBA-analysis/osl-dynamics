@@ -4,7 +4,7 @@ time courses.
 """
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import mne
 import numpy as np
@@ -217,13 +217,33 @@ def correlate_modes(
     correlation_matrix : np.ndarray
         Correlation matrix. Shape is (n_modes, n_modes).
     """
-    correlation = np.zeros(
-        (mode_time_course_1.shape[1], mode_time_course_2.shape[1]),
-    )
-    for i, mode1 in enumerate(mode_time_course_1.T):
-        for j, mode2 in enumerate(mode_time_course_2.T):
-            correlation[i, j] = np.corrcoef(mode1, mode2)[0, 1]
-    return correlation
+    n_modes = mode_time_course_1.shape[1]
+    correlation = np.corrcoef(mode_time_course_1, mode_time_course_2, rowvar=False)
+    return correlation[:n_modes, n_modes:]
+
+
+def _match_to_first(items: Tuple, similarity: Callable) -> List[np.ndarray]:
+    """Order of each item's modes that best matches the first item's.
+
+    Parameters
+    ----------
+    items : tuple
+        Items to match, e.g. sets of vectors or covariances.
+    similarity : callable
+        :code:`similarity(first, item)` must return a (n_modes, n_modes)
+        array, larger for more similar, with the first item's modes along
+        the rows.
+
+    Returns
+    -------
+    orders : list of np.ndarray
+        Order for each item (always unchanged for the first item). Found with
+        the Hungarian algorithm, maximising the total similarity.
+    """
+    orders = [np.arange(len(items[0]))]
+    for item in items[1:]:
+        orders.append(optimize.linear_sum_assignment(-similarity(items[0], item))[1])
+    return orders
 
 
 def match_covariances(
@@ -272,38 +292,20 @@ def match_covariances(
             "Comparison must be 'rv_coefficient', 'correlation' or 'frobenius'."
         )
 
-    # Number of arguments and number of matrices in each argument passed
-    n_args = len(covariances)
-    n_matrices = covariances[0].shape[0]
+    def similarity(first, covs):
+        n = len(first)
+        if comparison == "frobenius":
+            return -np.linalg.norm(first[:, None] - covs[None], axis=(2, 3))
+        if comparison == "correlation":
+            flat = np.concatenate([first, covs]).reshape(2 * n, -1)
+            return np.corrcoef(flat)[:n, n:]
+        rv = metrics.pairwise_rv_coefficient(np.concatenate([first, covs]))
+        return rv[:n, n:]
 
-    # Calculate the similarity between matrices
-    F = np.empty([n_matrices, n_matrices])
-    matched_covariances = [covariances[0]]
-    orders = [np.arange(covariances[0].shape[0])]
-    for i in range(1, n_args):
-        for j in range(n_matrices):
-            # Find the matrix that is most similar to matrix j
-            for k in range(n_matrices):
-                if comparison == "frobenius":
-                    F[j, k] = np.linalg.norm(covariances[i][k] - covariances[0][j])
-                elif comparison == "correlation":
-                    F[j, k] = -np.corrcoef(
-                        covariances[i][k].flatten(), covariances[0][j].flatten()
-                    )[0, 1]
-                else:
-                    F[j, k] = -metrics.pairwise_rv_coefficient(
-                        np.array([covariances[i][k], covariances[0][j]])
-                    )[0, 1]
-        order = optimize.linear_sum_assignment(F)[1]
-
-        # Add the ordered matrix to the list
-        matched_covariances.append(covariances[i][order])
-        orders.append(order)
-
+    orders = _match_to_first(covariances, similarity)
     if return_order:
         return orders
-    else:
-        return tuple(matched_covariances)
+    return tuple(c[order] for c, order in zip(covariances, orders))
 
 
 def match_vectors(
@@ -349,34 +351,15 @@ def match_vectors(
     if comparison not in ["correlation", "cosine_similarity"]:
         raise ValueError("Comparison must be 'correlation' or 'cosine_similarity'.")
 
-    # Number of arguments and number of vectors in each argument passed
-    n_args = len(vectors)
-    n_vectors = vectors[0].shape[0]
+    def similarity(first, v):
+        if comparison == "correlation":
+            return np.corrcoef(first, v)[: len(first), len(first) :]
+        return 1 - spatial.distance.cdist(first, v, metric="cosine")
 
-    # Calculate the similarity between vectors
-    F = np.empty([n_vectors, n_vectors])
-    matched_vectors = [vectors[0]]
-    orders = [np.arange(vectors[0].shape[0])]
-    for i in range(1, n_args):
-        for j in range(n_vectors):
-            # Find the vector that is most similar to vector j
-            for k in range(n_vectors):
-                if comparison == "correlation":
-                    F[j, k] = -np.corrcoef(vectors[i][k], vectors[0][j])[0, 1]
-                elif comparison == "cosine_similarity":
-                    F[j, k] = -(
-                        1 - spatial.distance.cosine(vectors[i][k], vectors[0][j])
-                    )
-        order = optimize.linear_sum_assignment(F)[1]
-
-        # Add the ordered vector to the list
-        matched_vectors.append(vectors[i][order])
-        orders.append(order)
-
+    orders = _match_to_first(vectors, similarity)
     if return_order:
         return orders
-    else:
-        return tuple(matched_vectors)
+    return tuple(v[order] for v, order in zip(vectors, orders))
 
 
 def match_modes(
@@ -422,24 +405,18 @@ def match_modes(
     # first n_samples
     n_samples = min([stc.shape[0] for stc in mode_time_courses])
 
-    # Match time courses based on correlation
-    matched_mode_time_courses = [mode_time_courses[0][:n_samples]]
-    orders = [np.arange(mode_time_courses[0].shape[1])]
-    for mode_time_course in mode_time_courses[1:]:
-        correlation = correlate_modes(
-            mode_time_courses[0][:n_samples], mode_time_course[:n_samples]
-        )
-        correlation = np.nan_to_num(
-            np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1)
-        )
-        matches = optimize.linear_sum_assignment(-correlation)
-        matched_mode_time_courses.append(mode_time_course[:n_samples, matches[1]])
-        orders.append(matches[1])
+    # Match time courses based on correlation, with modes along the rows. A
+    # mode that never changes has no correlation: treat it as the least similar
+    def similarity(first, mtc):
+        correlation = correlate_modes(first.T, mtc.T)
+        # (and if no mode changes, all modes as equally similar)
+        return np.nan_to_num(np.nan_to_num(correlation, nan=np.nanmin(correlation) - 1))
 
+    mode_time_courses = [mtc[:n_samples] for mtc in mode_time_courses]
+    orders = _match_to_first([mtc.T for mtc in mode_time_courses], similarity)
     if return_order:
         return orders
-    else:
-        return matched_mode_time_courses
+    return [mtc[:, order] for mtc, order in zip(mode_time_courses, orders)]
 
 
 def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
@@ -766,21 +743,27 @@ def _mode_correlations(
     features = [np.asarray(f, dtype=np.float64) for f in features]
     if len(features) < 2:
         raise ValueError("features must contain at least two runs.")
-    for f in features:
-        if f.ndim != 2 or f.shape[1] != features[0].shape[1]:
-            raise ValueError(
-                "each run's features must be (n_modes, n_features), with the "
-                "same n_features for every run."
-            )
+    if any(f.ndim != 2 or f.shape[1] != features[0].shape[1] for f in features):
+        raise ValueError(
+            "each run's features must be (n_modes, n_features), with the "
+            "same n_features for every run."
+        )
 
     # Describe each mode by what distinguishes it from the other modes of
     # its run
-    features = [f - f.mean(axis=0, keepdims=True) for f in features]
+    features = [f - f.mean(axis=0) for f in features]
 
     run = np.concatenate([np.full(len(f), i) for i, f in enumerate(features)])
     modes = [np.flatnonzero(run == i) for i in range(len(features))]
-    corr = np.corrcoef(np.concatenate(features))
-    return corr, run, modes
+    return np.corrcoef(np.concatenate(features)), run, modes
+
+
+def _mean_off_diagonal(matrix: np.ndarray) -> float:
+    """Mean of the off-diagonal elements of a square matrix (NaN if 1x1)."""
+    n = len(matrix)
+    if n == 1:
+        return np.nan
+    return (matrix.sum() - np.trace(matrix)) / (n * (n - 1))
 
 
 def _otsu_threshold(values: np.ndarray) -> float:
@@ -865,64 +848,65 @@ def match_runs(
     ...     maps.append(np.diagonal(raw, axis1=-2, axis2=-1))
     >>> networks = match_runs(maps)
     """
-    is_array = isinstance(features, np.ndarray)
     corr, run, modes = _mode_correlations(features)
-    n_runs = len(modes)
-
-    if threshold is None:
-        best_matches = [
-            corr[i, modes[r]].max()
-            for i in range(len(corr))
-            for r in range(n_runs)
-            if r != run[i]
-        ]
-        threshold = _otsu_threshold(np.array(best_matches))
-
-    # Average-linkage agglomerative clustering with a cannot-link constraint
-    # between modes of the same run
-    clusters = [[i] for i in range(len(corr))]
-    in_run = np.eye(n_runs, dtype=bool)[run]  # (n_clusters, n_runs)
-    similarity = corr.copy()
-    np.fill_diagonal(similarity, -np.inf)
-    while True:
-        allowed = ~(in_run.astype(int) @ in_run.T.astype(int)).astype(bool)
-        s = np.where(allowed, similarity, -np.inf)
-        a, b = np.unravel_index(np.argmax(s), s.shape)
-        if s[a, b] < threshold:
-            break
-
-        # Merge b into a: the average linkage similarity to every other
-        # cluster is the size-weighted mean of a's and b's
-        n_a, n_b = len(clusters[a]), len(clusters[b])
-        similarity[a] = (n_a * similarity[a] + n_b * similarity[b]) / (n_a + n_b)
-        similarity[:, a] = similarity[a]
-        similarity[a, a] = -np.inf
-        clusters[a] += clusters[b]
-        in_run[a] |= in_run[b]
-
-        del clusters[b]
-        similarity = np.delete(np.delete(similarity, b, axis=0), b, axis=1)
-        in_run = np.delete(in_run, b, axis=0)
-
-    # Number networks by the number of runs they are found in, then by how
-    # well their modes agree
-    def _cohesion(members):
-        if len(members) == 1:
-            return -np.inf
-        c = corr[np.ix_(members, members)]
-        return c[np.triu_indices(len(members), k=1)].mean()
-
-    clusters.sort(key=lambda c: (-len(c), -_cohesion(c)))
-    labels = np.empty(len(corr), dtype=int)
-    for network, members in enumerate(clusters):
-        labels[members] = network
+    labels, threshold = _networks(corr, run, modes, threshold)
     networks = [labels[m] for m in modes]
-    if is_array:
+    if isinstance(features, np.ndarray):
         networks = np.array(networks)
 
     if return_threshold:
         return networks, threshold
     return networks
+
+
+def _networks(
+    corr: np.ndarray,
+    run: np.ndarray,
+    modes: List[np.ndarray],
+    threshold: Optional[float],
+) -> Tuple[np.ndarray, float]:
+    """Network of each mode, from the correlations of :func:`_mode_correlations`.
+
+    See :func:`match_runs`. Returns the network of each mode (as indexed in
+    corr) and the threshold.
+    """
+    if threshold is None:
+        best_matches = [
+            corr[i, m].max()
+            for i in range(len(corr))
+            for r, m in enumerate(modes)
+            if r != run[i]
+        ]
+        threshold = _otsu_threshold(np.array(best_matches))
+
+    # Average-linkage agglomerative clustering. Two modes of the same run
+    # must not be in the same network: their similarity is -inf, which stays
+    # -inf in any average, so clusters containing them are never merged.
+    similarity = np.where(run[:, None] == run[None, :], -np.inf, corr)
+    clusters = [[i] for i in range(len(corr))]
+    while len(clusters) > 1:
+        a, b = sorted(np.unravel_index(np.argmax(similarity), similarity.shape))
+        if similarity[a, b] < threshold:
+            break
+        n_a, n_b = len(clusters[a]), len(clusters[b])
+        merged = (n_a * similarity[a] + n_b * similarity[b]) / (n_a + n_b)
+        similarity[a], similarity[:, a] = merged, merged
+        similarity[a, a] = -np.inf
+        clusters[a] += clusters.pop(b)
+        similarity = np.delete(np.delete(similarity, b, axis=0), b, axis=1)
+
+    # Number networks by the number of runs they are found in, then by how
+    # well their modes agree
+    clusters.sort(
+        key=lambda c: (
+            -len(c),
+            -np.nan_to_num(_mean_off_diagonal(corr[np.ix_(c, c)]), nan=-np.inf),
+        )
+    )
+    labels = np.empty(len(corr), dtype=int)
+    for network, members in enumerate(clusters):
+        labels[members] = network
+    return labels, threshold
 
 
 def run_families(
@@ -955,6 +939,7 @@ def run_families(
 
 def select_run(
     features: Union[np.ndarray, List[np.ndarray]],
+    free_energy: Optional[np.ndarray] = None,
     threshold: Optional[float] = None,
     return_info: bool = False,
 ) -> Union[int, Tuple[int, Dict]]:
@@ -969,10 +954,16 @@ def select_run(
     1. Group the modes of all runs into networks (:func:`match_runs`).
     2. Group runs that found the same set of networks into families
        (:func:`run_families`).
-    3. Take the largest family - the solution found most often - and, if
-       two are as large, the one whose runs agree best.
+    3. Take the largest family - the solution found most often. If two or
+       more are as large, take the one with the lowest median free energy
+       (or, if free energies are not given, the one whose runs agree best).
     4. Within it, take the medoid: the run whose modes correlate best, on
        average, with the same networks in the other runs of the family.
+
+    The choice is only as reliable as the family sizes: with few runs,
+    families are small and often equally large, and the tie-break decides.
+    Train enough runs (e.g. 20) for the most common solution to stand out,
+    and check the sizes of the families in :code:`info`.
 
     Parameters
     ----------
@@ -980,6 +971,9 @@ def select_run(
         Features of each mode of each run. Shape must be (n_runs, n_modes,
         n_features) or a list of (n_modes, n_features) arrays. See
         :func:`match_runs`.
+    free_energy : np.ndarray, optional
+        Variational free energy of each run. Shape must be (n_runs,). Used
+        to choose between families that are equally large.
     threshold : float, optional
         Correlation above which two groups of modes are the same network.
         See :func:`match_runs`.
@@ -1001,6 +995,8 @@ def select_run(
         - :code:`'families'`: run indices of each family, largest first.
         - :code:`'family_cohesion'`: mean similarity between the runs of
           each family (NaN for a family of one run).
+        - :code:`'family_free_energy'`: median free energy of the runs of
+          each family (NaN if :code:`free_energy` is not given).
         - :code:`'family'`: index of the selected family in
           :code:`'families'`.
         - :code:`'typicality'`: mean similarity of each run in the selected
@@ -1010,65 +1006,61 @@ def select_run(
         of their modes over the networks they share.
     """
     corr, run, modes = _mode_correlations(features)
-    networks, threshold = match_runs(
-        features, threshold=threshold, return_threshold=True
-    )
+    if free_energy is not None:
+        free_energy = np.asarray(free_energy, dtype=np.float64)
+        if free_energy.shape != (len(modes),):
+            raise ValueError("free_energy must have one value per run.")
+    labels, threshold = _networks(corr, run, modes, threshold)
+    networks = [labels[m] for m in modes]
     families = run_families(networks)
 
-    def _similarity(members):
-        # Similarity between each pair of runs in a family
-        n = len(members)
-        s = np.eye(n)
-        for i in range(n):
-            for j in range(i + 1, n):
-                a, b = members[i], members[j]
-                order = [np.flatnonzero(networks[b] == k)[0] for k in networks[a]]
-                s[i, j] = s[j, i] = np.mean(corr[modes[a], modes[b][order]])
-        return s
-
-    def _cohesion(s):
-        n = len(s)
-        if n == 1:
-            return np.nan
-        return s[np.triu_indices(n, k=1)].mean()
+    # Similarity between each pair of runs in a family: the mean over
+    # networks of the correlation between their modes of that network. The
+    # runs of a family share their networks, so sorting each run's modes by
+    # network lines them up.
+    def _similarity(family):
+        by_network = np.array([modes[r][np.argsort(networks[r])] for r in family])
+        s = np.mean([corr[np.ix_(m, m)] for m in by_network.T], axis=0)
+        return (s + s.T) / 2  # exactly symmetric, so ties go to the first run
 
     similarities = [_similarity(f) for f in families]
-    family_cohesion = np.array([_cohesion(s) for s in similarities])
+    family_cohesion = np.array([_mean_off_diagonal(s) for s in similarities])
+    family_free_energy = np.array(
+        [np.nan if free_energy is None else np.median(free_energy[f]) for f in families]
+    )
 
-    # The largest family; if several are as large, the most cohesive
+    # The largest family; if several are as large, the one with the lowest
+    # median free energy or, without free energies, the most cohesive
     largest = [i for i, f in enumerate(families) if len(f) == len(families[0])]
-    family = max(largest, key=lambda i: np.nan_to_num(family_cohesion[i], nan=-np.inf))
+    if free_energy is not None:
+        family = min(largest, key=lambda i: family_free_energy[i])
+    else:
+        family = max(
+            largest, key=lambda i: np.nan_to_num(family_cohesion[i], nan=-np.inf)
+        )
     s = similarities[family]
     n = len(s)
-    if n == 1:
-        typicality = np.array([np.nan])
-        selected = int(families[family][0])
-    else:
-        typicality = (s.sum(axis=1) - 1) / (n - 1)
-        selected = int(families[family][np.argmax(typicality)])
+    typicality = (s.sum(axis=1) - 1) / (n - 1) if n > 1 else np.array([np.nan])
+    selected = int(families[family][np.nanargmax(typicality) if n > 1 else 0])
 
     if not return_info:
         return selected
 
-    labels = np.concatenate([np.asarray(n) for n in networks])
-    n_networks = labels.max() + 1
-    network_runs = np.array(
-        [np.unique(run[labels == k]).size for k in range(n_networks)]
-    )
-    network_cohesion = np.full(n_networks, np.nan)
-    for k in range(n_networks):
-        members = np.flatnonzero(labels == k)
-        if len(members) > 1:
-            c = corr[np.ix_(members, members)]
-            network_cohesion[k] = c[np.triu_indices(len(members), k=1)].mean()
-
     info = {
-        "networks": networks,
+        "networks": (
+            np.array(networks) if isinstance(features, np.ndarray) else networks
+        ),
         "threshold": threshold,
-        "network_runs": network_runs,
-        "network_cohesion": network_cohesion,
+        "network_runs": np.bincount(labels),
+        "network_cohesion": np.array(
+            [
+                _mean_off_diagonal(corr[np.ix_(m, m)])
+                for m in (np.flatnonzero(labels == k) for k in range(labels.max() + 1))
+            ]
+        ),
         "families": families,
         "family_cohesion": family_cohesion,
+        "family_free_energy": family_free_energy,
         "family": family,
         "typicality": typicality,
     }

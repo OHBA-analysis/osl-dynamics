@@ -80,12 +80,12 @@ print(f"threshold: {threshold:.2f}")
 print(networks)
 
 #%%
-# `networks` gives the network of each mode of each run. Networks are numbered by the number of runs they are found in. Let's see how often each network is found. This is a useful measure of how reproducible each network is.
+# `networks` gives the network of each mode of each run. Networks are numbered by the number of runs they are found in, most first. Like the modes, they are numbered from 0 in the arrays; we add 1 when printing and plotting. Let's see how often each network is found. This is a useful measure of how reproducible each network is.
 
 n_runs = len(networks)
 for network in range(networks.max() + 1):
     n = np.sum(np.any(networks == network, axis=1))
-    print(f"network {network}: found in {n} of {n_runs} runs")
+    print(f"Network {network + 1}: found in {n} of {n_runs} runs")
 
 #%%
 # Let's plot the average power map of the networks found in more than one run. We average the power maps of a network's modes, after subtracting the mean over modes in each run.
@@ -102,7 +102,7 @@ fig, ax = power.save(
     mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
-    titles=[f"Network {k} ({n_found[k]} runs)" for k in common],
+    titles=[f"Network {k + 1} ({n_found[k]} runs)" for k in common],
 )
 
 #%%
@@ -112,26 +112,47 @@ fig, ax = power.save(
 
 families = modes.run_families(networks)
 for family in families:
-    print(f"runs {family}: networks {np.sort(networks[family[0]])}")
+    print(f"runs {family}: networks {np.sort(networks[family[0]]) + 1}")
 
 #%%
-# The largest family is the solution the model finds most often. Comparing the networks of different families shows how the solutions differ, e.g. whether a network found as one mode in some runs is split into two in others.
+# The largest family is the solution the model finds most often. Comparing the networks of different families shows how the solutions differ, e.g. whether a network found as one mode in some runs is split into two in others. Let's also look at the median free energy of each family.
+
+for family in families:
+    print(f"runs {family}: median free energy {np.median(free_energy[family]):.3f}")
+
+#%%
+# If the largest families are equally large, we choose the one with the lowest median free energy: among the solutions found equally often, the one that fits the data best. The median over a family is much less noisy than the free energy of a single run.
 #
 # Select a run
 # ^^^^^^^^^^^^
-# :func:`select_run <osl_dynamics.inference.modes.select_run>` does all of the above and selects the medoid of the largest family: the run whose modes agree best, on average, with the same networks in the other runs of the family. This is the most typical run of the most common solution.
+# :func:`select_run <osl_dynamics.inference.modes.select_run>` does all of the above and selects the medoid of the largest family: the run whose modes agree best, on average, with the same networks in the other runs of the family. This is the most typical run of the most common solution. We pass the free energies for the tie-break.
 
-run, info = modes.select_run(power_maps, return_info=True)
+run, info = modes.select_run(power_maps, free_energy=free_energy, return_info=True)
 
 print(f"selected run: {run}")
 print(f"runs in its family: {info['families'][info['family']]}")
 print(f"typicality: {np.round(info['typicality'], 3)}")
 
 #%%
-# `info` also contains the networks, the threshold, the number of runs each network is found in and how well each family's runs agree. We would now use the selected run for the rest of the analysis, e.g. getting the inferred parameters, see the :doc:`Getting Inferred Parameters tutorial <../tutorials_build/3-4_hmm_dynemo_get_inf_params>`.
+# Let's plot the power maps of the selected run. These are the networks we would analyse. Each title gives the network the mode belongs to and the number of runs that network is found in.
+
+fig, ax = power.save(
+    relative_maps[run],
+    mask_file="MNI152_T1_8mm_brain.nii.gz",
+    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
+    plot_kwargs={"symmetric_cbar": True},
+    titles=[
+        f"Mode {mode + 1}: network {k + 1} ({n_found[k]} runs)"
+        for mode, k in enumerate(networks[run])
+    ],
+)
+
+#%%
+# `info` also contains the networks, the threshold, the number of runs each network is found in, and how well each family's runs agree and their median free energy. We would now use the selected run for the rest of the analysis, e.g. getting the inferred parameters, see the :doc:`Getting Inferred Parameters tutorial <../tutorials_build/3-4_hmm_dynemo_get_inf_params>`.
 #
 # A few notes:
 #
 # - **Validation.** The selection only uses the mode covariances. A useful check is to calculate the spectra (see the :doc:`DyNeMo Regression Spectra tutorial <../tutorials_build/5-1_dynemo_regression_spectra>`) for a few runs of the selected family and confirm their power maps agree.
-# - **Stability.** To see how stable the choice is, you can repeat the selection on random subsets of the runs (e.g. 16 of the 20, many times) and count how often the same family is the largest.
+# - **Number of runs.** The choice is only as reliable as the family sizes. With few runs, families are small and often equally large, so the tie-break decides. Train enough runs (e.g. 20) for the most common solution to stand out, and check the family sizes.
+# - **Stability.** To see how stable the choice is, you can repeat the selection on random subsets of the runs (e.g. 16 of the 20, many times) and count how often the same family is chosen.
 # - **Other features.** :func:`match_runs <osl_dynamics.inference.modes.match_runs>` and :func:`select_run <osl_dynamics.inference.modes.select_run>` accept any features describing the modes, e.g. spectral power maps or vectorised covariances. For an HMM, use the state covariances in the same way.
