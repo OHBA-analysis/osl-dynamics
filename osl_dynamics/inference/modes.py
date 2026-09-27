@@ -3,6 +3,7 @@ Functions to manipulate and calculate statistics for inferred mode/state
 time courses.
 """
 
+import logging
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
@@ -17,6 +18,8 @@ from osl_dynamics.analysis import post_hoc
 from osl_dynamics.inference import metrics
 from osl_dynamics.utils import array_ops, sklearn_wrappers, plotting
 from osl_dynamics.utils.misc import override_dict_defaults
+
+_logger = logging.getLogger("osl-dynamics")
 
 
 def argmax_time_courses(
@@ -973,7 +976,8 @@ def select_run(
         :func:`match_runs`.
     free_energy : np.ndarray, optional
         Variational free energy of each run. Shape must be (n_runs,). Used
-        to choose between families that are equally large.
+        to choose between families that are equally large. A NaN counts as
+        the highest free energy.
     threshold : float, optional
         Correlation above which two groups of modes are the same network.
         See :func:`match_runs`.
@@ -1010,6 +1014,13 @@ def select_run(
         free_energy = np.asarray(free_energy, dtype=np.float64)
         if free_energy.shape != (len(modes),):
             raise ValueError("free_energy must have one value per run.")
+        nan = np.isnan(free_energy)
+        if nan.any():
+            _logger.warning(
+                f"The free energy is NaN for the runs with indices "
+                f"{np.flatnonzero(nan).tolist()}: treating it as the highest."
+            )
+            free_energy = np.where(nan, np.inf, free_energy)
     labels, threshold = _networks(corr, run, modes, threshold)
     networks = [labels[m] for m in modes]
     families = run_families(networks)
