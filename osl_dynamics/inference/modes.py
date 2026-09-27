@@ -739,3 +739,337 @@ def average_runs(
 
     else:
         return average_alpha
+
+
+def _mode_correlations(
+    features: Union[np.ndarray, List[np.ndarray]],
+) -> Tuple[np.ndarray, np.ndarray, List[np.ndarray]]:
+    """Correlation between every pair of modes, pooled over runs.
+
+    Parameters
+    ----------
+    features : np.ndarray or list of np.ndarray
+        Features of each mode of each run. Shape must be (n_runs, n_modes,
+        n_features) or a list of (n_modes, n_features) arrays.
+
+    Returns
+    -------
+    corr : np.ndarray
+        Correlation between the modes, after removing the mean over modes
+        from each run's features. Shape is (n_total_modes, n_total_modes),
+        where n_total_modes is the number of modes summed over runs.
+    run : np.ndarray
+        Run each mode belongs to. Shape is (n_total_modes,).
+    modes : list of np.ndarray
+        Indices into corr of each run's modes.
+    """
+    features = [np.asarray(f, dtype=np.float64) for f in features]
+    if len(features) < 2:
+        raise ValueError("features must contain at least two runs.")
+    for f in features:
+        if f.ndim != 2 or f.shape[1] != features[0].shape[1]:
+            raise ValueError(
+                "each run's features must be (n_modes, n_features), with the "
+                "same n_features for every run."
+            )
+
+    # Describe each mode by what distinguishes it from the other modes of
+    # its run
+    features = [f - f.mean(axis=0, keepdims=True) for f in features]
+
+    run = np.concatenate([np.full(len(f), i) for i, f in enumerate(features)])
+    modes = [np.flatnonzero(run == i) for i in range(len(features))]
+    corr = np.corrcoef(np.concatenate(features))
+    return corr, run, modes
+
+
+def _otsu_threshold(values: np.ndarray) -> float:
+    """Threshold that best separates values into two groups (Otsu's method).
+
+    Parameters
+    ----------
+    values : np.ndarray
+        1D array of values.
+
+    Returns
+    -------
+    threshold : float
+        Midpoint between the two sorted values where the between-group
+        variance is largest.
+    """
+    values = np.sort(values)
+    n = len(values)
+    cumsum = np.cumsum(values)
+    n_low = np.arange(1, n)
+    mean_low = cumsum[:-1] / n_low
+    mean_high = (cumsum[-1] - cumsum[:-1]) / (n - n_low)
+    between = n_low * (n - n_low) * (mean_low - mean_high) ** 2
+    i = np.argmax(between)
+    return float((values[i] + values[i + 1]) / 2)
+
+
+def match_runs(
+    features: Union[np.ndarray, List[np.ndarray]],
+    threshold: Optional[float] = None,
+    return_threshold: bool = False,
+) -> Union[np.ndarray, Tuple[np.ndarray, float]]:
+    """Group the modes of different runs into networks.
+
+    Training a model (e.g. DyNeMo or an HMM) multiple times on the same data
+    gives modes (states) in a different order and, where the data do not
+    constrain the solution well, a different set of modes. This function
+    labels each mode of each run with the network it represents, so that
+    runs can be compared network by network.
+
+    Each mode is described by features, e.g. its power map. The mean over
+    modes is removed from each run's features, so a mode is described by
+    what distinguishes it from the other modes of its run. The modes of all
+    runs are then clustered by average linkage on their correlation, with
+    the constraint that two modes of the same run are never in the same
+    network. Clustering stops when no two networks correlate more than
+    :code:`threshold`.
+
+    Parameters
+    ----------
+    features : np.ndarray or list of np.ndarray
+        Features of each mode of each run. Shape must be (n_runs, n_modes,
+        n_features) or a list of (n_modes, n_features) arrays. E.g. power
+        maps computed from the mode covariances with
+        :code:`osl_dynamics.analysis.post_hoc.raw_covariances`.
+    threshold : float, optional
+        Correlation above which two groups of modes are the same network.
+        Defaults to the threshold that best separates (by Otsu's method) the
+        correlation of each mode with its best match in every other run: a
+        match is either the same network found again or a different network.
+    return_threshold : bool, optional
+        Should we return the threshold?
+
+    Returns
+    -------
+    networks : np.ndarray or list of np.ndarray
+        Network of each mode of each run. Shape is (n_runs, n_modes) or a
+        list of (n_modes,) arrays, like :code:`features`. Networks are
+        numbered by the number of runs they are found in, most first.
+    threshold : float
+        Correlation threshold. Only returned if :code:`return_threshold=True`.
+
+    Examples
+    --------
+    Power maps from the mode covariances of each run of a TDE-DyNeMo model:
+
+    >>> maps = []
+    >>> for covs in covariances:
+    ...     raw = post_hoc.raw_covariances(
+    ...         covs, n_embeddings, pca_components, zero_lag=True
+    ...     )
+    ...     maps.append(np.diagonal(raw, axis1=-2, axis2=-1))
+    >>> networks = match_runs(maps)
+    """
+    is_array = isinstance(features, np.ndarray)
+    corr, run, modes = _mode_correlations(features)
+    n_runs = len(modes)
+
+    if threshold is None:
+        best_matches = [
+            corr[i, modes[r]].max()
+            for i in range(len(corr))
+            for r in range(n_runs)
+            if r != run[i]
+        ]
+        threshold = _otsu_threshold(np.array(best_matches))
+
+    # Average-linkage agglomerative clustering with a cannot-link constraint
+    # between modes of the same run
+    clusters = [[i] for i in range(len(corr))]
+    in_run = np.eye(n_runs, dtype=bool)[run]  # (n_clusters, n_runs)
+    similarity = corr.copy()
+    np.fill_diagonal(similarity, -np.inf)
+    while True:
+        allowed = ~(in_run.astype(int) @ in_run.T.astype(int)).astype(bool)
+        s = np.where(allowed, similarity, -np.inf)
+        a, b = np.unravel_index(np.argmax(s), s.shape)
+        if s[a, b] < threshold:
+            break
+
+        # Merge b into a: the average linkage similarity to every other
+        # cluster is the size-weighted mean of a's and b's
+        n_a, n_b = len(clusters[a]), len(clusters[b])
+        similarity[a] = (n_a * similarity[a] + n_b * similarity[b]) / (n_a + n_b)
+        similarity[:, a] = similarity[a]
+        similarity[a, a] = -np.inf
+        clusters[a] += clusters[b]
+        in_run[a] |= in_run[b]
+
+        del clusters[b]
+        similarity = np.delete(np.delete(similarity, b, axis=0), b, axis=1)
+        in_run = np.delete(in_run, b, axis=0)
+
+    # Number networks by the number of runs they are found in, then by how
+    # well their modes agree
+    def _cohesion(members):
+        if len(members) == 1:
+            return -np.inf
+        c = corr[np.ix_(members, members)]
+        return c[np.triu_indices(len(members), k=1)].mean()
+
+    clusters.sort(key=lambda c: (-len(c), -_cohesion(c)))
+    labels = np.empty(len(corr), dtype=int)
+    for network, members in enumerate(clusters):
+        labels[members] = network
+    networks = [labels[m] for m in modes]
+    if is_array:
+        networks = np.array(networks)
+
+    if return_threshold:
+        return networks, threshold
+    return networks
+
+
+def run_families(
+    networks: Union[np.ndarray, List[np.ndarray]],
+) -> List[np.ndarray]:
+    """Group runs that found the same networks.
+
+    Parameters
+    ----------
+    networks : np.ndarray or list of np.ndarray
+        Network of each mode of each run, as returned by
+        :func:`match_runs`. Shape must be (n_runs, n_modes) or a list of
+        (n_modes,) arrays.
+
+    Returns
+    -------
+    families : list of np.ndarray
+        Indices of the runs in each family: runs that found the same set of
+        networks. Largest family first; families of the same size are in
+        the order of their first run.
+    """
+    keys = [tuple(sorted(n)) for n in networks]
+    families = {}
+    for i, key in enumerate(keys):
+        families.setdefault(key, []).append(i)
+    return sorted(
+        (np.array(f) for f in families.values()), key=lambda f: (-len(f), f[0])
+    )
+
+
+def select_run(
+    features: Union[np.ndarray, List[np.ndarray]],
+    threshold: Optional[float] = None,
+    return_info: bool = False,
+) -> Union[int, Tuple[int, Dict]]:
+    """Select the run to analyse: the most typical run of the most common
+    solution.
+
+    When a model is trained multiple times, a common choice is the run with
+    the lowest variational free energy. When the free energies of the runs
+    are within the noise of one another, an alternative is to choose by the
+    networks the runs found:
+
+    1. Group the modes of all runs into networks (:func:`match_runs`).
+    2. Group runs that found the same set of networks into families
+       (:func:`run_families`).
+    3. Take the largest family - the solution found most often - and, if
+       two are as large, the one whose runs agree best.
+    4. Within it, take the medoid: the run whose modes correlate best, on
+       average, with the same networks in the other runs of the family.
+
+    Parameters
+    ----------
+    features : np.ndarray or list of np.ndarray
+        Features of each mode of each run. Shape must be (n_runs, n_modes,
+        n_features) or a list of (n_modes, n_features) arrays. See
+        :func:`match_runs`.
+    threshold : float, optional
+        Correlation above which two groups of modes are the same network.
+        See :func:`match_runs`.
+    return_info : bool, optional
+        Should we return information describing the selection?
+
+    Returns
+    -------
+    run : int
+        Index of the selected run.
+    info : dict
+        Only returned if :code:`return_info=True`. A dictionary with keys:
+
+        - :code:`'networks'`: network of each mode of each run.
+        - :code:`'threshold'`: correlation threshold used for the networks.
+        - :code:`'network_runs'`: number of runs each network is found in.
+        - :code:`'network_cohesion'`: mean correlation between the modes of
+          each network (NaN for a network found in one run).
+        - :code:`'families'`: run indices of each family, largest first.
+        - :code:`'family_cohesion'`: mean similarity between the runs of
+          each family (NaN for a family of one run).
+        - :code:`'family'`: index of the selected family in
+          :code:`'families'`.
+        - :code:`'typicality'`: mean similarity of each run in the selected
+          family to the others in it, in the order of its runs.
+
+        The similarity between two runs of a family is the mean correlation
+        of their modes over the networks they share.
+    """
+    corr, run, modes = _mode_correlations(features)
+    networks, threshold = match_runs(
+        features, threshold=threshold, return_threshold=True
+    )
+    families = run_families(networks)
+
+    def _similarity(members):
+        # Similarity between each pair of runs in a family
+        n = len(members)
+        s = np.eye(n)
+        for i in range(n):
+            for j in range(i + 1, n):
+                a, b = members[i], members[j]
+                order = [np.flatnonzero(networks[b] == k)[0] for k in networks[a]]
+                s[i, j] = s[j, i] = np.mean(corr[modes[a], modes[b][order]])
+        return s
+
+    def _cohesion(s):
+        n = len(s)
+        if n == 1:
+            return np.nan
+        return s[np.triu_indices(n, k=1)].mean()
+
+    similarities = [_similarity(f) for f in families]
+    family_cohesion = np.array([_cohesion(s) for s in similarities])
+
+    # The largest family; if several are as large, the most cohesive
+    largest = [i for i, f in enumerate(families) if len(f) == len(families[0])]
+    family = max(largest, key=lambda i: np.nan_to_num(family_cohesion[i], nan=-np.inf))
+    s = similarities[family]
+    n = len(s)
+    if n == 1:
+        typicality = np.array([np.nan])
+        selected = int(families[family][0])
+    else:
+        typicality = (s.sum(axis=1) - 1) / (n - 1)
+        selected = int(families[family][np.argmax(typicality)])
+
+    if not return_info:
+        return selected
+
+    labels = np.concatenate([np.asarray(n) for n in networks])
+    n_networks = labels.max() + 1
+    network_runs = np.array(
+        [np.unique(run[labels == k]).size for k in range(n_networks)]
+    )
+    network_cohesion = np.full(n_networks, np.nan)
+    for k in range(n_networks):
+        members = np.flatnonzero(labels == k)
+        if len(members) > 1:
+            c = corr[np.ix_(members, members)]
+            network_cohesion[k] = c[np.triu_indices(len(members), k=1)].mean()
+
+    info = {
+        "networks": networks,
+        "threshold": threshold,
+        "network_runs": network_runs,
+        "network_cohesion": network_cohesion,
+        "families": families,
+        "family_cohesion": family_cohesion,
+        "family": family,
+        "typicality": typicality,
+    }
+    return selected, info
