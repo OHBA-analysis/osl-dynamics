@@ -82,8 +82,8 @@ Also see `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM
 - :doc:`tutorials_build/3-1_sliding_window_analysis`.
 - :doc:`tutorials_build/3-2_hmm_training`.
 - :doc:`tutorials_build/3-3_dynemo_training`.
-- :doc:`tutorials_build/3-4_hmm_dynemo_get_inf_params`.
-- :doc:`tutorials_build/3-5_dynemo_selecting_a_run`.
+- :doc:`tutorials_build/3-4_dynemo_selecting_a_run`.
+- :doc:`tutorials_build/3-5_hmm_dynemo_get_inf_params`.
 
 **HMM post-hoc analysis tutorials**:
 

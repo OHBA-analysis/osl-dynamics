@@ -146,11 +146,11 @@ fig, ax = power.save(
 )
 
 #%%
-# `info` also contains the networks, the threshold, the number of runs each network is found in, and how well each family's runs agree and their median free energy. We would now use the selected run for the rest of the analysis, e.g. getting the inferred parameters, see the :doc:`Getting Inferred Parameters tutorial <../tutorials_build/3-4_hmm_dynemo_get_inf_params>`.
+# `info` also contains the networks, the threshold, the number of runs each network is found in, and how well each family's runs agree and their median free energy. We would now use the selected run for the rest of the analysis, e.g. getting the inferred parameters, see :doc:`HMM/DyNeMo: Get Inferred Parameters <../tutorials_build/3-5_hmm_dynemo_get_inf_params>`.
 #
 # A few notes:
 #
-# - **Validation.** The selection only uses the mode covariances. A useful check is to calculate the spectra (see the :doc:`DyNeMo Regression Spectra tutorial <../tutorials_build/5-1_dynemo_regression_spectra>`) for a few runs of the selected family and confirm their power maps agree.
+# - **Validation.** The selection only uses the mode covariances. A useful check is to calculate the spectra (see :doc:`DyNeMo: Regression Spectra <../tutorials_build/5-1_dynemo_regression_spectra>`) for a few runs of the selected family and confirm their power maps agree.
 # - **Number of runs.** The choice is only as reliable as the family sizes. With few runs, families are small and often equally large, so the tie-break decides. Train enough runs (e.g. 20) for the most common solution to stand out, and check the family sizes.
 # - **Stability.** To see how stable the choice is, you can repeat the selection on random subsets of the runs (e.g. 16 of the 20, many times) and count how often the same family is chosen.
 # - **Other features.** :func:`match_runs <osl_dynamics.inference.modes.match_runs>` and :func:`select_run <osl_dynamics.inference.modes.select_run>` accept any features describing the modes, e.g. spectral power maps or vectorised covariances.

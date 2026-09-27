@@ -94,7 +94,8 @@ Tutorials
 ---------
 - :doc:`HMM Training </tutorials_build/3-2_hmm_training>`
 - :doc:`DyNeMo Training </tutorials_build/3-3_dynemo_training>`
-- :doc:`Getting Inferred Parameters </tutorials_build/3-4_hmm_dynemo_get_inf_params>`
+- :doc:`DyNeMo: Selecting a Run </tutorials_build/3-4_dynemo_selecting_a_run>`
+- :doc:`Getting Inferred Parameters </tutorials_build/3-5_hmm_dynemo_get_inf_params>`
 
 Python example scripts
 ----------------------

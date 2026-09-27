@@ -10,8 +10,8 @@ If you use osl-dynamics, please cite: Gohil, C., Huang, R., Roberts, E., van Es,
 
 - [Installation](https://osl-dynamics.readthedocs.io/en/latest/install.html): conda environment files for Linux, Mac and HPC clusters.
 - [Getting started](https://osl-dynamics.readthedocs.io/en/latest/getting_started.html): a minimal pipeline for training an HMM on M/EEG data.
-- [Tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.html): step by step walkthroughs covering data loading and preparation, time-delay embedding, HMM and DyNeMo training, spectral estimation, power maps, connectivity and statistical testing.
-- [FAQ](https://osl-dynamics.readthedocs.io/en/latest/faq.html): guidance on preprocessing, time-delay embedding, choosing parameters and interpreting results.
+- [Tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.html): step by step walkthroughs covering data loading and preparation, time-delay embedding, HMM and DyNeMo training, selecting a run, spectral estimation, power maps, connectivity and statistical testing.
+- [FAQ](https://osl-dynamics.readthedocs.io/en/latest/faq.html): guidance on preprocessing, time-delay embedding, choosing parameters, choosing between runs and interpreting results.
 - [API reference](https://osl-dynamics.readthedocs.io/en/latest/autoapi/index.html): documentation for every module, class and function.
 
 ## Models
