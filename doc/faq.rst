@@ -257,7 +257,7 @@ If many steps are skipped, or training stops, there a few things you can do to h
 - Check your data for any periods of consecutive zeros or NaNs.
 - Remove bad segments (with abnormally high variance). You can use the :code:`Data.remove_bad_segments` method to do this in osl-dynamics.
 - If you are loading fif files, make sure you have specified :code:`Data(..., picks="...", reject_by_annotation="omit")` correctly.
-- Lower the learning rate.
+- Lower the learning rate and/or increase the batch size.
 
 Why is my loss function increasing when I train a DyNeMo model?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
