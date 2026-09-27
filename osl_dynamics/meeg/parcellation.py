@@ -1054,9 +1054,6 @@ def convert_to_mne_raw(
     new_raw.__dict__["_last_samps"] = raw.__dict__["_last_samps"]
     new_raw.__dict__["_cropped_samp"] = raw.__dict__["_cropped_samp"]
 
-    # Copy annotations
-    new_raw.set_annotations(raw._annotations)
-
     # Add extra channels
     for extra_chan in extra_chans:
         if extra_chan in raw:
@@ -1069,6 +1066,15 @@ def convert_to_mne_raw(
             )
             chan_raw = mne.io.RawArray(chan_data, chan_info)
             new_raw.add_channels([chan_raw], force_update_info=True)
+
+    # Copy annotations
+    annotations = raw.annotations.copy()
+    if annotations.orig_time is None:
+        annotations.onset -= raw.first_time
+    for i, names in enumerate(annotations.ch_names):
+        if not set(names).issubset(new_raw.ch_names):
+            annotations.ch_names[i] = ()
+    new_raw.set_annotations(annotations)
 
     # Copy description
     new_raw.info["description"] = raw.info["description"]
