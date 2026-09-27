@@ -1254,8 +1254,6 @@ class KLDivergenceLayer(layers.Layer):
             loc=inference_mu,
             scale=inference_sigma,
         )
-        # A NaN is not raised here, the training step is skipped instead
-        # (see ModelBase.skip_non_finite_steps)
         kl_loss = tfp.distributions.kl_divergence(posterior, prior)
 
         if self.calculation == "sum":
@@ -1481,8 +1479,6 @@ class CategoricalKLDivergenceLayer(layers.Layer):
         # Calculate the KL divergence between the posterior and prior
         prior = tfp.distributions.Categorical(logits=model_logits)
         posterior = tfp.distributions.Categorical(logits=inference_logits)
-        # A NaN is not raised here, the training step is skipped instead
-        # (see ModelBase.skip_non_finite_steps)
         kl_loss = tfp.distributions.kl_divergence(posterior, prior)
 
         if self.calculation == "sum":
@@ -1690,8 +1686,6 @@ class GammaExponentialKLDivergenceLayer(layers.Layer):
         posterior = tfp.distributions.Gamma(
             concentration=inference_alpha, rate=inference_beta
         )
-        # A NaN is not raised here, the training step is skipped instead
-        # (see ModelBase.skip_non_finite_steps)
         kl_loss = tfp.distributions.kl_divergence(posterior, prior)
         kl_loss = tf.reduce_sum(kl_loss)
 
