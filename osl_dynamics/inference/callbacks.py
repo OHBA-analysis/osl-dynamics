@@ -442,6 +442,46 @@ def latest_checkpoint(checkpoint_dir: str) -> str:
     return epochs[max(epochs)]
 
 
+class SkippedStepsCallback(callbacks.Callback):
+    """Callback to report training steps skipped because they were not finite.
+
+    Logs a warning at the end of each epoch in which a step was skipped (see
+    :code:`ModelBase.skip_non_finite_steps`). If every step in an epoch was
+    skipped the model can't learn, so an error is raised as it would have
+    been before steps were skipped.
+
+    Parameters
+    ----------
+    n_skipped_steps : tf.Variable
+        Count of the skipped steps.
+    steps_per_epoch : int
+        Number of steps in an epoch.
+    """
+
+    def __init__(self, n_skipped_steps: tf.Variable, steps_per_epoch: int) -> None:
+        super().__init__()
+        self.n_skipped_steps = n_skipped_steps
+        self.steps_per_epoch = steps_per_epoch
+
+    def on_epoch_begin(self, epoch: int, logs: Optional[Dict] = None) -> None:
+        self.n_skipped_before = int(self.n_skipped_steps.numpy())
+
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
+        n_skipped = int(self.n_skipped_steps.numpy()) - self.n_skipped_before
+        if n_skipped >= self.steps_per_epoch:
+            raise tf.errors.InvalidArgumentError(
+                None,
+                None,
+                f"Every training step in epoch {epoch + 1} had a NaN or inf "
+                "in the loss or gradients.",
+            )
+        if n_skipped > 0:
+            _logger.warning(
+                f"Skipped {n_skipped} of {self.steps_per_epoch} training steps "
+                f"in epoch {epoch + 1}: the loss or gradients had a NaN or inf."
+            )
+
+
 class TensorBoardCallback(callbacks.TensorBoard):
     """Callback to log training information to TensorBoard.
 

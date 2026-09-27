@@ -248,7 +248,11 @@ Also see: `Cho, et al. (2024) <https://onlinelibrary.wiley.com/doi/full/10.1002/
 I've encountered a NaN when I tried to train a model? Why did this happen and how can I fix it?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Models in osl-dynamics are trained using 'stochastic gradient decent'. We believe the NaN values in the loss function arise from a bad update to the model parameters. There a few things you can do to help resolve this:
+Models in osl-dynamics are trained using 'stochastic gradient decent'. We believe the NaN values in the loss function arise from a bad update to the model parameters.
+
+A training step whose loss or gradients contain a NaN or inf is skipped: the model parameters are not updated and the batch is left out of the loss reported for the epoch. A warning is logged at the end of each epoch in which a step was skipped. An occasional skipped step does not affect the model. Training only stops if every step in an epoch was skipped.
+
+If many steps are skipped, or training stops, there a few things you can do to help resolve this:
 
 - Check your data for any periods of consecutive zeros or NaNs.
 - Remove bad segments (with abnormally high variance). You can use the :code:`Data.remove_bad_segments` method to do this in osl-dynamics.
