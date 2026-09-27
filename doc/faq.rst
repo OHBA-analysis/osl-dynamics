@@ -204,7 +204,7 @@ An alternative is to choose a run based on the networks the runs found:
 #. Group the states/modes of all runs into networks with :code:`osl_dynamics.inference.modes.match_runs`. This also tells us how many runs each network is found in, which is a useful measure of how reproducible each network is.
 #. Group runs that found the same set of networks into families with :code:`osl_dynamics.inference.modes.run_families`, and analyse the most typical run (the medoid) of the largest family. If the largest families are equally large, choose the one with the lowest median free energy. :code:`osl_dynamics.inference.modes.select_run` does all of these steps.
 
-This selects a run that is representative of the solution the model finds most often. The choice is only as reliable as the family sizes, so train enough runs (e.g. 20) for the most common solution to stand out. It can be used with the HMM and DyNeMo. See the :doc:`DyNeMo Selecting a Run tutorial <tutorials_build/3-5_dynemo_selecting_a_run>` for an example.
+This selects a run that is representative of the solution the model finds most often. The choice is only as reliable as the family sizes, so train enough runs (e.g. 20) for the most common solution to stand out. It can be used with the HMM and DyNeMo. See :doc:`DyNeMo: Selecting a Run <tutorials_build/3-5_dynemo_selecting_a_run>` for an example.
 
 How do I select the optimum number of HMM states or DyNeMo modes?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

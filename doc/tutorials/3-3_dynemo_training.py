@@ -163,4 +163,4 @@ model.summary()
 #%%
 # Selecting a Run
 # ^^^^^^^^^^^^^^^^
-# Training DyNeMo multiple times on the same data can give different networks. The run with the lowest variational free energy is a good default choice. For an alternative based on the networks the runs found, see the :doc:`DyNeMo Selecting a Run tutorial <../tutorials_build/3-5_dynemo_selecting_a_run>`.
+# Training DyNeMo multiple times on the same data can give different networks. The run with the lowest variational free energy is a good default choice. For an alternative based on the networks the runs found, see :doc:`DyNeMo: Selecting a Run <../tutorials_build/3-5_dynemo_selecting_a_run>`.

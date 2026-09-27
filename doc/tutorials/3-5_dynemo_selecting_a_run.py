@@ -9,8 +9,6 @@ Training DyNeMo several times on the same data can give different networks: the 
 3. Match the modes of different runs
 4. Group the runs into families
 5. Select a run
-
-The same approach can be used for the states of an HMM.
 """
 
 #%%
@@ -155,4 +153,4 @@ fig, ax = power.save(
 # - **Validation.** The selection only uses the mode covariances. A useful check is to calculate the spectra (see the :doc:`DyNeMo Regression Spectra tutorial <../tutorials_build/5-1_dynemo_regression_spectra>`) for a few runs of the selected family and confirm their power maps agree.
 # - **Number of runs.** The choice is only as reliable as the family sizes. With few runs, families are small and often equally large, so the tie-break decides. Train enough runs (e.g. 20) for the most common solution to stand out, and check the family sizes.
 # - **Stability.** To see how stable the choice is, you can repeat the selection on random subsets of the runs (e.g. 16 of the 20, many times) and count how often the same family is chosen.
-# - **Other features.** :func:`match_runs <osl_dynamics.inference.modes.match_runs>` and :func:`select_run <osl_dynamics.inference.modes.select_run>` accept any features describing the modes, e.g. spectral power maps or vectorised covariances. For an HMM, use the state covariances in the same way.
+# - **Other features.** :func:`match_runs <osl_dynamics.inference.modes.match_runs>` and :func:`select_run <osl_dynamics.inference.modes.select_run>` accept any features describing the modes, e.g. spectral power maps or vectorised covariances.
