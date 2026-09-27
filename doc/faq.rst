@@ -200,7 +200,7 @@ Training a model multiple times on the same data can give different networks: th
 An alternative is to choose a run based on the networks the runs found:
 
 #. Train the model multiple times (e.g. 10-20 runs).
-#. Describe each state/mode by its power map, which can be calculated directly from the state/mode covariances (using :code:`osl_dynamics.analysis.post_hoc.raw_covariances` for time-delay embedded data). This does not require the inferred state/mode time courses or spectra.
+#. Describe each state/mode by its power map, which can be calculated directly from the state/mode covariances (using :code:`osl_dynamics.analysis.post_hoc.raw_covariances` for time-delay embedded data).
 #. Group the states/modes of all runs into networks with :code:`osl_dynamics.inference.modes.match_runs`. This also tells us how many runs each network is found in, which is a useful measure of how reproducible each network is.
 #. Group runs that found the same set of networks into families with :code:`osl_dynamics.inference.modes.run_families`, and analyse the most typical run (the medoid) of the largest family. If the largest families are equally large, choose the one with the lowest median free energy. :code:`osl_dynamics.inference.modes.select_run` does all of these steps.
 
