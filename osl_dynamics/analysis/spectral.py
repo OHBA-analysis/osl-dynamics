@@ -844,14 +844,16 @@ def rescale_regression_coefs(
     n_sessions = len(alpha)
 
     # Window alphas to match the windowing of STFT
-    for i, a in enumerate(alpha):
-        alpha[i] = _window_mean(
+    alpha = [
+        _window_mean(
             a,
             "hann",
             window_length,
             step_size=step_size,
             n_sub_windows=n_sub_windows,
         )
+        for a in alpha
+    ]
 
     # Normalize the alphas
     alpha = [(a - np.mean(a, axis=0)) / np.std(a, axis=0) for a in alpha]

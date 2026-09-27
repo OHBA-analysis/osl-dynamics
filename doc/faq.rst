@@ -190,6 +190,22 @@ Many modern machine learning models have a problem of **local optima**. When we 
 
 Unfortunately, there is no solution to this. With more data this becomes less of a problem. The recommendation is to train a model multiple times and select the model with the best (lowest) variational free energy for further analysis. Preferably the variational free energy would be calculated using a hold out validation dataset rather than the training data. However, it is common just to compare the variational free energy on the training dataset.
 
+Different runs can also find different networks (states/modes). See the next question for an alternative way of choosing a run based on the networks it found.
+
+How can I handle run-to-run variability in the networks (states/modes)?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Training a model multiple times on the same data can give different networks: the states/modes come out in a different order and, where the data do not constrain the solution well, some networks can be split or combined differently from run to run. Selecting the run with the lowest variational free energy (see the previous question) is a good default. However, the free energies of different runs are often very similar, in which case the lowest free energy does not tell us which solution the model finds most often.
+
+An alternative is to choose a run based on the networks the runs found:
+
+#. Train the model multiple times (e.g. 10-20 runs).
+#. Describe each state/mode by its power map, which can be calculated directly from the state/mode covariances (using :code:`osl_dynamics.analysis.post_hoc.raw_covariances` for time-delay embedded data).
+#. Group the states/modes of all runs into networks with :code:`osl_dynamics.inference.modes.match_runs`. This also tells us how many runs each network is found in, which is a useful measure of how reproducible each network is.
+#. Group runs that found the same set of networks into families with :code:`osl_dynamics.inference.modes.run_families`, and analyse the most typical run (the medoid) of the largest family. If the largest families are equally large, choose the one with the lowest median free energy. :code:`osl_dynamics.inference.modes.select_run` does all of these steps.
+
+This selects a run that is representative of the solution the model finds most often. The choice is only as reliable as the family sizes, so train enough runs (e.g. 20) for the most common solution to stand out. It can be used with the HMM and DyNeMo. See :doc:`DyNeMo: Selecting a Run <tutorials_build/3-4_dynemo_selecting_a_run>` for an example.
+
 How do I select the optimum number of HMM states or DyNeMo modes?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

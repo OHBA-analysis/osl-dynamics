@@ -159,3 +159,8 @@ model.summary()
 #     free_energy = model.free_energy(data)
 #     history["free_energy"] = free_energy
 #     pickle.dump(history, open("results/model/history.pkl", "wb"))
+
+#%%
+# Selecting a Run
+# ^^^^^^^^^^^^^^^^
+# Training DyNeMo multiple times on the same data can give different networks. The run with the lowest variational free energy is a good default choice. For an alternative based on the networks the runs found, see :doc:`DyNeMo: Selecting a Run <../tutorials_build/3-4_dynemo_selecting_a_run>`.
