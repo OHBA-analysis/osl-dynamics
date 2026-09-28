@@ -448,10 +448,11 @@ class SkippedStepsCallback(callbacks.Callback):
     The number of steps skipped in each epoch (see
     :code:`ModelBase.skip_non_finite_steps`) is added to the training
     history as :code:`skipped_steps`, and a warning is logged at the end of
-    each epoch in which a step was skipped. The warning suggests what to
-    change if more than :code:`warn_fraction` of the steps were skipped. If
-    every step in an epoch was skipped the model can't learn, so an error
-    is raised as it would have been before steps were skipped.
+    each epoch in which a step was skipped. The warning suggests cleaning
+    the data and, if more than :code:`warn_fraction` of the steps were
+    skipped, other changes to try. If every step in an epoch was skipped the
+    model can't learn, so an error is raised as it would have been before
+    steps were skipped.
 
     Parameters
     ----------
@@ -485,18 +486,22 @@ class SkippedStepsCallback(callbacks.Callback):
                 None,
                 None,
                 f"Every training step in epoch {epoch + 1} had a NaN or inf "
-                "in the loss or gradients.",
+                "in the loss or gradients. Consider cleaning the data (e.g. "
+                "look for segments with outlier variance), lowering the "
+                "learning rate or increasing the batch size (see the FAQ).",
             )
         if n_skipped > 0:
             message = (
                 f"Skipped {n_skipped} of {self.steps_per_epoch} training steps "
-                f"in epoch {epoch + 1}: the loss or gradients had a NaN or inf."
+                f"in epoch {epoch + 1}: the loss or gradients had a NaN or inf. "
+                "Consider cleaning the data (e.g. look for segments with "
+                "outlier variance)."
             )
             if n_skipped > self.warn_fraction * self.steps_per_epoch:
                 message += (
                     f" This is more than {100 * self.warn_fraction:g}% of the "
-                    "steps: check the data for bad segments, lower the "
-                    "learning rate or increase the batch size (see the FAQ)."
+                    "steps: if the data are clean, also consider lowering the "
+                    "learning rate or increasing the batch size (see the FAQ)."
                 )
             _logger.warning(message)
 

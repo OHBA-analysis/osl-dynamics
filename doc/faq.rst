@@ -255,7 +255,7 @@ A training step whose loss or gradients contain a NaN or inf is skipped: the mod
 If many steps are skipped, or training stops, there a few things you can do to help resolve this:
 
 - Check your data for any periods of consecutive zeros or NaNs.
-- Remove bad segments (with abnormally high variance). You can use the :code:`Data.remove_bad_segments` method to do this in osl-dynamics.
+- Remove bad segments (with abnormally high variance). You can use :code:`osl_dynamics.meeg.preproc.detect_bad_segments` to mark them in the M/EEG data before source reconstruction.
 - If you are loading fif files, make sure you have specified :code:`Data(..., picks="...", reject_by_annotation="omit")` correctly.
 - Lower the learning rate and/or increase the batch size.
 
