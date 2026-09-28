@@ -442,6 +442,70 @@ def latest_checkpoint(checkpoint_dir: str) -> str:
     return epochs[max(epochs)]
 
 
+class SkippedStepsCallback(callbacks.Callback):
+    """Callback to report training steps skipped because they were not finite.
+
+    The number of steps skipped in each epoch (see
+    :code:`ModelBase.skip_non_finite_steps`) is added to the training
+    history as :code:`skipped_steps`, and a warning is logged at the end of
+    each epoch in which a step was skipped. The warning suggests cleaning
+    the data and, if more than :code:`warn_fraction` of the steps were
+    skipped, other changes to try. If every step in an epoch was skipped the
+    model can't learn, so an error is raised as it would have been before
+    steps were skipped.
+
+    Parameters
+    ----------
+    n_skipped_steps : tf.Variable
+        Count of the skipped steps.
+    steps_per_epoch : int
+        Number of steps in an epoch.
+    """
+
+    # Fraction of the steps in an epoch above which the skipped steps are
+    # more than occasional
+    warn_fraction = 0.01
+
+    def __init__(self, n_skipped_steps: tf.Variable, steps_per_epoch: int) -> None:
+        super().__init__()
+        self.n_skipped_steps = n_skipped_steps
+        self.steps_per_epoch = steps_per_epoch
+
+    def on_epoch_begin(self, epoch: int, logs: Optional[Dict] = None) -> None:
+        self.n_skipped_before = int(self.n_skipped_steps.numpy())
+
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
+        n_skipped = int(self.n_skipped_steps.numpy()) - self.n_skipped_before
+
+        # Add to the training history
+        if logs is not None:
+            logs["skipped_steps"] = n_skipped
+
+        if n_skipped >= self.steps_per_epoch:
+            raise tf.errors.InvalidArgumentError(
+                None,
+                None,
+                f"Every training step in epoch {epoch + 1} had a NaN or inf "
+                "in the loss or gradients. Consider cleaning the data (e.g. "
+                "look for segments with outlier variance), lowering the "
+                "learning rate or increasing the batch size (see the FAQ).",
+            )
+        if n_skipped > 0:
+            message = (
+                f"Skipped {n_skipped} of {self.steps_per_epoch} training steps "
+                f"in epoch {epoch + 1}: the loss or gradients had a NaN or inf. "
+                "Consider cleaning the data (e.g. look for segments with "
+                "outlier variance)."
+            )
+            if n_skipped > self.warn_fraction * self.steps_per_epoch:
+                message += (
+                    f" This is more than {100 * self.warn_fraction:g}% of the "
+                    "steps: if the data are clean, also consider lowering the "
+                    "learning rate or increasing the batch size (see the FAQ)."
+                )
+            _logger.warning(message)
+
+
 class TensorBoardCallback(callbacks.TensorBoard):
     """Callback to log training information to TensorBoard.
 
