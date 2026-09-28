@@ -240,8 +240,7 @@ class ModelBase:
         """
         model = self.model
 
-        # Count of skipped steps, kept outside the Keras model so it is not
-        # saved with the weights
+        # Count of skipped steps
         if "n_skipped_steps" not in self.__dict__:
             self.n_skipped_steps = tf.Variable(
                 0,
@@ -276,56 +275,41 @@ class ModelBase:
                 [tf.reduce_all(tf.math.is_finite(t)) for t in tensors]
             )
 
+            # With multiple GPUs, skip the step on all of them if any of them
+            # had a NaN or inf
+            context = tf.distribute.get_replica_context()
+            n_not_finite = context.all_reduce(
+                tf.distribute.ReduceOp.SUM, tf.cast(~finite, tf.float32)
+            )
+            finite = n_not_finite == 0
+
             # Update the weights, or skip the step
-            def apply(gradients):
+            def update(gradients):
                 model.optimizer.apply_gradients(zip(gradients, variables))
 
-            if tf.distribute.has_strategy():
-                # With multiple GPUs, skip the step on all of them if any of
-                # them had a NaN or inf
-                replica_context = tf.distribute.get_replica_context()
-                n_not_finite = replica_context.all_reduce(
-                    tf.distribute.ReduceOp.SUM,
-                    tf.cast(tf.logical_not(finite), tf.float32),
+            def apply(strategy, finite, gradients):
+                tf.cond(
+                    strategy.experimental_local_results(finite)[0],
+                    lambda: strategy.extended.call_for_each_replica(
+                        update, args=(gradients,)
+                    ),
+                    lambda: None,
                 )
-                finite = tf.equal(n_not_finite, 0)
 
-                # The optimizer synchronises the GPUs, which can't be done
-                # inside tf.cond on each GPU, so we decide for all of them
-                # at once (as Keras' LossScaleOptimizer does)
-                def apply_all(strategy, finite, gradients):
-                    finite = strategy.experimental_local_results(finite)[0]
-                    tf.cond(
-                        finite,
-                        lambda: strategy.extended.call_for_each_replica(
-                            apply, args=(gradients,)
-                        ),
-                        lambda: None,
-                    )
+            context.merge_call(apply, args=(finite, gradients))
+            self.n_skipped_steps.assign_add(tf.cast(~finite, tf.int64))
 
-                replica_context.merge_call(apply_all, args=(finite, gradients))
-            else:
-                tf.cond(finite, lambda: apply(gradients), lambda: None)
+            # Metrics, leaving out a skipped step (with zero weight, and its
+            # NaNs set to zero so they don't reach the averages)
+            def mask(t):
+                return tf.where(finite, t, tf.zeros_like(t))
 
-            skipped = tf.cast(tf.logical_not(finite), tf.int64)
-            self.n_skipped_steps.assign_add(skipped)
-
-            # Metrics, leaving out a skipped step
             weight = tf.cast(finite, loss.dtype)
-            loss = tf.where(finite, loss, tf.zeros_like(loss))
             for metric in model.metrics:
                 if metric.name == "loss":
-                    metric.update_state(
-                        unscale_loss_for_distribution(loss), sample_weight=weight
-                    )
-            y_pred = {
-                name: (
-                    tf.where(finite, value, tf.zeros_like(value))
-                    if "loss" in name
-                    else value
-                )
-                for name, value in y_pred.items()
-            }
+                    loss = unscale_loss_for_distribution(mask(loss))
+                    metric.update_state(loss, sample_weight=weight)
+            y_pred = {k: mask(v) if "loss" in k else v for k, v in y_pred.items()}
             return model.compute_metrics(x, y, y_pred, sample_weight=weight)
 
         # Override the original Keras method
