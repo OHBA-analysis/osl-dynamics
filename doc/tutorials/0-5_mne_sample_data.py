@@ -256,7 +256,6 @@ Prerequisites
 #     parcel_data = parcellation.parcellate_lcmv(
 #         fns,
 #         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
-#         method="spatial_basis",
 #         orthogonalisation=None,
 #         raw=raw,
 #     )
@@ -318,7 +317,6 @@ Prerequisites
 #     parcel_data = parcellation.parcellate_lcmv(
 #         fns,
 #         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
-#         method="spatial_basis",
 #         orthogonalisation=None,
 #         raw=raw,
 #     )

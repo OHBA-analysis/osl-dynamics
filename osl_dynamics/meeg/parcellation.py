@@ -203,8 +203,8 @@ def parcel_vector_to_nifti(
 def parcellate(
     voxel_data: np.ndarray,
     voxel_coords: np.ndarray,
-    method: str,
     parcellation_file: str,
+    method: str = "pca",
     orthogonalisation: str | None = None,
 ) -> np.ndarray:
     """Parcellate data.
@@ -221,17 +221,19 @@ def parcellate(
         voxel is assigned the parcel weights of the parcellation voxel that
         contains it, so the voxels do not need to be on the same grid as the
         parcellation.
-    method : str
-        'pca'           - take 1st PC of voxels.
-        'spatial_basis' - The parcel time-course for each spatial map is the
-                          1st PC from all voxels, weighted by the spatial map.
-                          If the parcellation is unweighted and non-overlapping,
-                          'spatial_basis' will give the same result as 'pca'
-                          except with a different normalisation.
-        'centroid'      - Use the time course of the voxel nearest to each
-                          parcel centroid.
     parcellation_file : str
-        Path to parcellation file. In same space as voxel_coords.
+        Path to parcellation file. In same space as voxel_coords. The weights
+        must be non-negative.
+    method : str, optional
+        'pca'      - The parcel time course is the 1st principal component of
+                     the voxels in the parcel, with each voxel weighted by the
+                     parcellation (for a binary parcellation all voxels in the
+                     parcel have the same weight). It is scaled to the
+                     standard deviation of the voxels in the parcel and its
+                     sign is chosen so the voxels contribute positively on
+                     average.
+        'centroid' - Use the time course of the voxel nearest to each parcel
+                     centroid.
     orthogonalisation : str, optional
         Method for orthogonalising the data. Can be None or 'symmetric'.
 
@@ -247,8 +249,8 @@ def parcellate(
     if orthogonalisation not in [None, "symmetric"]:
         raise ValueError("orthogonalisation must be None or 'symmetric'.")
 
-    if method not in ["pca", "spatial_basis", "centroid"]:
-        raise ValueError("method must be 'pca', 'spatial_basis' or 'centroid'.")
+    if method not in ["pca", "centroid"]:
+        raise ValueError("method must be 'pca' or 'centroid'.")
 
     # Get parcellation file
     parcellation_file = files.check_exists(
@@ -265,7 +267,7 @@ def parcellate(
 
         # Calculate parcel time courses
         parcel_data = _get_parcel_data_pca(
-            voxel_data, parcellation, method, parcellation_file, voxel_coords
+            voxel_data, parcellation, parcellation_file, voxel_coords
         )
 
     # Orthogonalisation
@@ -280,7 +282,6 @@ def parcellate(
 def parcellate_lcmv(
     fns: OSLFilenames,
     parcellation_file: str,
-    method: str,
     orthogonalisation: str | None = None,
     raw: mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | list[str] | None = "omit",
@@ -292,16 +293,16 @@ def parcellate_lcmv(
     memory because the voxel data is not calculated. The parcel time course
     (the rescaled 1st PC of the dipoles in the parcel) is calculated from the
     covariance of the dipoles (estimated from the sensor data) and applied to
-    the sensor data as a spatial filter.
+    the sensor data as a spatial filter. See method='pca' in
+    :func:`parcellate`.
 
     Parameters
     ----------
     fns : OSLFilenames
         Container for OSL filenames.
     parcellation_file : str
-        Path to parcellation file (in MNI space).
-    method : str
-        'pca' or 'spatial_basis', see :func:`parcellate`.
+        Path to parcellation file (in MNI space). The weights must be
+        non-negative.
     orthogonalisation : str, optional
         Method for orthogonalising the data. Can be None or 'symmetric'.
     raw : mne.io.Raw or mne.Epochs, optional
@@ -322,9 +323,6 @@ def parcellate_lcmv(
 
     if orthogonalisation not in [None, "symmetric"]:
         raise ValueError("orthogonalisation must be None or 'symmetric'.")
-
-    if method not in ["pca", "spatial_basis"]:
-        raise ValueError("method must be 'pca' or 'spatial_basis'.")
 
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
@@ -361,7 +359,7 @@ def parcellate_lcmv(
         return W[inds] @ data_cov @ W[inds].T
 
     voxel_weightings = _get_parcel_weights(
-        voxel_cov, parcellation, method, parcellation_file, voxel_coords
+        voxel_cov, parcellation, parcellation_file, voxel_coords
     )
 
     # Spatial filter for each parcel, shape is (parcels, channels)
@@ -613,15 +611,14 @@ def _sample_parcellation(parcellation_file: str, coords: np.ndarray) -> np.ndarr
 def _get_parcel_weights(
     voxel_cov: callable,
     parcellation_asmatrix: np.ndarray,
-    method: str,
     parcellation_file: str,
     voxel_coords: np.ndarray,
 ) -> np.ndarray:
     """Calculate the voxel weights that give each parcel time course.
 
     The parcel time course is the (rescaled) 1st PC of the voxels in the
-    parcel. This only depends on the covariance of the voxels in each parcel,
-    so the voxel time courses are not needed.
+    parcel, weighted by the parcellation. This only depends on the covariance
+    of the voxels in each parcel, so the voxel time courses are not needed.
 
     Parameters
     ----------
@@ -631,8 +628,6 @@ def _get_parcel_weights(
         voxels.
     parcellation_asmatrix: np.ndarray
         (nvoxels x n_parcels) parcel weights for each voxel.
-    method : str
-        'pca' or 'spatial_basis', see :func:`parcellate`.
     parcellation_file : str
         Parcellation file, used for the error message if a parcel does not
         contain any dipoles.
@@ -646,83 +641,45 @@ def _get_parcel_weights(
         (nvoxels x n_parcels) such that the parcel time courses are
         voxel_weightings.T @ (voxel_data - voxel_data.mean(axis=1)).
     """
-    print(f"Calculating parcel time courses with {method}")
+    print("Calculating parcel time courses")
 
-    n_parcels = parcellation_asmatrix.shape[1]
+    if np.any(parcellation_asmatrix < 0):
+        raise ValueError(f"The weights in {parcellation_file} must be non-negative.")
+
     voxel_weightings = np.zeros(parcellation_asmatrix.shape)
-
-    if method == "pca":
-        print(
-            "PCA assumes a binary parcellation.\n"
-            "Parcellation will be binarised if it is not already "
-            "(any voxels >0 are set to 1, otherwise voxels are set to 0), "
-            "i.e. any weightings will be ignored.\n"
-        )
-
-        # Check that each voxel is only a member of one parcel
-        if any(np.sum(parcellation_asmatrix, axis=1) > 1):
-            print(
-                "WARNING: Each voxel is meant to be a member of at most one "
-                "parcel, when using the PCA method.\nResults may not be sensible"
-            )
-
     empty_parcels = []
-    for pp in range(n_parcels):
-        if not np.any(parcellation_asmatrix[:, pp] != 0):
+    for pp in range(parcellation_asmatrix.shape[1]):
+        # Voxels in the parcel and their weights (scaled to a peak of 1)
+        weights = parcellation_asmatrix[:, pp]
+        inds = np.flatnonzero(weights > 0)
+        if len(inds) == 0:
             empty_parcels.append(pp)
             continue
+        spatial_map = weights[inds] / weights[inds].max()
 
-        if method == "spatial_basis":
-            # Scale group maps so all have a positive peak of height 1 in case
-            # there is a very noisy outlier, choose the sign from the top 5%
-            # of magnitudes
-            thresh = np.percentile(np.abs(parcellation_asmatrix[:, pp]), 95)
-            mapsign = np.sign(
-                np.mean(
-                    parcellation_asmatrix[parcellation_asmatrix[:, pp] > thresh, pp]
-                )
-            )
-            scaled_parcellation = (
-                mapsign
-                * parcellation_asmatrix[:, pp]
-                / np.max(np.abs(parcellation_asmatrix[:, pp]))
-            )
-
-            # Weight all voxels by the spatial map in question
-            inds = np.where(scaled_parcellation > 0)[0]
-            spatial_map = scaled_parcellation[inds]
-
-            # 0.5 is a decent arbitrary threshold used in fslnets after
-            # playing with various maps
-            this_mask = spatial_map > 0.5
-        else:
-            inds = np.where(parcellation_asmatrix[:, pp] > 0)[0]
-            spatial_map = np.ones(len(inds))
-            this_mask = np.ones(len(inds), dtype=bool)
-
-        if not np.any(this_mask):
-            empty_parcels.append(pp)
-            continue
-
-        # Covariance of the (weighted) voxels in the parcel
+        # Covariance of the voxels in the parcel. Voxels without a dipole
+        # have no data
         cov = voxel_cov(inds)
+        temporal_std = np.sqrt(np.diag(cov))
 
-        # Voxels without a dipole have no data
-        if not np.any(this_mask & (np.diag(cov) > 0)):
+        # The sign and scale of the parcel time course is taken from the
+        # voxels with a weight greater than 0.5 (the threshold used in
+        # fslnets)
+        this_mask = spatial_map > 0.5
+        if not np.any(this_mask & (temporal_std > 0)):
             empty_parcels.append(pp)
             continue
-        temporal_std = np.maximum(np.sqrt(np.diag(cov)), np.finfo(float).eps)
-        weighted_cov = spatial_map[:, None] * cov * spatial_map[None, :]
 
         # 1st PC of the weighted voxels. The PCA scores are U.T @ weighted_ts
         # and their standard deviation is the square root of the eigenvalue
+        weighted_cov = spatial_map[:, None] * cov * spatial_map[None, :]
         d, U = misc.top_eig(weighted_cov, k=1)
         U = U[:, 0]
         pca_std = np.maximum(np.sqrt(np.abs(d[0])), np.finfo(float).eps)
 
-        # Restore sign and scaling of parcel time-series
-        # U indicates the weight with which each voxel in the parcel
-        # contributes to the 1st PC
+        # Restore the sign and scaling of the parcel time course. U indicates
+        # the weight with which each voxel in the parcel contributes to the
+        # 1st PC
         relative_weighting = np.abs(U[this_mask]) / np.sum(np.abs(U[this_mask]))
         ts_sign = np.sign(np.mean(U[this_mask]))
         ts_scale = np.dot(relative_weighting, temporal_std[this_mask])
@@ -768,7 +725,6 @@ def _empty_parcels_message(
 def _get_parcel_data_pca(
     voxel_data: np.ndarray,
     parcellation_asmatrix: np.ndarray,
-    method: str,
     parcellation_file: str,
     voxel_coords: np.ndarray,
 ) -> np.ndarray:
@@ -780,8 +736,6 @@ def _get_parcel_data_pca(
         (nvoxels x n_time) or (nvoxels x n_time x n_trials).
     parcellation_asmatrix: np.ndarray
         (nvoxels x n_parcels) parcel weights for each voxel.
-    method : str
-        'pca' or 'spatial_basis', see :func:`parcellate`.
     parcellation_file : str
         Parcellation file, used for the error message if a parcel does not
         contain any dipoles.
@@ -810,7 +764,7 @@ def _get_parcel_data_pca(
         return x @ x.T / x.shape[1]
 
     voxel_weightings = _get_parcel_weights(
-        voxel_cov, parcellation_asmatrix, method, parcellation_file, voxel_coords
+        voxel_cov, parcellation_asmatrix, parcellation_file, voxel_coords
     )
 
     parcel_data = (

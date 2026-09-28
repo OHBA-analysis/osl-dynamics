@@ -84,7 +84,6 @@ def process_session(session, logger):
     parcel_data = parcellation.parcellate(
         voxel_data,
         voxel_coords,
-        method="spatial_basis",
         orthogonalisation="symmetric",
         parcellation_file=parcellation_file,
     )

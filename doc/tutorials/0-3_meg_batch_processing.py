@@ -412,7 +412,6 @@ The output of this script is written to ``derivatives/``.
 #         parcel_data = parcellation.parcellate_lcmv(
 #             fns,
 #             parcellation_file=parcellation_file,
-#             method="spatial_basis",
 #             orthogonalisation="symmetric",
 #         )
 #

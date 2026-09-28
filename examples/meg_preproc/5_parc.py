@@ -21,7 +21,6 @@ sessions = [
 ]
 
 parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
-parcellation_method = "spatial_basis"
 orthogonalisation = "symmetric"
 use_mni152 = False
 # ----------------------------------------------------------------------------
@@ -49,7 +48,6 @@ def process_session(session, logger):
     parcel_data = parcellation.parcellate_lcmv(
         fns,
         parcellation_file=parcellation_file,
-        method=parcellation_method,
         orthogonalisation=orthogonalisation,
     )
 
