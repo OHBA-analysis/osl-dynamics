@@ -599,9 +599,9 @@ def _sample_parcellation(parcellation_file: str, coords: np.ndarray) -> np.ndarr
     """
     parcellation = Parcellation(parcellation_file)
     img = parcellation.parcellation
-    ijk = np.rint(
-        nib.affines.apply_affine(np.linalg.inv(img.affine), coords)
-    ).astype(int)
+    ijk = np.rint(nib.affines.apply_affine(np.linalg.inv(img.affine), coords)).astype(
+        int
+    )
     inside = np.all((ijk >= 0) & (ijk < img.shape[:3]), axis=1)
     parcellation_asmatrix = np.zeros([len(coords), parcellation.n_parcels])
     parcellation_asmatrix[inside] = np.asarray(img.dataobj)[tuple(ijk[inside].T)]

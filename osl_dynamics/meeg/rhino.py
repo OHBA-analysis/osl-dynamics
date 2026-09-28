@@ -2557,9 +2557,7 @@ def _make_mni_grid(fns: OSLFilenames, gridstep: int) -> None:
     gridstep : int
         Resolution in mm.
     """
-    packaged_mask = (
-        f"{files.mask.directory}/MNI152_T1_{int(gridstep)}mm_brain.nii.gz"
-    )
+    packaged_mask = f"{files.mask.directory}/MNI152_T1_{int(gridstep)}mm_brain.nii.gz"
     if os.path.exists(packaged_mask):
         shutil.copyfile(packaged_mask, fns.mni_grid)
     else:
