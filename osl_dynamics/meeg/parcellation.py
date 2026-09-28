@@ -268,7 +268,11 @@ def parcellate(
 
         # Calculate parcel time courses
         parcel_data, _, _ = _get_parcel_data_pca(
-            voxel_data, parcellation, method=method
+            voxel_data,
+            parcellation,
+            method=method,
+            parcellation_file=parcellation_file,
+            voxel_coords=voxel_coords,
         )
 
     # Orthogonalisation
@@ -380,7 +384,9 @@ def parcellate_lcmv(
     def voxel_cov(inds):
         return W[inds] @ data_cov @ W[inds].T
 
-    voxel_weightings = _get_parcel_weights(voxel_cov, parcellation, method)
+    voxel_weightings = _get_parcel_weights(
+        voxel_cov, parcellation, method, parcellation_file, dipole_coords
+    )
 
     # Spatial filter for each parcel, shape is (parcels, channels)
     parcel_filters = voxel_weightings.T @ W
@@ -632,6 +638,8 @@ def _get_parcel_weights(
     voxel_cov: callable,
     parcellation_asmatrix: np.ndarray,
     method: str = "spatial_basis",
+    parcellation_file: str | None = None,
+    voxel_coords: np.ndarray | None = None,
 ) -> np.ndarray:
     """Calculate the voxel weights that give each parcel time course.
 
@@ -649,6 +657,12 @@ def _get_parcel_weights(
         (nvoxels x n_parcels) parcel weights for each voxel.
     method : str, optional
         'pca' or 'spatial_basis', see :code:`_get_parcel_data_pca`.
+    parcellation_file : str, optional
+        Parcellation file, used for the error message if a parcel does not
+        contain any dipoles.
+    voxel_coords : np.ndarray, optional
+        (nvoxels, 3) MNI coordinates in mm, used for the error message if a
+        parcel does not contain any dipoles.
 
     Returns
     -------
@@ -679,17 +693,10 @@ def _get_parcel_weights(
                 "parcel, when using the PCA method.\nResults may not be sensible"
             )
 
-    def warn_empty(pp):
-        print(
-            f"WARNING: An empty parcel mask was found for parcel {pp} "
-            "when calculating its time-courses\n"
-            "The parcel will have a flat zero time-course.\n"
-            "Check this does not cause further problems with the analysis.\n"
-        )
-
+    empty_parcels = []
     for pp in range(n_parcels):
         if not np.any(parcellation_asmatrix[:, pp] != 0):
-            warn_empty(pp)
+            empty_parcels.append(pp)
             continue
 
         if method == "spatial_basis":
@@ -721,11 +728,16 @@ def _get_parcel_weights(
             this_mask = np.ones(len(inds), dtype=bool)
 
         if not np.any(this_mask):
-            warn_empty(pp)
+            empty_parcels.append(pp)
             continue
 
         # Covariance of the (weighted) voxels in the parcel
         cov = voxel_cov(inds)
+
+        # Voxels without a dipole have no data
+        if not np.any(this_mask & (np.diag(cov) > 0)):
+            empty_parcels.append(pp)
+            continue
         temporal_std = np.maximum(np.sqrt(np.diag(cov)), np.finfo(float).eps)
         weighted_cov = spatial_map[:, None] * cov * spatial_map[None, :]
 
@@ -744,13 +756,53 @@ def _get_parcel_weights(
 
         voxel_weightings[inds, pp] = ts_sign * ts_scale / pca_std * U * spatial_map
 
+    if empty_parcels:
+        raise ValueError(
+            _empty_parcels_message(empty_parcels, parcellation_file, voxel_coords)
+        )
+
     return voxel_weightings
+
+
+def _empty_parcels_message(
+    empty_parcels: list[int],
+    parcellation_file: str | None,
+    voxel_coords: np.ndarray | None,
+) -> str:
+    """Error message for parcels that do not contain any dipoles."""
+    msg = f"{len(empty_parcels)} parcel(s) do not contain any dipoles: {empty_parcels}."
+    if parcellation_file is None:
+        return msg
+    parcellation = Parcellation(parcellation_file)
+    centres = np.round(parcellation.roi_centers()[empty_parcels]).astype(int)
+    msg += f" MNI coordinates (mm) of the parcel centres: {centres.tolist()}.\n\n"
+    msg += "This can happen if:\n"
+    parcellation_res = float(parcellation.parcellation.header.get_zooms()[0])
+    if voxel_coords is not None:
+        gridstep = source_recon._get_gridstep(voxel_coords / 1000)
+        if gridstep > parcellation_res + 0.5:
+            msg += (
+                f"- The dipole grid ({gridstep} mm) is coarser than the "
+                f"parcellation ({parcellation_res:g} mm), so small parcels can "
+                "fall between dipoles. Use rhino.forward_model with "
+                f"gridstep={parcellation_res:g}, or a parcellation with larger "
+                "parcels.\n"
+            )
+    msg += (
+        "- The parcel is outside the subject's inner skull surface (dipoles "
+        "outside it, or closer than mindist to it, are removed by "
+        "rhino.forward_model). Check the surface extraction and "
+        "coregistration plots, or use a smaller mindist in rhino.forward_model."
+    )
+    return msg
 
 
 def _get_parcel_data_pca(
     voxel_data: np.ndarray,
     parcellation_asmatrix: np.ndarray,
     method: str = "spatial_basis",
+    parcellation_file: str | None = None,
+    voxel_coords: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calculate parcel time courses using PCA over the voxels in each parcel.
 
@@ -768,6 +820,12 @@ def _get_parcel_data_pca(
                           1st PC from all voxels, weighted by the spatial map.
         If the parcellation is unweighted and non-overlapping, 'spatial_basis'
         will give the same result as 'PCA' except with a different normalisation.
+    parcellation_file : str, optional
+        Parcellation file, used for the error message if a parcel does not
+        contain any dipoles.
+    voxel_coords : np.ndarray, optional
+        (nvoxels, 3) MNI coordinates in mm, used for the error message if a
+        parcel does not contain any dipoles.
 
     Returns
     -------
@@ -797,7 +855,9 @@ def _get_parcel_data_pca(
         x = voxel_data_reshaped[inds] - voxel_mean[inds, None]
         return x @ x.T / x.shape[1]
 
-    voxel_weightings = _get_parcel_weights(voxel_cov, parcellation_asmatrix, method)
+    voxel_weightings = _get_parcel_weights(
+        voxel_cov, parcellation_asmatrix, method, parcellation_file, voxel_coords
+    )
 
     parcel_data = (
         voxel_weightings.T @ voxel_data_reshaped
