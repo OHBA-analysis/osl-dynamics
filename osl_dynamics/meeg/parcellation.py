@@ -201,7 +201,6 @@ def parcel_vector_to_nifti(
 
 
 def parcellate(
-    fns: OSLFilenames,
     voxel_data: np.ndarray,
     voxel_coords: np.ndarray,
     method: str,
@@ -215,8 +214,6 @@ def parcellate(
 
     Parameters
     ----------
-    fns : OSLFilenames
-        Container for OSL filenames.
     voxel_data : np.ndarray
         (nvoxels x n_time) or (nvoxels x n_time x n_trials).
     voxel_coords :
@@ -224,7 +221,7 @@ def parcellate(
         voxel is assigned the parcel weights of the parcellation voxel that
         contains it, so the voxels do not need to be on the same grid as the
         parcellation.
-    method : str, optional
+    method : str
         'pca'           - take 1st PC of voxels.
         'spatial_basis' - The parcel time-course for each spatial map is the
                           1st PC from all voxels, weighted by the spatial map.
@@ -267,12 +264,8 @@ def parcellate(
         parcellation = _sample_parcellation(parcellation_file, voxel_coords)
 
         # Calculate parcel time courses
-        parcel_data, _, _ = _get_parcel_data_pca(
-            voxel_data,
-            parcellation,
-            method=method,
-            parcellation_file=parcellation_file,
-            voxel_coords=voxel_coords,
+        parcel_data = _get_parcel_data_pca(
+            voxel_data, parcellation, method, parcellation_file, voxel_coords
         )
 
     # Orthogonalisation
@@ -294,16 +287,12 @@ def parcellate_lcmv(
 ) -> np.ndarray:
     """Calculate parcel time courses from sensor data with the LCMV filters.
 
-    This gives the parcel time courses without calculating the voxel data.
-    Each dipole of the forward model is assigned to parcels using its MNI
-    coordinate, the parcel time course (the rescaled 1st PC of the dipoles in
-    the parcel) is calculated from the covariance of the dipoles (estimated
-    from the sensor data) and applied to the sensor data as a spatial filter.
-
-    This is equivalent to :func:`source_recon.apply_lcmv_beamformer` followed
-    by :func:`parcellate` except the dipoles are used directly rather than
-    being resampled onto a regular MNI grid first, and it is much faster and
-    uses much less memory.
+    This gives the same result as :func:`source_recon.apply_lcmv_beamformer`
+    followed by :func:`parcellate`, but it is much faster and uses much less
+    memory because the voxel data is not calculated. The parcel time course
+    (the rescaled 1st PC of the dipoles in the parcel) is calculated from the
+    covariance of the dipoles (estimated from the sensor data) and applied to
+    the sensor data as a spatial filter.
 
     Parameters
     ----------
@@ -350,32 +339,19 @@ def parcellate_lcmv(
             "parcellate_lcmv requires a scalar beamformer, "
             "e.g. pick_ori='max-power-pre-weight-norm'."
         )
-    # (dipoles, channels). Filters from older versions of osl-dynamics can be
-    # complex (with a zero imaginary part)
-    W = np.real(filters["weights"])
-
-    # Parcel weights for each dipole
+    # Beamformer weights for each voxel of the MNI grid, shape is
+    # (voxels, channels). Voxels without a dipole (outside the inner skull)
+    # have zero weights
     fwd = mne.read_forward_solution(fns.fwd_model, verbose=False)
-    dipole_coords = source_recon._get_source_coords_mni(fns, fwd)
-    if len(dipole_coords) != W.shape[0]:
+    voxel_coords = source_recon._get_mni_grid(fns, fwd)
+    if fwd["nsource"] != filters["weights"].shape[0]:
         raise ValueError(
-            f"{fns.filters} has {W.shape[0]} dipoles, but {fns.fwd_model} has "
-            f"{len(dipole_coords)}."
+            f"{fns.filters} has {filters['weights'].shape[0]} dipoles, but "
+            f"{fns.fwd_model} has {fwd['nsource']}."
         )
-    in_parcel = np.any(
-        _sample_parcellation(parcellation_file, dipole_coords) > 0, axis=1
-    )
-    print(f"{int(in_parcel.sum())} of {len(dipole_coords)} dipoles are in a parcel")
-    mni_grid = source_recon._get_mni_grid(fns, fwd)
-    if mni_grid is not None:
-        # Use every voxel of the MNI grid (voxels without a dipole have zero
-        # weights), so the parcel weights are normalised in the same way for
-        # every subject. This gives the same result as parcellate
-        dipole_coords = mni_grid[0]
-        W_grid = np.zeros((len(dipole_coords), W.shape[1]))
-        W_grid[fwd["src"][0]["vertno"]] = W
-        W = W_grid
-    parcellation = _sample_parcellation(parcellation_file, dipole_coords)
+    W = np.zeros((len(voxel_coords), filters["weights"].shape[1]))
+    W[fwd["src"][0]["vertno"]] = filters["weights"]
+    parcellation = _sample_parcellation(parcellation_file, voxel_coords)
 
     # Covariance of the dipoles is W @ C @ W.T
     data_mean = np.mean(data, axis=1)
@@ -385,7 +361,7 @@ def parcellate_lcmv(
         return W[inds] @ data_cov @ W[inds].T
 
     voxel_weightings = _get_parcel_weights(
-        voxel_cov, parcellation, method, parcellation_file, dipole_coords
+        voxel_cov, parcellation, method, parcellation_file, voxel_coords
     )
 
     # Spatial filter for each parcel, shape is (parcels, channels)
@@ -637,9 +613,9 @@ def _sample_parcellation(parcellation_file: str, coords: np.ndarray) -> np.ndarr
 def _get_parcel_weights(
     voxel_cov: callable,
     parcellation_asmatrix: np.ndarray,
-    method: str = "spatial_basis",
-    parcellation_file: str | None = None,
-    voxel_coords: np.ndarray | None = None,
+    method: str,
+    parcellation_file: str,
+    voxel_coords: np.ndarray,
 ) -> np.ndarray:
     """Calculate the voxel weights that give each parcel time course.
 
@@ -655,12 +631,12 @@ def _get_parcel_weights(
         voxels.
     parcellation_asmatrix: np.ndarray
         (nvoxels x n_parcels) parcel weights for each voxel.
-    method : str, optional
-        'pca' or 'spatial_basis', see :code:`_get_parcel_data_pca`.
-    parcellation_file : str, optional
+    method : str
+        'pca' or 'spatial_basis', see :func:`parcellate`.
+    parcellation_file : str
         Parcellation file, used for the error message if a parcel does not
         contain any dipoles.
-    voxel_coords : np.ndarray, optional
+    voxel_coords : np.ndarray
         (nvoxels, 3) MNI coordinates in mm, used for the error message if a
         parcel does not contain any dipoles.
 
@@ -671,9 +647,6 @@ def _get_parcel_weights(
         voxel_weightings.T @ (voxel_data - voxel_data.mean(axis=1)).
     """
     print(f"Calculating parcel time courses with {method}")
-
-    if method not in ["pca", "spatial_basis"]:
-        raise ValueError("Invalid method specified")
 
     n_parcels = parcellation_asmatrix.shape[1]
     voxel_weightings = np.zeros(parcellation_asmatrix.shape)
@@ -765,29 +738,24 @@ def _get_parcel_weights(
 
 
 def _empty_parcels_message(
-    empty_parcels: list[int],
-    parcellation_file: str | None,
-    voxel_coords: np.ndarray | None,
+    empty_parcels: list[int], parcellation_file: str, voxel_coords: np.ndarray
 ) -> str:
     """Error message for parcels that do not contain any dipoles."""
     msg = f"{len(empty_parcels)} parcel(s) do not contain any dipoles: {empty_parcels}."
-    if parcellation_file is None:
-        return msg
     parcellation = Parcellation(parcellation_file)
     centres = np.round(parcellation.roi_centers()[empty_parcels]).astype(int)
     msg += f" MNI coordinates (mm) of the parcel centres: {centres.tolist()}.\n\n"
     msg += "This can happen if:\n"
     parcellation_res = float(parcellation.parcellation.header.get_zooms()[0])
-    if voxel_coords is not None:
-        gridstep = source_recon._get_gridstep(voxel_coords / 1000)
-        if gridstep > parcellation_res + 0.5:
-            msg += (
-                f"- The dipole grid ({gridstep} mm) is coarser than the "
-                f"parcellation ({parcellation_res:g} mm), so small parcels can "
-                "fall between dipoles. Use rhino.forward_model with "
-                f"gridstep={parcellation_res:g}, or a parcellation with larger "
-                "parcels.\n"
-            )
+    gridstep = source_recon._get_gridstep(voxel_coords / 1000)
+    if gridstep > parcellation_res + 0.5:
+        msg += (
+            f"- The dipole grid ({gridstep} mm) is coarser than the "
+            f"parcellation ({parcellation_res:g} mm), so small parcels can "
+            "fall between dipoles. Use rhino.forward_model with "
+            f"gridstep={parcellation_res:g}, or a parcellation with larger "
+            "parcels.\n"
+        )
     msg += (
         "- The parcel is outside the subject's inner skull surface (dipoles "
         "outside it, or closer than mindist to it, are removed by "
@@ -800,30 +768,24 @@ def _empty_parcels_message(
 def _get_parcel_data_pca(
     voxel_data: np.ndarray,
     parcellation_asmatrix: np.ndarray,
-    method: str = "spatial_basis",
-    parcellation_file: str | None = None,
-    voxel_coords: np.ndarray | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    method: str,
+    parcellation_file: str,
+    voxel_coords: np.ndarray,
+) -> np.ndarray:
     """Calculate parcel time courses using PCA over the voxels in each parcel.
 
     Parameters
     ----------
     voxel_data : np.ndarray
-        (nvoxels x n_time) or (nvoxels x n_time x n_trials) and is assumed to be
-        on the same grid as parcellation.
+        (nvoxels x n_time) or (nvoxels x n_time x n_trials).
     parcellation_asmatrix: np.ndarray
-        (nvoxels x n_parcels) and is assumed to be on the same grid as
-        voxel_data.
-    method : str, optional
-        'pca'           - take 1st PC of voxels
-        'spatial_basis' - The parcel time-course for each spatial map is the
-                          1st PC from all voxels, weighted by the spatial map.
-        If the parcellation is unweighted and non-overlapping, 'spatial_basis'
-        will give the same result as 'PCA' except with a different normalisation.
-    parcellation_file : str, optional
+        (nvoxels x n_parcels) parcel weights for each voxel.
+    method : str
+        'pca' or 'spatial_basis', see :func:`parcellate`.
+    parcellation_file : str
         Parcellation file, used for the error message if a parcel does not
         contain any dipoles.
-    voxel_coords : np.ndarray, optional
+    voxel_coords : np.ndarray
         (nvoxels, 3) MNI coordinates in mm, used for the error message if a
         parcel does not contain any dipoles.
 
@@ -831,14 +793,6 @@ def _get_parcel_data_pca(
     -------
     parcel_data : np.ndarray
         n_parcels x n_time, or n_parcels x n_time x n_trials
-    voxel_weightings : np.ndarray
-        nvoxels x n_parcels
-        Voxel weightings for each parcel to compute parcel_data from
-        voxel_data
-    voxel_assignments : bool np.ndarray
-        nvoxels x n_parcels
-        Boolean assignments indicating for each voxel the winner takes all
-        parcel it belongs to
     """
     if parcellation_asmatrix.shape[0] != voxel_data.shape[0]:
         raise ValueError(
@@ -865,14 +819,7 @@ def _get_parcel_data_pca(
     )
 
     # Re-separate the trials and time dimensions
-    parcel_data = np.reshape(parcel_data, (-1,) + voxel_data.shape[1:])
-
-    # Compute voxel_assignments using winner takes all
-    voxel_assignments = np.zeros(voxel_weightings.shape)
-    winning_parcel = np.argmax(voxel_weightings, axis=1)
-    voxel_assignments[np.arange(voxel_weightings.shape[0]), winning_parcel] = 1
-
-    return parcel_data, voxel_weightings, voxel_assignments
+    return np.reshape(parcel_data, (-1,) + voxel_data.shape[1:])
 
 
 def _get_parcel_data_centroid(

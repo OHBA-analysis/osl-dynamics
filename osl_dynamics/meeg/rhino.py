@@ -2508,28 +2508,43 @@ def _setup_mni_grid_source_space(
     """
     _make_mni_grid(fns, gridstep)
     coords_mni = _mni_grid_coords(fns.mni_grid)
-    coords_mri = _mni_to_scaledmri(fns, coords_mni)
     print(f"MNI grid: {len(coords_mni)} voxels ({gridstep} mm)")
-
-    nn = np.tile([0.0, 0.0, 1.0], (len(coords_mri), 1))
-    src = mne.setup_volume_source_space(
-        pos=dict(rr=coords_mri / 1000, nn=nn), verbose=False
-    )
+    src = _mni_source_space(fns, coords_mni)
 
     if exclude > 0:
         # Exclude points close to the centre of mass of the inner skull
         surf = mne.surface.read_surface(
             f"{fns.bem_dir}/inner_skull.surf", return_dict=True
         )[-1]
-        dist = np.linalg.norm(coords_mri - surf["rr"].mean(axis=0), axis=1)
+        dist = np.linalg.norm(src[0]["rr"] * 1000 - surf["rr"].mean(axis=0), axis=1)
         src[0]["inuse"][dist < exclude] = 0
         src[0]["vertno"] = np.flatnonzero(src[0]["inuse"])
         src[0]["nuse"] = len(src[0]["vertno"])
 
-    if src[0]["coord_frame"] != FIFF.FIFFV_COORD_MRI:
-        raise RuntimeError("source space is not in MRI coordinates")
-
     return src
+
+
+def _mni_source_space(fns: OSLFilenames, coords_mni: np.ndarray) -> mne.SourceSpaces:
+    """Discrete source space with a dipole at each MNI coordinate.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    coords_mni : np.ndarray
+        (n, 3) coordinates in MNI space in mm.
+
+    Returns
+    -------
+    src : mne.SourceSpaces
+        Source space in scaled MRI space (in metres), which is what
+        _make_fwd_solution expects.
+    """
+    coords_mri = _mni_to_scaledmri(fns, coords_mni)
+    nn = np.tile([0.0, 0.0, 1.0], (len(coords_mri), 1))
+    return mne.setup_volume_source_space(
+        pos=dict(rr=coords_mri / 1000, nn=nn), verbose=False
+    )
 
 
 def _make_mni_grid(fns: OSLFilenames, gridstep: int) -> None:
@@ -2674,63 +2689,29 @@ def _mni_to_mri(fns: SurfaceFilenames, coords_mni: np.ndarray) -> np.ndarray:
     coords_mri : np.ndarray
         (n, 3) coordinates in MRI space in mm.
     """
-    if os.path.exists(fns.mri2mni_warp_file):
-        return _fsl_coord_xform(
-            "std2imgcoord",
-            ["-img", fns.mri_file, "-std", fns.std_head_2mm],
-            fns.mri2mni_warp_file,
-            coords_mni,
-        )
-    mni_mri_t = read_trans(fns.mni_mri_t_file)["trans"]
-    return _xform_points(mni_mri_t, coords_mni.T).T
+    if not os.path.exists(fns.mri2mni_warp_file):
+        mni_mri_t = read_trans(fns.mni_mri_t_file)["trans"]
+        return _xform_points(mni_mri_t, coords_mni.T).T
 
-
-def _mri_to_mni(fns: SurfaceFilenames, coords_mri: np.ndarray) -> np.ndarray:
-    """Transform points from (unscaled) MRI space to MNI space.
-
-    Inverse of :func:`_mni_to_mri`.
-
-    Parameters
-    ----------
-    fns : SurfaceFilenames
-        Surface extraction file paths.
-    coords_mri : np.ndarray
-        (n, 3) coordinates in MRI space in mm.
-
-    Returns
-    -------
-    coords_mni : np.ndarray
-        (n, 3) coordinates in MNI space in mm.
-    """
-    if os.path.exists(fns.mri2mni_warp_file):
-        return _fsl_coord_xform(
-            "img2stdcoord",
-            ["-img", fns.mri_file, "-std", fns.std_head_2mm],
-            fns.mri2mni_warp_file,
-            coords_mri,
-        )
-    mni_mri_t = read_trans(fns.mni_mri_t_file)["trans"]
-    return _xform_points(np.linalg.inv(mni_mri_t), coords_mri.T).T
-
-
-def _fsl_coord_xform(
-    cmd: str, args: list[str], warp_file: str, coords: np.ndarray
-) -> np.ndarray:
-    """Transform coordinates (in mm) with FSL's std2imgcoord/img2stdcoord."""
-    coords = np.atleast_2d(coords)
+    # Command: std2imgcoord -img <mri_file> -std <MNI152_T1_2mm> \
+    #          -warp <mri2mni_warp_file> -mm -
     result = subprocess.run(
-        [cmd, *args, "-warp", warp_file, "-mm", "-"],
-        input="\n".join(" ".join(f"{c:.6f}" for c in xyz) for xyz in coords),
+        [
+            "std2imgcoord",
+            *["-img", fns.mri_file, "-std", fns.std_head_2mm],
+            *["-warp", fns.mri2mni_warp_file, "-mm", "-"],
+        ],
+        input="\n".join(" ".join(f"{c:.6f}" for c in xyz) for xyz in coords_mni),
         capture_output=True,
         text=True,
         check=True,
     )
-    out = np.array(
+    coords_mri = np.array(
         [line.split() for line in result.stdout.strip().splitlines()], dtype=float
     )
-    if out.shape != coords.shape:
-        raise RuntimeError(f"{cmd} failed:\n{result.stderr}")
-    return out
+    if coords_mri.shape != coords_mni.shape:
+        raise RuntimeError(f"std2imgcoord failed:\n{result.stderr}")
+    return coords_mri
 
 
 def _mni_to_scaledmri(fns: OSLFilenames, coords_mni: np.ndarray) -> np.ndarray:

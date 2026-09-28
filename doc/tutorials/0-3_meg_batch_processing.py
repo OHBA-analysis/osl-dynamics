@@ -467,7 +467,7 @@ The output of this script is written to ``derivatives/``.
 #     from osl_dynamics.data import sign_flipping
 #
 #     logger.log("Parcellating...")
-#     parcel_data = parcellation.parcellate(...)  # (parcels, time)
+#     parcel_data = parcellation.parcellate_lcmv(...)  # (parcels, time)
 #
 #     logger.log("Sign flipping...")
 #     parcel_data, flips, corr = sign_flipping.sign_flip(
