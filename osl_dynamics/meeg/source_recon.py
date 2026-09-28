@@ -429,47 +429,6 @@ def apply_lcmv_beamformer(
     return voxel_data_mni_resampled, voxel_coords_mni_resampled
 
 
-def extract_voxel_data(
-    voxel_data: np.ndarray,
-    voxel_coords: np.ndarray,
-    coords: list | np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Extract the time course of the voxel nearest to each MNI coordinate.
-
-    Voxels without source reconstructed data (all zeros, i.e. no dipole within
-    the spatial resolution in apply_lcmv_beamformer) are skipped.
-
-    The voxel used can be several mm from the coordinate, see
-    :func:`virtual_electrodes` to beamform the exact location.
-
-    Parameters
-    ----------
-    voxel_data : np.ndarray
-        Voxel data from apply_lcmv_beamformer. Shape is (voxels, time) or
-        (voxels, time, epochs).
-    voxel_coords : np.ndarray
-        MNI coordinates (in mm) from apply_lcmv_beamformer. Shape is
-        (voxels, 3).
-    coords : list | np.ndarray
-        MNI coordinates (in mm) to extract. Shape is (3,) for a single
-        coordinate or (n_coords, 3).
-
-    Returns
-    -------
-    data : np.ndarray
-        Time course of the nearest voxel to each coordinate. Shape is
-        (n_coords, time) or (n_coords, time, epochs), without the first axis
-        if a single coordinate is passed.
-    nearest_coords : np.ndarray
-        MNI coordinates (in mm) of the voxels used. Shape is (n_coords, 3),
-        or (3,) if a single coordinate is passed.
-    """
-    valid = np.flatnonzero(np.any(voxel_data.reshape(len(voxel_data), -1), axis=1))
-    _, indices = KDTree(voxel_coords[valid]).query(coords)
-    indices = valid[indices]
-    return voxel_data[indices], voxel_coords[indices]
-
-
 def virtual_electrodes(
     fns: OSLFilenames,
     coords: list | np.ndarray,
@@ -481,9 +440,8 @@ def virtual_electrodes(
 
     The lead field is computed for a dipole at the exact location of each
     coordinate and the LCMV beamformer weights are computed with the same data
-    covariance and settings used by :func:`lcmv_beamformer`. Unlike
-    :func:`extract_voxel_data`, the time course is not taken from the nearest
-    dipole of the source grid.
+    covariance and settings used by :func:`lcmv_beamformer`, so the time
+    course is not taken from the nearest dipole of the MNI grid.
 
     Parameters
     ----------

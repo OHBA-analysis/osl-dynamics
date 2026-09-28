@@ -2309,7 +2309,7 @@ def forward_model(
         raise ValueError(f"{model} is an invalid model choice")
 
     _write_bem_surfaces(fns)
-    src = _setup_template_source_space(fns, gridstep=gridstep, exclude=exclude)
+    src = _setup_mni_grid_source_space(fns, gridstep=gridstep, exclude=exclude)
 
     # Save the BEM solution so we can compute the forward model for other
     # dipole locations later, see source_recon.virtual_electrodes
@@ -2451,7 +2451,7 @@ def _write_bem_surfaces(fns: OSLFilenames) -> None:
     )
 
 
-def _setup_template_source_space(
+def _setup_mni_grid_source_space(
     fns: OSLFilenames, gridstep: int = 8, exclude: float = 0.0
 ) -> mne.SourceSpaces:
     """Set up a source space with a dipole at each voxel of an MNI grid.
@@ -2481,7 +2481,7 @@ def _setup_template_source_space(
     _make_mni_grid(fns, gridstep)
     coords_mni = _mni_grid_coords(fns.mni_grid)
     coords_mri = _mni_to_scaledmri(fns, coords_mni)
-    print(f"Template grid: {len(coords_mni)} voxels ({gridstep} mm MNI grid)")
+    print(f"MNI grid: {len(coords_mni)} voxels ({gridstep} mm)")
 
     nn = np.tile([0.0, 0.0, 1.0], (len(coords_mri), 1))
     src = mne.setup_volume_source_space(

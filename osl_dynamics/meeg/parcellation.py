@@ -120,36 +120,6 @@ def plot_parcellation(parcellation: str | Parcellation, **kwargs) -> object:
     )
 
 
-def parcel_vector_to_voxel_grid(
-    parcellation_file: str,
-    vector: np.ndarray,
-    remove_subcortical_voxels: bool = False,
-) -> np.ndarray:
-    """Takes a vector of parcel values and return a 3D voxel grid.
-
-    The voxel grid is the grid of the parcellation file, see
-    :func:`parcel_vector_to_nifti` to also get the affine.
-
-    Parameters
-    ----------
-    parcellation_file : str
-        Parcellation file. Must be a NIFTI file.
-    vector : np.ndarray
-        Value at each parcel. Shape must be (n_parcels,).
-    remove_subcortical_voxels : bool, optional
-        Should we set the subcortical voxels to np.nan?
-
-    Returns
-    -------
-    voxel_grid : np.ndarray
-        Value at each voxel. Shape is (x, y, z), where :code:`x`,
-        :code:`y` and :code:`z` correspond to 3D voxel locations.
-    """
-    return parcel_vector_to_nifti(
-        vector, parcellation_file, remove_subcortical_voxels
-    ).get_fdata()
-
-
 def parcel_vector_to_nifti(
     vector: np.ndarray,
     parcellation_file: str,
@@ -313,7 +283,7 @@ def parcellate(
 def parcellate_lcmv(
     fns: OSLFilenames,
     parcellation_file: str,
-    method: str = "spatial_basis",
+    method: str,
     orthogonalisation: str | None = None,
     raw: mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | list[str] | None = "omit",
@@ -337,7 +307,7 @@ def parcellate_lcmv(
         Container for OSL filenames.
     parcellation_file : str
         Path to parcellation file (in MNI space).
-    method : str, optional
+    method : str
         'pca' or 'spatial_basis', see :func:`parcellate`.
     orthogonalisation : str, optional
         Method for orthogonalising the data. Can be None or 'symmetric'.
