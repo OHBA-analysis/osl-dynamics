@@ -166,6 +166,8 @@ def compute_fo_stats(
     divided_intervals: List,
     interval_mask: Optional[np.ndarray] = None,
     return_all_intervals: bool = False,
+    *,
+    interval_weighting: str = "duration",
 ) -> Tuple[np.ndarray, np.ndarray, Optional[List], Optional[List]]:
     """Compute sums and weighted averages of time courses in each interval.
 
@@ -181,6 +183,10 @@ def compute_fo_stats(
     return_all_intervals : bool, optional
         Whether to return the density/sum of all intervals in addition to the
         interval averages/sums.
+
+    interval_weighting : str, optional
+        'duration' (default) pools samples across intervals; 'equal'
+        averages interval means with equal weight.
 
     Returns
     -------
@@ -200,6 +206,8 @@ def compute_fo_stats(
         sums of time courses in each interval of shape (n_states, n_bins,
         n_intervals). :code:`None` if :code:`return_all_intervals=False`.
     """
+    if interval_weighting not in ("equal", "duration"):
+        raise ValueError("interval_weighting must be 'equal' or 'duration'.")
     if interval_mask is None:
         interval_mask = [np.ones(len(divided_intervals))]
 
@@ -240,6 +248,13 @@ def compute_fo_stats(
 
             interval_weighted_avg[:, 0, j] = np.mean(temp_away_flat, axis=0)
             interval_weighted_avg[:, 1, j] = np.mean(temp_to_flat, axis=0)
+            if interval_weighting == "equal":
+                interval_weighted_avg[:, 0, j] = np.mean(
+                    [temp_away[k].mean(0) for k in selected], axis=0
+                )
+                interval_weighted_avg[:, 1, j] = np.mean(
+                    [temp_to[k].mean(0) for k in selected], axis=0
+                )
             interval_sum[:, 0, j] = np.sum(temp_away_flat, axis=0)
             interval_sum[:, 1, j] = np.sum(temp_to_flat, axis=0)
             interval_weighted_avg_all.append(
@@ -305,6 +320,15 @@ def compute_fo_stats(
         interval_sum = np.stack(
             [int_sum.mean(axis=-1) for int_sum in interval_sum_all], axis=-1
         )
+
+        if interval_weighting == "duration":
+            for r, selection in enumerate(interval_mask):
+                selected = np.flatnonzero(selection)
+                for b in range(len(divided_intervals[0])):
+                    pieces = [tc_sec[slice(*divided_intervals[k][b])] for k in selected]
+                    interval_weighted_avg[:, b, r] = (
+                        np.concatenate(pieces).mean(0) if pieces else np.nan
+                    )
 
     if return_all_intervals:
         return (
@@ -385,6 +409,8 @@ def tinda(
     interval_range: Optional[np.ndarray] = None,
     sampling_frequency: Optional[float] = None,
     return_all_intervals: bool = False,
+    *,
+    interval_weighting: str = "duration",
 ) -> Tuple[np.ndarray, np.ndarray, Union[List[Dict], Dict]]:
     """Compute time-in-state density and sum for each interval.
 
@@ -416,6 +442,10 @@ def tinda(
         interval averages/sums. If :code:`True`, will return a list of arrays in
         :code:`stats[i]['all_interval_wavg'/'all_interval_sum']`, each
         corresponding to an interval range.
+
+    interval_weighting : str, optional
+        'duration' (default) pools samples across intervals; 'equal'
+        averages interval means with equal weight.
 
     Returns
     -------
@@ -449,6 +479,8 @@ def tinda(
         - :code:`all_interval_sum`: unaveraged interval sums (only if
           :code:`return_all_intervals=True`).
     """
+    if interval_weighting not in ("equal", "duration"):
+        raise ValueError("interval_weighting must be 'equal' or 'duration'.")
     if isinstance(
         tc, list
     ):  # list of time courses (e.g., individuals' HMM state time courses)
@@ -463,6 +495,7 @@ def tinda(
                         interval_range,
                         sampling_frequency,
                         return_all_intervals,
+                        interval_weighting=interval_weighting,
                     )
                     for itc in tc
                 ]
@@ -478,6 +511,7 @@ def tinda(
                         interval_range,
                         sampling_frequency,
                         return_all_intervals,
+                        interval_weighting=interval_weighting,
                     )
                     for ix, itc in enumerate(tc)
                 ]
@@ -551,6 +585,7 @@ def tinda(
                     divided_intervals,
                     interval_mask,
                     return_all_intervals=return_all_intervals,
+                    interval_weighting=interval_weighting,
                 )
 
                 # Append stats
