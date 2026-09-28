@@ -37,6 +37,7 @@ from mne.surface import _points_outside_surface
 from mne.io.constants import FIFF
 from mne.viz.backends.renderer import _get_renderer
 
+from osl_dynamics import files
 from osl_dynamics.utils.filenames import OSLFilenames, SurfaceFilenames
 from osl_dynamics.utils.misc import system_call
 
@@ -2285,8 +2286,11 @@ def forward_model(
         - 'Triple Layer' to three layers (scalp, inner skull, brain/cortex).
           Recommended for EEG.
     gridstep : int, optional
-        A grid will be constructed with the spacing given by ``gridstep`` in mm
-        generating a volume source space.
+        Resolution of the dipole grid in mm. A dipole is placed at each voxel
+        of the MNI152 brain mask with this resolution (transformed into the
+        subject's MRI space), so the dipoles are at the same MNI coordinates
+        for every subject and match the voxels of the parcellation files.
+        The MNI grid is saved to :code:`fns.mni_grid`.
     mindist : float
         Exclude points closer than this distance (mm) to the bounding surface.
     exclude : float, optional
@@ -2304,12 +2308,8 @@ def forward_model(
     if model not in ["Single Layer", "Triple Layer"]:
         raise ValueError(f"{model} is an invalid model choice")
 
-    vol_src = _setup_volume_source_space(
-        fns,
-        gridstep=gridstep,
-        mindist=mindist,
-        exclude=exclude,
-    )
+    _write_bem_surfaces(fns)
+    src = _setup_template_source_space(fns, gridstep=gridstep, exclude=exclude)
 
     # Save the BEM solution so we can compute the forward model for other
     # dipole locations later, see source_recon.virtual_electrodes
@@ -2318,13 +2318,15 @@ def forward_model(
 
     fwd = _make_fwd_solution(
         fns,
-        src=vol_src,
+        src=src,
         ignore_ref=True,
         bem=bem,
         eeg=eeg,
         meg=meg,
+        mindist=mindist,
         verbose=verbose,
     )
+    print(f"{fwd['nsource']} dipoles inside the inner skull")
     mne.write_forward_solution(fns.fwd_model, fwd, overwrite=True)
 
     print("Forward model complete.")
@@ -2365,7 +2367,7 @@ def _make_bem_solution(
     # It is therefore independent from the MEG data and the head position.
     #
     # This will get the surfaces from: subjects_dir/subject/bem/inner_skull.surf,
-    # which is where rhino.setup_volume_source_space will have put it.
+    # which is where _write_bem_surfaces will have put it.
     bem_model = mne.make_bem_model(
         subjects_dir=fns.outdir,
         subject=fns.head_model_id,
@@ -2376,48 +2378,17 @@ def _make_bem_solution(
     return mne.make_bem_solution(bem_model, verbose=verbose)
 
 
-def _setup_volume_source_space(
-    fns: OSLFilenames, gridstep: int = 5, mindist: float = 5.0, exclude: float = 0.0
-) -> mne.SourceSpaces:
-    """Set up a volume source space grid inside the inner skull surface.
+def _write_bem_surfaces(fns: OSLFilenames) -> None:
+    """Copy the BET surfaces to where MNE expects them.
 
-    This is a RHINO specific version of mne.setup_volume_source_space.
+    This copies the CoregFilenames.bet_*_surf_file files to
+    `subjects_dir/subject/bem/*.surf` since this is where mne expects to find
+    them when mne.make_bem_model is called.
 
     Parameters
     ----------
     fns : OSLFilenames
         Container for OSL filenames.
-    gridstep : int, optional
-        A grid will be constructed with the spacing given by ``gridstep`` in mm
-        generating a volume source space.
-    mindist : float, optional
-        Exclude points closer than this distance (mm) to the bounding surface.
-    exclude : float, optional
-        Exclude points closer than this distance (mm) from the center of mass of
-        the bounding surface.
-
-    Returns
-    -------
-    src : mne.SourceSpaces
-        A single source space object.
-
-    Notes
-    -----
-    This is a RHINO-specific version of mne.setup_volume_source_space,
-    which can handle mri's that are niftii files.
-
-    This specifically uses the inner skull surface in
-    CoregFilenames.bet_inskull_surf_file to define the source space grid.
-
-    This will also copy the CoregFilenames.bet_inskull_surf_file file to:
-    `subjects_dir/subject/bem/inner_skull.surf` since this is where mne expects
-    to find it when mne.make_bem_model is called.
-
-    The coords of points to reconstruct to can be found in the output here:
-
-    >>> src[0]['rr'][src[0]['vertno']]
-
-    where they are in native MRI space in metres.
     """
     # Note that due to the unusual naming conventions used by BET and MNE:
     # - bet_inskull_*_file is actually the brain surface
@@ -2479,51 +2450,123 @@ def _setup_volume_source_space(
         overwrite=True,
     )
 
-    # ------------------------------------------------
-    # Setup main MNE call to _make_volume_source_space
-    # ------------------------------------------------
 
-    pos = float(int(gridstep))
-    pos /= 1000.0  # convert pos to m from mm for MNE
+def _setup_template_source_space(
+    fns: OSLFilenames, gridstep: int = 8, exclude: float = 0.0
+) -> mne.SourceSpaces:
+    """Set up a source space with a dipole at each voxel of an MNI grid.
 
-    vol_info = _get_vol_info_from_nii(fns.coreg.mri_file)
+    The voxels of the MNI152 brain mask at a resolution of gridstep are
+    transformed into the subject's (scaled) MRI space, so every subject has a
+    dipole at the same MNI coordinates. The MNI grid is saved to
+    fns.mni_grid. Dipoles outside the inner skull surface (or closer than
+    mindist to it) are excluded when the forward model is computed.
 
-    surface = f"{fns.bem_dir}/inner_skull.surf"
-    surf = mne.surface.read_surface(surface, return_dict=True)[-1]
-    surf = copy.deepcopy(surf)
-    surf["rr"] *= 1e-3  # must be in metres for MNE call
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    gridstep : int, optional
+        Resolution of the MNI grid in mm.
+    exclude : float, optional
+        Exclude points closer than this distance (mm) from the center of mass
+        of the inner skull surface.
 
-    # -------------
-    # Main MNE call
-    # -------------
+    Returns
+    -------
+    src : mne.SourceSpaces
+        A single discrete source space in MRI space. The order of the dipoles
+        is the order of the voxels returned by :code:`_mni_grid_coords`.
+    """
+    _make_mni_grid(fns, gridstep)
+    coords_mni = _mni_grid_coords(fns.mni_grid)
+    coords_mri = _mni_to_scaledmri(fns, coords_mni)
+    print(f"Template grid: {len(coords_mni)} voxels ({gridstep} mm MNI grid)")
 
-    sp = mne.source_space._source_space._make_volume_source_space(
-        surf,
-        pos,
-        exclude,
-        mindist,
-        fns.coreg.mri_file,
-        None,
-        vol_info=vol_info,
-        single_volume=False,
+    nn = np.tile([0.0, 0.0, 1.0], (len(coords_mri), 1))
+    src = mne.setup_volume_source_space(
+        pos=dict(rr=coords_mri / 1000, nn=nn), verbose=False
     )
-    sp[0]["type"] = "vol"
 
-    # ----------------------
-    # Save and return result
-    # ----------------------
+    if exclude > 0:
+        # Exclude points close to the centre of mass of the inner skull
+        surf = mne.surface.read_surface(
+            f"{fns.bem_dir}/inner_skull.surf", return_dict=True
+        )[-1]
+        dist = np.linalg.norm(coords_mri - surf["rr"].mean(axis=0), axis=1)
+        src[0]["inuse"][dist < exclude] = 0
+        src[0]["vertno"] = np.flatnonzero(src[0]["inuse"])
+        src[0]["nuse"] = len(src[0]["vertno"])
 
-    sp = mne.source_space._source_space._complete_vol_src(sp, fns.head_model_id)
-
-    # Add dummy mri_ras_t and vox_mri_t transforms as these are needed
-    # for the forward model to be saved (for some reason)
-    sp[0]["mri_ras_t"] = Transform("mri", "ras")
-    sp[0]["vox_mri_t"] = Transform("mri_voxel", "mri")
-
-    if sp[0]["coord_frame"] != FIFF.FIFFV_COORD_MRI:
+    if src[0]["coord_frame"] != FIFF.FIFFV_COORD_MRI:
         raise RuntimeError("source space is not in MRI coordinates")
 
-    return sp
+    return src
+
+
+def _make_mni_grid(fns: OSLFilenames, gridstep: int) -> None:
+    """Save the MNI152 brain mask at a resolution of gridstep to fns.mni_grid.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    gridstep : int
+        Resolution in mm.
+    """
+    packaged_mask = (
+        f"{files.mask.directory}/MNI152_T1_{int(gridstep)}mm_brain.nii.gz"
+    )
+    if os.path.exists(packaged_mask):
+        shutil.copyfile(packaged_mask, fns.mni_grid)
+    else:
+        fsl_wrappers.flirt(
+            fns.surfaces.std_brain,
+            fns.surfaces.std_brain,
+            out=fns.mni_grid,
+            applyisoxfm=int(gridstep),
+        )
+
+
+def _mni_grid_coords(grid_file: str) -> np.ndarray:
+    """MNI coordinates of the voxels of an MNI grid (mask) file.
+
+    Parameters
+    ----------
+    grid_file : str
+        Path to the mask file.
+
+    Returns
+    -------
+    coords : np.ndarray
+        (n_voxels, 3) coordinates in mm of the non-zero voxels.
+    """
+    img = nib.load(grid_file)
+    ijk = np.array(np.where(np.asanyarray(img.dataobj) != 0)).T
+    return nib.affines.apply_affine(img.header.get_sform(), ijk)
+
+
+def _mni_to_scaledmri(fns: OSLFilenames, coords_mni: np.ndarray) -> np.ndarray:
+    """Transform points from MNI space to scaled MRI space.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    coords_mni : np.ndarray
+        (n, 3) coordinates in MNI space in mm.
+
+    Returns
+    -------
+    coords_mri : np.ndarray
+        (n, 3) coordinates in scaled MRI space in mm.
+    """
+    # MNI -> (unscaled) MRI -> head -> scaled MRI
+    mni_mri_t = read_trans(fns.surfaces.mni_mri_t_file)["trans"]
+    head_mri_t = read_trans(fns.coreg.head_mri_t_file)["trans"]
+    head_scaledmri_t = read_trans(fns.coreg.head_scaledmri_t_file)["trans"]
+    xform = head_scaledmri_t @ np.linalg.inv(head_mri_t) @ mni_mri_t
+    return _xform_points(xform, coords_mni.T).T
 
 
 def _make_fwd_solution(

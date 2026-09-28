@@ -318,10 +318,10 @@ Output is written to ``derivatives/``.
 # Step 4: Forward Model
 # ^^^^^^^^^^^^^^^^^^^^^
 #
-# The forward model (lead field matrix) describes how a dipole at each source location projects onto the MEG sensors. We use a Single Layer (Single Shell) head model based on the inner skull surface and a volumetric dipole grid.
+# The forward model (lead field matrix) describes how a dipole at each source location projects onto the MEG sensors. We use a Single Layer (Single Shell) head model based on the inner skull surface. A dipole is placed at each voxel of the MNI152 brain mask (transformed into the subject's MRI space), so the dipoles are at the same MNI coordinates for every subject and match the voxels of the parcellation files.
 #
 # - ``model="Single Layer"`` — Single shell head model (standard for MEG).
-# - ``gridstep=8`` — 8 mm dipole grid spacing. Smaller values give finer resolution but are slower.
+# - ``gridstep=8`` — 8 mm MNI grid, which matches the 8 mm parcellation files. Smaller values give finer resolution but are slower.
 #
 # .. code-block:: python
 #

@@ -388,11 +388,20 @@ def parcellate_lcmv(
             f"{fns.filters} has {W.shape[0]} dipoles, but {fns.fwd_model} has "
             f"{len(dipole_coords)}."
         )
-    parcellation = _sample_parcellation(parcellation_file, dipole_coords)
-    print(
-        f"{int(np.any(parcellation > 0, axis=1).sum())} of {len(dipole_coords)} "
-        "dipoles are in a parcel"
+    in_parcel = np.any(
+        _sample_parcellation(parcellation_file, dipole_coords) > 0, axis=1
     )
+    print(f"{int(in_parcel.sum())} of {len(dipole_coords)} dipoles are in a parcel")
+    mni_grid = source_recon._get_mni_grid(fns, fwd)
+    if mni_grid is not None:
+        # Use every voxel of the MNI grid (voxels without a dipole have zero
+        # weights), so the parcel weights are normalised in the same way for
+        # every subject. This gives the same result as parcellate
+        dipole_coords = mni_grid[0]
+        W_grid = np.zeros((len(dipole_coords), W.shape[1]))
+        W_grid[fwd["src"][0]["vertno"]] = W
+        W = W_grid
+    parcellation = _sample_parcellation(parcellation_file, dipole_coords)
 
     # Covariance of the dipoles is W @ C @ W.T
     data_mean = np.mean(data, axis=1)

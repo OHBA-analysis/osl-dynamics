@@ -205,8 +205,10 @@ Prerequisites
 #
 # The forward model (lead field matrix) describes how a dipole at each source
 # location projects onto the MEG sensors. We use a Single Layer (single shell)
-# head model based on the inner skull surface and a volumetric dipole grid
-# with 8 mm spacing.
+# head model based on the inner skull surface and a dipole at each voxel of
+# the 8 mm MNI152 brain mask (transformed into the subject's MRI space), so
+# the dipoles are at the same MNI coordinates for every subject and match the
+# voxels of the parcellation files.
 #
 # .. code-block:: python
 #
@@ -288,11 +290,13 @@ Prerequisites
 # Now we repeat the source reconstruction with the bilateral beamformer. We
 # simply pass ``use_bilateral_pairs=True``:
 #
-# - Dipoles are transformed to MNI space, mirrored across the midline
-#   (x = 0), and greedily paired with the closest dipole in the opposite
-#   hemisphere within ``bilateral_tol`` mm. By default this is set to half
-#   the dipole grid spacing (here: 8 mm grid, so 4 mm), which is usually what
-#   you want.
+# - Dipoles are mirrored across the midline of the MNI grid and paired with
+#   the closest dipole in the opposite hemisphere within ``bilateral_tol`` mm.
+#   Because the dipoles are on an MNI grid, the mirror image of a dipole is
+#   exactly on the grid, so almost all pairs are exact mirror images (a
+#   dipole whose mirror image is outside the brain is paired with the closest
+#   dipole). ``bilateral_tol`` defaults to half the grid spacing (here: 8 mm
+#   grid, so 4 mm).
 # - Dipoles within ``bilateral_tol_midline`` of the midline, and dipoles with
 #   no match, are beamformed as usual (defaults to ``bilateral_tol``).
 # - Joint weights are computed for each pair by concatenating the two lead

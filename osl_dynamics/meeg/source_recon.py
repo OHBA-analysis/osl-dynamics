@@ -227,7 +227,10 @@ def lcmv_beamformer(
 
         src_coords_mni = _get_source_coords_mni(fns, fwd)
         multi_dipoles, single_dipoles, midline_points = _find_bilateral_pairs(
-            src_coords_mni, bilateral_tol, bilateral_tol_midline
+            src_coords_mni,
+            bilateral_tol,
+            bilateral_tol_midline,
+            midline_x=_get_midline_x(fns, fwd),
         )
         if len(multi_dipoles) == 0:
             warn(
@@ -297,7 +300,9 @@ def apply_lcmv_beamformer(
     spatial_resolution : int, optional
         Resolution to use for the reference brain in mm (must be an integer,
         or will be cast to nearest int). If None, then the gridstep used to
-        create the forward model is used.
+        create the forward model is used. Only used for forward models made
+        with older versions of osl-dynamics (newer forward models have a dipole
+        at each voxel of the MNI grid, which is returned).
     reference_brain : str, optional
         Either 'head' or 'mni'.
 
@@ -350,6 +355,30 @@ def apply_lcmv_beamformer(
 
     if reference_brain == "head":
         return voxel_data_head, voxel_coords_head
+
+    mni_grid = _get_mni_grid(fns, fwd)
+    if mni_grid is not None:
+        # The dipoles are at the voxels of an MNI grid
+        grid_coords, _ = mni_grid
+        if spatial_resolution is not None and int(spatial_resolution) != int(
+            _get_gridstep(grid_coords / 1000)
+        ):
+            raise ValueError(
+                "spatial_resolution must match the gridstep of the forward "
+                "model (the dipoles are on an MNI grid)."
+            )
+        print(f"MNI voxel grid: {fns.mni_grid}")
+        voxel_data_mni = np.zeros(
+            (len(grid_coords),) + voxel_data_head.shape[1:],
+            dtype=voxel_data_head.dtype,
+        )
+        voxel_data_mni[vs["vertno"]] = voxel_data_head
+        print("Applying LCMV beamformer complete.")
+        return voxel_data_mni, grid_coords
+
+    # Forward model from an older version of osl-dynamics with a dipole grid
+    # in the subject's MRI space: find the nearest dipole to each voxel of an
+    # MNI grid
 
     # Convert coordinates from head space to MNI
     voxel_coords_mni = _head_to_mni(fns, voxel_coords_head)
@@ -727,7 +756,10 @@ def plot_bilateral_pairs(
     fwd = mne.read_forward_solution(fns.fwd_model, verbose=False)
     src_coords_mni = _get_source_coords_mni(fns, fwd)
     multi_dipoles, single_dipoles, midline_points = _find_bilateral_pairs(
-        src_coords_mni, bilateral_tol, bilateral_tol_midline
+        src_coords_mni,
+        bilateral_tol,
+        bilateral_tol_midline,
+        midline_x=_get_midline_x(fns, fwd),
     )
     _plot_bilateral_pairs(
         src_coords_mni, multi_dipoles, single_dipoles, midline_points, filename, show
@@ -1656,16 +1688,64 @@ def _get_source_coords_mni(fns: OSLFilenames, fwd: mne.Forward) -> np.ndarray:
     if fwd["coord_frame"] != mne.io.constants.FIFF.FIFFV_COORD_HEAD:
         raise ValueError("Forward solution must be in head coordinates.")
     vs = fwd["src"][0]
-    if vs["type"] != "vol":
+    if vs["type"] not in ["vol", "discrete"]:
         raise ValueError("Forward solution must have a volumetric source space.")
+    mni_grid = _get_mni_grid(fns, fwd)
+    if mni_grid is not None:
+        return mni_grid[0][vs["vertno"]]
     coords_head = vs["rr"][vs["vertno"]] * 1000  # in mm
     return _head_to_mni(fns, coords_head)
+
+
+def _get_midline_x(fns: OSLFilenames, fwd: mne.Forward) -> float:
+    """x coordinate (in mm) of the plane to mirror dipoles across."""
+    mni_grid = _get_mni_grid(fns, fwd)
+    return 0.0 if mni_grid is None else mni_grid[1]
+
+
+def _get_mni_grid(
+    fns: OSLFilenames, fwd: mne.Forward
+) -> tuple[np.ndarray, float] | None:
+    """Get the MNI grid of the dipoles in a forward model.
+
+    Parameters
+    ----------
+    fns : OSLFilenames
+        Container for OSL filenames.
+    fwd : mne.Forward
+        Forward solution.
+
+    Returns
+    -------
+    mni_grid : tuple or None
+        (coords, midline_x). coords is the (n_voxels, 3) MNI coordinates (in
+        mm) of each voxel of the grid, the dipoles of the forward model are at
+        coords[fwd["src"][0]["vertno"]]. midline_x is the x coordinate of the
+        plane the grid is symmetric about. None if the forward model was made
+        with an older version of osl-dynamics (with a dipole grid in the
+        subject's MRI space).
+    """
+    vs = fwd["src"][0]
+    if vs["type"] != "discrete" or not os.path.exists(fns.mni_grid):
+        return None
+    coords = rhino._mni_grid_coords(fns.mni_grid)
+    if len(coords) != len(vs["rr"]):
+        raise ValueError(
+            f"{fns.mni_grid} has {len(coords)} voxels, but {fns.fwd_model} has "
+            f"{len(vs['rr'])} dipoles. Rerun rhino.forward_model."
+        )
+    img = nib.load(fns.mni_grid)
+    midline_x = nib.affines.apply_affine(
+        img.header.get_sform(), [(img.shape[0] - 1) / 2, 0, 0]
+    )[0]
+    return coords, midline_x
 
 
 def _find_bilateral_pairs(
     src_coords_mni: np.ndarray,
     bilateral_tol: float | None = None,
     bilateral_tol_midline: float | None = None,
+    midline_x: float = 0.0,
 ) -> tuple[list[list[int]], np.ndarray, np.ndarray]:
     """Find pairs of bilaterally symmetric dipoles.
 
@@ -1680,6 +1760,10 @@ def _find_bilateral_pairs(
     bilateral_tol_midline : float, optional
         Dipoles closer (in mm) than this to the midline are not paired.
         If None, bilateral_tol is used.
+    midline_x : float, optional
+        x coordinate (in mm) of the plane the dipoles are mirrored across.
+        For a dipole grid on an MNI grid, this is the plane the grid is
+        symmetric about (so the mirrored dipoles are exactly on the grid).
 
     Returns
     -------
@@ -1704,6 +1788,9 @@ def _find_bilateral_pairs(
     if bilateral_tol_midline is None:
         bilateral_tol_midline = bilateral_tol
         print(f"Setting bilateral_tol_midline = {bilateral_tol_midline} mm")
+
+    # Coordinates relative to the midline
+    src_coords_mni = src_coords_mni - [midline_x, 0, 0]
 
     # Dipoles close to the midline are not paired
     x = src_coords_mni[:, 0]

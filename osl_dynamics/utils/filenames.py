@@ -172,6 +172,12 @@ class OSLFilenames:
         return f"{self.coreg_dir}/model-bem-sol.fif"
 
     @property
+    def mni_grid(self) -> str:
+        """MNI grid (mask) of the dipoles in the forward model. Creates the
+        coregistration directory."""
+        return f"{self.coreg_dir}/model-mni-grid.nii.gz"
+
+    @property
     def src_dir(self) -> str:
         """Source reconstruction directory, created on first use."""
         os.makedirs(self._src_dir, exist_ok=True)
@@ -200,7 +206,8 @@ class OSLFilenames:
             f"  BEM directory:     {self._bem_dir}",
             f"  Coreg directory:   {self._coreg_dir}",
             f"    \u251c\u2500 Forward model: {self._coreg_dir}/model-fwd.fif",
-            f"    \u2514\u2500 BEM solution:  {self._coreg_dir}/model-bem-sol.fif",
+            f"    \u251c\u2500 BEM solution:  {self._coreg_dir}/model-bem-sol.fif",
+            f"    \u2514\u2500 MNI grid:      {self._coreg_dir}/model-mni-grid.nii.gz",
             f"  Source directory:  {self._src_dir}",
             f"    \u2514\u2500 lcmv filters:  {self._filters}",
         ]
