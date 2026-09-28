@@ -28,6 +28,12 @@ class SurfaceFilenames:
         self.mni2mri_flirt_xform_file = f"{root}/mni2mri_flirt_xform.txt"
         self.mni_mri_t_file = f"{root}/mni_mri-trans.fif"
 
+        # Nonlinear registration to MNI (optional)
+        self.std_head_2mm = f"{self.fsl_dir}/data/standard/MNI152_T1_2mm.nii.gz"
+        self.mri2mni_warp_file = f"{root}/mri2mni_warpcoef.nii.gz"
+        self.mri_mni_nonlinear_file = f"{root}/smri_mni_nonlinear.nii.gz"
+        self.mni_registration_plot = f"{root}/mni_registration.png"
+
         # BET mesh / surfaces
         self.bet_outskin_mesh_vtk_file = f"{root}/outskin_mesh.vtk"
         self.bet_inskull_mesh_vtk_file = f"{root}/inskull_mesh.vtk"

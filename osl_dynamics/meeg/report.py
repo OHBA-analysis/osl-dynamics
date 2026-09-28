@@ -53,6 +53,10 @@ STEPS = {
                 "name": "Outer Skin + Nose",
                 "files": ["2_outskin_plus_nose.png"],
             },
+            {
+                "name": "MNI Registration",
+                "files": ["2_mni_registration.png"],
+            },
         ],
     },
     3: {

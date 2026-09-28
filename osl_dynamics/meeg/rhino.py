@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import copy
 import shutil
+import subprocess
 import warnings
 from pathlib import Path
 
@@ -269,6 +270,7 @@ def extract_surfaces(
     include_nose: bool = True,
     do_mri2mniaxes_xform: bool = True,
     bet_fval: float | None = None,
+    nonlinear_registration: bool = False,
     show: bool = False,
 ) -> None:
     """Extract surfaces.
@@ -294,6 +296,7 @@ def extract_surfaces(
     5) Add nose to scalp surface (optional)
     6) Output the transform from MRI space to MNI
     7) Output surfaces in MRI space
+    8) Use FNIRT to nonlinearly register the MRI to MNI space (optional)
 
     Parameters
     ----------
@@ -322,6 +325,13 @@ def extract_surfaces(
         uses BET's default (0.5). Higher values (e.g. 0.6-0.7) give more
         aggressive skull stripping, which can help when the inner skull
         surface includes non-brain tissue.
+    nonlinear_registration : bool, optional
+        Should we nonlinearly register the MRI to MNI space with FSL's FNIRT
+        (initialised with the FLIRT affine registration)? If True, the warp
+        is used to transform MNI coordinates into the subject's MRI space,
+        e.g. to place the dipoles of the MNI grid in rhino.forward_model and
+        in source_recon.virtual_electrodes. This takes several minutes. Check
+        the registration with the command printed at the end.
     show : bool, optional
         Whether to display the surface plots interactively. Default is
         False (suitable for batch processing).
@@ -766,6 +776,24 @@ def extract_surfaces(
         )
 
     print("Cleaning up FLIRT files")
+    # ---------------------------------------------------------------------
+    # 8) Use FNIRT to nonlinearly register the MRI to MNI space (optional)
+    # ---------------------------------------------------------------------
+
+    if nonlinear_registration:
+        _nonlinear_registration(fns)
+    else:
+        # Make sure a warp from a previous call is not used
+        for f in [fns.mri2mni_warp_file, fns.mri_mni_nonlinear_file]:
+            if os.path.exists(f):
+                os.remove(f)
+        _plot_mni_registration(
+            flirt_mri_mni_file,
+            fns.std_head_2mm,
+            fns.mni_registration_plot,
+            "MNI registration (FLIRT, affine)",
+        )
+
     system_call(f"rm -f {fns.root}/flirt*", verbose=False)
 
     # Plot the surfaces
@@ -2546,6 +2574,165 @@ def _mni_grid_coords(grid_file: str) -> np.ndarray:
     return nib.affines.apply_affine(img.header.get_sform(), ijk)
 
 
+def _nonlinear_registration(fns: SurfaceFilenames) -> None:
+    """Nonlinearly register the MRI to MNI space with FNIRT.
+
+    The warp (coefficient file) is saved to fns.mri2mni_warp_file and the MRI
+    in MNI space to fns.mri_mni_nonlinear_file (for checking the
+    registration).
+
+    Parameters
+    ----------
+    fns : SurfaceFilenames
+        Surface extraction file paths.
+    """
+    print("Running FNIRT...")
+
+    # FLIRT affine from MRI to MNI to initialise FNIRT with
+    mri2mni_flirt_xform = np.linalg.inv(np.loadtxt(fns.mni2mri_flirt_xform_file))
+
+    # Command: fnirt --in=<mri_file> --aff=<mri2mni_flirt_xform> \
+    #          --ref=<MNI152_T1_2mm> --config=T1_2_MNI152_2mm \
+    #          --cout=<mri2mni_warp_file> --iout=<mri_mni_nonlinear_file>
+    fsl_wrappers.fnirt(
+        fns.mri_file,
+        aff=mri2mni_flirt_xform,
+        ref=fns.std_head_2mm,
+        config="T1_2_MNI152_2mm",
+        cout=fns.mri2mni_warp_file,
+        iout=fns.mri_mni_nonlinear_file,
+    )
+
+    _plot_mni_registration(
+        fns.mri_mni_nonlinear_file,
+        fns.std_head_2mm,
+        fns.mni_registration_plot,
+        "MNI registration (FNIRT, nonlinear)",
+    )
+    print(
+        "You can use the following command line call to check the nonlinear "
+        "registration:"
+    )
+    print(f"fsleyes {fns.std_head_2mm} {fns.mri_mni_nonlinear_file}")
+
+
+def _plot_mni_registration(
+    registered_file: str, mni_file: str, output_file: str, title: str
+) -> None:
+    """Plot the edges of the MNI template on the MRI registered to MNI space.
+
+    Parameters
+    ----------
+    registered_file : str
+        MRI registered to MNI space.
+    mni_file : str
+        MNI template the MRI was registered to.
+    output_file : str
+        Output filename.
+    title : str
+        Title for the plot.
+    """
+    from nilearn import plotting
+
+    data = np.asanyarray(nib.load(registered_file).dataobj)
+    vmax = np.percentile(data[data > 0], 99)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        display = plotting.plot_anat(
+            registered_file,
+            display_mode="ortho",
+            cut_coords=(0, -18, 18),
+            title=title,
+            draw_cross=False,
+            dim=0,
+            vmin=0,
+            vmax=vmax,
+            colorbar=False,
+        )
+        display.add_edges(mni_file, color="r")
+    print(f"Saving {output_file}")
+    display.savefig(output_file)
+    display.close()
+
+
+def _mni_to_mri(fns: SurfaceFilenames, coords_mni: np.ndarray) -> np.ndarray:
+    """Transform points from MNI space to (unscaled) MRI space.
+
+    Uses the nonlinear registration (FNIRT warp) if extract_surfaces was
+    called with nonlinear_registration=True, otherwise the FLIRT affine
+    registration.
+
+    Parameters
+    ----------
+    fns : SurfaceFilenames
+        Surface extraction file paths.
+    coords_mni : np.ndarray
+        (n, 3) coordinates in MNI space in mm.
+
+    Returns
+    -------
+    coords_mri : np.ndarray
+        (n, 3) coordinates in MRI space in mm.
+    """
+    if os.path.exists(fns.mri2mni_warp_file):
+        return _fsl_coord_xform(
+            "std2imgcoord",
+            ["-img", fns.mri_file, "-std", fns.std_head_2mm],
+            fns.mri2mni_warp_file,
+            coords_mni,
+        )
+    mni_mri_t = read_trans(fns.mni_mri_t_file)["trans"]
+    return _xform_points(mni_mri_t, coords_mni.T).T
+
+
+def _mri_to_mni(fns: SurfaceFilenames, coords_mri: np.ndarray) -> np.ndarray:
+    """Transform points from (unscaled) MRI space to MNI space.
+
+    Inverse of :func:`_mni_to_mri`.
+
+    Parameters
+    ----------
+    fns : SurfaceFilenames
+        Surface extraction file paths.
+    coords_mri : np.ndarray
+        (n, 3) coordinates in MRI space in mm.
+
+    Returns
+    -------
+    coords_mni : np.ndarray
+        (n, 3) coordinates in MNI space in mm.
+    """
+    if os.path.exists(fns.mri2mni_warp_file):
+        return _fsl_coord_xform(
+            "img2stdcoord",
+            ["-img", fns.mri_file, "-std", fns.std_head_2mm],
+            fns.mri2mni_warp_file,
+            coords_mri,
+        )
+    mni_mri_t = read_trans(fns.mni_mri_t_file)["trans"]
+    return _xform_points(np.linalg.inv(mni_mri_t), coords_mri.T).T
+
+
+def _fsl_coord_xform(
+    cmd: str, args: list[str], warp_file: str, coords: np.ndarray
+) -> np.ndarray:
+    """Transform coordinates (in mm) with FSL's std2imgcoord/img2stdcoord."""
+    coords = np.atleast_2d(coords)
+    result = subprocess.run(
+        [cmd, *args, "-warp", warp_file, "-mm", "-"],
+        input="\n".join(" ".join(f"{c:.6f}" for c in xyz) for xyz in coords),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    out = np.array(
+        [line.split() for line in result.stdout.strip().splitlines()], dtype=float
+    )
+    if out.shape != coords.shape:
+        raise RuntimeError(f"{cmd} failed:\n{result.stderr}")
+    return out
+
+
 def _mni_to_scaledmri(fns: OSLFilenames, coords_mni: np.ndarray) -> np.ndarray:
     """Transform points from MNI space to scaled MRI space.
 
@@ -2562,11 +2749,11 @@ def _mni_to_scaledmri(fns: OSLFilenames, coords_mni: np.ndarray) -> np.ndarray:
         (n, 3) coordinates in scaled MRI space in mm.
     """
     # MNI -> (unscaled) MRI -> head -> scaled MRI
-    mni_mri_t = read_trans(fns.surfaces.mni_mri_t_file)["trans"]
+    coords_mri = _mni_to_mri(fns.surfaces, coords_mni)
     head_mri_t = read_trans(fns.coreg.head_mri_t_file)["trans"]
     head_scaledmri_t = read_trans(fns.coreg.head_scaledmri_t_file)["trans"]
-    xform = head_scaledmri_t @ np.linalg.inv(head_mri_t) @ mni_mri_t
-    return _xform_points(xform, coords_mni.T).T
+    xform = head_scaledmri_t @ np.linalg.inv(head_mri_t)
+    return _xform_points(xform, coords_mri.T).T
 
 
 def _make_fwd_solution(

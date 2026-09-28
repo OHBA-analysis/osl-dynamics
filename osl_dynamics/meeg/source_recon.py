@@ -397,7 +397,9 @@ def apply_lcmv_beamformer(
     )
     print(f"MNI voxel grid: {reference_brain_resampled}")
 
-    packaged_mask = f"{files.mask.directory}/MNI152_T1_{spatial_resolution}mm_brain.nii.gz"
+    packaged_mask = (
+        f"{files.mask.directory}/MNI152_T1_{spatial_resolution}mm_brain.nii.gz"
+    )
     if os.path.exists(packaged_mask):
         # Use the mask packaged with osl-dynamics, this is the mask used
         # to plot the data
@@ -1594,9 +1596,7 @@ def _head_to_mni(fns: OSLFilenames, coords_head: np.ndarray) -> np.ndarray:
     coords_mri = rhino._xform_points(head_mri_t["trans"], coords_head.T).T
 
     # Convert coords_mri to MNI
-    # mni_mri_t_file xform is to unscaled MRI
-    mni_mri_t = mne.transforms.read_trans(fns.surfaces.mni_mri_t_file)
-    coords_mni = rhino._xform_points(np.linalg.inv(mni_mri_t["trans"]), coords_mri.T).T
+    coords_mni = rhino._mri_to_mni(fns.surfaces, coords_mri)
 
     return coords_mni
 
@@ -1618,11 +1618,12 @@ def _mni_to_head(fns: OSLFilenames, coords_mni: np.ndarray) -> np.ndarray:
     coords_head : np.ndarray
         (n, 3) coordinates in head space in mm.
     """
-    mni_mri_t = mne.transforms.read_trans(fns.surfaces.mni_mri_t_file)
-    coords_mri = rhino._xform_points(mni_mri_t["trans"], coords_mni.T).T
+    coords_mri = rhino._mni_to_mri(fns.surfaces, coords_mni)
 
     head_mri_t = mne.transforms.read_trans(fns.coreg.head_mri_t_file)
-    coords_head = rhino._xform_points(np.linalg.inv(head_mri_t["trans"]), coords_mri.T).T
+    coords_head = rhino._xform_points(
+        np.linalg.inv(head_mri_t["trans"]), coords_mri.T
+    ).T
 
     return coords_head
 
