@@ -350,8 +350,8 @@ def parcellate_lcmv(
             "parcellate_lcmv requires a scalar beamformer, "
             "e.g. pick_ori='max-power-pre-weight-norm'."
         )
-    # (dipoles, channels), the weights can be complex with zero imaginary
-    # part (from the eigendecomposition used to find the orientation)
+    # (dipoles, channels). Filters from older versions of osl-dynamics can be
+    # complex (with a zero imaginary part)
     W = np.real(filters["weights"])
 
     # Parcel weights for each dipole

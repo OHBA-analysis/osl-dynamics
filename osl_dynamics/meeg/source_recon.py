@@ -344,8 +344,8 @@ def apply_lcmv_beamformer(
         stc = _apply_lcmv(data=data, filters=filters, info=raw.info, tmin=times[0])
         voxel_data_head = next(stc).data
 
-    # The weights can be complex with zero imaginary part (from the
-    # eigendecomposition used to find the orientation)
+    # Filters from older versions of osl-dynamics can be complex (with a zero
+    # imaginary part)
     voxel_data_head = np.real(voxel_data_head)
 
     # Get coordinates in head space
@@ -561,7 +561,7 @@ def virtual_electrodes(
     data, _, epochs_shape = _get_filter_input_data(
         fns, raw, reject_by_annotation, filters=ve_filters
     )
-    ve_data = np.real(ve_filters["weights"][:n_coords]) @ data
+    ve_data = ve_filters["weights"][:n_coords] @ data
     if epochs_shape is not None:
         ve_data = ve_data.reshape(n_coords, *epochs_shape)
 
@@ -1171,7 +1171,15 @@ def _compute_beamformer(
         assert ori_pick.shape == (n_sources, n_orient, n_orient)
 
         # Pick eigenvector that corresponds to maximum eigenvalue
-        eig_vals, eig_vecs = np.linalg.eig(ori_pick.real)  # not Hermitian!
+        if pick_ori == "max-power-pre-weight-norm":
+            # ori_pick is symmetric
+            eig_vals, eig_vecs = np.linalg.eigh(ori_pick.real)
+        else:
+            # ori_pick is not symmetric, but it is the product of two symmetric
+            # positive semi-definite matrices, so the eigenvalues and
+            # eigenvectors are real
+            eig_vals, eig_vecs = np.linalg.eig(ori_pick.real)
+            eig_vals, eig_vecs = eig_vals.real, eig_vecs.real
 
         # Sort eigenvectors by eigenvalues for picking
         order = np.argsort(np.abs(eig_vals), axis=-1)

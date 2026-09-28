@@ -96,7 +96,7 @@ def sliding_window_power(
             results.append(_swp(**kwargs[i]))
 
     else:
-        _logger.info(f"Sliding window power")
+        _logger.info("Sliding window power")
         results = pqdm(
             kwargs,
             _swp,
@@ -617,7 +617,6 @@ def independent_components_to_volumetric_maps(
 
     # Get data from nifti
     ica_spatial_maps_data = ica_spatial_maps.get_fdata()
-    ica_spatial_maps_shape = ica_spatial_maps_data.shape
     n_maps, n_ica_components = ic_values.shape
 
     # Calculate volumetric maps
