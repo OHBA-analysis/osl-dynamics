@@ -11,6 +11,8 @@ dynamic = ["version"]
 description = "Toolbox for studying dynamic functional brain networks in MEG, EEG and fMRI data"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
+# Listed explicitly: the default patterns don't match files in a subdirectory
+license-files = ["LICENSE", "NOTICE", "LICENSES/*"]
 requires-python = ">=3.10"
 keywords = [
     "neuroimaging",
