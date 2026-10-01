@@ -97,7 +97,6 @@ network_maps = np.array([relative_maps[networks == k].mean(axis=0) for k in comm
 
 fig, ax = power.save(
     network_maps,
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
     titles=[f"Network {k + 1} ({n_found[k]} runs)" for k in common],
@@ -136,7 +135,6 @@ print(f"typicality: {np.round(info['typicality'], 3)}")
 
 fig, ax = power.save(
     relative_maps[run],
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     plot_kwargs={"symmetric_cbar": True},
     titles=[

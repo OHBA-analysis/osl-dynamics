@@ -80,7 +80,6 @@ config = """
         inputs: training_data/networks
         kwargs:
             sampling_frequency: 250
-            mask_file: MNI152_T1_8mm_brain.nii.gz
             parcellation_file: atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz
             n_jobs: 8
         prepare:

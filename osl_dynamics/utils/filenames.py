@@ -28,6 +28,12 @@ class SurfaceFilenames:
         self.mni2mri_flirt_xform_file = f"{root}/mni2mri_flirt_xform.txt"
         self.mni_mri_t_file = f"{root}/mni_mri-trans.fif"
 
+        # Nonlinear registration to MNI (optional)
+        self.std_head_2mm = f"{self.fsl_dir}/data/standard/MNI152_T1_2mm.nii.gz"
+        self.mri2mni_warp_file = f"{root}/mri2mni_warpcoef.nii.gz"
+        self.mri_mni_nonlinear_file = f"{root}/smri_mni_nonlinear.nii.gz"
+        self.mni_registration_plot = f"{root}/mni_registration.png"
+
         # BET mesh / surfaces
         self.bet_outskin_mesh_vtk_file = f"{root}/outskin_mesh.vtk"
         self.bet_inskull_mesh_vtk_file = f"{root}/inskull_mesh.vtk"
@@ -166,6 +172,18 @@ class OSLFilenames:
         return f"{self.coreg_dir}/model-fwd.fif"
 
     @property
+    def bem_solution(self) -> str:
+        """BEM solution used for the forward model. Creates the coregistration
+        directory."""
+        return f"{self.coreg_dir}/model-bem-sol.fif"
+
+    @property
+    def mni_grid(self) -> str:
+        """MNI grid (mask) of the dipoles in the forward model. Creates the
+        coregistration directory."""
+        return f"{self.coreg_dir}/model-mni-grid.nii.gz"
+
+    @property
     def src_dir(self) -> str:
         """Source reconstruction directory, created on first use."""
         os.makedirs(self._src_dir, exist_ok=True)
@@ -193,7 +211,9 @@ class OSLFilenames:
             f"  Surfaces directory: {self.surfaces_dir}",
             f"  BEM directory:     {self._bem_dir}",
             f"  Coreg directory:   {self._coreg_dir}",
-            f"    \u2514\u2500 Forward model: {self._coreg_dir}/model-fwd.fif",
+            f"    \u251c\u2500 Forward model: {self._coreg_dir}/model-fwd.fif",
+            f"    \u251c\u2500 BEM solution:  {self._coreg_dir}/model-bem-sol.fif",
+            f"    \u2514\u2500 MNI grid:      {self._coreg_dir}/model-mni-grid.nii.gz",
             f"  Source directory:  {self._src_dir}",
             f"    \u2514\u2500 lcmv filters:  {self._filters}",
         ]

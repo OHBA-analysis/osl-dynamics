@@ -227,6 +227,8 @@ Output is written to ``derivatives/``.
 #
 # The output plots overlay each extracted surface (yellow line) on the structural MRI. Check that each surface matches the corresponding anatomical boundary. If they don't, consider using the standard MNI152 brain as a fallback.
 #
+# The MRI is also registered to MNI space (with an affine transform by default). The ``mni_registration.png`` plot shows the edges of the MNI152 template (red) on the registered MRI, check they match the anatomy. Passing ``nonlinear_registration=True`` uses FSL's FNIRT for a nonlinear registration, which aligns the anatomy more closely (and so places the parcels more accurately) but takes several more minutes per subject.
+#
 # .. code-block:: python
 #
 #     surfaces_dir = str(output_dir / "anat_surfaces" / f"sub-{subject}")
@@ -318,10 +320,10 @@ Output is written to ``derivatives/``.
 # Step 4: Forward Model
 # ^^^^^^^^^^^^^^^^^^^^^
 #
-# The forward model (lead field matrix) describes how a dipole at each source location projects onto the MEG sensors. We use a Single Layer (Single Shell) head model based on the inner skull surface and a volumetric dipole grid.
+# The forward model (lead field matrix) describes how a dipole at each source location projects onto the MEG sensors. We use a Single Layer (Single Shell) head model based on the inner skull surface. A dipole is placed at each voxel of the MNI152 brain mask (transformed into the subject's MRI space), so the dipoles are at the same MNI coordinates for every subject and match the voxels of the parcellation files.
 #
 # - ``model="Single Layer"`` — Single shell head model (standard for MEG).
-# - ``gridstep=8`` — 8 mm dipole grid spacing. Smaller values give finer resolution but are slower.
+# - ``gridstep=8`` — 8 mm MNI grid, which matches the 8 mm parcellation files. Smaller values give finer resolution but are slower.
 #
 # .. code-block:: python
 #
@@ -346,37 +348,36 @@ Output is written to ``derivatives/``.
 #     source_recon.lcmv_beamformer(fns, raw, chantypes=chantypes, rank=rank)
 
 #%%
-# Apply beamformer
-# ****************
+# Step 6: Parcellation
+# ^^^^^^^^^^^^^^^^^^^^
 #
-# This applies the spatial filters to the sensor data to produce voxel time courses in MNI space. Bad segments are automatically excluded.
+# We reduce the source space to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis. See the :ref:`parcellations <parcellations>` page for the full list of available parcellations.
+#
+# ``parcellate_lcmv`` assigns each dipole of the forward model to parcels using its MNI coordinate and calculates each parcel time course from the sensor data with the beamformer weights. Bad segments are automatically excluded.
+#
+# - The time course of each parcel is the first principal component of the dipoles in the parcel (weighted by the parcellation).
+# - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels.
+#
+# .. code-block:: python
+#
+#     parcel_data = parcellation.parcellate_lcmv(
+#         fns,
+#         parcellation_file,
+#         orthogonalisation="symmetric",
+#         raw=raw,
+#     )
+#     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
+
+#%%
+# If you need the voxel time courses (on a regular MNI grid), you can apply the beamformer with ``apply_lcmv_beamformer``. These can also be parcellated with ``parcellation.parcellate``. To get the time course at a specific MNI coordinate, use ``virtual_electrodes``, which computes the beamformer weights for a dipole at the exact location:
 #
 # .. code-block:: python
 #
 #     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns, raw)
 #     print(f"Voxel data shape: {voxel_data.shape} (voxels x time)")
-#     print(f"Voxel coords shape: {voxel_coords.shape} (voxels x 3, in MNI mm)")
-
-#%%
-# Step 6: Parcellation
-# ^^^^^^^^^^^^^^^^^^^^
 #
-# We reduce the high-dimensional voxel data to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis. See the :ref:`parcellations <parcellations>` page for the full list of available parcellations.
-#
-# - ``method="spatial_basis"`` — Weight voxels by their loading on each parcel (from the atlas) because calculate PCA.
-# - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels.
-#
-# .. code-block:: python
-#
-#     parcel_data = parcellation.parcellate(
-#         fns,
-#         voxel_data,
-#         voxel_coords,
-#         method="spatial_basis",
-#         orthogonalisation="symmetric",
-#         parcellation_file=parcellation_file,
-#     )
-#     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
+#     # Time courses at MNI coordinates (in mm)
+#     ve_data = source_recon.virtual_electrodes(fns, [[-42, -22, 10], [42, -22, 10]], raw=raw)
 
 #%%
 # Save parcellated data

@@ -35,7 +35,6 @@ power_map = power.variance_from_spectra(f, gpsd, frequency_range=[1, 30])
 # Save the power maps as images
 power.save(
     power_map,
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz",
     subtract_mean=True,
     filename="maps_.png",

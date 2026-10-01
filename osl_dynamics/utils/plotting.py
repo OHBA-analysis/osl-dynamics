@@ -2,12 +2,11 @@
 
 import logging
 from itertools import zip_longest
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import nibabel as nib
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import patches
@@ -15,11 +14,13 @@ from matplotlib.path import Path
 from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 from nilearn.plotting import plot_markers, plot_img_on_surf
 
-from osl_dynamics import files
 from osl_dynamics.utils.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.topoplots import Topology
-from osl_dynamics.meeg.parcellation import Parcellation, parcel_vector_to_voxel_grid
+from osl_dynamics.meeg.parcellation import (
+    Parcellation,
+    parcel_vector_to_nifti,
+)
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -1588,7 +1589,6 @@ def topoplot(
 
 def plot_brain_surface(
     values: np.ndarray,
-    mask_file: str,
     parcellation_file: str,
     title: Optional[str] = None,
     cmap: Union[str, matplotlib.colors.ListedColormap] = "cold_hot",
@@ -1613,8 +1613,6 @@ def plot_brain_surface(
     ----------
     values : np.ndarray
         Data to plot. Must be of shape (n_parcels,).
-    mask_file : str
-        Mask file for the brain. See osl_dynamics.files.mask.
     parcellation_file : str
         Parcellation file. See osl_dynamics.files.parcellation.
     title : str, optional
@@ -1695,20 +1693,8 @@ def plot_brain_surface(
     else:
         show_plot = False
 
-    # Find files
-    mask_file = files.check_exists(mask_file, files.mask.directory)
-    parcellation_file = files.check_exists(
-        parcellation_file, files.parcellation.directory
-    )
-
     # Convert from parcel values to voxel values
-    values = parcel_vector_to_voxel_grid(
-        mask_file, parcellation_file, values, remove_subcortical_voxels
-    )
-
-    # Create image to plot
-    mask = nib.load(mask_file)
-    nii = nib.Nifti1Image(values, mask.affine, mask.header)
+    nii = parcel_vector_to_nifti(values, parcellation_file, remove_subcortical_voxels)
 
     # Plot
     fig, ax = plot_img_on_surf(

@@ -122,7 +122,6 @@ group_p = np.mean(p, axis=0)
 
 fig, ax = power.save(
     group_p,
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
 
@@ -131,6 +130,5 @@ fig, ax = power.save(
 
 fig, ax = power.save(
     p[:4],  # first four
-    mask_file="MNI152_T1_8mm_brain.nii.gz",
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
