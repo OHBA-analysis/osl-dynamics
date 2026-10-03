@@ -605,7 +605,7 @@ class HMM_Dirichlet(Simulation):
             return getattr(self.hmm, attr)
         else:
             raise AttributeError(f"No attribute called {attr}.")
-        
+
 
 class MSess_HMM_MVN(Simulation):
     """Simulate an HMM with multivariate normal observation model for each session.

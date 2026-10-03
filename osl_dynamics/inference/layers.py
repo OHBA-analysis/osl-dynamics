@@ -2358,7 +2358,6 @@ class EmbeddingLayer(layers.Layer):
 
 class DirichletConcentrationLayer(layers.Layer):
 
-
     def __init__(
         self, n_states, n_channels, learn, initial_value=None, epsilon=1e-9, **kwargs
     ):
@@ -2393,6 +2392,7 @@ class DirichletConcentrationLayer(layers.Layer):
 
     def call(self, inputs, **kwargs):
         return self.bijector(self.layers[0](inputs, **kwargs)) + self.epsilon
+
 
 class WindowedDirichletLogLikelihoodLayer(layers.Layer):
 
