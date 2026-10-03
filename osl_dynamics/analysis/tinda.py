@@ -183,7 +183,6 @@ def compute_fo_stats(
     return_all_intervals : bool, optional
         Whether to return the density/sum of all intervals in addition to the
         interval averages/sums.
-
     interval_weighting : str, optional
         'duration' (default) pools samples across intervals; 'equal'
         averages interval means with equal weight.
@@ -442,7 +441,6 @@ def tinda(
         interval averages/sums. If :code:`True`, will return a list of arrays in
         :code:`stats[i]['all_interval_wavg'/'all_interval_sum']`, each
         corresponding to an interval range.
-
     interval_weighting : str, optional
         'duration' (default) pools samples across intervals; 'equal'
         averages interval means with equal weight.
