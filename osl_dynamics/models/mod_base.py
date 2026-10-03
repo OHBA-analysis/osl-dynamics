@@ -28,6 +28,15 @@ if version.parse(tf.__version__) < version.parse("2.13"):
 else:
     from tensorflow.python.distribute.distribute_lib import get_strategy
 
+try:
+    # Keras scales the loss by the number of GPUs and unscales it to report it
+    from keras.src.losses.loss import unscale_loss_for_distribution
+except ImportError:
+
+    def unscale_loss_for_distribution(value):
+        return value
+
+
 import osl_dynamics
 from osl_dynamics import data
 import osl_dynamics.data.tf as dtf
@@ -180,6 +189,9 @@ class ModelBase:
         # Add losses to metrics to print during training
         self.add_metrics_for_loss()
 
+        # Skip training steps with a NaN or inf
+        self.skip_non_finite_steps()
+
     def add_metrics_for_loss(self) -> None:
         """Add a metric for each model output loss."""
 
@@ -210,12 +222,98 @@ class ModelBase:
             metrics = old_compute_metrics(x, y, y_pred, sample_weight)
             for metric in self.loss_metric:
                 name = metric.name
-                metric.update_state(y_pred[name])
+                metric.update_state(y_pred[name], sample_weight=sample_weight)
                 metrics[name] = metric.result()
             return metrics
 
         # Override the original Keras method
         self.model.compute_metrics = compute_metrics
+
+    def skip_non_finite_steps(self) -> None:
+        """Skip any training step whose loss or gradients are not finite.
+
+        Without this, a NaN or inf in a single batch (e.g. from an unstable
+        KL term) would be applied to the weights and end the training. The
+        step is skipped instead: the weights and optimizer are left as they
+        were and the batch is left out of the losses reported for the epoch.
+        :code:`fit` logs how many steps were skipped.
+        """
+        model = self.model
+
+        # Count of skipped steps
+        if "n_skipped_steps" not in self.__dict__:
+            self.n_skipped_steps = tf.Variable(
+                0,
+                trainable=False,
+                dtype=tf.int64,
+                aggregation=tf.VariableAggregation.ONLY_FIRST_REPLICA,
+            )
+
+        # Same as the Keras train_step, except for the check before the
+        # weights are updated
+        def train_step(data):
+            x, y, sample_weight = tf.keras.utils.unpack_x_y_sample_weight(data)
+
+            # Forward pass
+            with tf.GradientTape() as tape:
+                y_pred = model(x, training=True)
+                loss = model.compute_loss(
+                    x=x, y=y, y_pred=y_pred, sample_weight=sample_weight
+                )
+
+            # Gradients
+            variables = model.trainable_variables
+            gradients = tape.gradient(loss, variables)
+
+            # Is everything finite?
+            tensors = [loss] + [
+                g.values if isinstance(g, tf.IndexedSlices) else g
+                for g in gradients
+                if g is not None
+            ]
+            finite = tf.reduce_all(
+                [tf.reduce_all(tf.math.is_finite(t)) for t in tensors]
+            )
+
+            # With multiple GPUs, skip the step on all of them if any of them
+            # had a NaN or inf
+            context = tf.distribute.get_replica_context()
+            n_not_finite = context.all_reduce(
+                tf.distribute.ReduceOp.SUM, tf.cast(~finite, tf.float32)
+            )
+            finite = n_not_finite == 0
+
+            # Update the weights, or skip the step
+            def update(gradients):
+                model.optimizer.apply_gradients(zip(gradients, variables))
+
+            def apply(strategy, finite, gradients):
+                tf.cond(
+                    strategy.experimental_local_results(finite)[0],
+                    lambda: strategy.extended.call_for_each_replica(
+                        update, args=(gradients,)
+                    ),
+                    lambda: None,
+                )
+
+            context.merge_call(apply, args=(finite, gradients))
+            self.n_skipped_steps.assign_add(tf.cast(~finite, tf.int64))
+
+            # Metrics, leaving out a skipped step (with zero weight, and its
+            # NaNs set to zero so they don't reach the averages)
+            def mask(t):
+                return tf.where(finite, t, tf.zeros_like(t))
+
+            weight = tf.cast(finite, loss.dtype)
+            for metric in model.metrics:
+                if metric.name == "loss":
+                    loss = unscale_loss_for_distribution(mask(loss))
+                    metric.update_state(loss, sample_weight=weight)
+            y_pred = {k: mask(v) if "loss" in k else v for k, v in y_pred.items()}
+            return model.compute_metrics(x, y, y_pred, sample_weight=weight)
+
+        # Override the original Keras method
+        model.train_step = train_step
 
     def initialization(
         self, *args, method: Optional[str] = None, **kwargs
@@ -367,6 +465,13 @@ class ModelBase:
                 checkpoint_dir=f"{checkpoint_dir}/checkpoints",
             )
             additional_callbacks.append(checkpoint_callback)
+
+        # Callback to report skipped training steps
+        skipped_steps_callback = callbacks.SkippedStepsCallback(
+            n_skipped_steps=self.n_skipped_steps,
+            steps_per_epoch=steps_per_epoch,
+        )
+        additional_callbacks.append(skipped_steps_callback)
 
         # Update arguments/keyword arguments to pass to the fit method
         args, kwargs = replace_argument(

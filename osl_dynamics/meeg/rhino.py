@@ -940,6 +940,11 @@ def extract_fiducials_and_headshape_from_fif(
 def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
     """Saves fiducials/headshape from a pos file.
 
+    Two layouts are supported. Either the headshape points are the first rows
+    (the header gives how many) and the fiducials are labelled ``nasion``,
+    ``left`` and ``right``, or the headshape points are labelled ``EXTRA`` and
+    the fiducials ``nasion``, ``lpa`` and ``rpa``. Labels are case-insensitive.
+
     Parameters
     ----------
     fns : OSLFilenames
@@ -956,24 +961,25 @@ def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
 
     # RHINO is going to work with distances in mm
     data.iloc[:, 1:4] = data.iloc[:, 1:4] * 10
+    labels = data.iloc[:, 0].str.lower()
 
     # Polhemus fiducial points in HEAD space
     nasion = (
-        data[data.iloc[:, 0].str.match("nasion")]
+        data[labels.str.match("nasion")]
         .iloc[0, 1:4]
         .to_numpy()
         .astype("float64")
         .T
     )
     rpa = (
-        data[data.iloc[:, 0].str.match("right")]
+        data[labels.str.match("right|rpa")]
         .iloc[0, 1:4]
         .to_numpy()
         .astype("float64")
         .T
     )
     lpa = (
-        data[data.iloc[:, 0].str.match("left")]
+        data[labels.str.match("left|lpa")]
         .iloc[0, 1:4]
         .to_numpy()
         .astype("float64")
@@ -981,7 +987,9 @@ def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
     )
 
     # Polhemus headshape points in HEAD space in mm
-    headshape = data[0:num_headshape_pnts].iloc[:, 1:4].to_numpy().astype("float64").T
+    extra = labels == "extra"
+    headshape = data[extra] if extra.any() else data[0:num_headshape_pnts]
+    headshape = headshape.iloc[:, 1:4].to_numpy().astype("float64").T
 
     # Save
     print(f"Saved: {fns.coreg.head_nasion_file}")

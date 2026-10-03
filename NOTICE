@@ -1,0 +1,51 @@
+osl-dynamics
+Copyright 2020-present University of Oxford, Oxford, UK.
+
+This product includes software developed at the Oxford Centre for Human Brain
+Activity (OHBA), University of Oxford.
+
+osl-dynamics bundles the following neuroimaging templates, surfaces and
+parcellations under osl_dynamics/files/. They are redistributed here for
+convenience and remain the work of their original authors, who should be
+cited when they are used. The full text of each licence is in LICENSES/.
+
+MNI152 templates and surfaces (files/mask/MNI152_T1_*_brain.nii.gz;
+    files/mni152_surfaces/)
+    Derived from the MNI ICBM 152 non-linear 6th generation average brain,
+    Montreal Neurological Institute, McGill University.
+    Copyright (C) 1993-2009 Louis Collins, McGill University. Permission to
+    use, copy, modify and distribute is granted without fee, provided that
+    the copyright notice appears in all copies. The authors and McGill
+    University make no representations about the suitability of this
+    software for any purpose. See LICENSES/MNI152.txt.
+
+AAL parcellations (files/parcellation/atlas-AAL_*)
+    Modified at OHBA from the Automated Anatomical Labeling atlas,
+    Neurofunctional Imaging Group (GIN), Caen.
+    Tzourio-Mazoyer et al. (2002), NeuroImage 15:273-289.
+    The AAL readme states that it is "available to the scientific community
+    as a copyright freeware under the terms of the GNU General Public
+    Licence". See LICENSES/AAL-GPL-2.0.txt.
+
+Desikan-Killiany parcellations (files/parcellation/atlas-DK_*)
+    Modified at OHBA from FreeSurfer's aparc annotation.
+    Desikan et al. (2006), NeuroImage 31:968-980.
+    Distributed under the FreeSurfer Software License.
+    See LICENSES/Desikan-Killiany-FreeSurfer.txt.
+
+Glasser parcellations (files/parcellation/atlas-Glasser_*)
+    Glasser52: A parcellation for MEG analysis. Kohl, Woolrich, Nobre and
+    Quinn, University of Oxford. Licensed under CC BY 4.0.
+    https://doi.org/10.5281/zenodo.11099418
+    See LICENSES/Glasser52-CC-BY-4.0.txt.
+    Derived from the HCP multi-modal parcellation (HCP-MMP1.0),
+    Glasser et al. (2016), Nature 536:171-178.
+
+Schaefer parcellations (files/parcellation/atlas-Schaefer_*)
+    Schaefer et al. (2018), Cerebral Cortex 28:3095-3114.
+    From the CBIG repository, licensed under the MIT License.
+    Copyright (c) 2016 Computational Brain Imaging Group (CBIG).
+    See LICENSES/Schaefer-CBIG-MIT.txt.
+
+Giles parcellations (files/parcellation/atlas-Giles_*)
+    Developed at OHBA, University of Oxford.

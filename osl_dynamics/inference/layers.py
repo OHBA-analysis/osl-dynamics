@@ -1254,9 +1254,7 @@ class KLDivergenceLayer(layers.Layer):
             loc=inference_mu,
             scale=inference_sigma,
         )
-        kl_loss = tfp.distributions.kl_divergence(
-            posterior, prior, allow_nan_stats=False
-        )
+        kl_loss = tfp.distributions.kl_divergence(posterior, prior)
 
         if self.calculation == "sum":
             # Sum the KL loss for each mode and time point and average over batches
@@ -1481,9 +1479,7 @@ class CategoricalKLDivergenceLayer(layers.Layer):
         # Calculate the KL divergence between the posterior and prior
         prior = tfp.distributions.Categorical(logits=model_logits)
         posterior = tfp.distributions.Categorical(logits=inference_logits)
-        kl_loss = tfp.distributions.kl_divergence(
-            posterior, prior, allow_nan_stats=False
-        )
+        kl_loss = tfp.distributions.kl_divergence(posterior, prior)
 
         if self.calculation == "sum":
             # Sum the KL loss for each time point and average over batches
@@ -1690,9 +1686,7 @@ class GammaExponentialKLDivergenceLayer(layers.Layer):
         posterior = tfp.distributions.Gamma(
             concentration=inference_alpha, rate=inference_beta
         )
-        kl_loss = tfp.distributions.kl_divergence(
-            posterior, prior, allow_nan_stats=False
-        )
+        kl_loss = tfp.distributions.kl_divergence(posterior, prior)
         kl_loss = tf.reduce_sum(kl_loss)
 
         return self.scale_factor * kl_loss
