@@ -965,26 +965,12 @@ def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
 
     # Polhemus fiducial points in HEAD space
     nasion = (
-        data[labels.str.match("nasion")]
-        .iloc[0, 1:4]
-        .to_numpy()
-        .astype("float64")
-        .T
+        data[labels.str.match("nasion")].iloc[0, 1:4].to_numpy().astype("float64").T
     )
     rpa = (
-        data[labels.str.match("right|rpa")]
-        .iloc[0, 1:4]
-        .to_numpy()
-        .astype("float64")
-        .T
+        data[labels.str.match("right|rpa")].iloc[0, 1:4].to_numpy().astype("float64").T
     )
-    lpa = (
-        data[labels.str.match("left|lpa")]
-        .iloc[0, 1:4]
-        .to_numpy()
-        .astype("float64")
-        .T
-    )
+    lpa = data[labels.str.match("left|lpa")].iloc[0, 1:4].to_numpy().astype("float64").T
 
     # Polhemus headshape points in HEAD space in mm
     extra = labels == "extra"

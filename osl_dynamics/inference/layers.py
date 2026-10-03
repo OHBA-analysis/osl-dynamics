@@ -2354,3 +2354,68 @@ class EmbeddingLayer(layers.Layer):
             norm_sq = tf.reduce_sum(tf.square(output), axis=-1, keepdims=True)
             output = tf.concat([2 * output, norm_sq - 1], axis=-1) / (norm_sq + 1)
         return output
+
+
+class DirichletConcentrationLayer(layers.Layer):
+
+    def __init__(
+        self, n_states, n_channels, learn, initial_value=None, epsilon=1e-9, **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.epsilon = epsilon
+        self.bijector = tfp.bijectors.Softplus()
+        if initial_value is not None:
+            if isinstance(initial_value, (str, bytes)):
+                initial_value = np.load(initial_value)
+            initial_value = np.asarray(initial_value, dtype=np.float32)
+            if initial_value.shape != (n_states, n_channels):
+                raise ValueError("initial_concentration has the wrong shape.")
+            if not np.isfinite(initial_value).all() or np.any(initial_value <= epsilon):
+                raise ValueError("Concentrations must be finite and exceed epsilon.")
+            initial_value = self.bijector.inverse(initial_value - epsilon).numpy()
+            initializer = None
+        else:
+            initializer = (
+                initializers.TruncatedNormal(mean=0, stddev=1)
+                if learn
+                else initializers.Zeros()
+            )
+        self.layers = [
+            LearnableTensorLayer(
+                shape=(n_states, n_channels),
+                learn=learn,
+                initializer=initializer,
+                initial_value=initial_value,
+                name=self.name + "_kernel",
+            )
+        ]
+
+    def call(self, inputs, **kwargs):
+        return self.bijector(self.layers[0](inputs, **kwargs)) + self.epsilon
+
+
+class WindowedDirichletLogLikelihoodLayer(layers.Layer):
+
+    def __init__(self, window_size, **kwargs):
+        super().__init__(**kwargs)
+        if not isinstance(window_size, (int, np.integer)) or window_size < 1:
+            raise ValueError("window_size must be a positive integer.")
+        self.window_size = int(window_size)
+
+    def call(self, inputs, **kwargs):
+        x, concentration = inputs
+        x = tf.convert_to_tensor(x)
+        concentration = tf.cast(concentration, x.dtype)
+
+        x = tf.clip_by_value(x, tf.cast(1e-9, x.dtype), tf.cast(1, x.dtype))
+        x = x / tf.reduce_sum(x, axis=-1, keepdims=True)
+        # Use the sufficient statistic mean(log(x)) to avoid a large
+        # batch x windows x samples x states intermediate tensor.
+        log_x = tf.reshape(
+            tf.math.log(x), [tf.shape(x)[0], -1, self.window_size, tf.shape(x)[2]]
+        )
+        mean_log_x = tf.reduce_mean(log_x, axis=2)
+        normalizer = tf.math.lgamma(
+            tf.reduce_sum(concentration, axis=-1)
+        ) - tf.reduce_sum(tf.math.lgamma(concentration), axis=-1)
+        return tf.einsum("btc,kc->btk", mean_log_x, concentration - 1) + normalizer
