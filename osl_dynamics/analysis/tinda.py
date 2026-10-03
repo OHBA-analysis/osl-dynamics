@@ -524,8 +524,13 @@ def tinda(
 
         for i in range(dim[1]):
             itc_prim = tc[:, i]
-            if np.all(itc_prim == 0):
-                _logger.info(f"Skipping state {i}: no activations detected.")
+            # Skip states with no intervals that can be split into bins (e.g.
+            # never visited, or visited only once)
+            intervals_i = find_intervals(itc_prim)[0]
+            if len(intervals_i) == 0 or not np.any(
+                split_intervals(intervals_i, n_bins)[2] == 0
+            ):
+                _logger.info(f"Skipping state {i}: no intervals detected.")
 
                 stats.append(
                     {
