@@ -1,0 +1,125 @@
+"""Example script for running HMM_Dirchlet inference on simulated HMM-Dirichlet data.
+
+This script should take less than a couple minutes to run and
+currently the  dice coefficient is ~0.99.
+"""
+
+import os
+import pickle
+import numpy as np
+
+from osl_dynamics.simulation import HMM_Dirichlet
+from osl_dynamics.data import Data
+from osl_dynamics.models.hmm_dirichlet import Config, Model
+from osl_dynamics.inference import modes, metrics
+
+# Create directory for results
+results_dir = "results"
+os.makedirs(results_dir, exist_ok=True)
+
+#%% Simulate data
+window_size = 20
+print("Simulating data")
+sim = HMM_Dirichlet(
+    n_samples=25600*window_size,
+    trans_prob="sequence",
+    n_states=5,
+    n_channels=8,
+    concentration='random',
+    stay_prob=0.9,
+    window_size=window_size,
+)
+
+# Create Data object for training
+data = Data(sim.time_series)
+
+
+#%% Build model
+
+config = Config(
+    n_states=sim.n_states,
+    n_channels=sim.n_channels,
+    window_size=window_size,
+    sequence_length=200,
+    batch_size=16,
+    learning_rate=0.1,
+    lr_decay=0,
+    n_epochs=10,
+    learn_concentration=True,
+)
+model = Model(config)
+model.summary()
+
+#%% Train model
+
+# Initialization
+init_history = model.random_state_time_course_initialization(
+    data,
+    n_init=5,
+    n_epochs=2,
+    take=1,
+)
+
+# Full training
+history = model.fit(data)
+
+# Save model
+model_dir = f"{results_dir}/model"
+model.save(model_dir)
+
+# Calculate the free energy
+free_energy = model.free_energy(data)
+history["free_energy"] = free_energy
+
+# Save training history and free energy
+pickle.dump(init_history, open(f"{model_dir}/init_history.pkl", "wb"))
+pickle.dump(history, open(f"{model_dir}/history.pkl", "wb"))
+
+#%% Get inferred parameters
+
+# Inferred state probabilities
+alp = model.get_alpha(data)
+
+# Group-level HMM parameters
+concentration = model.get_concentration()
+initial_state_probs = model.get_initial_state_probs()
+trans_prob = model.get_trans_prob()
+
+# Save
+inf_params_dir = f"{results_dir}/inf_params"
+os.makedirs(inf_params_dir, exist_ok=True)
+
+pickle.dump(alp, open(f"{inf_params_dir}/alp.pkl", "wb"))
+np.save(f"{inf_params_dir}/concentration.npy", concentration)
+np.save(f"{inf_params_dir}/initial_state_probs.npy", initial_state_probs)
+np.save(f"{inf_params_dir}/trans_prob.npy", trans_prob)
+
+#%% Calculate summary statistics
+
+# State time course
+stc = modes.argmax_time_courses(alp)
+
+# Calculate summary statistics
+fo = modes.fractional_occupancies(stc)
+lt = modes.mean_lifetimes(stc)
+intv = modes.mean_intervals(stc)
+sr = modes.switching_rates(stc)
+
+# Save
+summary_stats_dir = f"{results_dir}/summary_stats"
+os.makedirs(summary_stats_dir, exist_ok=True)
+
+np.save(f"{summary_stats_dir}/fo.npy", fo)
+np.save(f"{summary_stats_dir}/lt.npy", lt)
+np.save(f"{summary_stats_dir}/intv.npy", intv)
+np.save(f"{summary_stats_dir}/sr.npy", sr)
+
+#%% Compare inferred parameters to ground truth simulation
+
+# Re-order simulated state time courses to match inferred
+inf_stc, sim_stc = modes.match_modes(stc, sim.state_time_course[::window_size])
+
+# Calculate dice coefficient
+dice = metrics.dice_coefficient(inf_stc, sim_stc)
+
+print("Dice coefficient:", dice)

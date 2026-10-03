@@ -26,6 +26,7 @@ Observation models
 - :py:class:`TDECovs` — TDE covariance. Each state has a TDE covariance
   matrix; generates autoregressive data via conditional sampling.
 - :py:class:`Poisson` — Poisson. Each state has a rate vector.
+- :py:class:`Dirichlet` — Dirichlet. Each state has a concentration vector.
 
 Combined simulation classes
 ---------------------------
@@ -36,6 +37,7 @@ These combine a state model with an observation model:
 - :py:class:`HMM_OscillatoryBursts` — HMM + oscillatory bursts.
 - :py:class:`HMM_TDECovs` — HMM + TDE covariances.
 - :py:class:`HMM_Poi` — HMM + Poisson.
+- :py:class:`HMM_Dirichlet` — HMM + Dirichlet compositions.
 - :py:class:`HSMM_MVN` — HSMM + MVN.
 - :py:class:`MixedHSMM_MVN` — HSMM with overlapping states + MVN.
 - :py:class:`MixedSine_MVN` — Sinusoidal mixing + MVN.
@@ -63,6 +65,7 @@ from osl_dynamics.simulation.obs_mod import (
     OscillatoryBursts,
     Poisson,
     TDECovs,
+    Dirichlet,
 )
 from osl_dynamics.simulation.hmm import (
     HMM,
@@ -74,6 +77,7 @@ from osl_dynamics.simulation.hmm import (
     HierarchicalHMM_MVN,
     MSess_HMM_MVN,
     HMM_Poi,
+    HMM_Dirichlet,
 )
 from osl_dynamics.simulation.hsmm import HSMM, HSMM_MVN, MixedHSMM_MVN
 from osl_dynamics.simulation.sm import MixedSine, MixedSine_MVN, MSess_MixedSine_MVN
