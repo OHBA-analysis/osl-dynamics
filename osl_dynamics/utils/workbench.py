@@ -15,6 +15,7 @@ from tqdm.auto import trange
 
 from osl_dynamics import files
 
+
 def _surfs():
     """Surface files by inflation, downloaded on first use."""
     return {
