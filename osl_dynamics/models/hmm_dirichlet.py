@@ -1,8 +1,7 @@
 """HMM-Dirichlet for compositional mode time courses.
 
 The sequence length is measured in hidden-state windows. Data contains raw
-samples and is never averaged before emission evaluation. The emission uses
-the mean per-sample log-density, preserving the thesis likelihood scale.
+samples. The emission uses the mean per-sample log-density.
 """
 
 import os
