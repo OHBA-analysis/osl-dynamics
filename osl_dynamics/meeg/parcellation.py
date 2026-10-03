@@ -475,7 +475,7 @@ def save_qc_plots(
         return
 
     # Band power maps — render each band and composite into a single image
-    mask_file = f"{files.mask.path}/MNI152_T1_8mm_brain.nii.gz"
+    mask_file = files.mask.file("MNI152_T1_8mm_brain.nii.gz")
     bands = {
         "delta": [1, 4],
         "theta": [4, 8],
