@@ -208,15 +208,13 @@ To release a new version:
 
 1. Check the latest commit on `main` has compiled successfully on [readthedocs](https://readthedocs.org/projects/osl-dynamics).
 
-2. Create a new release using the 'Create a new release' link on the right of the GitHub repo webpage. Set the tag to the new version number with a `v` prefix (e.g. `v3.3.0`), write the release notes, the output of the following is a useful starting point:
-```
-git log --oneline <previous tag>..main
-```
-Select 'Latest' for the release label and click 'Publish release'.
+2. Create a new release using the 'Create a new release' link on the right of the GitHub repo webpage:
+
+    - Set the tag to the new version number with a `v` prefix (e.g. `v3.3.0`).
+    - Write the release notes.
+    - Select 'Latest' for the release label and click 'Publish release'.
 
 3. Publishing the release triggers a GitHub Actions workflow (`.github/workflows/release.yml`) that builds the package and uploads it to [PyPI](https://pypi.org/project/osl-dynamics/). Check the workflow succeeded under the Actions tab of the GitHub repo.
-
-Installations from a clone of the repo (`pip install -e .`) automatically get a development version number based on the latest tag, e.g. `3.3.1.dev12` if 12 commits have been made since `v3.3.0`.
 
 ## Citation
 
