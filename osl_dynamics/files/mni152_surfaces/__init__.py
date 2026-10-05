@@ -15,7 +15,7 @@ Files
 
 from osl_dynamics.files import _fetch
 
-_SUBDIRECTORY = "mni152_surfaces"
+_SUBDIRECTORY = "surface/mni152"
 
 
 def file(name: str) -> str:
