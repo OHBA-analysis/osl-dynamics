@@ -19,9 +19,9 @@ from osl_dynamics import files
 def _surfs():
     """Surface files by inflation, downloaded on first use."""
     return {
-        0: [files.mask.surf_left, files.mask.surf_right],
-        1: [files.mask.surf_left_inf, files.mask.surf_right_inf],
-        2: [files.mask.surf_left_vinf, files.mask.surf_right_vinf],
+        0: [files.surface.left, files.surface.right],
+        1: [files.surface.left_inf, files.surface.right_inf],
+        2: [files.surface.left_vinf, files.surface.right_vinf],
     }
 
 
