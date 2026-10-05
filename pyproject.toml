@@ -11,8 +11,7 @@ dynamic = ["version"]
 description = "Toolbox for studying dynamic functional brain networks in MEG, EEG and fMRI data"
 readme = {file = "README.md", content-type = "text/markdown"}
 license = "Apache-2.0"
-# Listed explicitly: the default patterns don't match files in a subdirectory
-license-files = ["LICENSE", "NOTICE", "LICENSES/*"]
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10"
 keywords = [
     "neuroimaging",
@@ -61,6 +60,7 @@ dependencies = [
     "numpy",
     "osfclient",
     "packaging",
+    "pooch",
     "pandas",
     "pqdm",
     "pyside6",
@@ -102,6 +102,7 @@ tf-cuda = [
 
 [project.scripts]
 osl-dynamics = "osl_dynamics.config_api.pipeline:osl_dynamics_cli"
+osl-dynamics-download-data = "osl_dynamics.files._fetch:download_data_cli"
 
 # The version number is derived automatically from git tags
 [tool.setuptools_scm]

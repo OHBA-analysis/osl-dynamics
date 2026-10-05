@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.interpolate import griddata
 
-from osl_dynamics.files.scanner import layouts
+from osl_dynamics.files import scanner
 
 
 def available_layouts() -> List[str]:
-    layout_names = [file.stem for file in sorted(layouts.glob("*.lay"))]
+    layout_names = [file.stem for file in sorted(scanner.layouts.glob("*.lay"))]
     return layout_names
 
 
@@ -23,12 +23,12 @@ def get_layout(layout_name: str) -> str:
     if layout_name not in layout_names:
         raise FileNotFoundError(f"{layout_name} not found.")
 
-    layout = layouts / f"{layout_name}.lay"
+    layout = scanner.layouts / f"{layout_name}.lay"
     return str(layout)
 
 
 def available_outlines() -> List[str]:
-    outline_names = [file.stem for file in sorted(layouts.glob("*.outline"))]
+    outline_names = [file.stem for file in sorted(scanner.layouts.glob("*.outline"))]
     return outline_names
 
 
@@ -38,7 +38,7 @@ def get_outline(outline_name: str) -> str:
     if outline_name not in outline_names:
         raise FileNotFoundError(f"{outline_name} not found.")
 
-    outline = layouts / f"{outline_name}.outline"
+    outline = scanner.layouts / f"{outline_name}.outline"
     return str(outline)
 
 

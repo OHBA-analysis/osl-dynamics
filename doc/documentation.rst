@@ -47,7 +47,9 @@ Also see the :doc:`FAQ <faq>` for guidance on choosing a model and hyperparamete
 Parcellations
 -------------
 
-For information regarding the parcellations available in osl-dynamics, see :doc:`here <parcellations/index>`.
+The parcellations, masks and surfaces osl-dynamics uses are downloaded from
+`osl-files <https://github.com/OHBA-analysis/osl-files>`_. See `the parcellations page <https://github.com/OHBA-analysis/osl-files/tree/main/docs/parcellations>`_
+for the full list, with labels, MNI coordinates and pictures for each one.
 
 Tutorials
 ---------
