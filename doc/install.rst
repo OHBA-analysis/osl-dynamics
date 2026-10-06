@@ -23,6 +23,8 @@ Then create an environment with osl-dynamics in it:
 
 This installs osl-dynamics with everything it needs, TensorFlow included, on Linux and macOS (both Apple Silicon and Intel). There is no longer any need to download an environment file.
 
+Add :code:`jupyterlab` to that command if you want to work in notebooks.
+
 Windows Instructions
 --------------------
 
@@ -94,8 +96,8 @@ Files are cached in :code:`~/Library/Caches/osl-files` on macOS and :code:`~/.ca
 
     export OSL_DATA=/path/to/shared/osl-files
 
-Oxford-Specific Computers (hbaws, BMRC)
----------------------------------------
+Oxford-Specific Computers (BMRC)
+--------------------------------
 
 See the instructions on the GitHub `README <https://github.com/OHBA-analysis/osl-dynamics>`_.
 

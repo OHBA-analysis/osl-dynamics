@@ -78,28 +78,13 @@ rm Miniforge3-$(uname)-$(uname -m).sh
 conda create -n osld -c conda-forge osl-dynamics
 conda activate osld
 ```
-
-This installs osl-dynamics with everything it needs, TensorFlow included, on Linux and macOS (both Apple Silicon and Intel). On Linux a GPU is used automatically if you have one.
-
-If you do not need to train models, `osl-dynamics-base` installs the toolbox without TensorFlow:
-```
-conda create -n osld -c conda-forge osl-dynamics-base
-```
+This installs osl-dynamics with everything it needs (including TensorFlow and CUDA). Add `jupyterlab` to that command if you want to work in notebooks.
 
 osl-dynamics can also be installed from PyPI with `pip install osl-dynamics`, or `pip install "osl-dynamics[tf]"` to include TensorFlow (`"osl-dynamics[tf-cuda]"` for an NVIDIA GPU). Note that pip will not install the non-Python libraries some dependencies need.
 
 #### Windows
 
-conda-forge has no recent TensorFlow build for Windows, so the full package is not available there. We recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions [here](https://ubuntu.com/wsl), then following the instructions above in the Ubuntu terminal. `osl-dynamics-base` does install natively on Windows.
-
-#### hbaws (Oxford)
-
-On the OHBA workstation (hbaws), install Miniforge using the instructions above and install osl-dynamics using:
-```
-curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/hbaws.yml
-mamba env create -f hbaws.yml
-rm hbaws.yml
-```
+conda-forge has no recent TensorFlow build for Windows, so the full package is not available. We recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions [here](https://ubuntu.com/wsl), then following the instructions above in the Ubuntu terminal.
 
 #### BMRC (Oxford)
 
@@ -109,9 +94,8 @@ module load Miniforge3
 ```
 and osl-dynamics can be installed with:
 ```
-curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/bmrc.yml
-conda env create -f bmrc.yml
-rm bmrc.yml
+conda create -n osld -c conda-forge osl-dynamics
+conda activate osld
 ```
 The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
 ```
@@ -120,14 +104,7 @@ unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
 
 ### Data files
 
-The parcellations, masks, surfaces, scanner layouts and Workbench scenes are not shipped with the package. They live in [osl-files](https://github.com/OHBA-analysis/osl-files) and are downloaded the first time something needs them, then cached.
-
-To fetch everything up front, for a machine that will later be offline:
-```
-osl-dynamics-download-data
-```
-
-Files are cached in `~/Library/Caches/osl-files` (macOS) or `~/.cache/osl-files` (Linux). Set `OSL_DATA` to cache them elsewhere, for example if your home directory has a quota or to share one copy across a group.
+The parcellations, masks, surfaces, scanner layouts and Workbench scenes are not shipped with the package. They live in [osl-files](https://github.com/OHBA-analysis/osl-files) and are downloaded the first time something needs them, so a first run needs network access. Run `osl-dynamics-download-data` to fetch everything up front, and see the [installation instructions](https://osl-dynamics.readthedocs.io/en/latest/install.html#data-files) for where they are cached and how to change it.
 
 ### Install the latest code from the GitHub repository (optional)
 
