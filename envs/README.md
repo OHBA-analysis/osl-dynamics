@@ -1,18 +1,16 @@
 # Conda Environment Files
 
-The main conda environment files for installing osl-dynamics are:
+osl-dynamics is on conda-forge, so most people do not need an environment file:
 
-- `osld.yml` - install the the latest osl-dynamics.
-- `osld-tf.yml` - install the latest osl-dynamics and TensorFlow 2.19.
-- `osld-tf-cuda.yml` - install the latest osl-dynamics and TensorFlow 2.19 with CUDA.
+```
+conda create -n osld -c conda-forge osl-dynamics
+```
 
-Older Macs with an Intel chip need to use:
+See the [installation instructions](https://osl-dynamics.readthedocs.io/en/latest/install.html).
 
-- `osld-tf-macos.yml` - install osl-dynamics and TensorFlow 2.18.
+The files here are for machines that need a specific set of pinned packages:
 
-For Oxford-specific computers use:
-
-- `bmrc.yml`
-- `hbaws.yml`
+- `bmrc.yml` - the Biomedical Research Computing (BMRC) cluster at Oxford.
+- `hbaws.yml` - the OHBA workstation (hbaws) at Oxford.
 
 `fsl.yml` is used for installing osl-dynamics as an additional optional component of [FSL](https://fsl.fmrib.ox.ac.uk/fsl/docs/index.html).

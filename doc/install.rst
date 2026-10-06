@@ -1,12 +1,12 @@
 Installation
 ============
 
-We recommend installing osl-dynamics using `Miniforge <https://conda-forge.org/download/>`_.
+osl-dynamics is available on `conda-forge <https://anaconda.org/conda-forge/osl-dynamics>`_ and `PyPI <https://pypi.org/project/osl-dynamics>`_. We recommend conda-forge.
 
-Conda / Mamba Installation
---------------------------
+Conda Installation (recommended)
+--------------------------------
 
-Miniforge (:code:`conda`/:code:`mamba`) can be installed with:
+If you do not already have conda, install `Miniforge <https://conda-forge.org/download/>`_:
 
 .. code::
 
@@ -14,84 +14,95 @@ Miniforge (:code:`conda`/:code:`mamba`) can be installed with:
     bash Miniforge3-$(uname)-$(uname -m).sh
     rm Miniforge3-$(uname)-$(uname -m).sh
 
-
-Linux Instructions
-------------------
-
-The following lines can be used to download a conda environment file and install osl-dynamics with its dependencies.
+Then create an environment with osl-dynamics in it:
 
 .. code::
 
-    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
-    mamba env create -f osld-tf.yml
-    rm osld-tf.yml
+    conda create -n osld -c conda-forge osl-dynamics
+    conda activate osld
 
-If you have a GPU, then use the :code:`osld-tf-cuda.yml` environment file:
-
-.. code::
-
-    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-cuda.yml
-    mamba env create -f osld-tf-cuda.yml
-    rm osld-tf-cuda.yml
-
-Mac Instructions
-----------------
-
-If you have an M-series (M1, M2, M3) chip, the following lines can be used to download a conda environment file and install osl-dynamics with its dependencies.
-
-.. code::
-
-    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
-    mamba env create -f osld-tf.yml
-    rm osld-tf.yml
-
-If you have an Intel chip, then use the :code:`osld-tf-macos.yml` environment file:
-
-.. code::
-
-    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-macos.yml
-    mamba env create -f osld-tf-macos.yml
-    rm osld-tf-macos.yml
+This installs osl-dynamics with everything it needs, TensorFlow included, on Linux and macOS (both Apple Silicon and Intel). There is no longer any need to download an environment file.
 
 Windows Instructions
 --------------------
 
-If you are using a Windows computer, we recommend first installing linux (Ubuntu) as a Windows Subsystem (WSL) by following the instructions `here <https://documentation.ubuntu.com/wsl/stable/howto/install-ubuntu-wsl2/>`_. Then follow the Conda/Mamba and Linux instructions above in the Ubuntu terminal.
+conda-forge has no recent TensorFlow build for Windows, so the full package is not available there. We recommend installing linux (Ubuntu) as a Windows Subsystem (WSL) by following the instructions `here <https://documentation.ubuntu.com/wsl/stable/howto/install-ubuntu-wsl2/>`_, then following the Conda instructions above in the Ubuntu terminal.
 
-Oxford-Specific Computers (hbaws, BMRC)
----------------------------------------
+If you only need to load, prepare and analyse data, :code:`osl-dynamics-base` (see below) does install natively on Windows.
 
-See the instructions on the GitHub `README <https://github.com/OHBA-analysis/osl-dynamics>`_.
+Install without TensorFlow
+--------------------------
+
+If you do not need to train models, install :code:`osl-dynamics-base`:
+
+.. code::
+
+    conda create -n osld -c conda-forge osl-dynamics-base
+    conda activate osld
+
+You will be able to load, prepare and analyse data, but not build or train models. TensorFlow can be added later with :code:`conda install -c conda-forge tensorflow tensorflow-probability tf-keras`.
 
 Test your GPUs are working
 --------------------------
 
-You can use the following to check if TensorFlow is using any GPUs you have available:
+On linux, conda-forge builds TensorFlow both with and without CUDA and picks between them based on the drivers on your machine, so a GPU is used automatically where there is one. To check:
 
 .. code::
 
     conda activate osld
     python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 
-This should print a list of the GPUs you have available (or an empty list :code:`[]` if there's none available).
+This should print a list of the GPUs you have available (or an empty list :code:`[]` if there are none).
 
-Install without TensorFlow
---------------------------
+Pip Installation
+----------------
 
-If you want to install osl-dynamics without TensorFlow, then use the :code:`osld.yml` environment file:
+osl-dynamics can also be installed from PyPI:
 
 .. code::
 
-    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld.yml
-    mamba env create -f osld.yml
-    rm osld.yml
+    pip install osl-dynamics
 
-This environment file installs osl-dynamics and its dependencies, but not TensorFlow. You will be able to load, prepare and analyse data, but not train models.
+This does not include TensorFlow. To install it as well:
+
+.. code::
+
+    pip install "osl-dynamics[tf]"
+
+or, if you have an NVIDIA GPU:
+
+.. code::
+
+    pip install "osl-dynamics[tf-cuda]"
+
+Note that pip will not install the non-Python libraries that some dependencies need, which is why we recommend conda.
+
+Data files
+----------
+
+The parcellations, masks, surfaces, scanner layouts and Workbench scenes used by osl-dynamics are not shipped with the package. They live in `osl-files <https://github.com/OHBA-analysis/osl-files>`_ and are downloaded the first time something needs them, then cached.
+
+If you will be working somewhere without network access, such as a cluster compute node, fetch everything up front from somewhere that does have access:
+
+.. code::
+
+    osl-dynamics-download-data
+
+Files are cached in :code:`~/Library/Caches/osl-files` on macOS and :code:`~/.cache/osl-files` on linux. Set the :code:`OSL_DATA` environment variable to put them somewhere else, which is useful if your home directory has a quota, or to point a whole group at one shared copy:
+
+.. code::
+
+    export OSL_DATA=/path/to/shared/osl-files
+
+Oxford-Specific Computers (hbaws, BMRC)
+---------------------------------------
+
+See the instructions on the GitHub `README <https://github.com/OHBA-analysis/osl-dynamics>`_.
 
 Install the latest development code (optional)
 ----------------------------------------------
 
-You should only need to do this if you need a feature or fix that has not been released on pip yet.
+You should only need to do this if you need a feature or fix that has not been released yet.
 
 Once you have created the :code:`osld` conda environment (see instructions above) you can install the latest development version on the `GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_ with:
 
@@ -123,3 +134,10 @@ To remove osl-dynamics simply delete the conda environment:
 
     conda env remove -n osld
     conda clean --all
+
+The downloaded data files are cached separately, and can be removed with:
+
+::
+
+    rm -rf ~/.cache/osl-files        # linux
+    rm -rf ~/Library/Caches/osl-files  # macOS
