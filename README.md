@@ -85,11 +85,11 @@ pip install osl-dynamics
 ```
 or to include TensorFlow:
 ```
-pip install osl-dynamics[tf]
+pip install "osl-dynamics[tf]"
 ```
 or to include TensorFlow and CUDA:
 ```
-pip install osl-dynamics[tf-cuda]
+pip install "osl-dynamics[tf-cuda]"
 ```
 Note that pip will not install the non-Python libraries some dependencies need.
 
@@ -119,7 +119,7 @@ conda activate osld
 pip install git+https://github.com/OHBA-analysis/osl-dynamics.git
 ```
 
-### Install the source code (optional)
+### Copy the source code (optional)
 
 After you have created an `osld` environment you can install an editable local copy of the source code on your computer with:
 ```
@@ -134,6 +134,7 @@ You will run your local copy of the code when you `import osl_dynamics`.
 
 You can use the following to check if TensorFlow is using any GPUs you have available:
 ```
+conda activate osld
 python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 ```
 This should return a list of GPUs.
