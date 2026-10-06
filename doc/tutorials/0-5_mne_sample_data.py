@@ -49,10 +49,7 @@ Prerequisites
 
 - `FSL <https://fsl.fmrib.ox.ac.uk/fsl/fslwiki>`_ (needed for surface
   extraction).
-- `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_. Note,
-  TensorFlow is not required for processing M/EEG (install
-  ``osl-dynamics-base`` from conda-forge to get osl-dynamics without
-  TensorFlow).
+- `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_.
 """
 
 #%%

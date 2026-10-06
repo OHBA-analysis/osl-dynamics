@@ -3,8 +3,8 @@ Installation
 
 osl-dynamics is available on `conda-forge <https://anaconda.org/conda-forge/osl-dynamics>`_ and `PyPI <https://pypi.org/project/osl-dynamics>`_.
 
-Conda Installation (recommended)
---------------------------------
+Conda (recommended)
+-------------------
 
 If you do not already have conda, install `Miniforge <https://conda-forge.org/download/>`_:
 
@@ -23,8 +23,8 @@ Then create an environment with osl-dynamics in it:
 
 This installs osl-dynamics with everything it needs, TensorFlow included. Add :code:`jupyterlab` to that command if you want to work in notebooks.
 
-Pip Installation
-----------------
+Pip
+---
 
 osl-dynamics can also be installed from PyPI:
 
@@ -63,8 +63,8 @@ Once you have created the :code:`osld` conda environment (see instructions above
     conda activate osld
     pip install git+https://github.com/OHBA-analysis/osl-dynamics.git
 
-Install the source code (optional)
-----------------------------------
+Copy the source code (optional)
+-------------------------------
 
 Once you have created the :code:`osld` conda environment (see instructions above) you can install a local copy of the source code (`GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_) into it.
 
