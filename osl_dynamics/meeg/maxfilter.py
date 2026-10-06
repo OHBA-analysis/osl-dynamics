@@ -594,9 +594,17 @@ def _estimate_output_size(input_file: str) -> tuple[int, float]:
 
 
 def _needs_chunking(input_file: str, options: dict) -> bool:
-    """Return True if *input_file* would exceed ``size_limit_gb`` after maxfilter."""
+    """Return True if *input_file* would exceed ``size_limit_gb`` after maxfilter.
+
+    The size is estimated by opening the file with MNE. If MNE cannot
+    read the file its duration is unknown, so it is not chunked and
+    maxfilter is left to process it whole (see :func:`_is_split_chain`).
+    """
     size_limit_bytes = options["size_limit_gb"] * 1024**3
-    nbytes, _ = _estimate_output_size(input_file)
+    try:
+        nbytes, _ = _estimate_output_size(input_file)
+    except Exception:
+        return False
     return nbytes > size_limit_bytes
 
 
@@ -1013,8 +1021,20 @@ def _is_split_chain(input_file: str) -> bool:
     ``raw.filenames`` contains one entry per split. Maxfilter-2.2, in
     contrast, only processes the head file, which is why chains must
     be pre-sliced before being handed to maxfilter.
+
+    Maxfilter can read some recordings that MNE cannot (for example, a
+    file with a projection item that has no channel list). Such a file
+    cannot be checked or pre-sliced, so it is treated as a single file
+    and handed to maxfilter as it is.
     """
-    raw = mne.io.read_raw_fif(input_file, allow_maxshield="yes", verbose="error")
+    try:
+        raw = mne.io.read_raw_fif(input_file, allow_maxshield="yes", verbose="error")
+    except Exception as e:
+        print(
+            f"  MNE could not open {os.path.basename(input_file)} ({e}); "
+            "treating it as a single file and leaving it to maxfilter"
+        )
+        return False
     return len(raw.filenames) > 1
 
 
