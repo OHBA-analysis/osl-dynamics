@@ -61,100 +61,13 @@ See the [tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.
 
 ## Installation
 
-### Conda (recommended)
-
-If you do not already have conda, install [Miniforge](https://conda-forge.org/download/):
-```
-curl -LO "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-bash Miniforge3-$(uname)-$(uname -m).sh
-rm Miniforge3-$(uname)-$(uname -m).sh
-```
-
-Then install osl-dynamics from [conda-forge](https://anaconda.org/conda-forge/osl-dynamics) with:
+The recommended installation for osl-dynamics is:
 ```
 conda create -n osld -c conda-forge osl-dynamics
 conda activate osld
 ```
-This installs everything it needs including TensorFlow. Add `jupyterlab` to that command if you want to work in notebooks.
 
-### Pip
-
-osl-dynamics can also be installed from [PyPI](https://pypi.org/project/osl-dynamics) with:
-```
-pip install osl-dynamics
-```
-or to include TensorFlow:
-```
-pip install "osl-dynamics[tf]"
-```
-or to include TensorFlow and CUDA:
-```
-pip install "osl-dynamics[tf-cuda]"
-```
-Note that pip will not install the non-Python libraries some dependencies need.
-
-### BMRC Cluster (Oxford)
-
-On the Biomedical Research Computing (BMRC) cluster, `conda` is available as a software module:
-```
-module load Miniforge3
-```
-and osl-dynamics can be installed with:
-```
-conda create -n osld -c conda-forge osl-dynamics
-conda activate osld
-```
-The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
-```
-unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
-```
-
-### Install the latest code from the GitHub repository (optional)
-
-You should only need to do this if you need a feature or fix that has not been released on pip yet.
-
-After you have created an `osld` environment you can install the latest code (development version) from the GitHub repository with:
-```
-conda activate osld
-pip install git+https://github.com/OHBA-analysis/osl-dynamics.git
-```
-
-### Copy the source code (optional)
-
-After you have created an `osld` environment you can install an editable local copy of the source code on your computer with:
-```
-git clone https://github.com/OHBA-analysis/osl-dynamics.git
-conda activate osld
-cd osl-dynamics
-pip install -e .
-```
-You will run your local copy of the code when you `import osl_dynamics`.
-
-### Test GPUs are working
-
-You can use the following to check if TensorFlow is using any GPUs you have available:
-```
-conda activate osld
-python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
-```
-This should return a list of GPUs.
-
-### Removing osl-dynamics
-
-Simply delete the conda environment:
-```
-conda env remove -n osld
-conda clean --all
-```
-And remove the downloaded data files, which are cached separately:
-```
-rm -rf ~/.cache/osl-files          # Linux
-rm -rf ~/Library/Caches/osl-files  # macOS
-```
-And remove the GitHub repository if you have cloned it:
-```
-rm -rf osl-dynamics
-```
+See the [installation page](https://osl-dynamics.readthedocs.io/en/latest/install.html) for more information.
 
 ## Documentation
 

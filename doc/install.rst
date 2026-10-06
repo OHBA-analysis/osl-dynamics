@@ -3,8 +3,8 @@ Installation
 
 osl-dynamics is available on `conda-forge <https://anaconda.org/conda-forge/osl-dynamics>`_ and `PyPI <https://pypi.org/project/osl-dynamics>`_.
 
-Conda (recommended)
--------------------
+Conda installation (recommended)
+--------------------------------
 
 If you do not already have conda, install `Miniforge <https://conda-forge.org/download/>`_:
 
@@ -21,12 +21,12 @@ Then create an environment with osl-dynamics in it:
     conda create -n osld -c conda-forge osl-dynamics
     conda activate osld
 
-This installs osl-dynamics with everything it needs, TensorFlow included. Add :code:`jupyterlab` to that command if you want to work in notebooks.
+This installs osl-dynamics with everything it needs, TensorFlow included.
 
-Pip
----
+Pip installation
+----------------
 
-osl-dynamics can also be installed from PyPI:
+osl-dynamics can be installed from PyPI with:
 
 .. code::
 
@@ -46,10 +46,27 @@ or, if you have an NVIDIA GPU:
 
 Note that pip will not install the non-Python libraries that some dependencies need, which is why we recommend conda.
 
-BMRC Cluster (Oxford)
+BMRC cluster (Oxford)
 ---------------------
 
-See the instructions on the GitHub `README <https://github.com/OHBA-analysis/osl-dynamics>`_.
+On the Biomedical Research Computing (BMRC) cluster, `conda` is available as a software module:
+
+.. code::
+
+    module load Miniforge3
+
+and osl-dynamics can be installed with:
+
+.. code::
+
+    conda create -n osld -c conda-forge osl-dynamics
+    conda activate osld
+
+The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
+
+.. code::
+
+    unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
 
 Install the latest development code (optional)
 ----------------------------------------------
@@ -66,7 +83,7 @@ Once you have created the :code:`osld` conda environment (see instructions above
 Copy the source code (optional)
 -------------------------------
 
-Once you have created the :code:`osld` conda environment (see instructions above) you can install a local copy of the source code (`GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_) into it.
+Once you have created the :code:`osld` conda environment (see instructions above) you can install a local copy of the source code (`GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_) into it:
 
 .. code::
 
