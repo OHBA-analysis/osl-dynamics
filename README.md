@@ -70,7 +70,7 @@ bash Miniforge3-$(uname)-$(uname -m).sh
 rm Miniforge3-$(uname)-$(uname -m).sh
 ```
 
-Then install [osl-dynamics](https://anaconda.org/conda-forge/osl-dynamics) with:
+Then install osl-dynamics from [conda-forge](https://anaconda.org/conda-forge/osl-dynamics) with:
 ```
 conda create -n osld -c conda-forge osl-dynamics
 conda activate osld
@@ -79,7 +79,19 @@ This installs everything it needs including TensorFlow. Add `jupyterlab` to that
 
 ### Pip
 
-[osl-dynamics](https://pypi.org/project/osl-dynamics) can also be installed from PyPI with `pip install osl-dynamics`, or `pip install "osl-dynamics[tf]"` to include TensorFlow (`"osl-dynamics[tf-cuda]"` for an NVIDIA GPU). Note that pip will not install the non-Python libraries some dependencies need.
+osl-dynamics can also be installed from [PyPI](https://pypi.org/project/osl-dynamics) with:
+```
+pip install osl-dynamics
+```
+or to include TensorFlow:
+```
+pip install osl-dynamics[tf]
+```
+or to include TensorFlow and CUDA:
+```
+pip install osl-dynamics[tf-cuda]
+```
+Note that pip will not install the non-Python libraries some dependencies need.
 
 ### BMRC Cluster (Oxford)
 
