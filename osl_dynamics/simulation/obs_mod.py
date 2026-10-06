@@ -1211,3 +1211,70 @@ class TDECovs:
             data += state_time_course[:, i : i + 1] * activity
 
         return data
+
+
+class Dirichlet:
+    """Class that generates Dirichlet time series data.
+
+    Parameters
+    ----------
+    concentration : np.ndarray or str
+        concentration vector for each mode, shape should be (n_states, n_channels).
+        Either a numpy array or 'random'.
+    n_channels : int
+        Number of channels.
+    n_states : int
+        Number of states.
+    """
+
+    def __init__(
+        self,
+        concentration,
+        n_states=None,
+        n_channels=None,
+    ):
+        if isinstance(concentration, np.ndarray):
+            self.n_states = concentration.shape[0]
+            self.n_channels = concentration.shape[1]
+            self.concentration = concentration
+
+        elif not isinstance(concentration, np.ndarray):
+            if n_states is None or n_channels is None:
+                raise ValueError(
+                    "If we are generating concentration, "
+                    + "n_states and n_channels must be passed."
+                )
+            self.n_states = n_states
+            self.n_channels = n_channels
+            self.concentration = self.create_concentration(concentration)
+
+    def create_concentration(self, option, eps=1e-2):
+        if option == "random":
+            # Randomly sample the concentration from a gamma distribution
+            concentration = np.random.gamma(
+                shape=1.0, scale=1.1, size=(self.n_states, self.n_channels)
+            )
+
+            #  Add a large concentration to a small number of the channels at random
+            n_active_channels = max(1, self.n_channels // self.n_states)
+            for i in range(self.n_states):
+                active_channels = np.unique(
+                    np.random.randint(0, self.n_channels, size=n_active_channels)
+                )
+                concentration[i, active_channels] += 3
+
+        else:
+            raise NotImplementedError("Please use concentration='random'.")
+
+        return concentration + eps
+
+    def simulate_data(self, state_time_course):
+        n_samples = state_time_course.shape[0]
+        data = np.empty([n_samples, self.n_channels])
+
+        # Generates data
+        for i in range(n_samples):
+            state = np.argmax(state_time_course[i])
+            data[i] = np.random.dirichlet(self.concentration[state])
+
+        return data

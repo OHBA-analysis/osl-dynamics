@@ -15,11 +15,14 @@ from tqdm.auto import trange
 
 from osl_dynamics import files
 
-surfs = {
-    0: [files.mask.surf_left, files.mask.surf_right],
-    1: [files.mask.surf_left_inf, files.mask.surf_right_inf],
-    2: [files.mask.surf_left_vinf, files.mask.surf_right_vinf],
-}
+
+def _surfs():
+    """Surface files by inflation, downloaded on first use."""
+    return {
+        0: [files.surface.left, files.surface.right],
+        1: [files.surface.left_inf, files.surface.right_inf],
+        2: [files.surface.left_vinf, files.surface.right_vinf],
+    }
 
 
 def setup(path: str) -> None:
@@ -79,6 +82,7 @@ def render(
     save_dir.mkdir(parents=True, exist_ok=True)
 
     out_file = save_dir / img.stem
+    surfs = _surfs()
     surf_left, surf_right = surfs.get(inflation, surfs[0])
 
     stem_right = out_file.with_name(out_file.stem + "_right")
@@ -157,6 +161,7 @@ def create_scene(
     scene_file = files.scene.mode_scene
     temp_scene = pathlib.Path(temp_scene)
 
+    surfs = _surfs()
     surf_left, surf_right = surfs.get(inflation, surfs[0])
 
     scene = scene_file.read_text()
@@ -173,7 +178,7 @@ def visualise(
     inflation: int = 0,
     temp_scene: Optional[str] = None,
 ) -> None:
-    surface = surfs.get(inflation, None)
+    surface = _surfs().get(inflation, None)
     if surface is None:
         warnings.warn(
             f"Inflation of {inflation} is not a valid selection. Using '0' instead.",

@@ -433,8 +433,9 @@ The output of this script is written to ``derivatives/``.
 # ^^^^^^^^^^^^^^^^^^^^
 #
 # The final step applies the beamformer, parcellates the voxel data, and
-# saves the output. See the :ref:`parcellations <parcellations>` page for
-# the full list of available parcellations.
+# saves the output. See the `parcellations page
+# <https://github.com/OHBA-analysis/osl-files/tree/main/docs/parcellations>`_
+# for the full list of available parcellations.
 #
 # .. code-block:: python
 #

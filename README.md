@@ -61,126 +61,13 @@ See the [tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.
 
 ## Installation
 
-We recommend installing osl-dynamics using the conda environment files in `/envs`, which can be installed using [Miniforge](https://conda-forge.org/download/).
-
-### conda / mamba installation
-
-Miniforge (`conda`/`mamba`) can be installed with:
+The recommended installation for osl-dynamics is:
 ```
-curl -LO "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-bash Miniforge3-$(uname)-$(uname -m).sh
-rm Miniforge3-$(uname)-$(uname -m).sh
-```
-
-### osl-dynamics installation
-
-Different computers have their own environment files. For more information see the envs [README](https://github.com/OHBA-analysis/osl-dynamics/tree/main/envs#readme).
-
-#### Linux
-```
-curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
-mamba env create -f osld-tf.yml
-rm osld-tf.yml
-```
-
-If you have a GPU, then use the `osld-tf-cuda.yml` environment instead:
-```
-curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-cuda.yml
-mamba env create -f osld-tf-cuda.yml
-rm osld-tf-cuda.yml
-```
-
-#### Mac
-
-If you have an M-series (M1, M2, M3) chip use:
-```
-curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
-mamba env create -f osld-tf.yml
-rm osld-tf.yml
-```
-
-Otherwise, if you have an Intel chip use:
-```
-curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-macos.yml
-mamba env create -f osld-tf-macos.yml
-rm osld-tf-macos.yml
-```
-
-#### Windows
-
-If you are using a Windows computer, we recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions [here](https://ubuntu.com/wsl). Then follow the instructions for Linux above in the Ubuntu terminal.
-
-#### hbaws (Oxford)
-
-On the OHBA workstation (hbaws), install Miniforge and Mamba using the instructions above and install osl-dynamics using:
-```
-curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/hbaws.yml
-mamba env create -f hbaws.yml
-rm hbaws.yml
-```
-
-#### BMRC (Oxford)
-
-On the Biomedical Research Computing (BMRC) cluster, `conda` is available as a software module:
-```
-module load Miniforge3
-```
-and osl-dynamics can be installed with:
-```
-curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/bmrc.yml
-conda env create -f bmrc.yml
-rm bmrc.yml
-```
-The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
-```
-unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
-```
-
-### Install the latest code from the GitHub repository (optional)
-
-You should only need to do this if you need a feature or fix that has not been released on pip yet.
-
-After you have created an `osld` environment you can install the latest code (development version) from the GitHub repository with:
-```
+conda create -n osld -c conda-forge osl-dynamics
 conda activate osld
-pip install git+https://github.com/OHBA-analysis/osl-dynamics.git
 ```
 
-### Install the source code (optional)
-
-After you have created an `osld` environment you can install an editable local copy of the source code on your computer with:
-```
-git clone https://github.com/OHBA-analysis/osl-dynamics.git
-conda activate osld
-cd osl-dynamics
-pip install -e .
-```
-You will run your local copy of the code when you `import osl_dynamics`.
-
-If you are a developer, you may wish to clone the repository using SSH rather than HTTPS to make pushing branches/commits easier:
-```
-git clone git@github.com:OHBA-analysis/osl-dynamics.git
-```
-
-### Test GPUs are working
-
-You can use the following to check if TensorFlow is using any GPUs you have available:
-```
-python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
-```
-This should return a list of GPUs.
-
-### Removing osl-dynamics
-
-Simply delete the conda environment:
-```
-conda env remove -n osld
-conda clean --all
-```
-And remove the GitHub repository if you have cloned it:
-```
-rm -rf osl-dynamics
-```
+See the [installation page](https://osl-dynamics.readthedocs.io/en/latest/install.html) for more information.
 
 ## Documentation
 
@@ -208,15 +95,13 @@ To release a new version:
 
 1. Check the latest commit on `main` has compiled successfully on [readthedocs](https://readthedocs.org/projects/osl-dynamics).
 
-2. Create a new release using the 'Create a new release' link on the right of the GitHub repo webpage. Set the tag to the new version number with a `v` prefix (e.g. `v3.3.0`), write the release notes, the output of the following is a useful starting point:
-```
-git log --oneline <previous tag>..main
-```
-Select 'Latest' for the release label and click 'Publish release'.
+2. Create a new release using the 'Create a new release' link on the right of the GitHub repo webpage:
+
+    - Set the tag to the new version number with a `v` prefix (e.g. `v3.3.0`).
+    - Write the release notes.
+    - Select 'Latest' for the release label and click 'Publish release'.
 
 3. Publishing the release triggers a GitHub Actions workflow (`.github/workflows/release.yml`) that builds the package and uploads it to [PyPI](https://pypi.org/project/osl-dynamics/). Check the workflow succeeded under the Actions tab of the GitHub repo.
-
-Installations from a clone of the repo (`pip install -e .`) automatically get a development version number based on the latest tag, e.g. `3.3.1.dev12` if 12 commits have been made since `v3.3.0`.
 
 ## Citation
 

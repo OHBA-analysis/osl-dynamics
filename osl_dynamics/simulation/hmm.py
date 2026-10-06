@@ -12,6 +12,7 @@ from osl_dynamics.simulation.obs_mod import (
     MSess_MVN,
     OscillatoryBursts,
     Poisson,
+    Dirichlet,
     TDECovs,
 )
 from osl_dynamics.simulation.hsmm import HSMM
@@ -510,6 +511,92 @@ class HMM_Poi(Simulation):
         return self.state_time_course
 
     def __getattr__(self, attr: str):
+        if attr in ("obs_mod", "hmm"):
+            raise AttributeError(f"No attribute called {attr}.")
+        if attr in dir(self.obs_mod):
+            return getattr(self.obs_mod, attr)
+        elif attr in dir(self.hmm):
+            return getattr(self.hmm, attr)
+        else:
+            raise AttributeError(f"No attribute called {attr}.")
+
+
+class HMM_Dirichlet(Simulation):
+    """Simulate an HMM with Dirichlet distribution as the observation model.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of raw samples to draw. Must be divisible by window_size.
+    trans_prob : np.ndarray or str
+        Transition probability matrix as a numpy array or a str ('sequence',
+        'uniform') to generate a transition probability matrix.
+    concentration : np.ndarray or str
+        Concentration vector for each state, shape (n_states, n_channels),
+        or 'random'.
+    n_states : int, optional
+        Number of states when concentration='random'.
+    n_channels : int, optional
+        Number of channels when concentration='random'.
+    window_size : int, optional
+        Raw samples per hidden-state step (default 1). State transitions occur
+        between windows; samples within each window share a state. Both
+        time_series and state_time_course have n_samples rows.
+    stay_prob : float
+        Used to generate the transition probability matrix is trans_prob is a str.
+    """
+
+    def __init__(
+        self,
+        n_samples,
+        trans_prob,
+        concentration,
+        n_states=None,
+        n_channels=None,
+        stay_prob=None,
+        window_size=1,
+    ):
+        if not isinstance(window_size, (int, np.integer)) or window_size < 1:
+            raise ValueError("window_size must be a positive integer.")
+        if n_samples % window_size:
+            raise ValueError("n_samples must be divisible by window_size.")
+        self.window_size = window_size
+
+        # Observation model
+        self.obs_mod = Dirichlet(
+            concentration=concentration,
+            n_states=n_states,
+            n_channels=n_channels,
+        )
+
+        self.n_states = self.obs_mod.n_states
+        self.n_channels = self.obs_mod.n_channels
+
+        # HMM object
+        self.hmm = HMM(
+            trans_prob=trans_prob,
+            stay_prob=stay_prob,
+            n_states=self.n_states,
+        )
+
+        # Initialise base class
+        super().__init__(n_samples=n_samples)
+
+        # Simulate data
+        self.state_time_course = np.repeat(
+            self.hmm.generate_states(self.n_samples // window_size), window_size, axis=0
+        )
+        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
+
+    @property
+    def n_modes(self):
+        return self.n_states
+
+    @property
+    def mode_time_course(self):
+        return self.state_time_course
+
+    def __getattr__(self, attr):
         if attr in ("obs_mod", "hmm"):
             raise AttributeError(f"No attribute called {attr}.")
         if attr in dir(self.obs_mod):

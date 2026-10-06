@@ -1,0 +1,10 @@
+osl-dynamics
+Copyright 2020-present University of Oxford, Oxford, UK.
+
+This product includes software developed at the Oxford Centre for Human Brain
+Activity (OHBA), University of Oxford.
+
+osl-dynamics downloads the neuroimaging templates, surfaces and parcellations
+it uses from https://github.com/OHBA-analysis/osl-files rather than bundling
+them. They remain the work of their original authors, who should be cited when
+they are used; that repository records the source and licence of each one.

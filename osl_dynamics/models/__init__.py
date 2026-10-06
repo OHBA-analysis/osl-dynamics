@@ -117,14 +117,13 @@ simulation) can be used without it.
 
 To install the packages needed for model training:
 
+    conda install -c conda-forge tensorflow tensorflow-probability tf-keras
+
+or, if you installed osl-dynamics with pip:
+
     pip install "osl-dynamics[tf]"
 
-or, if you have an NVIDIA GPU:
-
-    pip install "osl-dynamics[tf-cuda]"
-
-Alternatively, use one of the conda environment files described here:
-https://osl-dynamics.readthedocs.io/en/latest/install.html\
+See https://osl-dynamics.readthedocs.io/en/latest/install.html\
 """
 
 
@@ -147,6 +146,7 @@ try:
         hive,
         dive,
         dyneste,
+        hmm_dirichlet,
     )
 except ImportError as error:
     _package = _missing_tensorflow_package(error)
@@ -161,6 +161,7 @@ models = {
     "SC-DyNeMo": sc_dynemo.Model,
     "HMM": hmm.Model,
     "HMM-Poisson": hmm_poi.Model,
+    "HMM-Dirichlet": hmm_dirichlet.Model,
     "HIVE": hive.Model,
     "DIVE": dive.Model,
     "DyNeStE": dyneste.Model,
