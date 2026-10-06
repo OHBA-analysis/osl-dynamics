@@ -1,7 +1,7 @@
 Installation
 ============
 
-osl-dynamics is available on `conda-forge <https://anaconda.org/conda-forge/osl-dynamics>`_ and `PyPI <https://pypi.org/project/osl-dynamics>`_. We recommend conda-forge.
+osl-dynamics is available on `conda-forge <https://anaconda.org/conda-forge/osl-dynamics>`_ and `PyPI <https://pypi.org/project/osl-dynamics>`_.
 
 Conda Installation (recommended)
 --------------------------------
@@ -21,40 +21,7 @@ Then create an environment with osl-dynamics in it:
     conda create -n osld -c conda-forge osl-dynamics
     conda activate osld
 
-This installs osl-dynamics with everything it needs, TensorFlow included, on Linux and macOS (both Apple Silicon and Intel). There is no longer any need to download an environment file.
-
-Add :code:`jupyterlab` to that command if you want to work in notebooks.
-
-Windows Instructions
---------------------
-
-conda-forge has no recent TensorFlow build for Windows, so the full package is not available there. We recommend installing linux (Ubuntu) as a Windows Subsystem (WSL) by following the instructions `here <https://documentation.ubuntu.com/wsl/stable/howto/install-ubuntu-wsl2/>`_, then following the Conda instructions above in the Ubuntu terminal.
-
-If you only need to load, prepare and analyse data, :code:`osl-dynamics-base` (see below) does install natively on Windows.
-
-Install without TensorFlow
---------------------------
-
-If you do not need to train models, install :code:`osl-dynamics-base`:
-
-.. code::
-
-    conda create -n osld -c conda-forge osl-dynamics-base
-    conda activate osld
-
-You will be able to load, prepare and analyse data, but not build or train models. TensorFlow can be added later with :code:`conda install -c conda-forge tensorflow tensorflow-probability tf-keras`.
-
-Test your GPUs are working
---------------------------
-
-On linux, conda-forge builds TensorFlow both with and without CUDA and picks between them based on the drivers on your machine, so a GPU is used automatically where there is one. To check:
-
-.. code::
-
-    conda activate osld
-    python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
-
-This should print a list of the GPUs you have available (or an empty list :code:`[]` if there are none).
+This installs osl-dynamics with everything it needs, TensorFlow included. Add :code:`jupyterlab` to that command if you want to work in notebooks.
 
 Pip Installation
 ----------------
@@ -79,25 +46,8 @@ or, if you have an NVIDIA GPU:
 
 Note that pip will not install the non-Python libraries that some dependencies need, which is why we recommend conda.
 
-Data files
-----------
-
-The parcellations, masks, surfaces, scanner layouts and Workbench scenes used by osl-dynamics are not shipped with the package. They live in `osl-files <https://github.com/OHBA-analysis/osl-files>`_ and are downloaded the first time something needs them, then cached.
-
-If you will be working somewhere without network access, such as a cluster compute node, fetch everything up front from somewhere that does have access:
-
-.. code::
-
-    osl-dynamics-download-data
-
-Files are cached in :code:`~/Library/Caches/osl-files` on macOS and :code:`~/.cache/osl-files` on linux. Set the :code:`OSL_DATA` environment variable to put them somewhere else, which is useful if your home directory has a quota, or to point a whole group at one shared copy:
-
-.. code::
-
-    export OSL_DATA=/path/to/shared/osl-files
-
-Oxford-Specific Computers (BMRC)
---------------------------------
+BMRC Cluster (Oxford)
+---------------------
 
 See the instructions on the GitHub `README <https://github.com/OHBA-analysis/osl-dynamics>`_.
 
@@ -126,6 +76,18 @@ Once you have created the :code:`osld` conda environment (see instructions above
     pip install -e .
 
 Now you can run osl-dynamics with your own local changes to the code.
+
+Test your GPUs are working
+--------------------------
+
+To check if your GPUs are working:
+
+.. code::
+
+    conda activate osld
+    python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+
+This should print a list of the GPUs you have available (or an empty list :code:`[]` if there are none).
 
 Removing osl-dynamics
 ---------------------

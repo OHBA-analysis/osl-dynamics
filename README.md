@@ -63,7 +63,7 @@ See the [tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.
 
 osl-dynamics is available on [conda-forge](https://anaconda.org/conda-forge/osl-dynamics) and [PyPI](https://pypi.org/project/osl-dynamics). We recommend conda-forge.
 
-### conda / mamba installation
+### Conda
 
 If you do not already have conda, install [Miniforge](https://conda-forge.org/download/):
 ```
@@ -72,21 +72,18 @@ bash Miniforge3-$(uname)-$(uname -m).sh
 rm Miniforge3-$(uname)-$(uname -m).sh
 ```
 
-### osl-dynamics installation
-
+Then install osl-dynamics with:
 ```
 conda create -n osld -c conda-forge osl-dynamics
 conda activate osld
 ```
-This installs osl-dynamics with everything it needs (including TensorFlow and CUDA). Add `jupyterlab` to that command if you want to work in notebooks.
+This installs everything it needs including TensorFlow. Add `jupyterlab` to that command if you want to work in notebooks.
+
+### Pip
 
 osl-dynamics can also be installed from PyPI with `pip install osl-dynamics`, or `pip install "osl-dynamics[tf]"` to include TensorFlow (`"osl-dynamics[tf-cuda]"` for an NVIDIA GPU). Note that pip will not install the non-Python libraries some dependencies need.
 
-#### Windows
-
-conda-forge has no recent TensorFlow build for Windows, so the full package is not available. We recommend first installing Linux (Ubuntu) as a Windows Subsystem by following the instructions [here](https://ubuntu.com/wsl), then following the instructions above in the Ubuntu terminal.
-
-#### BMRC (Oxford)
+#### BMRC Cluster (Oxford)
 
 On the Biomedical Research Computing (BMRC) cluster, `conda` is available as a software module:
 ```
@@ -101,10 +98,6 @@ The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017
 ```
 unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
 ```
-
-### Data files
-
-The parcellations, masks, surfaces, scanner layouts and Workbench scenes are not shipped with the package. They live in [osl-files](https://github.com/OHBA-analysis/osl-files) and are downloaded the first time something needs them, so a first run needs network access. Run `osl-dynamics-download-data` to fetch everything up front, and see the [installation instructions](https://osl-dynamics.readthedocs.io/en/latest/install.html#data-files) for where they are cached and how to change it.
 
 ### Install the latest code from the GitHub repository (optional)
 
@@ -126,11 +119,6 @@ cd osl-dynamics
 pip install -e .
 ```
 You will run your local copy of the code when you `import osl_dynamics`.
-
-If you are a developer, you may wish to clone the repository using SSH rather than HTTPS to make pushing branches/commits easier:
-```
-git clone git@github.com:OHBA-analysis/osl-dynamics.git
-```
 
 ### Test GPUs are working
 
