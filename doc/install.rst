@@ -1,12 +1,12 @@
 Installation
 ============
 
-We recommend installing osl-dynamics using `Miniforge <https://conda-forge.org/download/>`_.
+osl-dynamics is available on `conda-forge <https://anaconda.org/conda-forge/osl-dynamics>`_ and `PyPI <https://pypi.org/project/osl-dynamics>`_.
 
-Conda / Mamba Installation
---------------------------
+Conda installation (recommended)
+--------------------------------
 
-Miniforge (:code:`conda`/:code:`mamba`) can be installed with:
+If you do not already have conda, install `Miniforge <https://conda-forge.org/download/>`_:
 
 .. code::
 
@@ -14,84 +14,64 @@ Miniforge (:code:`conda`/:code:`mamba`) can be installed with:
     bash Miniforge3-$(uname)-$(uname -m).sh
     rm Miniforge3-$(uname)-$(uname -m).sh
 
-
-Linux Instructions
-------------------
-
-The following lines can be used to download a conda environment file and install osl-dynamics with its dependencies.
+Then create an environment with osl-dynamics in it:
 
 .. code::
 
-    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
-    mamba env create -f osld-tf.yml
-    rm osld-tf.yml
+    conda create -n osld -c conda-forge osl-dynamics
+    conda activate osld
 
-If you have a GPU, then use the :code:`osld-tf-cuda.yml` environment file:
+This installs osl-dynamics with everything it needs, TensorFlow included.
 
-.. code::
-
-    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-cuda.yml
-    mamba env create -f osld-tf-cuda.yml
-    rm osld-tf-cuda.yml
-
-Mac Instructions
+Pip installation
 ----------------
 
-If you have an M-series (M1, M2, M3) chip, the following lines can be used to download a conda environment file and install osl-dynamics with its dependencies.
+osl-dynamics can be installed from PyPI with:
 
 .. code::
 
-    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf.yml
-    mamba env create -f osld-tf.yml
-    rm osld-tf.yml
+    pip install osl-dynamics
 
-If you have an Intel chip, then use the :code:`osld-tf-macos.yml` environment file:
+This does not include TensorFlow. To install it as well:
 
 .. code::
 
-    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld-tf-macos.yml
-    mamba env create -f osld-tf-macos.yml
-    rm osld-tf-macos.yml
+    pip install "osl-dynamics[tf]"
 
-Windows Instructions
---------------------
-
-If you are using a Windows computer, we recommend first installing linux (Ubuntu) as a Windows Subsystem (WSL) by following the instructions `here <https://documentation.ubuntu.com/wsl/stable/howto/install-ubuntu-wsl2/>`_. Then follow the Conda/Mamba and Linux instructions above in the Ubuntu terminal.
-
-Oxford-Specific Computers (hbaws, BMRC)
----------------------------------------
-
-See the instructions on the GitHub `README <https://github.com/OHBA-analysis/osl-dynamics>`_.
-
-Test your GPUs are working
---------------------------
-
-You can use the following to check if TensorFlow is using any GPUs you have available:
+or, if you have an NVIDIA GPU:
 
 .. code::
 
+    pip install "osl-dynamics[tf-cuda]"
+
+Note that pip will not install the non-Python libraries that some dependencies need, which is why we recommend conda.
+
+BMRC cluster (Oxford)
+---------------------
+
+On the Biomedical Research Computing (BMRC) cluster, `conda` is available as a software module:
+
+.. code::
+
+    module load Miniforge3
+
+and osl-dynamics can be installed with:
+
+.. code::
+
+    conda create -n osld -c conda-forge osl-dynamics
     conda activate osld
-    python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
 
-This should print a list of the GPUs you have available (or an empty list :code:`[]` if there's none available).
-
-Install without TensorFlow
---------------------------
-
-If you want to install osl-dynamics without TensorFlow, then use the :code:`osld.yml` environment file:
+The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
 
 .. code::
 
-    curl -LO https://raw.githubusercontent.com/OHBA-analysis/osl-dynamics/refs/heads/main/envs/osld.yml
-    mamba env create -f osld.yml
-    rm osld.yml
-
-This environment file installs osl-dynamics and its dependencies, but not TensorFlow. You will be able to load, prepare and analyse data, but not train models.
+    unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
 
 Install the latest development code (optional)
 ----------------------------------------------
 
-You should only need to do this if you need a feature or fix that has not been released on pip yet.
+You should only need to do this if you need a feature or fix that has not been released yet.
 
 Once you have created the :code:`osld` conda environment (see instructions above) you can install the latest development version on the `GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_ with:
 
@@ -100,10 +80,10 @@ Once you have created the :code:`osld` conda environment (see instructions above
     conda activate osld
     pip install git+https://github.com/OHBA-analysis/osl-dynamics.git
 
-Install the source code (optional)
-----------------------------------
+Copy the source code (optional)
+-------------------------------
 
-Once you have created the :code:`osld` conda environment (see instructions above) you can install a local copy of the source code (`GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_) into it.
+Once you have created the :code:`osld` conda environment (see instructions above) you can install a local copy of the source code (`GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_) into it:
 
 .. code::
 
@@ -114,6 +94,18 @@ Once you have created the :code:`osld` conda environment (see instructions above
 
 Now you can run osl-dynamics with your own local changes to the code.
 
+Test your GPUs are working
+--------------------------
+
+To check if your GPUs are working:
+
+.. code::
+
+    conda activate osld
+    python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+
+This should print a list of the GPUs you have available (or an empty list :code:`[]` if there are none).
+
 Removing osl-dynamics
 ---------------------
 
@@ -123,3 +115,10 @@ To remove osl-dynamics simply delete the conda environment:
 
     conda env remove -n osld
     conda clean --all
+
+The downloaded data files are cached separately, and can be removed with:
+
+::
+
+    rm -rf ~/.cache/osl-files        # linux
+    rm -rf ~/Library/Caches/osl-files  # macOS

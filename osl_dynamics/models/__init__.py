@@ -117,14 +117,13 @@ simulation) can be used without it.
 
 To install the packages needed for model training:
 
+    conda install -c conda-forge tensorflow tensorflow-probability tf-keras
+
+or, if you installed osl-dynamics with pip:
+
     pip install "osl-dynamics[tf]"
 
-or, if you have an NVIDIA GPU:
-
-    pip install "osl-dynamics[tf-cuda]"
-
-Alternatively, use one of the conda environment files described here:
-https://osl-dynamics.readthedocs.io/en/latest/install.html\
+See https://osl-dynamics.readthedocs.io/en/latest/install.html\
 """
 
 
