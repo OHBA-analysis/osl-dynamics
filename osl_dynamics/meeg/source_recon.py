@@ -1149,7 +1149,7 @@ def _compute_beamformer(
 
             # 4. Invert the denominator
             bf_denom_single_inv = _sym_inv_sm(
-                bf_denom_single, reduce_rank, "matrix", sk[single_dipoles]
+                bf_denom_single, reduce_rank, inversion, sk[single_dipoles]
             )
             W_single = np.matmul(bf_denom_single_inv, bf_numer_single)
 
