@@ -53,6 +53,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from pathlib import Path
 
 import mne
 import numpy as np
@@ -66,6 +67,11 @@ _STAGE1_KEYS = _COMMON_KEYS + [
     "hpig",
     "origin",
     "frame",
+    "badlimit",
+    "autobad_dur",
+    "linefreq",
+    "hpisubt",
+    "force",
 ]
 _STAGE2_KEYS = _COMMON_KEYS + [
     "tsss",
@@ -81,6 +87,9 @@ _STAGE2_KEYS = _COMMON_KEYS + [
     "origin",
     "frame",
     "skip",
+    "linefreq",
+    "hpisubt",
+    "force",
 ]
 _STAGE3_KEYS = _COMMON_KEYS + ["trans"]
 
@@ -268,6 +277,27 @@ def _parse_bad_channels(log_file: str) -> str | None:
     return bads
 
 
+def _merge_bads(*bad_lists: str | None) -> str | None:
+    """Combine bad channel lists, dropping duplicates.
+
+    Parameters
+    ----------
+    *bad_lists : str or None
+        Space-separated channel numbers, e.g. ``"2233 2312"``.
+
+    Returns
+    -------
+    bads : str or None
+        Space-separated channel numbers, or ``None`` if there are none.
+    """
+    merged: list[str] = []
+    for bads in bad_lists:
+        for channel in (bads or "").split():
+            if channel not in merged:
+                merged.append(channel)
+    return " ".join(merged) or None
+
+
 def _quick_load_dig(fname: str) -> list:
     """Extract digitization points from a FIF file.
 
@@ -284,12 +314,16 @@ def _quick_load_dig(fname: str) -> list:
     dig : list
         List of digitization points.
     """
-    from mne.io.constants import FIFF
+    from mne._fiff._digitization import _read_dig_fif
+    from mne._fiff.constants import FIFF
+    from mne._fiff.open import fiff_open
+    from mne._fiff.tree import dir_tree_find
 
-    fid, tree, _ = mne.io.open.fiff_open(fname, preload=False)
-    meas = mne.io.tree.dir_tree_find(tree, FIFF.FIFFB_MEAS)
-    meas_info = mne.io.tree.dir_tree_find(meas, FIFF.FIFFB_MEAS_INFO)
-    dig = mne.io._digitization._read_dig_fif(fid, meas_info)
+    fid, tree, _ = fiff_open(Path(fname), preload=False)
+    with fid:
+        meas = dir_tree_find(tree, FIFF.FIFFB_MEAS)
+        meas_info = dir_tree_find(meas, FIFF.FIFFB_MEAS_INFO)
+        dig = _read_dig_fif(fid, meas_info)
     return dig
 
 
@@ -320,7 +354,7 @@ def _fit_cbu_origin(
         Fitted origin coordinates [x, y, z] in mm.
     """
     try:
-        raw = mne.io.read_raw_fif(input_file)
+        raw = mne.io.read_raw_fif(input_file, allow_maxshield="yes", verbose="error")
         dig = raw.info["dig"]
     except ValueError:
         dig = _quick_load_dig(input_file)
@@ -408,7 +442,9 @@ def _run_multistage(input_file: str, outdir: str, options: dict) -> None:
     """Run Maxfilter in three sequential stages.
 
     1. **Bad channel detection** — run with ``-autobad on`` to identify
-       bad channels automatically.
+       bad channels automatically.  Skipped when ``options["bads"]`` is
+       set, unless ``options["autobad"]`` is also set: then the given
+       channels are marked bad and maxfilter looks for more.
     2. **SSS/tSSS** — apply Signal Space Separation with the detected
        bad channels marked.
     3. **Head translation** (optional) — transform data to the head
@@ -424,17 +460,22 @@ def _run_multistage(input_file: str, outdir: str, options: dict) -> None:
     options : dict
         Full Maxfilter options from :func:`run_maxfilter`.
     """
-    # Stage 1 - Find Bad Channels (skipped if bads are pre-provided,
-    # e.g. by chain expansion which shares one autobad pass across pieces)
+    # Stage 1 - Find Bad Channels. Skipped if bads are pre-provided (e.g. by
+    # chain expansion, which shares one autobad pass across pieces), unless
+    # autobad is requested as well: then the given channels are marked bad
+    # and maxfilter looks for more.
     pre_bads = options.get("bads")
-    if pre_bads is None:
+    if pre_bads is None or options.get("autobad"):
         output_file = _output_name(input_file, outdir, "autobad")
         if os.path.exists(output_file):
             os.remove(output_file)
 
-        stage1_options = _pick_keys(options, _STAGE1_KEYS, overrides={"autobad": True})
+        stage1_options = _pick_keys(
+            options, _STAGE1_KEYS, overrides={"autobad": True, "bads": pre_bads}
+        )
         output_file, log_file = _run_single(input_file, output_file, stage1_options)
-        bads = _parse_bad_channels(log_file) if not options["dryrun"] else None
+        detected = _parse_bad_channels(log_file) if not options["dryrun"] else None
+        bads = _merge_bads(pre_bads, detected)
     else:
         bads = pre_bads
 
@@ -597,13 +638,18 @@ def _needs_chunking(input_file: str, options: dict) -> bool:
     """Return True if *input_file* would exceed ``size_limit_gb`` after maxfilter.
 
     The size is estimated by opening the file with MNE. If MNE cannot
-    read the file its duration is unknown, so it is not chunked and
-    maxfilter is left to process it whole (see :func:`_is_split_chain`).
+    read the file (it raises a ``ValueError``) its duration is unknown,
+    so it is not chunked and maxfilter is left to process it whole (see
+    :func:`_is_split_chain`).
     """
     size_limit_bytes = options["size_limit_gb"] * 1024**3
     try:
         nbytes, _ = _estimate_output_size(input_file)
-    except Exception:
+    except ValueError as e:
+        print(
+            f"  MNE could not open {os.path.basename(input_file)} ({e}); "
+            "not checking whether it needs chunking"
+        )
         return False
     return nbytes > size_limit_bytes
 
@@ -1023,13 +1069,15 @@ def _is_split_chain(input_file: str) -> bool:
     be pre-sliced before being handed to maxfilter.
 
     Maxfilter can read some recordings that MNE cannot (for example, a
-    file with a projection item that has no channel list). Such a file
-    cannot be checked or pre-sliced, so it is treated as a single file
-    and handed to maxfilter as it is.
+    file with a projection item that has no channel list, for which MNE
+    raises a ``ValueError``). Such a file cannot be checked or
+    pre-sliced, so it is treated as a single file and handed to
+    maxfilter as it is. If it is in fact the head of a split chain, only
+    the head file is processed.
     """
     try:
         raw = mne.io.read_raw_fif(input_file, allow_maxshield="yes", verbose="error")
-    except Exception as e:
+    except ValueError as e:
         print(
             f"  MNE could not open {os.path.basename(input_file)} ({e}); "
             "treating it as a single file and leaving it to maxfilter"
@@ -1162,7 +1210,7 @@ def run_maxfilter(
     autobad: bool = False,
     autobad_dur: int | None = None,
     bads: str | None = None,
-    badlimit: int | None = None,
+    badlimit: float | None = None,
     trans: str | None = None,
     origin: list[float] | None = None,
     frame: str | None = None,
@@ -1211,14 +1259,23 @@ def run_maxfilter(
     nomovecompinter : bool, optional
         Remove default movecomp in the CBU 3-stage pipeline.
     autobad : bool, optional
-        Apply automatic bad channel detection.
+        Apply automatic bad channel detection. In multistage mode
+        detection always runs unless ``bads`` is given; pass
+        ``autobad=True`` together with ``bads`` to mark those channels
+        bad and detect further ones. The two are only combined for
+        recordings processed in one piece: for a recording that is
+        chunked, detection runs without ``bads``, and for a split chain
+        detection is skipped when ``bads`` is given.
     autobad_dur : int, optional
         Set autobad with a specific duration.
     bads : str, optional
         Static bad channels as a space-separated string of channel numbers,
         e.g. ``"2233 2312"``.
-    badlimit : int, optional
-        Upper limit for number of bad channels to be removed.
+    badlimit : float, optional
+        Threshold for automatic bad channel detection, in standard
+        deviations above the average. A higher value flags fewer
+        channels. The CBU pipeline uses 7. Maxfilter-2.2 has been
+        observed to write no output when more than 12 channels are bad.
     trans : str, optional
         Transform data to the head position in the specified file, or
         ``"default"`` for the default head position.
