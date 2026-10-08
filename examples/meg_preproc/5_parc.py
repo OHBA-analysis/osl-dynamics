@@ -4,8 +4,7 @@ from pathlib import Path
 import mne
 import matplotlib
 matplotlib.use("Agg")
-from osl_dynamics.meeg import parallel, parcellation
-from osl_dynamics.utils.filenames import OSLFilenames
+from osl_dynamics.meeg import parallel, parcellation, Session
 
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
@@ -37,7 +36,7 @@ def process_session(session, logger):
     else:
         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
 
-    fns = OSLFilenames(
+    session_files = Session(
         outdir=str(output_dir / "osl"),
         id=session["id"],
         preproc_file=str(preproc_file),
@@ -46,7 +45,7 @@ def process_session(session, logger):
 
     logger.log("Parcellating...")
     parcel_data = parcellation.parcellate_lcmv(
-        fns,
+        session_files,
         parcellation_file=parcellation_file,
         orthogonalisation=orthogonalisation,
     )

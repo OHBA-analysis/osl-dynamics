@@ -2,8 +2,7 @@
 
 from pathlib import Path
 from osl_dynamics import files
-from osl_dynamics.meeg import parallel, rhino
-from osl_dynamics.utils.filenames import OSLFilenames
+from osl_dynamics.meeg import parallel, rhino, Session
 
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
@@ -34,7 +33,7 @@ def process_session(session, logger):
     else:
         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
 
-    fns = OSLFilenames(
+    session_files = Session(
         outdir=str(output_dir / "osl"),
         id=session["id"],
         preproc_file=str(preproc_file),
@@ -42,11 +41,11 @@ def process_session(session, logger):
     )
 
     logger.log("Extracting fiducials and headshape...")
-    rhino.extract_fiducials_and_headshape_from_fif(fns)
+    rhino.extract_fiducials_and_headshape_from_fif(session_files)
 
     logger.log("Coregistering MEG to MRI...")
     rhino.coregister_head_and_mri(
-        fns,
+        session_files,
         use_nose=use_nose,
         allow_mri_scaling=allow_mri_scaling,
     )

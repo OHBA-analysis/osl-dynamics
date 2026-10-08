@@ -23,13 +23,13 @@ from mne.minimum_norm.inverse import (
 )
 from mne.utils import logger as mne_logger, warn
 
-from osl_dynamics.utils.filenames import OSLFilenames
+from osl_dynamics.meeg.session import Session, check_up_to_date
 
 from . import rhino
 
 
 def lcmv_beamformer(
-    fns: OSLFilenames,
+    session: Session,
     data: str | mne.io.Raw | mne.Epochs | None = None,
     chantypes: str | list[str] | None = None,
     data_cov: mne.Covariance | None = None,
@@ -46,16 +46,16 @@ def lcmv_beamformer(
 ) -> None:
     """Compute LCMV spatial filter.
 
-    The filters are saved to fns.filters.
+    The filters are saved to session.filters_file.
 
     Parameters
     ----------
-    fns : OSLFilenames
-        Container for OSL filenames.
+    session : Session
+        Files of the session.
     data : str | instance of mne.Raw | mne.Epochs, optional
         The measurement data to specify the channels to include. Bad channels
         in info['bads'] are not used. Will also be used to calculate data_cov.
-        If None, fns.preproc_file is used.
+        If None, session.preproc_file is used.
     chantypes : list or str
         List of channel types to use to calculate the noise covariance.
         E.g. ['eeg'], ['mag', 'grad'], ['eeg', 'mag', 'grad'].
@@ -117,8 +117,9 @@ def lcmv_beamformer(
     print("Making LCMV beamformer")
     print("----------------------")
 
+    check_up_to_date(session, "forward model")
     if data is None:
-        data = fns.preproc_file
+        data = session.preproc_file
 
     if chantypes is None:
         raise ValueError("chantypes must be passed.")
@@ -143,8 +144,114 @@ def lcmv_beamformer(
         )
 
     # Load forward solution
-    fwd = mne.read_forward_solution(fns.fwd_model)
+    fwd = mne.read_forward_solution(session.fwd_model_file)
 
+    data_cov, noise_cov = _data_and_noise_covariance(
+        data, chantypes, rank, data_cov, noise_cov
+    )
+
+    # Find pairs of bilaterally symmetric dipoles to beamform jointly
+    multi_dipoles = None
+    single_dipoles = None
+    if use_bilateral_pairs:
+        if pick_ori not in ("max-power", "max-power-pre-weight-norm"):
+            raise ValueError(
+                "use_bilateral_pairs=True requires pick_ori='max-power' or "
+                "'max-power-pre-weight-norm'."
+            )
+        if kwargs.get("weight_norm") == "unit-noise-gain-invariant":
+            raise ValueError(
+                "use_bilateral_pairs=True is not compatible with "
+                "weight_norm='unit-noise-gain-invariant', which computes "
+                "the weights from the leadfields alone and would discard "
+                "the joint beamformer denominator of each bilateral pair. "
+                "Use weight_norm='unit-noise-gain' instead."
+            )
+        _use_unit_noise_gain(kwargs)
+
+        src_coords_mni = _get_source_coords_mni(session, fwd)
+        multi_dipoles, single_dipoles, midline_points = _find_bilateral_pairs(
+            src_coords_mni,
+            bilateral_tol,
+            bilateral_tol_midline,
+            midline_x=_get_midline_x(session),
+        )
+        if len(multi_dipoles) == 0:
+            warn(
+                "No bilateral pairs found, using a standard beamformer. "
+                "Consider increasing bilateral_tol."
+            )
+            multi_dipoles = None
+            single_dipoles = None
+        else:
+            # Midline dipoles get standard single-dipole weights
+            single_dipoles = np.concatenate([single_dipoles, midline_points])
+
+    # Make filters
+    lcmv_params = dict(
+        pick_ori=pick_ori,
+        rank=rank,
+        noise_rank=noise_rank,
+        reduce_rank=reduce_rank,
+        **{k: v for k, v in kwargs.items() if k != "verbose"},
+    )
+    filters = _make_lcmv(
+        data.info,
+        fwd,
+        data_cov,
+        noise_cov=noise_cov,
+        multi_dipoles=multi_dipoles,
+        single_dipoles=single_dipoles,
+        verbose=kwargs.get("verbose"),
+        **lcmv_params,
+    )
+
+    # Keep the settings so we can compute filters for other locations,
+    # see virtual_electrodes
+    filters["osl_lcmv_params"] = lcmv_params
+    filters["osl_bilateral_pairs"] = dict(
+        used=multi_dipoles is not None,
+        bilateral_tol=bilateral_tol,
+        bilateral_tol_midline=bilateral_tol_midline,
+    )
+
+    os.makedirs(session.src_dir, exist_ok=True)
+    print(f"Saving {session.filters_file}")
+    filters.save(session.filters_file, overwrite=True)
+
+    print("LCMV beamformer complete.")
+
+
+def _data_and_noise_covariance(
+    data: mne.io.Raw | mne.Epochs,
+    chantypes: list[str],
+    rank: str | dict,
+    data_cov: mne.Covariance | None = None,
+    noise_cov: mne.Covariance | None = None,
+) -> tuple[mne.Covariance, mne.Covariance]:
+    """Data and noise covariance for the LCMV beamformer.
+
+    Parameters
+    ----------
+    data : mne.io.Raw | mne.Epochs
+        Sensor data.
+    chantypes : list of str
+        Channel types in the data, e.g. ['mag', 'grad'].
+    rank : str | dict
+        Rank of the data, see :func:`lcmv_beamformer`.
+    data_cov : mne.Covariance, optional
+        Data covariance. If None, it is computed from the data.
+    noise_cov : mne.Covariance, optional
+        Noise covariance. If None, a diagonal matrix with the variance of each
+        channel type set to the mean variance of its channels.
+
+    Returns
+    -------
+    data_cov : mne.Covariance
+        Data covariance.
+    noise_cov : mne.Covariance
+        Noise covariance.
+    """
     if data_cov is None:
         # Note that if chantypes are meg, eeg; and meg includes mag, grad then
         # compute_covariance will project data separately for meg and eeg to
@@ -196,80 +303,11 @@ def lcmv_beamformer(
             data.info["projs"],
             nfree=1e10,
         )
-
-    # Find pairs of bilaterally symmetric dipoles to beamform jointly
-    multi_dipoles = None
-    single_dipoles = None
-    if use_bilateral_pairs:
-        if pick_ori not in ("max-power", "max-power-pre-weight-norm"):
-            raise ValueError(
-                "use_bilateral_pairs=True requires pick_ori='max-power' or "
-                "'max-power-pre-weight-norm'."
-            )
-        if kwargs.get("weight_norm") == "unit-noise-gain-invariant":
-            raise ValueError(
-                "use_bilateral_pairs=True is not compatible with "
-                "weight_norm='unit-noise-gain-invariant', which computes "
-                "the weights from the leadfields alone and would discard "
-                "the joint beamformer denominator of each bilateral pair. "
-                "Use weight_norm='unit-noise-gain' instead."
-            )
-        _use_unit_noise_gain(kwargs)
-
-        src_coords_mni = _get_source_coords_mni(fns, fwd)
-        multi_dipoles, single_dipoles, midline_points = _find_bilateral_pairs(
-            src_coords_mni,
-            bilateral_tol,
-            bilateral_tol_midline,
-            midline_x=_get_midline_x(fns),
-        )
-        if len(multi_dipoles) == 0:
-            warn(
-                "No bilateral pairs found, using a standard beamformer. "
-                "Consider increasing bilateral_tol."
-            )
-            multi_dipoles = None
-            single_dipoles = None
-        else:
-            # Midline dipoles get standard single-dipole weights
-            single_dipoles = np.concatenate([single_dipoles, midline_points])
-
-    # Make filters
-    lcmv_params = dict(
-        pick_ori=pick_ori,
-        rank=rank,
-        noise_rank=noise_rank,
-        reduce_rank=reduce_rank,
-        **{k: v for k, v in kwargs.items() if k != "verbose"},
-    )
-    filters = _make_lcmv(
-        data.info,
-        fwd,
-        data_cov,
-        noise_cov=noise_cov,
-        multi_dipoles=multi_dipoles,
-        single_dipoles=single_dipoles,
-        verbose=kwargs.get("verbose"),
-        **lcmv_params,
-    )
-
-    # Keep the settings so we can compute filters for other locations,
-    # see virtual_electrodes
-    filters["osl_lcmv_params"] = lcmv_params
-    filters["osl_bilateral_pairs"] = dict(
-        used=multi_dipoles is not None,
-        bilateral_tol=bilateral_tol,
-        bilateral_tol_midline=bilateral_tol_midline,
-    )
-
-    print(f"Saving {fns.filters}")
-    filters.save(fns.filters, overwrite=True)
-
-    print("LCMV beamformer complete.")
+    return data_cov, noise_cov
 
 
 def apply_lcmv_beamformer(
-    fns: OSLFilenames,
+    session: Session,
     raw: mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | list[str] | None = "omit",
     reference_brain: str = "mni",
@@ -278,18 +316,18 @@ def apply_lcmv_beamformer(
 
     Parameters
     ----------
-    fns : OSLFilenames
-        Container for OSL filenames.
+    session : Session
+        Files of the session.
     raw : instance of mne.io.Raw or mne.Epochs, optional
         The data to apply the LCMV filter to.
-        If None, fns.preproc_file is used.
+        If None, session.preproc_file is used.
     reject_by_annotation : str | list of str | None
         If string, the annotation description to use to reject epochs.
         If list of str, the annotation descriptions to use to reject epochs.
         If None, do not reject epochs.
     reference_brain : str, optional
         Either 'head' or 'mni'. If 'mni', the data is returned for each voxel
-        of the MNI grid of the forward model (fns.mni_grid). Voxels without a
+        of the MNI grid of the forward model (session.mni_grid_file). Voxels without a
         dipole (outside the inner skull) are zero.
 
     Returns
@@ -306,11 +344,12 @@ def apply_lcmv_beamformer(
     print("Applying LCMV beamformer")
     print("------------------------")
 
+    check_up_to_date(session, "LCMV filters")
     if raw is None:
-        raw = mne.io.read_raw_fif(fns.preproc_file, preload=True)
+        raw = mne.io.read_raw_fif(session.preproc_file, preload=True)
 
     # Load filters
-    filters = mne.beamformer.read_beamformer(fns.filters)
+    filters = mne.beamformer.read_beamformer(session.filters_file)
 
     # Pick chantypes that were used to make the beamformer in the data
     raw = raw.copy().pick(filters["ch_names"])
@@ -331,7 +370,7 @@ def apply_lcmv_beamformer(
         voxel_data_head = next(stc).data
 
     # Get coordinates in head space
-    fwd = mne.read_forward_solution(fns.fwd_model)
+    fwd = mne.read_forward_solution(session.fwd_model_file)
     vs = fwd["src"][0]
     voxel_coords_head = vs["rr"][vs["vertno"]] * 1000  # in mm
 
@@ -339,7 +378,7 @@ def apply_lcmv_beamformer(
         return voxel_data_head, voxel_coords_head
 
     # The dipoles are at the voxels of an MNI grid
-    grid_coords = _get_mni_grid(fns, fwd)
+    grid_coords = _get_mni_grid(session, fwd)
     voxel_data_mni = np.zeros((len(grid_coords),) + voxel_data_head.shape[1:])
     voxel_data_mni[vs["vertno"]] = voxel_data_head
 
@@ -349,7 +388,7 @@ def apply_lcmv_beamformer(
 
 
 def virtual_electrodes(
-    fns: OSLFilenames,
+    session: Session,
     coords: list | np.ndarray,
     raw: mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | list[str] | None = "omit",
@@ -364,14 +403,14 @@ def virtual_electrodes(
 
     Parameters
     ----------
-    fns : OSLFilenames
-        Container for OSL filenames. :func:`lcmv_beamformer` must have been
+    session : Session
+        Files of the session. :func:`lcmv_beamformer` must have been
         run.
     coords : list | np.ndarray
         MNI coordinates (in mm). Shape is (3,) for a single coordinate or
         (n_coords, 3). The coordinates must be inside the inner skull.
     raw : mne.io.Raw or mne.Epochs, optional
-        The data to beamform. If None, fns.preproc_file is used.
+        The data to beamform. If None, session.preproc_file is used.
     reject_by_annotation : str | list of str | None
         Annotation descriptions to omit when getting the data from a Raw
         object. If None, all time points are used.
@@ -397,14 +436,15 @@ def virtual_electrodes(
     coords = np.atleast_2d(coords)
     n_coords = len(coords)
 
+    check_up_to_date(session, "LCMV filters")
     if raw is None:
-        raw = mne.io.read_raw_fif(fns.preproc_file, preload=True)
+        raw = mne.io.read_raw_fif(session.preproc_file, preload=True)
 
     # Settings used to compute the filters on the MNI grid
-    filters = mne.beamformer.read_beamformer(fns.filters)
+    filters = mne.beamformer.read_beamformer(session.filters_file)
     if "osl_lcmv_params" not in filters:
         raise ValueError(
-            f"{fns.filters} does not contain the settings used to compute it "
+            f"{session.filters_file} does not contain the settings used to compute it "
             "(it was made with an older version of osl-dynamics). Rerun "
             "source_recon.lcmv_beamformer."
         )
@@ -417,7 +457,7 @@ def virtual_electrodes(
         use_bilateral_pairs = bool(bilateral["used"])
 
     # Sensors used by the forward model
-    fwd = mne.read_forward_solution(fns.fwd_model, verbose=False)
+    fwd = mne.read_forward_solution(session.fwd_model_file, verbose=False)
     meg = len(mne.pick_types(fwd["info"], meg=True, ref_meg=False)) > 0
     eeg = len(mne.pick_types(fwd["info"], meg=False, eeg=True)) > 0
 
@@ -430,7 +470,7 @@ def virtual_electrodes(
         if tol_midline is None:
             tol_midline = bilateral["bilateral_tol"]
         if tol_midline is None:
-            tol_midline = _get_gridstep(_get_mni_grid(fns, fwd) / 1000) / 2
+            tol_midline = _get_gridstep(_get_mni_grid(session, fwd) / 1000) / 2
         paired = np.flatnonzero(np.abs(coords[:, 0]) >= tol_midline)
         positions = np.concatenate([coords, coords[paired] * [-1, 1, 1]])
         multi_dipoles = [[i, n_coords + j] for j, i in enumerate(paired)]
@@ -441,7 +481,7 @@ def virtual_electrodes(
     # Beamformer weights using the lead fields at the exact locations
     ve_filters = _make_lcmv(
         raw.copy().pick(filters["ch_names"]).info,
-        _forward_model_at_coords(fns, positions, meg=meg, eeg=eeg),
+        _forward_model_at_coords(session, positions, meg=meg, eeg=eeg),
         filters["data_cov"],
         noise_cov=filters["noise_cov"],
         multi_dipoles=multi_dipoles,
@@ -451,7 +491,7 @@ def virtual_electrodes(
 
     # Apply to the data
     data, _, epochs_shape = _get_filter_input_data(
-        fns, raw, reject_by_annotation, filters=ve_filters
+        session, raw, reject_by_annotation, filters=ve_filters
     )
     ve_data = ve_filters["weights"][:n_coords] @ data
     if epochs_shape is not None:
@@ -463,14 +503,14 @@ def virtual_electrodes(
 
 
 def _forward_model_at_coords(
-    fns: OSLFilenames, coords_mni: np.ndarray, meg: bool = True, eeg: bool = False
+    session: Session, coords_mni: np.ndarray, meg: bool = True, eeg: bool = False
 ) -> mne.Forward:
     """Compute the forward model for dipoles at MNI coordinates.
 
     Parameters
     ----------
-    fns : OSLFilenames
-        Container for OSL filenames.
+    session : Session
+        Files of the session.
     coords_mni : np.ndarray
         (n, 3) coordinates in MNI space in mm.
     meg : bool, optional
@@ -484,18 +524,20 @@ def _forward_model_at_coords(
         Forward model with one (free orientation) dipole per coordinate, in
         the same order as coords_mni.
     """
-    if not os.path.exists(fns.bem_solution):
+    if not os.path.exists(session.bem_solution_file):
         raise ValueError(
-            f"{fns.bem_solution} not found (it is saved by rhino.forward_model, "
+            f"{session.bem_solution_file} not found (it is saved by rhino.forward_model, "
             "the forward model may be from an older version of osl-dynamics). "
             "Rerun rhino.forward_model and source_recon.lcmv_beamformer."
         )
-    src = rhino._mni_source_space(fns, coords_mni)
+    src = rhino._mni_source_space(session, coords_mni)
+    info, head_mri_t = rhino._read_head_model(session)
     try:
         fwd = rhino._make_fwd_solution(
-            fns,
+            info,
+            head_mri_t,
             src=src,
-            bem=fns.bem_solution,
+            bem=session.bem_solution_file,
             meg=meg,
             eeg=eeg,
             ignore_ref=True,
@@ -533,7 +575,7 @@ def _use_unit_noise_gain(lcmv_params: dict) -> None:
 
 
 def _get_filter_input_data(
-    fns: OSLFilenames,
+    session: Session,
     raw: mne.io.Raw | mne.Epochs | None,
     reject_by_annotation: str | list[str] | None,
     filters: Beamformer | None = None,
@@ -542,15 +584,15 @@ def _get_filter_input_data(
 
     Parameters
     ----------
-    fns : OSLFilenames
-        Container for OSL filenames.
+    session : Session
+        Files of the session.
     raw : mne.io.Raw or mne.Epochs
-        Data. If None, fns.preproc_file is used.
+        Data. If None, session.preproc_file is used.
     reject_by_annotation : str | list of str | None
         Annotation descriptions to omit when getting the data from a Raw
         object.
     filters : Beamformer, optional
-        LCMV filters. If None, fns.filters is used.
+        LCMV filters. If None, session.filters_file is used.
 
     Returns
     -------
@@ -563,9 +605,9 @@ def _get_filter_input_data(
         (time, epochs) shape of the samples for Epochs, None for Raw.
     """
     if raw is None:
-        raw = mne.io.read_raw_fif(fns.preproc_file, preload=True)
+        raw = mne.io.read_raw_fif(session.preproc_file, preload=True)
     if filters is None:
-        filters = mne.beamformer.read_beamformer(fns.filters)
+        filters = mne.beamformer.read_beamformer(session.filters_file)
 
     raw = raw.copy().pick(filters["ch_names"])
     _check_reference(raw)
@@ -584,7 +626,7 @@ def _get_filter_input_data(
 
 
 def plot_bilateral_pairs(
-    fns: OSLFilenames,
+    session: Session,
     bilateral_tol: float | None = None,
     bilateral_tol_midline: float | None = None,
     filename: str | None = None,
@@ -597,8 +639,8 @@ def plot_bilateral_pairs(
 
     Parameters
     ----------
-    fns : OSLFilenames
-        Container for OSL filenames.
+    session : Session
+        Files of the session.
     bilateral_tol : float, optional
         Distance threshold (in mm) for pairing dipoles mirrored across the
         midline. If None, half the gridstep of the dipole grid is used.
@@ -606,20 +648,20 @@ def plot_bilateral_pairs(
         Dipoles closer (in mm) than this to the midline are not paired.
         If None, bilateral_tol is used.
     filename : str, optional
-        Output filename. If None, {fns.src_dir}/bilateral_dipoles.png is used.
+        Output filename. If None, {session.src_dir}/bilateral_dipoles.png is used.
     show : bool, optional
         Should we show the plot?
     """
     if filename is None:
-        filename = f"{fns.src_dir}/bilateral_dipoles.png"
+        filename = f"{session.src_dir}/bilateral_dipoles.png"
 
-    fwd = mne.read_forward_solution(fns.fwd_model, verbose=False)
-    src_coords_mni = _get_source_coords_mni(fns, fwd)
+    fwd = mne.read_forward_solution(session.fwd_model_file, verbose=False)
+    src_coords_mni = _get_source_coords_mni(session, fwd)
     multi_dipoles, single_dipoles, midline_points = _find_bilateral_pairs(
         src_coords_mni,
         bilateral_tol,
         bilateral_tol_midline,
-        midline_x=_get_midline_x(fns),
+        midline_x=_get_midline_x(session),
     )
     _plot_bilateral_pairs(
         src_coords_mni, multi_dipoles, single_dipoles, midline_points, filename, show
@@ -1446,13 +1488,13 @@ def _get_gridstep(coords: np.ndarray) -> int:
     return int(np.round(dists[dists > 0].min() * 1000))
 
 
-def _get_source_coords_mni(fns: OSLFilenames, fwd: mne.Forward) -> np.ndarray:
+def _get_source_coords_mni(session: Session, fwd: mne.Forward) -> np.ndarray:
     """Get the coordinates of the in-use dipoles in MNI space.
 
     Parameters
     ----------
-    fns : OSLFilenames
-        Container for OSL filenames.
+    session : Session
+        Files of the session.
     fwd : mne.Forward
         Forward solution.
 
@@ -1462,16 +1504,16 @@ def _get_source_coords_mni(fns: OSLFilenames, fwd: mne.Forward) -> np.ndarray:
         (n_sources, 3) dipole coordinates in MNI space in mm. Ordering
         matches the in-use sources of the forward model (fwd["src"][0]).
     """
-    return _get_mni_grid(fns, fwd)[fwd["src"][0]["vertno"]]
+    return _get_mni_grid(session, fwd)[fwd["src"][0]["vertno"]]
 
 
-def _get_mni_grid(fns: OSLFilenames, fwd: mne.Forward) -> np.ndarray:
+def _get_mni_grid(session: Session, fwd: mne.Forward) -> np.ndarray:
     """Get the MNI grid of the dipoles in a forward model.
 
     Parameters
     ----------
-    fns : OSLFilenames
-        Container for OSL filenames.
+    session : Session
+        Files of the session.
     fwd : mne.Forward
         Forward solution.
 
@@ -1482,20 +1524,20 @@ def _get_mni_grid(fns: OSLFilenames, fwd: mne.Forward) -> np.ndarray:
         dipoles of the forward model are at coords[fwd["src"][0]["vertno"]].
     """
     vs = fwd["src"][0]
-    if vs["type"] == "discrete" and os.path.exists(fns.mni_grid):
-        coords = rhino._mni_grid_coords(fns.mni_grid)
+    if vs["type"] == "discrete" and os.path.exists(session.mni_grid_file):
+        coords = rhino._mni_grid_coords(session.mni_grid_file)
         if len(coords) == len(vs["rr"]):
             return coords
     raise ValueError(
-        f"{fns.fwd_model} does not have a dipole grid in MNI space (it may be "
+        f"{session.fwd_model_file} does not have a dipole grid in MNI space (it may be "
         "from an older version of osl-dynamics). Rerun rhino.forward_model and "
         "source_recon.lcmv_beamformer."
     )
 
 
-def _get_midline_x(fns: OSLFilenames) -> float:
+def _get_midline_x(session: Session) -> float:
     """x coordinate (in mm) of the plane the MNI grid is symmetric about."""
-    img = nib.load(fns.mni_grid)
+    img = nib.load(session.mni_grid_file)
     return nib.affines.apply_affine(
         img.header.get_sform(), [(img.shape[0] - 1) / 2, 0, 0]
     )[0]

@@ -124,7 +124,7 @@ The output of this script is written to ``derivatives/``.
 #     from scipy import io
 #     import matplotlib
 #     matplotlib.use("Agg")
-#     from osl_dynamics.meeg import parallel, preproc
+#     from osl_dynamics.meeg import parallel, preproc, Session
 #
 #     output_dir = Path("derivatives")
 #     plots_dir = Path("plots")
@@ -233,7 +233,7 @@ The output of this script is written to ``derivatives/``.
 #
 #     from pathlib import Path
 #     import pandas as pd
-#     from osl_dynamics.meeg import parallel, rhino
+#     from osl_dynamics.meeg import parallel, rhino, Session
 #
 #     output_dir = Path("derivatives")
 #     log_dir = Path("logs/2_surfaces")
@@ -290,8 +290,7 @@ The output of this script is written to ``derivatives/``.
 #     from pathlib import Path
 #     import numpy as np
 #     import pandas as pd
-#     from osl_dynamics.meeg import parallel, rhino
-#     from osl_dynamics.utils.filenames import OSLFilenames
+#     from osl_dynamics.meeg import parallel, rhino, Session
 #
 #     output_dir = Path("derivatives")
 #     plots_dir = Path("plots")
@@ -300,15 +299,15 @@ The output of this script is written to ``derivatives/``.
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
 #
 #
-#     def fix_headshape_fiducials(fns, logger):
+#     def fix_headshape_fiducials(session_files, logger):
 #         """Shrink headshape and shift fiducials for EEG coregistration."""
 #
-#         fns = fns.coreg
+#         coreg = session_files.coreg
 #
-#         hs = np.loadtxt(fns.head_headshape_file)
-#         nas = np.loadtxt(fns.head_nasion_file)
-#         lpa = np.loadtxt(fns.head_lpa_file)
-#         rpa = np.loadtxt(fns.head_rpa_file)
+#         hs = np.loadtxt(coreg.head_headshape_file)
+#         nas = np.loadtxt(coreg.head_nasion_file)
+#         lpa = np.loadtxt(coreg.head_lpa_file)
+#         rpa = np.loadtxt(coreg.head_rpa_file)
 #
 #         # Shrink headshape points by 5%
 #         hs *= 0.95
@@ -323,11 +322,11 @@ The output of this script is written to ``derivatives/``.
 #         lpa[1] -= 10
 #         rpa[1] -= 10
 #
-#         logger.log(f"Overwriting {fns.head_headshape_file}")
-#         np.savetxt(fns.head_nasion_file, nas)
-#         np.savetxt(fns.head_lpa_file, lpa)
-#         np.savetxt(fns.head_rpa_file, rpa)
-#         np.savetxt(fns.head_headshape_file, hs)
+#         logger.log(f"Overwriting {coreg.head_headshape_file}")
+#         np.savetxt(coreg.head_nasion_file, nas)
+#         np.savetxt(coreg.head_lpa_file, lpa)
+#         np.savetxt(coreg.head_rpa_file, rpa)
+#         np.savetxt(coreg.head_headshape_file, hs)
 #
 #
 #     def process_session(session, logger):
@@ -336,7 +335,7 @@ The output of this script is written to ``derivatives/``.
 #         preproc_file = output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif"
 #         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
 #
-#         fns = OSLFilenames(
+#         session_files = Session(
 #             outdir=str(output_dir / "osl"),
 #             id=session["id"],
 #             preproc_file=str(preproc_file),
@@ -345,15 +344,15 @@ The output of this script is written to ``derivatives/``.
 #
 #         logger.log("Extracting fiducials and headshape...")
 #         rhino.extract_fiducials_and_headshape_from_fif(
-#             fns, include_eeg_as_headshape=True,
+#             session_files, include_eeg_as_headshape=True,
 #         )
 #
 #         logger.log("Fixing headshape and fiducials...")
-#         fix_headshape_fiducials(fns, logger)
+#         fix_headshape_fiducials(session_files, logger)
 #
 #         logger.log("Coregistering EEG to MRI...")
 #         rhino.coregister_head_and_mri(
-#             fns, use_nose=False, use_headshape=False,
+#             session_files, use_nose=False, use_headshape=False,
 #         )
 #
 #         logger.log("Done.")
@@ -386,8 +385,7 @@ The output of this script is written to ``derivatives/``.
 #     import pandas as pd
 #     import matplotlib
 #     matplotlib.use("Agg")
-#     from osl_dynamics.meeg import parallel, rhino, source_recon
-#     from osl_dynamics.utils.filenames import OSLFilenames
+#     from osl_dynamics.meeg import parallel, rhino, source_recon, Session
 #
 #     output_dir = Path("derivatives")
 #     plots_dir = Path("plots")
@@ -402,7 +400,7 @@ The output of this script is written to ``derivatives/``.
 #         preproc_file = str(output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif")
 #         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
 #
-#         fns = OSLFilenames(
+#         session_files = Session(
 #             outdir=str(output_dir / "osl"),
 #             id=session["id"],
 #             preproc_file=preproc_file,
@@ -410,10 +408,10 @@ The output of this script is written to ``derivatives/``.
 #         )
 #
 #         logger.log("Computing forward model...")
-#         rhino.forward_model(fns, model="Triple Layer", gridstep=8, eeg=True)
+#         rhino.forward_model(session_files, model="Triple Layer", gridstep=8, eeg=True)
 #
 #         logger.log("Computing LCMV beamformer...")
-#         source_recon.lcmv_beamformer(fns, chantypes=["eeg"], rank={"eeg": 54})
+#         source_recon.lcmv_beamformer(session_files, chantypes=["eeg"], rank={"eeg": 54})
 #
 #         logger.log("Done.")
 #
@@ -444,8 +442,7 @@ The output of this script is written to ``derivatives/``.
 #     import mne
 #     import matplotlib
 #     matplotlib.use("Agg")
-#     from osl_dynamics.meeg import parallel, parcellation
-#     from osl_dynamics.utils.filenames import OSLFilenames
+#     from osl_dynamics.meeg import parallel, parcellation, Session
 #
 #     output_dir = Path("derivatives")
 #     plots_dir = Path("plots")
@@ -460,7 +457,7 @@ The output of this script is written to ``derivatives/``.
 #         preproc_file = str(output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif")
 #         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
 #
-#         fns = OSLFilenames(
+#         session_files = Session(
 #             outdir=str(output_dir / "osl"),
 #             id=session["id"],
 #             preproc_file=preproc_file,
@@ -471,7 +468,7 @@ The output of this script is written to ``derivatives/``.
 #
 #         logger.log("Parcellating...")
 #         parcel_data = parcellation.parcellate_lcmv(
-#             fns,
+#             session_files,
 #             parcellation_file=parcellation_file,
 #             orthogonalisation="symmetric",
 #         )

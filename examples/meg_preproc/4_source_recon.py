@@ -3,8 +3,7 @@
 from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
-from osl_dynamics.meeg import parallel, rhino, source_recon
-from osl_dynamics.utils.filenames import OSLFilenames
+from osl_dynamics.meeg import parallel, rhino, source_recon, Session
 
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
@@ -37,7 +36,7 @@ def process_session(session, logger):
     else:
         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
 
-    fns = OSLFilenames(
+    session_files = Session(
         outdir=str(output_dir / "osl"),
         id=session["id"],
         preproc_file=str(preproc_file),
@@ -45,10 +44,10 @@ def process_session(session, logger):
     )
 
     logger.log("Computing forward model...")
-    rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
+    rhino.forward_model(session_files, model="Single Layer", gridstep=gridstep)
 
     logger.log("Computing LCMV beamformer...")
-    source_recon.lcmv_beamformer(fns, chantypes=chantypes, rank=rank)
+    source_recon.lcmv_beamformer(session_files, chantypes=chantypes, rank=rank)
 
     logger.log("Done.")
 

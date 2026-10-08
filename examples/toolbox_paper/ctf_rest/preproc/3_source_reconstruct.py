@@ -7,8 +7,7 @@ import matplotlib
 matplotlib.use("Agg")
 import mne
 
-from osl_dynamics.meeg import parallel, parcellation, rhino, source_recon
-from osl_dynamics.utils.filenames import OSLFilenames
+from osl_dynamics.meeg import parallel, parcellation, rhino, source_recon, Session
 
 # ----------------------------------------------------------------------------
 rawdir = Path("data/raw/Nottingham")
@@ -29,7 +28,7 @@ def process_session(session, logger):
     surfaces_dir = outdir / subject / "surfaces"
     pos_file = rawdir / subject / "meg" / f"{subject}_headshape.pos"
 
-    fns = OSLFilenames(
+    session_files = Session(
         outdir=str(outdir),
         id=subject,
         preproc_file=str(preproc_file),
@@ -38,7 +37,7 @@ def process_session(session, logger):
     )
 
     logger.log("Extracting fiducials and headshape from .pos file...")
-    rhino.extract_fiducials_and_headshape_from_pos(fns)
+    rhino.extract_fiducials_and_headshape_from_pos(session_files)
 
     logger.log("Extracting surfaces...")
     rhino.extract_surfaces(
@@ -48,21 +47,21 @@ def process_session(session, logger):
     )
 
     logger.log("Coregistering MEG to MRI...")
-    rhino.coregister_head_and_mri(fns, use_nose=True, use_headshape=True)
+    rhino.coregister_head_and_mri(session_files, use_nose=True, use_headshape=True)
 
     logger.log("Computing forward model...")
-    rhino.forward_model(fns, model="Single Layer")
+    rhino.forward_model(session_files, model="Single Layer")
 
     logger.log("Computing LCMV beamformer...")
     source_recon.lcmv_beamformer(
-        fns,
+        session_files,
         chantypes="mag",
         rank={"mag": 120},
         frequency_range=[1, 45],
     )
 
     logger.log("Applying LCMV beamformer...")
-    voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns)
+    voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(session_files)
 
     logger.log("Parcellating...")
     parcel_data = parcellation.parcellate(

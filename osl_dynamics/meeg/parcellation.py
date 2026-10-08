@@ -15,7 +15,7 @@ from nilearn import plotting as nilearn_plotting
 
 from osl_dynamics import files
 from osl_dynamics.utils import misc
-from osl_dynamics.utils.filenames import OSLFilenames
+from osl_dynamics.meeg.session import Session, check_up_to_date
 
 from . import source_recon
 
@@ -280,7 +280,7 @@ def parcellate(
 
 
 def parcellate_lcmv(
-    fns: OSLFilenames,
+    session: Session,
     parcellation_file: str,
     orthogonalisation: str | None = None,
     raw: mne.io.Raw | mne.Epochs | None = None,
@@ -298,8 +298,8 @@ def parcellate_lcmv(
 
     Parameters
     ----------
-    fns : OSLFilenames
-        Container for OSL filenames.
+    session : Session
+        Files of the session.
     parcellation_file : str
         Path to parcellation file (in MNI space). The weights must be
         non-negative.
@@ -307,7 +307,7 @@ def parcellate_lcmv(
         Method for orthogonalising the data. Can be None or 'symmetric'.
     raw : mne.io.Raw or mne.Epochs, optional
         The data to calculate parcel time courses for.
-        If None, fns.preproc_file is used.
+        If None, session.preproc_file is used.
     reject_by_annotation : str | list of str | None
         Annotation descriptions to omit when getting the data from a Raw
         object. If None, all time points are used.
@@ -328,9 +328,11 @@ def parcellate_lcmv(
         parcellation_file, files.parcellation.directory
     )
 
+    check_up_to_date(session, "LCMV filters")
+
     # Sensor data after projection/whitening, shape is (channels, samples)
     data, filters, epochs_shape = source_recon._get_filter_input_data(
-        fns, raw, reject_by_annotation
+        session, raw, reject_by_annotation
     )
     if filters["is_free_ori"]:
         raise ValueError(
@@ -340,12 +342,12 @@ def parcellate_lcmv(
     # Beamformer weights for each voxel of the MNI grid, shape is
     # (voxels, channels). Voxels without a dipole (outside the inner skull)
     # have zero weights
-    fwd = mne.read_forward_solution(fns.fwd_model, verbose=False)
-    voxel_coords = source_recon._get_mni_grid(fns, fwd)
+    fwd = mne.read_forward_solution(session.fwd_model_file, verbose=False)
+    voxel_coords = source_recon._get_mni_grid(session, fwd)
     if fwd["nsource"] != filters["weights"].shape[0]:
         raise ValueError(
-            f"{fns.filters} has {filters['weights'].shape[0]} dipoles, but "
-            f"{fns.fwd_model} has {fwd['nsource']}."
+            f"{session.filters_file} has {filters['weights'].shape[0]} dipoles, but "
+            f"{session.fwd_model_file} has {fwd['nsource']}."
         )
     W = np.zeros((len(voxel_coords), filters["weights"].shape[1]))
     W[fwd["src"][0]["vertno"]] = filters["weights"]
