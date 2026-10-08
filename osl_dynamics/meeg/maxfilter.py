@@ -53,6 +53,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+from pathlib import Path
 
 import mne
 import numpy as np
@@ -67,6 +68,10 @@ _STAGE1_KEYS = _COMMON_KEYS + [
     "origin",
     "frame",
     "badlimit",
+    "autobad_dur",
+    "linefreq",
+    "hpisubt",
+    "force",
 ]
 _STAGE2_KEYS = _COMMON_KEYS + [
     "tsss",
@@ -82,6 +87,9 @@ _STAGE2_KEYS = _COMMON_KEYS + [
     "origin",
     "frame",
     "skip",
+    "linefreq",
+    "hpisubt",
+    "force",
 ]
 _STAGE3_KEYS = _COMMON_KEYS + ["trans"]
 
@@ -306,12 +314,16 @@ def _quick_load_dig(fname: str) -> list:
     dig : list
         List of digitization points.
     """
-    from mne.io.constants import FIFF
+    from mne._fiff._digitization import _read_dig_fif
+    from mne._fiff.constants import FIFF
+    from mne._fiff.open import fiff_open
+    from mne._fiff.tree import dir_tree_find
 
-    fid, tree, _ = mne.io.open.fiff_open(fname, preload=False)
-    meas = mne.io.tree.dir_tree_find(tree, FIFF.FIFFB_MEAS)
-    meas_info = mne.io.tree.dir_tree_find(meas, FIFF.FIFFB_MEAS_INFO)
-    dig = mne.io._digitization._read_dig_fif(fid, meas_info)
+    fid, tree, _ = fiff_open(Path(fname), preload=False)
+    with fid:
+        meas = dir_tree_find(tree, FIFF.FIFFB_MEAS)
+        meas_info = dir_tree_find(meas, FIFF.FIFFB_MEAS_INFO)
+        dig = _read_dig_fif(fid, meas_info)
     return dig
 
 
@@ -342,7 +354,7 @@ def _fit_cbu_origin(
         Fitted origin coordinates [x, y, z] in mm.
     """
     try:
-        raw = mne.io.read_raw_fif(input_file)
+        raw = mne.io.read_raw_fif(input_file, allow_maxshield="yes", verbose="error")
         dig = raw.info["dig"]
     except ValueError:
         dig = _quick_load_dig(input_file)
