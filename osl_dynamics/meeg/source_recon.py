@@ -653,6 +653,7 @@ def plot_bilateral_pairs(
         Should we show the plot?
     """
     if filename is None:
+        os.makedirs(session.src_dir, exist_ok=True)
         filename = f"{session.src_dir}/bilateral_dipoles.png"
 
     fwd = mne.read_forward_solution(session.fwd_model_file, verbose=False)

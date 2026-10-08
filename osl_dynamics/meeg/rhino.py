@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import copy
-import json
 import shutil
 import subprocess
 import warnings
@@ -814,13 +813,15 @@ def extract_surfaces(
         out=surfaces.mri_mni_affine_file,
     )
     quality = {
-        "affine": _mni_registration_quality(surfaces, surfaces.mri_mni_affine_file)
+        "affine": _mni_registration_quality(
+            surfaces, surfaces.mri_mni_affine_file, bet_kwargs
+        )
     }
 
     if nonlinear_registration:
         _nonlinear_registration(surfaces)
         quality["nonlinear"] = _mni_registration_quality(
-            surfaces, surfaces.mri_mni_nonlinear_file
+            surfaces, surfaces.mri_mni_nonlinear_file, bet_kwargs
         )
         registered_file = surfaces.mri_mni_nonlinear_file
     else:
@@ -836,40 +837,34 @@ def extract_surfaces(
     system_call(f"rm -f {surfaces.root}/flirt*", verbose=False)
 
     # Plot the surfaces
-    plot_surfaces(outdir, id, include_nose=include_nose)
+    plot_surfaces(outdir, include_nose=include_nose)
     if not show:
         plt.close("all")
 
     print("Surface extraction complete.")
 
 
-def plot_surfaces(
-    outdir: str,
-    id: str,
-    include_nose: bool = True,
-) -> None:
+def plot_surfaces(outdir: str, include_nose: bool = True) -> None:
     """Plot a structural MRI and extracted surfaces.
 
     Parameters
     ----------
     outdir : str
-        Output directory.
-    id : str
-        Identifier for the subject/surfaces subdirectory in the output directory.
+        Directory with the surfaces, see :func:`extract_surfaces`.
     include_nose : bool, optional
         Should we also plot the outskin surface including the nose?
     """
     surfaces = SurfaceFilenames(outdir)
 
     # Surfaces to plot
-    surfaces = ["inskull", "outskull", "outskin"]
+    names = ["inskull", "outskull", "outskin"]
     if include_nose:
-        surfaces.append("outskin_plus_nose")
-    output_files = [f"{surfaces.root}/{surface}.png" for surface in surfaces]
+        names.append("outskin_plus_nose")
+    output_files = [f"{surfaces.root}/{name}.png" for name in names]
 
     # Check surfaces exist
-    for surface in surfaces:
-        file = Path(getattr(surfaces, f"bet_{surface}_mesh_file"))
+    for name in names:
+        file = Path(getattr(surfaces, f"bet_{name}_mesh_file"))
         if not file.exists():
             raise ValueError(f"{file} does not exist")
 
@@ -881,9 +876,9 @@ def plot_surfaces(
         display = plotting.plot_anat(surfaces.mri_file)
 
     # Plot each surface
-    for surface, output_file in zip(surfaces, output_files):
+    for name, output_file in zip(names, output_files):
         display_copy = copy.deepcopy(display)
-        nii_file = getattr(surfaces, f"bet_{surface}_mesh_file")
+        nii_file = getattr(surfaces, f"bet_{name}_mesh_file")
         img = nil.image.load_img(nii_file)
         data = nil.image.get_data(img)
         vmin = np.nanmin(data)
@@ -1162,18 +1157,18 @@ def remove_stray_headshape_points(
         Worth turning off for sparse headshapes, where it can remove
         scalp points that are useful for the coregistration.
     """
-    session = session.coreg
+    coreg = session.coreg
 
     # Load saved headshape and fiducial files
-    hs = np.loadtxt(session.head_headshape_file)
-    nas = np.loadtxt(session.head_nasion_file)
-    lpa = np.loadtxt(session.head_lpa_file)
-    rpa = np.loadtxt(session.head_rpa_file)
+    hs = np.loadtxt(coreg.head_headshape_file)
+    nas = np.loadtxt(coreg.head_nasion_file)
+    lpa = np.loadtxt(coreg.head_lpa_file)
+    rpa = np.loadtxt(coreg.head_rpa_file)
 
     # Check the headshape array is 2D (3, n_points)
     if hs.ndim != 2 or hs.shape[0] != 3:
         warnings.warn(
-            f"Headshape file {session.head_headshape_file} has unexpected shape "
+            f"Headshape file {coreg.head_headshape_file} has unexpected shape "
             f"{hs.shape}, skipping stray point removal."
         )
         return
@@ -1239,8 +1234,8 @@ def remove_stray_headshape_points(
         hs = hs[:, ~remove]
 
     # Overwrite headshape file
-    print(f"Overwriting: {session.head_headshape_file}")
-    np.savetxt(session.head_headshape_file, hs)
+    print(f"Overwriting: {coreg.head_headshape_file}")
+    np.savetxt(coreg.head_headshape_file, hs)
 
 
 def save_coregistration_files(session: Session) -> None:
@@ -1855,25 +1850,25 @@ def plot_coregistration(
 
     rms = coreg_rms(session, include_nose=include_nose)
 
-    session = session.coreg
+    coreg = session.coreg
 
-    bet_outskin_mesh_file = session.bet_outskin_mesh_file
-    bet_outskin_mesh_vtk_file = session.bet_outskin_mesh_vtk_file
-    bet_outskin_surf_file = session.bet_outskin_surf_file
+    bet_outskin_mesh_file = coreg.bet_outskin_mesh_file
+    bet_outskin_mesh_vtk_file = coreg.bet_outskin_mesh_vtk_file
+    bet_outskin_surf_file = coreg.bet_outskin_surf_file
 
-    bet_outskin_plus_nose_mesh_file = session.bet_outskin_plus_nose_mesh_file
-    bet_outskin_plus_nose_surf_file = session.bet_outskin_plus_nose_surf_file
+    bet_outskin_plus_nose_mesh_file = coreg.bet_outskin_plus_nose_mesh_file
+    bet_outskin_plus_nose_surf_file = coreg.bet_outskin_plus_nose_surf_file
 
-    head_scaledmri_t_file = session.head_scaledmri_t_file
-    mrivoxel_scaledmri_t_file = session.mrivoxel_scaledmri_t_file
-    mri_nasion_file = session.mri_nasion_file
-    mri_rpa_file = session.mri_rpa_file
-    mri_lpa_file = session.mri_lpa_file
-    head_nasion_file = session.head_nasion_file
-    head_rpa_file = session.head_rpa_file
-    head_lpa_file = session.head_lpa_file
-    head_headshape_file = session.head_headshape_file
-    info_fif_file = session.info_fif_file
+    head_scaledmri_t_file = coreg.head_scaledmri_t_file
+    mrivoxel_scaledmri_t_file = coreg.mrivoxel_scaledmri_t_file
+    mri_nasion_file = coreg.mri_nasion_file
+    mri_rpa_file = coreg.mri_rpa_file
+    mri_lpa_file = coreg.mri_lpa_file
+    head_nasion_file = coreg.head_nasion_file
+    head_rpa_file = coreg.head_rpa_file
+    head_lpa_file = coreg.head_lpa_file
+    head_headshape_file = coreg.head_headshape_file
+    info_fif_file = coreg.info_fif_file
 
     if include_nose:
         outskin_mesh_file = bet_outskin_plus_nose_mesh_file
@@ -2285,14 +2280,14 @@ def repair_bem_surfaces(session: Session, max_iter: int = 50) -> None:
     RuntimeError
         If a surface still intersects after ``max_iter`` passes.
     """
-    session = session.coreg
+    coreg = session.coreg
 
     # Outside to inside. Note RHINO's names are offset from what they hold:
     # bet_outskin is the scalp, bet_outskull the inner skull and bet_inskull
     # the brain surface.
     pairs = [
-        (session.bet_outskin_surf_file, session.bet_outskull_surf_file),
-        (session.bet_outskull_surf_file, session.bet_inskull_surf_file),
+        (coreg.bet_outskin_surf_file, coreg.bet_outskull_surf_file),
+        (coreg.bet_outskull_surf_file, coreg.bet_inskull_surf_file),
     ]
 
     for outer_file, inner_file in pairs:
@@ -2702,7 +2697,7 @@ MNI_REGISTRATION_MIN_DICE = 0.9
 
 
 def _mni_registration_quality(
-    surfaces: SurfaceFilenames, registered_file: str
+    surfaces: SurfaceFilenames, registered_file: str, bet_kwargs: dict
 ) -> dict[str, float]:
     """How well an MRI registered to MNI space matches the MNI152 template.
 
@@ -2712,6 +2707,8 @@ def _mni_registration_quality(
         Surface extraction file paths.
     registered_file : str
         MRI registered to MNI space, on the 2 mm MNI grid.
+    bet_kwargs : dict
+        Keyword arguments for BET, as used to extract the surfaces.
 
     Returns
     -------
@@ -2724,22 +2721,31 @@ def _mni_registration_quality(
     """
     # Command: bet <registered_file> <flirt_registered_bet_file> -m
     flirt_registered_bet_file = f"{surfaces.root}/flirt_registered_bet"
-    fsl_wrappers.bet(registered_file, flirt_registered_bet_file, m=True)
+    fsl_wrappers.bet(registered_file, flirt_registered_bet_file, m=True, **bet_kwargs)
 
-    mask = np.asanyarray(nib.load(surfaces.std_brain_mask_2mm_file).dataobj) > 0
-    template = np.asanyarray(nib.load(surfaces.std_head_2mm_file).dataobj, dtype=float)
-    head = np.asanyarray(nib.load(registered_file).dataobj, dtype=float)
-    brain = (
-        np.asanyarray(nib.load(f"{flirt_registered_bet_file}_mask.nii.gz").dataobj) > 0
-    )
+    def load(file, dtype=float):
+        return np.asanyarray(nib.load(file).dataobj, dtype=dtype)
 
+    mask = load(surfaces.std_brain_mask_2mm_file, bool)
+    brain = load(f"{flirt_registered_bet_file}_mask.nii.gz", bool)
     dice = 2 * np.sum(brain & mask) / (np.sum(brain) + np.sum(mask))
 
-    counts, _, _ = np.histogram2d(head[mask], template[mask], bins=64)
+    # Intensities are scaled to [0, 1] so the histogram bins are the same
+    # for every image compared
+    def scaled(file):
+        x = load(file)[mask]
+        return np.clip(x / np.percentile(x, 99.9), 0, 1)
+
+    counts, _, _ = np.histogram2d(
+        scaled(registered_file),
+        scaled(surfaces.std_head_2mm_file),
+        bins=64,
+        range=[[0, 1], [0, 1]],
+    )
     p = counts / counts.sum()
-    px, py = p.sum(axis=1, keepdims=True), p.sum(axis=0, keepdims=True)
+    independent = p.sum(axis=1, keepdims=True) @ p.sum(axis=0, keepdims=True)
     nonzero = p > 0
-    mutual_information = np.sum(p[nonzero] * np.log(p[nonzero] / (px @ py)[nonzero]))
+    mutual_information = np.sum(p[nonzero] * np.log(p[nonzero] / independent[nonzero]))
 
     return {"dice": float(dice), "mutual_information": float(mutual_information)}
 
@@ -2761,11 +2767,12 @@ def _report_mni_registration(
     registered_file : str
         MRI registered to MNI space with the registration that will be used.
     """
-    with open(surfaces.mni_registration_quality_file, "w") as file:
-        json.dump(quality, file, indent=4)
+    save_params(surfaces.mni_registration_quality_file, quality)
 
-    nonlinear = "nonlinear" in quality
-    used = quality["nonlinear" if nonlinear else "affine"]
+    affine = quality["affine"]
+    nonlinear = quality.get("nonlinear")
+    used = nonlinear or affine
+
     print("MNI registration:")
     for name, q in quality.items():
         print(
@@ -2774,33 +2781,25 @@ def _report_mni_registration(
         )
     if used["dice"] < MNI_REGISTRATION_MIN_DICE:
         print(
-            "WARNING: the registration to MNI space looks poor (brain "
-            f"overlap {used['dice']:.2f}). Check {surfaces.mni_registration_plot_file}. "
-            "A cropped field of view, a strong bias field, a wrong sform or "
-            "poor skull stripping (bet_fval) can all cause this."
+            "WARNING: the registration to MNI space looks poor (brain overlap "
+            f"{used['dice']:.2f}). Check {surfaces.mni_registration_plot_file}. A "
+            "cropped field of view, a strong bias field, a wrong sform or poor "
+            "skull stripping (bet_fval) can all cause this."
         )
-    if (
-        nonlinear
-        and quality["nonlinear"]["mutual_information"]
-        < quality["affine"]["mutual_information"]
-    ):
+    if nonlinear and nonlinear["mutual_information"] < affine["mutual_information"]:
         print(
             "WARNING: the nonlinear (FNIRT) registration to MNI space is not "
-            "better than the affine (FLIRT) one. Check "
-            f"{surfaces.mni_registration_plot_file}; if it looks wrong, rerun with "
-            "nonlinear_registration=False."
+            f"better than the affine (FLIRT) one. Check "
+            f"{surfaces.mni_registration_plot_file}; if it looks wrong, rerun "
+            "with nonlinear_registration=False."
         )
 
+    def summary(q):
+        return f"overlap {q['dice']:.2f}, MI {q['mutual_information']:.2f}"
+
+    title = f"FLIRT: {summary(affine)}"
     if nonlinear:
-        title = (
-            f"FNIRT: overlap {used['dice']:.2f}, MI {used['mutual_information']:.2f} "
-            f"(FLIRT: {quality['affine']['dice']:.2f}, "
-            f"{quality['affine']['mutual_information']:.2f})"
-        )
-    else:
-        title = (
-            f"FLIRT: overlap {used['dice']:.2f}, MI {used['mutual_information']:.2f}"
-        )
+        title = f"FNIRT: {summary(nonlinear)} ({title})"
     _plot_mni_registration(
         registered_file,
         surfaces.std_head_2mm_file,

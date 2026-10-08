@@ -221,26 +221,44 @@ class Session:
         return f"<Session id='{self.id}' outdir='{self.outdir}'>"
 
 
-# The steps of the pipeline in order: the name of the step, the file that
-# step writes last, and the function that runs it
-_STEPS = [
-    ("surfaces", lambda s: s.surfaces.mni_mri_t_file, "rhino.extract_surfaces"),
-    (
-        "coregistration",
+# The steps of the pipeline that read earlier output, in order: the files a
+# step reads from earlier steps, a file it writes and the function that runs
+# it. The surfaces are represented by the registration check, written last by
+# rhino.extract_surfaces (the MNI152 surfaces from osl-files do not have one,
+# so they are not checked).
+_STEPS = {
+    "coregistration": (
+        lambda s: [
+            s.surfaces.mni_registration_quality_file,
+            s.coreg.head_headshape_file,
+        ],
         lambda s: s.coreg.head_scaledmri_t_file,
         "rhino.coregister_head_and_mri",
     ),
-    ("forward model", lambda s: s.fwd_model_file, "rhino.forward_model"),
-    ("LCMV filters", lambda s: s.filters_file, "source_recon.lcmv_beamformer"),
-]
+    "forward model": (
+        lambda s: [
+            s.surfaces.mni_registration_quality_file,
+            s.coreg.head_scaledmri_t_file,
+        ],
+        lambda s: s.fwd_model_file,
+        "rhino.forward_model",
+    ),
+    "LCMV filters": (
+        lambda s: [s.fwd_model_file],
+        lambda s: s.filters_file,
+        "source_recon.lcmv_beamformer",
+    ),
+}
 
 
 def check_up_to_date(session: Session, step: str) -> None:
-    """Warn if a step's output is older than the output of the step before it.
+    """Warn if a step's output is older than the files it was computed from.
 
     Rerunning one step without the steps after it is an easy mistake (e.g.
-    coregistering again but keeping the old forward model), so the steps that
-    read a file check its date against the file it was computed from.
+    editing the head shape points but keeping the old coregistration), so the
+    steps that read a file compare its date with the files it was computed
+    from. Copying a derivatives directory without keeping the file dates can
+    trigger these warnings spuriously.
 
     Parameters
     ----------
@@ -250,20 +268,23 @@ def check_up_to_date(session: Session, step: str) -> None:
         The last step whose output is needed: 'coregistration', 'forward
         model' or 'LCMV filters'. Every step up to it is checked.
     """
-    names = [name for name, _, _ in _STEPS]
-    if step not in names:
-        raise ValueError(f"step must be one of {names}")
-    for (_, upstream, _), (name, downstream, function) in zip(
-        _STEPS, _STEPS[1 : names.index(step) + 1]
-    ):
-        upstream_file, downstream_file = upstream(session), downstream(session)
-        if not os.path.exists(upstream_file) or not os.path.exists(downstream_file):
+    steps = list(_STEPS)
+    if step not in steps:
+        raise ValueError(f"step must be one of {steps}, got '{step}'.")
+    for name in steps[: steps.index(step) + 1]:
+        inputs, output, function = _STEPS[name]
+        output = output(session)
+        if not os.path.exists(output):
             continue
-        if os.path.getmtime(upstream_file) > os.path.getmtime(downstream_file):
+        newer = [
+            f
+            for f in inputs(session)
+            if os.path.exists(f) and os.path.getmtime(f) > os.path.getmtime(output)
+        ]
+        if newer:
             print(
-                f"WARNING: the {name} ({downstream_file}) is older than the "
-                f"files it was computed from ({upstream_file}). Rerun "
-                f"{function} (and the steps after it)."
+                f"WARNING: the {name} ({output}) is older than "
+                f"{', '.join(newer)}. Rerun {function} (and the steps after it)."
             )
 
 
@@ -279,22 +300,3 @@ def save_params(filename: str, params: dict) -> None:
     """
     with open(filename, "w") as file:
         json.dump(params, file, indent=4)
-
-
-def load_params(filename: str) -> dict | None:
-    """Load the parameters a step was run with.
-
-    Parameters
-    ----------
-    filename : str
-        JSON file written by :func:`save_params`.
-
-    Returns
-    -------
-    params : dict
-        Parameters, or None if the file does not exist.
-    """
-    if not os.path.exists(filename):
-        return None
-    with open(filename) as file:
-        return json.load(file)
