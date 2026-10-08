@@ -24,7 +24,6 @@ subj_sess_2exclude = np.zeros([10, 2]).astype(bool)
 sampling_frequency = 150  # Hz
 
 # Source reconstruction files used to create the source space data
-mask_file = "MNI152_T1_8mm_brain.nii.gz"
 parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz"
 
 # Filenames
@@ -106,7 +105,6 @@ varmap = power.variance_from_spectra(f, psd)
 power.save(
     power_map=varmap,
     filename=f"{static_dir}/power_subj_.png",
-    mask_file=mask_file,
     parcellation_file=parcellation_file,
     subtract_mean=True,  # display the differences in power relative to the group mean
 )
@@ -116,7 +114,6 @@ group_varmap = np.mean(varmap, axis=0)
 power.save(
     power_map=group_varmap,
     filename=f"{static_dir}/power_group_.png",
-    mask_file=mask_file,
     parcellation_file=parcellation_file,
 )
 
@@ -128,6 +125,5 @@ for frequency_range in [[7, 13], [13, 30]]:
     power.save(
         power_map=group_varmap,
         filename=f"{static_dir}/power_group_{frequency_range[0]}_{frequency_range[1]}_.png",
-        mask_file=mask_file,
         parcellation_file=parcellation_file,
     )

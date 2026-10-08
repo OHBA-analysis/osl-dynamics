@@ -116,7 +116,6 @@ def compare_power_maps(data, output_dir, n_perm, significance_level, n_jobs):
     os.makedirs(f"{output_dir}/young_vs_old", exist_ok=True)
     power.save(
         power_map_diff,
-        mask_file=data.mask_file,
         parcellation_file=data.parcellation_file,
         plot_kwargs={"views": ["lateral"]},
         filename=f"{output_dir}/young_vs_old/pow_diff_.png",
@@ -183,7 +182,6 @@ config = """
         inputs: training_data/networks
         kwargs:
             sampling_frequency: 250
-            mask_file: MNI152_T1_8mm_brain.nii.gz
             parcellation_file: atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz
             n_jobs: 8
         prepare:

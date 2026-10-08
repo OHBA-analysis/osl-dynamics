@@ -45,7 +45,6 @@ Note, we assume a group ICA parcellation was used and the HMM was trained on the
 #     # Plot
 #     fig, ax = power.save(
 #         means,
-#         mask_file="MNI152_T1_2mm_brain.nii.gz",
 #         parcellation_file="melodic_IC.nii.gz",  # this should be the group-ICA spatial maps from FSL
 #         plot_kwargs={"views": ["lateral", "medial"]},
 #     )

@@ -25,7 +25,6 @@ networks_dir = f"results/{n_modes}_modes/run{run:02d}/networks"
 
 os.makedirs(networks_dir, exist_ok=True)
 
-mask_file = "MNI152_T1_8mm_brain.nii.gz"
 parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
 
 #%% Load spectra
@@ -58,7 +57,6 @@ p = power.variance_from_spectra(f, gpsd_coefs)
 # Plot
 power.save(
     p,
-    mask_file=mask_file,
     parcellation_file=parcellation_file,
     subtract_mean=True,  # just for visualisation
     filename=f"{networks_dir}/pow_.png",

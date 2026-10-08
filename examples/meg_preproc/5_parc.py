@@ -4,8 +4,7 @@ from pathlib import Path
 import mne
 import matplotlib
 matplotlib.use("Agg")
-from osl_dynamics.meeg import parallel, source_recon, parcellation
-from osl_dynamics.utils.filenames import OSLFilenames
+from osl_dynamics.meeg import parallel, parcellation, Session
 
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
@@ -21,7 +20,6 @@ sessions = [
 ]
 
 parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
-parcellation_method = "spatial_basis"
 orthogonalisation = "symmetric"
 use_mni152 = False
 # ----------------------------------------------------------------------------
@@ -38,24 +36,18 @@ def process_session(session, logger):
     else:
         surfaces_dir = str(output_dir / "anat_surfaces" / session["subject"])
 
-    fns = OSLFilenames(
+    session_files = Session(
         outdir=str(output_dir / "osl"),
         id=session["id"],
         preproc_file=str(preproc_file),
         surfaces_dir=surfaces_dir,
     )
 
-    logger.log("Applying LCMV beamformer...")
-    voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns)
-
     logger.log("Parcellating...")
-    parcel_data = parcellation.parcellate(
-        fns,
-        voxel_data,
-        voxel_coords,
-        method=parcellation_method,
-        orthogonalisation=orthogonalisation,
+    parcel_data = parcellation.parcellate_lcmv(
+        session_files,
         parcellation_file=parcellation_file,
+        orthogonalisation=orthogonalisation,
     )
 
     logger.log("Saving parcellated data...")

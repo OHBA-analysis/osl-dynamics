@@ -9,8 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import mne
 
-from osl_dynamics.meeg import parallel, parcellation, rhino, source_recon
-from osl_dynamics.utils.filenames import OSLFilenames
+from osl_dynamics.meeg import parallel, parcellation, rhino, source_recon, Session
 
 # ----------------------------------------------------------------------------
 rawdir = Path("data/ds117")
@@ -22,18 +21,18 @@ parcellation_file = "atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz"
 # ----------------------------------------------------------------------------
 
 
-def fix_headshape_points(fns):
+def fix_headshape_points(session_files):
     """Remove headshape points on the nose."""
-    hs = np.loadtxt(fns.coreg.head_headshape_file)
-    nas = np.loadtxt(fns.coreg.head_nasion_file)
-    lpa = np.loadtxt(fns.coreg.head_lpa_file)
-    rpa = np.loadtxt(fns.coreg.head_rpa_file)
+    hs = np.loadtxt(session_files.coreg.head_headshape_file)
+    nas = np.loadtxt(session_files.coreg.head_nasion_file)
+    lpa = np.loadtxt(session_files.coreg.head_lpa_file)
+    rpa = np.loadtxt(session_files.coreg.head_rpa_file)
 
     remove = np.logical_and(hs[1] > max(lpa[1], rpa[1]), hs[2] < nas[2])
     hs = hs[:, ~remove]
 
-    print(f"overwriting {fns.coreg.head_headshape_file}")
-    np.savetxt(fns.coreg.head_headshape_file, hs)
+    print(f"overwriting {session_files.coreg.head_headshape_file}")
+    np.savetxt(session_files.coreg.head_headshape_file, hs)
 
 
 def process_session(session, logger):
@@ -43,7 +42,7 @@ def process_session(session, logger):
     preproc_file = outdir / session_id / f"{session_id}_preproc-raw.fif"
     surfaces_dir = outdir / session["subject"] / "surfaces"
 
-    fns = OSLFilenames(
+    session_files = Session(
         outdir=str(outdir),
         id=session_id,
         preproc_file=str(preproc_file),
@@ -51,10 +50,10 @@ def process_session(session, logger):
     )
 
     logger.log("Extracting fiducials and headshape from fif...")
-    rhino.extract_fiducials_and_headshape_from_fif(fns)
+    rhino.extract_fiducials_and_headshape_from_fif(session_files)
 
     logger.log("Removing headshape points on the nose...")
-    fix_headshape_points(fns)
+    fix_headshape_points(session_files)
 
     logger.log("Extracting surfaces...")
     rhino.extract_surfaces(
@@ -64,30 +63,24 @@ def process_session(session, logger):
     )
 
     logger.log("Coregistering MEG to MRI...")
-    rhino.coregister_head_and_mri(fns, use_nose=False, use_headshape=True)
+    rhino.coregister_head_and_mri(session_files, use_nose=False, use_headshape=True)
 
     logger.log("Computing forward model...")
-    rhino.forward_model(fns, model="Single Layer")
+    rhino.forward_model(session_files, model="Single Layer")
 
     logger.log("Computing LCMV beamformer...")
     source_recon.lcmv_beamformer(
-        fns,
+        session_files,
         chantypes=["mag", "grad"],
         rank={"meg": 60},
         frequency_range=[1, 45],
     )
 
-    logger.log("Applying LCMV beamformer...")
-    voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns)
-
     logger.log("Parcellating...")
-    parcel_data = parcellation.parcellate(
-        fns,
-        voxel_data,
-        voxel_coords,
-        method="spatial_basis",
-        orthogonalisation="symmetric",
+    parcel_data = parcellation.parcellate_lcmv(
+        session_files,
         parcellation_file=parcellation_file,
+        orthogonalisation="symmetric",
     )
 
     logger.log("Saving parcellated data...")

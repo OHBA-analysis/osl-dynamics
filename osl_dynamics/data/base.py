@@ -88,8 +88,6 @@ class Data:
         :code:`reject_by_annotation="omit"` to remove segments marked as bad.
     sampling_frequency : float, optional
         Sampling frequency of the data in Hz.
-    mask_file : str, optional
-        Path to mask file used to source reconstruct the data.
     parcellation_file : str, optional
         Path to parcellation file used to source reconstruct the data.
     time_axis_first : bool, optional
@@ -135,7 +133,6 @@ class Data:
         picks: Optional[Union[str, List[str]]] = None,
         reject_by_annotation: Optional[str] = None,
         sampling_frequency: Optional[float] = None,
-        mask_file: Optional[str] = None,
         parcellation_file: Optional[str] = None,
         time_axis_first: bool = True,
         load_memmaps: bool = False,
@@ -156,7 +153,6 @@ class Data:
         self.reject_by_annotation = reject_by_annotation
         self.original_sampling_frequency = sampling_frequency
         self.sampling_frequency = sampling_frequency
-        self.mask_file = mask_file
         self.parcellation_file = parcellation_file
         self.time_axis_first = time_axis_first
         self.load_memmaps = load_memmaps
@@ -2038,7 +2034,6 @@ class Data:
             "reject_by_annotation",
             "original_sampling_frequency",
             "sampling_frequency",
-            "mask_file",
             "parcellation_file",
             "time_axis_first",
             "load_memmaps",

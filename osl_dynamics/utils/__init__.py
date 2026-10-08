@@ -4,8 +4,6 @@ Modules
 -------
 - :py:mod:`~osl_dynamics.utils.array_ops` — Array operations (covariance ↔
   correlation conversions, matrix decompositions, etc.).
-- :py:mod:`~osl_dynamics.utils.filenames` — :py:class:`OSLFilenames` for
-  managing pipeline file paths.
 - :py:mod:`~osl_dynamics.utils.logger` — Logging utilities for pipeline
   scripts.
 - :py:mod:`~osl_dynamics.utils.misc` — Miscellaneous helpers (random seeds,
@@ -23,7 +21,6 @@ Modules
 
 from osl_dynamics.utils import (
     array_ops,
-    filenames,
     logger,
     misc,
     model,

@@ -68,8 +68,7 @@ Output is written to ``derivatives/``.
 #     %matplotlib inline
 #
 #     from osl_dynamics import files
-#     from osl_dynamics.meeg import preproc, rhino, source_recon, parcellation
-#     from osl_dynamics.utils.filenames import OSLFilenames
+#     from osl_dynamics.meeg import preproc, rhino, source_recon, parcellation, Session
 
 #%%
 # Edit the cell below to match your data.
@@ -227,6 +226,8 @@ Output is written to ``derivatives/``.
 #
 # The output plots overlay each extracted surface (yellow line) on the structural MRI. Check that each surface matches the corresponding anatomical boundary. If they don't, consider using the standard MNI152 brain as a fallback.
 #
+# The MRI is also registered to MNI space, which is how the dipoles and parcels (defined in MNI space) are placed in the subject's head. By default this is a nonlinear registration with FSL's FNIRT, which follows the subject's anatomy more closely than an affine registration and so places the parcels more accurately, at the cost of a few minutes per subject. The ``mni_registration.png`` plot shows the edges of the MNI152 template (red) on the registered MRI, check they match the anatomy. Its title gives the overlap of the skull-stripped brain with the MNI152 brain mask and the mutual information with the template, for the nonlinear and (in brackets) the affine registration; these are also saved to ``mni_registration.json``. A warning is printed if the registration looks poor or the nonlinear registration is not better than the affine one, in which case check the plot and consider passing ``nonlinear_registration=False``.
+#
 # .. code-block:: python
 #
 #     surfaces_dir = str(output_dir / "anat_surfaces" / f"sub-{subject}")
@@ -245,18 +246,18 @@ Output is written to ``derivatives/``.
 #
 # Coregistration aligns the MEG sensor coordinate system ("head" space) to the MRI coordinate system. We use the Polhemus fiducials (nasion, LPA, RPA) and headshape points recorded during the MEG session, and fit them to the MRI surfaces using the Iterative Closest Point (ICP) algorithm.
 #
-# First, let's create an ``OSLFilenames`` container to keep track of all the pipeline output files.
+# First, let's create a ``Session``, which holds the paths of all the pipeline output files.
 #
 # .. code-block:: python
 #
-#     fns = OSLFilenames(
+#     session = Session(
 #         outdir=str(output_dir / "osl"),
 #         id=id,
 #         preproc_file=str(preproc_file),
 #         surfaces_dir=surfaces_dir,
 #         # If using standard brain: surfaces_dir=files.mni152_surfaces.directory
 #     )
-#     print(fns)
+#     print(session)
 
 #%%
 # Extract fiducials and headshape
@@ -266,7 +267,7 @@ Output is written to ``derivatives/``.
 #
 # .. code-block:: python
 #
-#     rhino.extract_fiducials_and_headshape_from_fif(fns)
+#     rhino.extract_fiducials_and_headshape_from_fif(session)
 
 #%%
 # Fix stray Polhemus headshape points
@@ -276,16 +277,16 @@ Output is written to ``derivatives/``.
 #
 # .. code-block:: python
 #
-#     hs = np.loadtxt(fns.coreg.head_headshape_file)
-#     nas = np.loadtxt(fns.coreg.head_nasion_file)
-#     lpa = np.loadtxt(fns.coreg.head_lpa_file)
-#     rpa = np.loadtxt(fns.coreg.head_rpa_file)
+#     hs = np.loadtxt(session.coreg.head_headshape_file)
+#     nas = np.loadtxt(session.coreg.head_nasion_file)
+#     lpa = np.loadtxt(session.coreg.head_lpa_file)
+#     rpa = np.loadtxt(session.coreg.head_rpa_file)
 #
 #     remove = np.logical_and(hs[1] > max(lpa[1], rpa[1]), hs[2] < nas[2])
 #     hs = hs[:, ~remove]
 #
-#     print(f"Overwriting: {fns.coreg.head_headshape_file}")
-#     np.savetxt(fns.coreg.head_headshape_file, hs)
+#     print(f"Overwriting: {session.coreg.head_headshape_file}")
+#     np.savetxt(session.coreg.head_headshape_file, hs)
 
 #%%
 # Run coregistration
@@ -299,33 +300,33 @@ Output is written to ``derivatives/``.
 # .. code-block:: python
 #
 #     rhino.coregister_head_and_mri(
-#         fns,
+#         session,
 #         use_nose=False,
 #         allow_mri_scaling=False,  # set True if using MNI152 standard brain
 #         show=True,
 #     )
 
 #%%
-# The coregistration plot is saved automatically to ``fns.coreg_dir/coreg.png``. The 3D plot shows the MEG sensors (blue), headshape points (red dots), fiducials, and MRI surfaces. Check that the headshape points sit on the scalp surface and the sensors surround the head correctly. The QC report copies this plot automatically when generated.
+# The coregistration plot is saved automatically to ``session.coreg_dir/coreg.png``. The 3D plot shows the MEG sensors (blue), headshape points (red dots), fiducials, and MRI surfaces. Check that the headshape points sit on the scalp surface and the sensors surround the head correctly. The QC report copies this plot automatically when generated.
 #
 # If the coregistration looks off, you can try:
 #
 # - Removing stray headshape points with ``rhino.remove_stray_headshape_points``.
-# - Manually editing the headshape/fiducial text files in ``fns.coreg_dir``.
+# - Manually editing the headshape/fiducial text files in ``session.coreg_dir``.
 # - Setting ``use_nose=False``.
 
 #%%
 # Step 4: Forward Model
 # ^^^^^^^^^^^^^^^^^^^^^
 #
-# The forward model (lead field matrix) describes how a dipole at each source location projects onto the MEG sensors. We use a Single Layer (Single Shell) head model based on the inner skull surface and a volumetric dipole grid.
+# The forward model (lead field matrix) describes how a dipole at each source location projects onto the MEG sensors. We use a Single Layer (Single Shell) head model based on the inner skull surface. A dipole is placed at each voxel of the MNI152 brain mask (transformed into the subject's MRI space), so the dipoles are at the same MNI coordinates for every subject and match the voxels of the parcellation files.
 #
 # - ``model="Single Layer"`` — Single shell head model (standard for MEG).
-# - ``gridstep=8`` — 8 mm dipole grid spacing. Smaller values give finer resolution but are slower.
+# - ``gridstep=8`` — 8 mm MNI grid, which matches the 8 mm parcellation files. Smaller values give finer resolution but are slower.
 #
 # .. code-block:: python
 #
-#     rhino.forward_model(fns, model="Single Layer", gridstep=gridstep)
+#     rhino.forward_model(session, model="Single Layer", gridstep=gridstep)
 
 #%%
 # Step 5: Source Reconstruction
@@ -343,40 +344,39 @@ Output is written to ``derivatives/``.
 #
 # .. code-block:: python
 #
-#     source_recon.lcmv_beamformer(fns, raw, chantypes=chantypes, rank=rank)
-
-#%%
-# Apply beamformer
-# ****************
-#
-# This applies the spatial filters to the sensor data to produce voxel time courses in MNI space. Bad segments are automatically excluded.
-#
-# .. code-block:: python
-#
-#     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(fns, raw)
-#     print(f"Voxel data shape: {voxel_data.shape} (voxels x time)")
-#     print(f"Voxel coords shape: {voxel_coords.shape} (voxels x 3, in MNI mm)")
+#     source_recon.lcmv_beamformer(session, raw, chantypes=chantypes, rank=rank)
 
 #%%
 # Step 6: Parcellation
 # ^^^^^^^^^^^^^^^^^^^^
 #
-# We reduce the high-dimensional voxel data to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis. See `the parcellations page <https://github.com/OHBA-analysis/osl-files/tree/main/docs/parcellations>`_ for the full list of available parcellations.
+# We reduce the source space to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis. See `the parcellations page <https://github.com/OHBA-analysis/osl-files/tree/main/docs/parcellations>`_ for the full list of available parcellations.
 #
-# - ``method="spatial_basis"`` — Weight voxels by their loading on each parcel (from the atlas) because calculate PCA.
+# ``parcellate_lcmv`` assigns each dipole of the forward model to parcels using its MNI coordinate and calculates each parcel time course from the sensor data with the beamformer weights. Bad segments are automatically excluded.
+#
+# - The time course of each parcel is the first principal component of the dipoles in the parcel (weighted by the parcellation).
 # - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels.
 #
 # .. code-block:: python
 #
-#     parcel_data = parcellation.parcellate(
-#         fns,
-#         voxel_data,
-#         voxel_coords,
-#         method="spatial_basis",
+#     parcel_data = parcellation.parcellate_lcmv(
+#         session,
+#         parcellation_file,
 #         orthogonalisation="symmetric",
-#         parcellation_file=parcellation_file,
+#         raw=raw,
 #     )
 #     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
+
+#%%
+# If you need the voxel time courses (on a regular MNI grid), you can apply the beamformer with ``apply_lcmv_beamformer``. These can also be parcellated with ``parcellation.parcellate``. To get the time course at a specific MNI coordinate, use ``virtual_electrodes``, which computes the beamformer weights for a dipole at the exact location:
+#
+# .. code-block:: python
+#
+#     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(session, raw)
+#     print(f"Voxel data shape: {voxel_data.shape} (voxels x time)")
+#
+#     # Time courses at MNI coordinates (in mm)
+#     ve_data = source_recon.virtual_electrodes(session, [[-42, -22, 10], [42, -22, 10]], raw=raw)
 
 #%%
 # Save parcellated data
@@ -455,5 +455,5 @@ Output is written to ``derivatives/``.
 #
 # This tutorial uses Elekta MEG data. If you are working with different MEG systems (or EEG) see `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_. Note:
 #
-# - **CTF:** Use ``mne.io.read_raw_ctf()`` to load data. Set ``chantypes=["mag"]`` and adjust ``rank`` (CTF data is not MaxFiltered, so the rank is typically higher). Fiducials/headshape points may need to be extracted from a ``.pos`` file rather than the data file — pass ``pos_file`` to ``OSLFilenames``.
+# - **CTF:** Use ``mne.io.read_raw_ctf()`` to load data. Set ``chantypes=["mag"]`` and adjust ``rank`` (CTF data is not MaxFiltered, so the rank is typically higher). Fiducials/headshape points may need to be extracted from a ``.pos`` file rather than the data file — pass ``pos_file`` to ``Session``.
 # - **OPM:** Loading depends on the OPM system. Adjust ``chantypes`` and ``rank`` accordingly.

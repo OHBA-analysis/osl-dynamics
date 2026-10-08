@@ -243,7 +243,6 @@ gcoh = np.average(coh, axis=0, weights=w)
 #%% Power and connectivity maps
 
 # Source reconstruction files
-mask_file = "MNI152_T1_8mm_brain.nii.gz"
 parcellation_file = "atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz"
 
 # Calculate relative (regression coefficients only) power maps using the
@@ -251,7 +250,6 @@ parcellation_file = "atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz"
 power_map = analysis.power.variance_from_spectra(f, gpsd[0])
 analysis.power.save(
     power_map,
-    mask_file=mask_file,
     parcellation_file=parcellation_file,
     filename=f"{maps_dir}/pow_.png",
     subtract_mean=True,

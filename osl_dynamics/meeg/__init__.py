@@ -11,6 +11,8 @@ Modules
   OPM interference rejection.
 - :py:mod:`~osl_dynamics.meeg.preproc` — Sensor-level preprocessing
   (filtering, bad segment/channel detection, QC plots).
+- :py:mod:`~osl_dynamics.meeg.session` — :py:class:`~osl_dynamics.meeg.session.Session`,
+  the files of a session that the pipeline steps read and write.
 - :py:mod:`~osl_dynamics.meeg.rhino` — Surface extraction, coregistration
   (RHINO), and forward modelling.
 - :py:mod:`~osl_dynamics.meeg.source_recon` — Source reconstruction (LCMV
@@ -32,3 +34,5 @@ Python example scripts
 ----------------------
 - `Batch MEG preprocessing <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_
 """
+
+from osl_dynamics.meeg.session import Session

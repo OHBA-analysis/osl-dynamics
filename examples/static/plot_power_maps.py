@@ -15,7 +15,6 @@ f = np.load("spectra/f.npy")
 psd = np.load("spectra/psd.npy")
 
 # Source reconstruction files used to create the source space data
-mask_file = "MNI152_T1_8mm_brain.nii.gz"
 parcellation_file = (
     "atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz"
 )
@@ -25,7 +24,6 @@ power_map = power.variance_from_spectra(f, psd)
 power.save(
     power_map=power_map,
     filename="figures/power_subj_.png",
-    mask_file=mask_file,
     parcellation_file=parcellation_file,
     subtract_mean=True,  # display the differences in power relative to the group mean
 )
@@ -35,6 +33,5 @@ power_map = np.mean(power_map, axis=0)
 power.save(
     power_map=power_map,
     filename="figures/power_group_.png",
-    mask_file=mask_file,
     parcellation_file=parcellation_file,
 )

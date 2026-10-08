@@ -136,6 +136,7 @@ def _pooch(refresh: bool = False):
             path=cache_directory(),
             base_url=BASE_URL,
             registry=None,
+            retry_if_failed=3,
         )
         _POOCH.load_registry(path)
         _REGISTRY_MTIME = mtime
@@ -171,6 +172,9 @@ def fetch_file(path: str) -> Path:
                 f"'{path}' is not a data file provided by osl-dynamics."
             )
         try:
+            # pooch creates the directory without exist_ok, which fails when
+            # several processes fetch the same file at once
+            (cache_directory() / path).parent.mkdir(parents=True, exist_ok=True)
             return Path(pup.fetch(path))
         except ValueError as error:
             if "hash" not in str(error).lower():
