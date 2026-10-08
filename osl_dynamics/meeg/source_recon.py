@@ -551,9 +551,10 @@ def _forward_model_at_coords(
     """
     if not os.path.exists(session.bem_solution_file):
         raise ValueError(
-            f"{session.bem_solution_file} not found (it is saved by rhino.forward_model, "
-            "the forward model may be from an older version of osl-dynamics). "
-            "Rerun rhino.forward_model and source_recon.lcmv_beamformer."
+            f"{session.bem_solution_file} not found (it is saved by "
+            "rhino.forward_model, the forward model may be from an older "
+            "version of osl-dynamics). Rerun rhino.forward_model and "
+            "source_recon.lcmv_beamformer."
         )
     src = rhino._mni_source_space(session, coords_mni)
     info, head_mri_t = rhino._read_head_model(session)

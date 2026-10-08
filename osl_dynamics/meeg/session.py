@@ -238,9 +238,9 @@ class Session:
 
 # The steps of the pipeline that read earlier output, in order: the files a
 # step reads from earlier steps (and the preprocessed data), a file it writes
-# and the function that runs it. The surfaces are represented by the registration check, written last by
-# rhino.extract_surfaces (the MNI152 surfaces from osl-files do not have one,
-# so they are not checked).
+# and the function that runs it. The surfaces are represented by the
+# registration check, written last by rhino.extract_surfaces (the MNI152
+# surfaces from osl-files do not have one, so they are not checked).
 _STEPS = {
     "coregistration": (
         lambda s: [
