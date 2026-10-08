@@ -24,24 +24,15 @@ class SurfaceFilenames:
 
     def __init__(self, root: str):
         self.root = root
-        self.fsl_dir = os.environ["FSLDIR"]
 
         # Nifti files
         self.mri_file = f"{root}/smri.nii.gz"
-        self.std_brain_file = f"{self.fsl_dir}/data/standard/MNI152_T1_1mm_brain.nii.gz"
-        self.std_brain_bigfov_file = (
-            f"{self.fsl_dir}/data/standard/MNI152_T1_1mm_BigFoV_facemask.nii.gz"
-        )
 
         # Transformations
         self.mni2mri_flirt_xform_file = f"{root}/mni2mri_flirt_xform.txt"
         self.mni_mri_t_file = f"{root}/mni_mri-trans.fif"
 
         # Registration to MNI space (affine, and nonlinear if requested)
-        self.std_head_2mm_file = f"{self.fsl_dir}/data/standard/MNI152_T1_2mm.nii.gz"
-        self.std_brain_mask_2mm_file = (
-            f"{self.fsl_dir}/data/standard/MNI152_T1_2mm_brain_mask.nii.gz"
-        )
         self.mri_mni_affine_file = f"{root}/smri_mni_affine.nii.gz"
         self.mri2mni_warp_file = f"{root}/mri2mni_warpcoef.nii.gz"
         self.mri_mni_nonlinear_file = f"{root}/smri_mni_nonlinear.nii.gz"
@@ -56,6 +47,30 @@ class SurfaceFilenames:
         self.bet_outskin_plus_nose_mesh_file = f"{root}/outskin_plus_nose_mesh.nii.gz"
         self.bet_inskull_mesh_file = f"{root}/inskull_mesh.nii.gz"
         self.bet_outskull_mesh_file = f"{root}/outskull_mesh.nii.gz"
+
+    # FSL's standard templates, looked up when needed so that the steps that
+    # do not use FSL work without it
+    @property
+    def fsl_dir(self) -> str:
+        if "FSLDIR" not in os.environ:
+            raise RuntimeError("This step needs FSL, but FSLDIR is not set.")
+        return os.environ["FSLDIR"]
+
+    @property
+    def std_brain_file(self) -> str:
+        return f"{self.fsl_dir}/data/standard/MNI152_T1_1mm_brain.nii.gz"
+
+    @property
+    def std_brain_bigfov_file(self) -> str:
+        return f"{self.fsl_dir}/data/standard/MNI152_T1_1mm_BigFoV_facemask.nii.gz"
+
+    @property
+    def std_head_2mm_file(self) -> str:
+        return f"{self.fsl_dir}/data/standard/MNI152_T1_2mm.nii.gz"
+
+    @property
+    def std_brain_mask_2mm_file(self) -> str:
+        return f"{self.fsl_dir}/data/standard/MNI152_T1_2mm_brain_mask.nii.gz"
 
 
 class CoregFilenames:
@@ -222,8 +237,8 @@ class Session:
 
 
 # The steps of the pipeline that read earlier output, in order: the files a
-# step reads from earlier steps, a file it writes and the function that runs
-# it. The surfaces are represented by the registration check, written last by
+# step reads from earlier steps (and the preprocessed data), a file it writes
+# and the function that runs it. The surfaces are represented by the registration check, written last by
 # rhino.extract_surfaces (the MNI152 surfaces from osl-files do not have one,
 # so they are not checked).
 _STEPS = {
@@ -244,7 +259,7 @@ _STEPS = {
         "rhino.forward_model",
     ),
     "LCMV filters": (
-        lambda s: [s.fwd_model_file],
+        lambda s: [s.fwd_model_file] + ([s._preproc_file] if s._preproc_file else []),
         lambda s: s.filters_file,
         "source_recon.lcmv_beamformer",
     ),

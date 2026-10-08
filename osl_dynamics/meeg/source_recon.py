@@ -266,7 +266,7 @@ def _data_and_noise_covariance(
         # eeg are scaled so that they are on comparable scales to aid mixing in
         # the subspace and improve numerical stability. Note that in the
         # output data_cov the scalings have been undone.
-        if isinstance(data, mne.Epochs):
+        if isinstance(data, mne.BaseEpochs):
             data_cov = mne.compute_covariance(data, method="empirical", rank=rank)
         else:
             data_cov = mne.compute_raw_covariance(data, method="empirical", rank=rank)
@@ -354,7 +354,7 @@ def apply_lcmv_beamformer(
     # Pick chantypes that were used to make the beamformer in the data
     raw = raw.copy().pick(filters["ch_names"])
 
-    if isinstance(raw, mne.Epochs):
+    if isinstance(raw, mne.BaseEpochs):
         # Apply filters to an Epochs object
         stc = mne.beamformer.apply_lcmv_epochs(raw, filters)
         voxel_data_head = np.transpose([s.data for s in stc], axes=[1, 2, 0])
@@ -461,27 +461,49 @@ def virtual_electrodes(
     meg = len(mne.pick_types(fwd["info"], meg=True, ref_meg=False)) > 0
     eeg = len(mne.pick_types(fwd["info"], meg=False, eeg=True)) > 0
 
-    # Dipole locations
+    # Dipole locations: the coordinates, then (for bilateral pairs) their
+    # mirror images across the midline of the MNI grid, as in lcmv_beamformer
     positions = coords
-    multi_dipoles = None
-    single_dipoles = None
     if use_bilateral_pairs:
         tol_midline = bilateral["bilateral_tol_midline"]
         if tol_midline is None:
             tol_midline = bilateral["bilateral_tol"]
         if tol_midline is None:
             tol_midline = _get_gridstep(_get_mni_grid(session, fwd) / 1000) / 2
-        paired = np.flatnonzero(np.abs(coords[:, 0]) >= tol_midline)
-        positions = np.concatenate([coords, coords[paired] * [-1, 1, 1]])
-        multi_dipoles = [[i, n_coords + j] for j, i in enumerate(paired)]
-        single_dipoles = np.setdiff1d(np.arange(n_coords), paired)
-        print(f"Using bilateral pairs for {len(paired)} coordinate(s)")
+        midline_x = _get_midline_x(session)
+        paired = np.flatnonzero(np.abs(coords[:, 0] - midline_x) >= tol_midline)
+        mirrored = coords[paired] * [-1, 1, 1] + [2 * midline_x, 0, 0]
+        positions = np.concatenate([coords, mirrored])
+
+    # Lead fields at the exact locations
+    ve_fwd, inside = _forward_model_at_coords(session, positions, meg=meg, eeg=eeg)
+    if not inside[:n_coords].all():
+        raise ValueError(
+            "The following coordinates are outside the inner skull: "
+            f"{coords[~inside[:n_coords]].tolist()}"
+        )
+
+    multi_dipoles = None
+    single_dipoles = None
+    if use_bilateral_pairs:
+        # A coordinate whose mirror image is outside the inner skull gets a
+        # single dipole
+        dipole = np.cumsum(inside) - 1  # index of each position in ve_fwd
+        has_mirror = inside[n_coords:]
+        multi_dipoles = [
+            [i, dipole[n_coords + j]] for j, i in enumerate(paired) if has_mirror[j]
+        ]
+        single_dipoles = np.setdiff1d(np.arange(n_coords), paired[has_mirror])
+        print(f"Using bilateral pairs for {len(multi_dipoles)} coordinate(s)")
         _use_unit_noise_gain(lcmv_params)
 
-    # Beamformer weights using the lead fields at the exact locations
+    # Beamformer weights with the settings used for the MNI grid
+    info = mne.pick_info(
+        raw.info, mne.pick_channels(raw.ch_names, filters["ch_names"], ordered=False)
+    )
     ve_filters = _make_lcmv(
-        raw.copy().pick(filters["ch_names"]).info,
-        _forward_model_at_coords(session, positions, meg=meg, eeg=eeg),
+        info,
+        ve_fwd,
         filters["data_cov"],
         noise_cov=filters["noise_cov"],
         multi_dipoles=multi_dipoles,
@@ -504,7 +526,7 @@ def virtual_electrodes(
 
 def _forward_model_at_coords(
     session: Session, coords_mni: np.ndarray, meg: bool = True, eeg: bool = False
-) -> mne.Forward:
+) -> tuple[mne.Forward, np.ndarray]:
     """Compute the forward model for dipoles at MNI coordinates.
 
     Parameters
@@ -521,8 +543,11 @@ def _forward_model_at_coords(
     Returns
     -------
     fwd : mne.Forward
-        Forward model with one (free orientation) dipole per coordinate, in
-        the same order as coords_mni.
+        Forward model with one (free orientation) dipole per coordinate inside
+        the inner skull, in the same order as coords_mni. None if no
+        coordinate is inside.
+    inside : np.ndarray
+        (n,) whether each coordinate is inside the inner skull.
     """
     if not os.path.exists(session.bem_solution_file):
         raise ValueError(
@@ -546,16 +571,8 @@ def _forward_model_at_coords(
     except RuntimeError as e:
         if "No points left" not in str(e):
             raise
-        raise ValueError(
-            f"All coordinates are outside the inner skull: {coords_mni.tolist()}"
-        ) from None
-    if fwd["nsource"] != len(coords_mni):
-        inuse = fwd["src"][0]["inuse"].astype(bool)
-        raise ValueError(
-            "The following coordinates are outside the inner skull: "
-            f"{coords_mni[~inuse].tolist()}"
-        )
-    return fwd
+        return None, np.zeros(len(coords_mni), dtype=bool)
+    return fwd, fwd["src"][0]["inuse"].astype(bool)
 
 
 def _use_unit_noise_gain(lcmv_params: dict) -> None:
@@ -609,19 +626,19 @@ def _get_filter_input_data(
     if filters is None:
         filters = mne.beamformer.read_beamformer(session.filters_file)
 
-    raw = raw.copy().pick(filters["ch_names"])
     _check_reference(raw)
     chan_inds = mne.utils._check_channels_spatial_filter(raw.ch_names, filters)
 
-    if isinstance(raw, mne.Epochs):
-        data = raw.get_data()  # (epochs, channels, time)
+    if isinstance(raw, mne.BaseEpochs):
+        data = raw.get_data(picks=chan_inds)  # (epochs, channels, time)
         epochs_shape = (data.shape[2], data.shape[0])
         data = np.transpose(data, (1, 2, 0)).reshape(data.shape[1], -1)
     else:
-        data = raw.get_data(reject_by_annotation=reject_by_annotation)
+        data = raw.get_data(picks=chan_inds, reject_by_annotation=reject_by_annotation)
         epochs_shape = None
 
-    data = _proj_whiten_data(data[chan_inds], raw.info["projs"], filters)
+    projs = mne.pick_info(raw.info, chan_inds)["projs"]
+    data = _proj_whiten_data(data, projs, filters)
     return data, filters, epochs_shape
 
 

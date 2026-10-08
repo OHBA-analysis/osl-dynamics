@@ -403,7 +403,7 @@ def save_as_fif(
     """
     print(f"Saving {filename}")
 
-    if isinstance(raw, mne.Epochs):
+    if isinstance(raw, mne.BaseEpochs):
         # Save as a MNE Epochs object
         parc_epo = _convert2mne_epochs(parcel_data, raw)
         parc_epo.save(filename, overwrite=True)
