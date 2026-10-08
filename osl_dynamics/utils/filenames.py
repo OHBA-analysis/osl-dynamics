@@ -30,9 +30,14 @@ class SurfaceFilenames:
 
         # Nonlinear registration to MNI (optional)
         self.std_head_2mm = f"{self.fsl_dir}/data/standard/MNI152_T1_2mm.nii.gz"
+        self.std_brain_mask_2mm = (
+            f"{self.fsl_dir}/data/standard/MNI152_T1_2mm_brain_mask.nii.gz"
+        )
+        self.mri_mni_affine_file = f"{root}/smri_mni_affine.nii.gz"
         self.mri2mni_warp_file = f"{root}/mri2mni_warpcoef.nii.gz"
         self.mri_mni_nonlinear_file = f"{root}/smri_mni_nonlinear.nii.gz"
         self.mni_registration_plot = f"{root}/mni_registration.png"
+        self.mni_registration_quality_file = f"{root}/mni_registration.json"
 
         # BET mesh / surfaces
         self.bet_outskin_mesh_vtk_file = f"{root}/outskin_mesh.vtk"

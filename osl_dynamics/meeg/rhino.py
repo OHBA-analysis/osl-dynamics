@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import copy
+import json
 import shutil
 import subprocess
 import warnings
@@ -270,7 +271,7 @@ def extract_surfaces(
     include_nose: bool = True,
     do_mri2mniaxes_xform: bool = True,
     bet_fval: float | None = None,
-    nonlinear_registration: bool = False,
+    nonlinear_registration: bool = True,
     show: bool = False,
 ) -> None:
     """Extract surfaces.
@@ -327,11 +328,21 @@ def extract_surfaces(
         surface includes non-brain tissue.
     nonlinear_registration : bool, optional
         Should we nonlinearly register the MRI to MNI space with FSL's FNIRT
-        (initialised with the FLIRT affine registration)? If True, the warp
+        (initialised with the FLIRT affine registration)? The registration
         is used to transform MNI coordinates into the subject's MRI space,
         e.g. to place the dipoles of the MNI grid in rhino.forward_model and
-        in source_recon.virtual_electrodes. This takes several minutes. Check
-        the registration with the command printed at the end.
+        in source_recon.virtual_electrodes. A nonlinear registration follows
+        the subject's anatomy more closely, so the parcels are placed more
+        accurately, but takes a few more minutes. Pass False to use the
+        affine registration only (e.g. if the nonlinear registration looks
+        wrong for a subject).
+
+        Either way, the registration is checked: the overlap (Dice) of the
+        skull-stripped brain with the MNI152 brain mask and the mutual
+        information of the MRI with the MNI152 template are saved to
+        mni_registration.json and shown on mni_registration.png, and a
+        warning is printed if the registration looks poor or the nonlinear
+        registration is not better than the affine one.
     show : bool, optional
         Whether to display the surface plots interactively. Default is
         False (suitable for batch processing).
@@ -775,25 +786,40 @@ def extract_surfaces(
             fns.mni_mri_t_file,
         )
 
-    print("Cleaning up FLIRT files")
     # ---------------------------------------------------------------------
-    # 8) Use FNIRT to nonlinearly register the MRI to MNI space (optional)
+    # 8) Nonlinearly register the MRI to MNI space with FNIRT (optional) and
+    #    check the registration
     # ---------------------------------------------------------------------
+
+    # The registration is checked on the 2 mm MNI grid (the grid FNIRT uses)
+    #
+    # Command: flirt -in <mri_file> -ref <std_head_2mm> -applyxfm \
+    #          -init <flirt_mri2mni_xform_file> -out <mri_mni_affine_file>
+    fsl_wrappers.flirt(
+        fns.mri_file,
+        fns.std_head_2mm,
+        applyxfm=True,
+        init=flirt_mri2mni_xform_file,
+        out=fns.mri_mni_affine_file,
+    )
+    quality = {"affine": _mni_registration_quality(fns, fns.mri_mni_affine_file)}
 
     if nonlinear_registration:
         _nonlinear_registration(fns)
+        quality["nonlinear"] = _mni_registration_quality(
+            fns, fns.mri_mni_nonlinear_file
+        )
+        registered_file = fns.mri_mni_nonlinear_file
     else:
         # Make sure a warp from a previous call is not used
         for f in [fns.mri2mni_warp_file, fns.mri_mni_nonlinear_file]:
             if os.path.exists(f):
                 os.remove(f)
-        _plot_mni_registration(
-            flirt_mri_mni_file,
-            fns.std_head_2mm,
-            fns.mni_registration_plot,
-            "MNI registration (FLIRT, affine)",
-        )
+        registered_file = fns.mri_mni_affine_file
 
+    _report_mni_registration(fns, quality, registered_file)
+
+    print("Cleaning up FLIRT files")
     system_call(f"rm -f {fns.root}/flirt*", verbose=False)
 
     # Plot the surfaces
@@ -2623,17 +2649,115 @@ def _nonlinear_registration(fns: SurfaceFilenames) -> None:
         iout=fns.mri_mni_nonlinear_file,
     )
 
+
+# Below this overlap of the registered brain with the MNI brain mask, the
+# registration is reported as poor
+MNI_REGISTRATION_MIN_DICE = 0.9
+
+
+def _mni_registration_quality(
+    fns: SurfaceFilenames, registered_file: str
+) -> dict[str, float]:
+    """How well an MRI registered to MNI space matches the MNI152 template.
+
+    Parameters
+    ----------
+    fns : SurfaceFilenames
+        Surface extraction file paths.
+    registered_file : str
+        MRI registered to MNI space, on the 2 mm MNI grid.
+
+    Returns
+    -------
+    quality : dict
+        'dice': overlap of the skull-stripped registered MRI with the MNI152
+        brain mask. 'mutual_information': mutual information (in nats) of
+        the registered MRI with the MNI152 template within the template
+        brain, which increases as the anatomy lines up (unlike a
+        correlation, it is not thrown by a bias field).
+    """
+    # Command: bet <registered_file> <flirt_registered_bet_file> -m
+    flirt_registered_bet_file = f"{fns.root}/flirt_registered_bet"
+    fsl_wrappers.bet(registered_file, flirt_registered_bet_file, m=True)
+
+    mask = np.asanyarray(nib.load(fns.std_brain_mask_2mm).dataobj) > 0
+    template = np.asanyarray(nib.load(fns.std_head_2mm).dataobj, dtype=float)
+    head = np.asanyarray(nib.load(registered_file).dataobj, dtype=float)
+    brain = (
+        np.asanyarray(nib.load(f"{flirt_registered_bet_file}_mask.nii.gz").dataobj) > 0
+    )
+
+    dice = 2 * np.sum(brain & mask) / (np.sum(brain) + np.sum(mask))
+
+    counts, _, _ = np.histogram2d(head[mask], template[mask], bins=64)
+    p = counts / counts.sum()
+    px, py = p.sum(axis=1, keepdims=True), p.sum(axis=0, keepdims=True)
+    nonzero = p > 0
+    mutual_information = np.sum(p[nonzero] * np.log(p[nonzero] / (px @ py)[nonzero]))
+
+    return {"dice": float(dice), "mutual_information": float(mutual_information)}
+
+
+def _report_mni_registration(
+    fns: SurfaceFilenames, quality: dict[str, dict[str, float]], registered_file: str
+) -> None:
+    """Save, print and plot the quality of the registration to MNI space.
+
+    Parameters
+    ----------
+    fns : SurfaceFilenames
+        Surface extraction file paths.
+    quality : dict
+        Quality of the 'affine' and (if done) 'nonlinear' registration, from
+        _mni_registration_quality.
+    registered_file : str
+        MRI registered to MNI space with the registration that will be used.
+    """
+    with open(fns.mni_registration_quality_file, "w") as file:
+        json.dump(quality, file, indent=4)
+
+    nonlinear = "nonlinear" in quality
+    used = quality["nonlinear" if nonlinear else "affine"]
+    print("MNI registration:")
+    for name, q in quality.items():
+        print(
+            f"  {name}: brain overlap (Dice) = {q['dice']:.3f}, mutual "
+            f"information with template = {q['mutual_information']:.3f}"
+        )
+    if used["dice"] < MNI_REGISTRATION_MIN_DICE:
+        print(
+            "WARNING: the registration to MNI space looks poor (brain "
+            f"overlap {used['dice']:.2f}). Check {fns.mni_registration_plot}. "
+            "A cropped field of view, a strong bias field, a wrong sform or "
+            "poor skull stripping (bet_fval) can all cause this."
+        )
+    if (
+        nonlinear
+        and quality["nonlinear"]["mutual_information"]
+        < quality["affine"]["mutual_information"]
+    ):
+        print(
+            "WARNING: the nonlinear (FNIRT) registration to MNI space is not "
+            "better than the affine (FLIRT) one. Check "
+            f"{fns.mni_registration_plot}; if it looks wrong, rerun with "
+            "nonlinear_registration=False."
+        )
+
+    if nonlinear:
+        title = (
+            f"FNIRT: overlap {used['dice']:.2f}, MI {used['mutual_information']:.2f} "
+            f"(FLIRT: {quality['affine']['dice']:.2f}, "
+            f"{quality['affine']['mutual_information']:.2f})"
+        )
+    else:
+        title = (
+            f"FLIRT: overlap {used['dice']:.2f}, MI {used['mutual_information']:.2f}"
+        )
     _plot_mni_registration(
-        fns.mri_mni_nonlinear_file,
-        fns.std_head_2mm,
-        fns.mni_registration_plot,
-        "MNI registration (FNIRT, nonlinear)",
+        registered_file, fns.std_head_2mm, fns.mni_registration_plot, title
     )
-    print(
-        "You can use the following command line call to check the nonlinear "
-        "registration:"
-    )
-    print(f"fsleyes {fns.std_head_2mm} {fns.mri_mni_nonlinear_file}")
+    print("You can check the registration with:")
+    print(f"fsleyes {fns.std_head_2mm} {registered_file}")
 
 
 def _plot_mni_registration(

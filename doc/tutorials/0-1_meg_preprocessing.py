@@ -227,7 +227,7 @@ Output is written to ``derivatives/``.
 #
 # The output plots overlay each extracted surface (yellow line) on the structural MRI. Check that each surface matches the corresponding anatomical boundary. If they don't, consider using the standard MNI152 brain as a fallback.
 #
-# The MRI is also registered to MNI space (with an affine transform by default). The ``mni_registration.png`` plot shows the edges of the MNI152 template (red) on the registered MRI, check they match the anatomy. Passing ``nonlinear_registration=True`` uses FSL's FNIRT for a nonlinear registration, which aligns the anatomy more closely (and so places the parcels more accurately) but takes several more minutes per subject.
+# The MRI is also registered to MNI space, which is how the dipoles and parcels (defined in MNI space) are placed in the subject's head. By default this is a nonlinear registration with FSL's FNIRT, which follows the subject's anatomy more closely than an affine registration and so places the parcels more accurately, at the cost of a few minutes per subject. The ``mni_registration.png`` plot shows the edges of the MNI152 template (red) on the registered MRI, check they match the anatomy. Its title gives the overlap of the skull-stripped brain with the MNI152 brain mask and the mutual information with the template, for the nonlinear and (in brackets) the affine registration; these are also saved to ``mni_registration.json``. A warning is printed if the registration looks poor or the nonlinear registration is not better than the affine one, in which case check the plot and consider passing ``nonlinear_registration=False``.
 #
 # .. code-block:: python
 #
