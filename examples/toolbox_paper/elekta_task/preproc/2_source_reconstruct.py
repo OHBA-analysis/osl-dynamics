@@ -76,15 +76,11 @@ def process_session(session, logger):
         frequency_range=[1, 45],
     )
 
-    logger.log("Applying LCMV beamformer...")
-    voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(session_files)
-
     logger.log("Parcellating...")
-    parcel_data = parcellation.parcellate(
-        voxel_data,
-        voxel_coords,
-        orthogonalisation="symmetric",
+    parcel_data = parcellation.parcellate_lcmv(
+        session_files,
         parcellation_file=parcellation_file,
+        orthogonalisation="symmetric",
     )
 
     logger.log("Saving parcellated data...")
