@@ -442,12 +442,6 @@ def virtual_electrodes(
 
     # Settings used to compute the filters on the MNI grid
     filters = mne.beamformer.read_beamformer(session.filters_file)
-    if "osl_lcmv_params" not in filters:
-        raise ValueError(
-            f"{session.filters_file} does not contain the settings used to compute it "
-            "(it was made with an older version of osl-dynamics). Rerun "
-            "source_recon.lcmv_beamformer."
-        )
     lcmv_params = filters["osl_lcmv_params"]
     lcmv_params["reduce_rank"] = bool(lcmv_params["reduce_rank"])  # h5io int
     bilateral = filters["osl_bilateral_pairs"]
@@ -549,13 +543,6 @@ def _forward_model_at_coords(
     inside : np.ndarray
         (n,) whether each coordinate is inside the inner skull.
     """
-    if not os.path.exists(session.bem_solution_file):
-        raise ValueError(
-            f"{session.bem_solution_file} not found (it is saved by "
-            "rhino.forward_model, the forward model may be from an older "
-            "version of osl-dynamics). Rerun rhino.forward_model and "
-            "source_recon.lcmv_beamformer."
-        )
     src = rhino._mni_source_space(session, coords_mni)
     info, head_mri_t = rhino._read_head_model(session)
     try:
@@ -1542,16 +1529,13 @@ def _get_mni_grid(session: Session, fwd: mne.Forward) -> np.ndarray:
         (n_voxels, 3) MNI coordinates (in mm) of each voxel of the grid. The
         dipoles of the forward model are at coords[fwd["src"][0]["vertno"]].
     """
-    vs = fwd["src"][0]
-    if vs["type"] == "discrete" and os.path.exists(session.mni_grid_file):
-        coords = rhino._mni_grid_coords(session.mni_grid_file)
-        if len(coords) == len(vs["rr"]):
-            return coords
-    raise ValueError(
-        f"{session.fwd_model_file} does not have a dipole grid in MNI space (it may be "
-        "from an older version of osl-dynamics). Rerun rhino.forward_model and "
-        "source_recon.lcmv_beamformer."
-    )
+    coords = rhino._mni_grid_coords(session.mni_grid_file)
+    if len(coords) != len(fwd["src"][0]["rr"]):
+        raise ValueError(
+            f"{session.mni_grid_file} does not match {session.fwd_model_file}. "
+            "Rerun rhino.forward_model and source_recon.lcmv_beamformer."
+        )
+    return coords
 
 
 def _get_midline_x(session: Session) -> float:
