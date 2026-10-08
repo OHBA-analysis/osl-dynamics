@@ -9,6 +9,12 @@ The cache lives in the operating system's cache directory, which is
 :code:`~/Library/Caches/osl-files` on macOS and :code:`~/.cache/osl-files`
 on Linux. Set the :code:`OSL_DATA` environment variable to cache them
 somewhere else, for example on a cluster where your home directory has a quota.
+
+The files are always the ones currently in osl-files: the list of files and
+their checksums is downloaded from there too, and a cached file is downloaded
+again when its checksum changes. A cache directory that cannot be written to
+is used as it is, so a read-only copy shared by a group stays at the version
+its owner last downloaded with :code:`osl-dynamics-download-data`.
 """
 
 import os
@@ -31,6 +37,7 @@ REGISTRY_MAX_AGE = 3600
 
 _POOCH = None
 _REGISTRY_MTIME = None
+_REGISTRY_CHECKED = None
 
 
 class DownloadError(RuntimeError):
@@ -52,16 +59,33 @@ def cache_directory() -> Path:
     return Path(pooch.os_cache("osl-files"))
 
 
-def _registry_file() -> Path:
+def _registry_file(refresh: bool = False) -> Path:
     """Local copy of the registry, downloaded again once it is stale.
 
     Falls back to the cached copy if it cannot be downloaded, so a machine
-    with a warm cache keeps working offline.
-    """
-    path = cache_directory() / "registry.txt"
-    if path.exists() and time.time() - path.stat().st_mtime < REGISTRY_MAX_AGE:
-        return path
+    with a warm cache keeps working offline, and if the cache directory
+    cannot be written to.
 
+    Parameters
+    ----------
+    refresh : bool, optional
+        Download the registry even if the cached copy is not stale yet.
+    """
+    global _REGISTRY_CHECKED
+    path = cache_directory() / "registry.txt"
+    now = time.time()
+    if path.exists() and not refresh:
+        if now - path.stat().st_mtime < REGISTRY_MAX_AGE:
+            return path
+        # The cached copy is stale but could not be replaced the last time
+        # this was tried, so don't try again on every call
+        if _REGISTRY_CHECKED is not None and now - _REGISTRY_CHECKED < REGISTRY_MAX_AGE:
+            return path
+        # A read-only cache is a copy kept up to date by whoever owns it
+        if not os.access(path.parent, os.W_OK):
+            return path
+
+    _REGISTRY_CHECKED = now
     try:
         with urllib.request.urlopen(REGISTRY_URL, timeout=30) as response:
             registry = response.read()
@@ -78,15 +102,34 @@ def _registry_file() -> Path:
             f"{cache_directory()}."
         ) from error
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(registry)
+    # Written beside the registry and moved into place, so that another
+    # process never reads a partly written registry
+    temporary = path.with_name(f"registry.txt.{os.getpid()}.tmp")
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_bytes(registry)
+        os.replace(temporary, path)
+    except OSError as error:
+        if path.exists():
+            return path
+        raise DownloadError(
+            f"Could not write to the cache directory {cache_directory()}. Set "
+            "OSL_DATA to a directory you can write to, or to one that already "
+            "has the files."
+        ) from error
     return path
 
 
-def _pooch():
-    """The pooch instance, rebuilt whenever the registry changes."""
+def _pooch(refresh: bool = False):
+    """The pooch instance, rebuilt whenever the registry changes.
+
+    Parameters
+    ----------
+    refresh : bool, optional
+        Download the registry even if the cached copy is not stale yet.
+    """
     global _POOCH, _REGISTRY_MTIME
-    path = _registry_file()
+    path = _registry_file(refresh)
     mtime = path.stat().st_mtime
     if _POOCH is None or mtime != _REGISTRY_MTIME:
         _POOCH = pooch.create(
@@ -121,31 +164,37 @@ def fetch_file(path: str) -> Path:
         If the file is not cached and could not be downloaded.
     """
     path = str(path)
-    pup = _pooch()
-    if path not in pup.registry:
-        raise FileNotFoundError(
-            f"'{path}' is not a data file provided by osl-dynamics."
-        )
-    try:
-        return Path(pup.fetch(path))
-    except ValueError as error:
-        if "hash" not in str(error).lower():
-            raise
-        raise DownloadError(
-            f"'{path}' does not match its checksum in the osl-files "
-            "registry. The cached copy is probably corrupt: delete it from "
-            f"{cache_directory()} and try again."
-        ) from error
-    except Exception as error:
-        raise DownloadError(
-            f"Could not download '{path}' from {BASE_URL}.\n"
-            "osl-dynamics downloads its parcellations, masks and surfaces the "
-            "first time they are used, so this step needs network access. On "
-            "a machine without it, run 'osl-dynamics-download-data' somewhere "
-            "that does and copy the cache across, or point "
-            "OSL_DATA at a directory that already has the files. The "
-            f"cache is currently {cache_directory()}."
-        ) from error
+    for refresh in (False, True):
+        pup = _pooch(refresh)
+        if path not in pup.registry:
+            raise FileNotFoundError(
+                f"'{path}' is not a data file provided by osl-dynamics."
+            )
+        try:
+            return Path(pup.fetch(path))
+        except ValueError as error:
+            if "hash" not in str(error).lower():
+                raise
+            # The download does not match the registry. The file has probably
+            # changed in osl-files since the registry was cached, so get the
+            # registry again and have one more go
+            mismatch = error
+        except Exception as error:
+            raise DownloadError(
+                f"Could not download '{path}' from {BASE_URL}.\n"
+                "osl-dynamics downloads its parcellations, masks and surfaces the "
+                "first time they are used, so this step needs network access. On "
+                "a machine without it, run 'osl-dynamics-download-data' somewhere "
+                "that does and copy the cache across, or point "
+                "OSL_DATA at a directory that already has the files. The "
+                f"cache is currently {cache_directory()}."
+            ) from error
+    raise DownloadError(
+        f"The download of '{path}' does not match its checksum in the "
+        "osl-files registry. Either it was cut short, or the file has just "
+        "been changed in osl-files and the registry has not caught up yet. "
+        "Try again in a few minutes."
+    ) from mismatch
 
 
 def fetch_directory(subdirectory: str) -> Path:
@@ -180,7 +229,8 @@ def fetch_all() -> Path:
     path : pathlib.Path
         The cache directory the files were downloaded to.
     """
-    paths = sorted(_pooch().registry)
+    # Start from the current registry, not a cached copy up to an hour old
+    paths = sorted(_pooch(refresh=True).registry)
     for i, path in enumerate(paths, start=1):
         print(f"[{i}/{len(paths)}] {path}")
         fetch_file(path)
