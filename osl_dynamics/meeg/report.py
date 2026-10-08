@@ -1,241 +1,200 @@
-"""Generate a QC summary HTML report from pipeline plots."""
+"""Generate a QC summary HTML report from the pipeline's QC files.
+
+The report is a table with one row per session, holding the numbers each step
+saves (bad segments, MNI registration, coregistration error, ...), next to the
+QC plots of the selected session. Sort the table by a metric to see the worst
+sessions first. Only the plots of the selected session are loaded, so the
+report works for datasets with tens of thousands of sessions. The report and
+its plots are all in the plots directory, which can be moved or served on its
+own.
+"""
 
 from __future__ import annotations
 
-import html
 import json
 import shutil
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path
 
-STEPS = {
-    1: {
-        "name": "Preprocessing",
-        "subpanels": [
-            {
-                "name": "PSD",
-                "files": ["1_psd.png"],
-            },
-            {
-                "name": "Sum-Square",
-                "files": ["1_sum_square.png"],
-            },
-            {
-                "name": "Sum-Square (excl. bads)",
-                "files": ["1_sum_square_exclude_bads.png"],
-            },
-            {
-                "name": "Channel Stds",
-                "files": ["1_channel_stds.png"],
-            },
-            {
-                "name": "ICA Components",
-                "files": ["1_ica_components.png"],
-            },
-        ],
-    },
-    2: {
-        "name": "Surfaces",
-        "subpanels": [
-            {
-                "name": "Inner Skull",
-                "files": ["2_inskull.png"],
-            },
-            {
-                "name": "Outer Skull",
-                "files": ["2_outskull.png"],
-            },
-            {
-                "name": "Outer Skin",
-                "files": ["2_outskin.png"],
-            },
-            {
-                "name": "Outer Skin + Nose",
-                "files": ["2_outskin_plus_nose.png"],
-            },
-            {
-                "name": "MNI Registration",
-                "files": ["2_mni_registration.png"],
-            },
-        ],
-    },
-    3: {
-        "name": "Coregistration",
-        "subpanels": [
-            {
-                "name": "Coregistration",
-                "files": ["3_coreg.png"],
-            },
-        ],
-    },
-    5: {
-        "name": "Parcellation",
-        "subpanels": [
-            {
-                "name": "Parcellation PSD",
-                "files": ["5_psd_topo.png"],
-            },
-        ],
-    },
+import pandas as pd
+
+# Plots shown in each tab, relative to the plots directory. Plots that have
+# not been saved are not shown.
+TABS = {
+    "Preprocessing": [
+        "{id}/1_psd.png",
+        "{id}/1_sum_square.png",
+        "{id}/1_sum_square_exclude_bads.png",
+        "{id}/1_channel_stds.png",
+        "{id}/1_ica_components.png",
+    ],
+    "Surfaces": [
+        "2_surfaces/{subject}/inskull.png",
+        "2_surfaces/{subject}/outskull.png",
+        "2_surfaces/{subject}/outskin.png",
+        "2_surfaces/{subject}/outskin_plus_nose.png",
+    ],
+    "MNI Registration": [
+        "2_surfaces/{subject}/mni_registration.png",
+    ],
+    "Coregistration": [
+        "3_coreg/{head_model}/coreg.png",
+    ],
+    "Parcellation": [
+        "{id}/5_psd_topo.png",
+        "{id}/5_power_maps.png",
+    ],
 }
 
 CSS = """
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0;
-    padding: 20px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
     background: #f5f5f5;
     color: #333;
+    font-size: 13px;
 }
-h1 {
-    margin: 0 0 20px 0;
-}
-.tabs {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 20px;
-    border-bottom: 2px solid #ddd;
-}
-.tab-btn {
-    flex: 1;
-    padding: 10px 20px;
-    border: none;
-    background: #e0e0e0;
-    cursor: pointer;
-    font-size: 14px;
-    border-radius: 6px 6px 0 0;
-    transition: background 0.2s;
-    text-align: center;
-}
-.tab-btn:hover {
-    background: #d0d0d0;
-}
-.tab-btn.active {
-    background: #fff;
-    font-weight: bold;
-    border-bottom: 2px solid #fff;
-    margin-bottom: -2px;
-}
-.tab-content {
-    display: none;
-    background: #fff;
-    padding: 20px;
-    border-radius: 0 0 6px 6px;
-}
-.tab-content.active {
-    display: block;
-}
-.session-nav {
+header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-    padding: 10px;
-    background: #f0f0f0;
-    border-radius: 6px;
+    gap: 14px;
+    padding: 10px 16px;
+    background: #fff;
+    border-bottom: 1px solid #ddd;
 }
-.session-nav button {
-    padding: 6px 14px;
+header h1 {
+    font-size: 18px;
+    margin: 0;
+}
+header input[type=text] {
+    padding: 5px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: monospace;
+    width: 220px;
+}
+header .info {
+    color: #888;
+    margin-left: auto;
+}
+main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+}
+#table-pane {
+    max-width: 60%;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-right: 1px solid #ddd;
+}
+#table-scroll {
+    flex: 1;
+    overflow: auto;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+th, td {
+    padding: 3px 7px;
+    text-align: right;
+    white-space: nowrap;
+}
+th:first-child, td:first-child {
+    text-align: left;
+    font-family: monospace;
+}
+th {
+    position: sticky;
+    top: 0;
+    background: #eee;
+    cursor: pointer;
+    user-select: none;
+}
+th .count {
+    display: block;
+    color: #999;
+    font-weight: normal;
+    font-size: 11px;
+}
+tbody tr {
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+}
+tbody tr:hover {
+    background: #f5f9ff;
+}
+tbody tr.selected {
+    background: #dbe9ff;
+}
+td.flag {
+    color: #c62828;
+    font-weight: bold;
+}
+td.missing {
+    color: #ccc;
+}
+#pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 6px;
+    border-top: 1px solid #ddd;
+    color: #888;
+}
+button {
+    padding: 4px 12px;
     border: 1px solid #ccc;
     background: #fff;
-    cursor: pointer;
     border-radius: 4px;
-    font-size: 18px;
-    line-height: 1;
+    cursor: pointer;
 }
-.session-nav button:hover {
+button:hover {
     background: #e8e8e8;
 }
-.session-nav input {
-    padding: 6px 10px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+#plot-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+#tabs {
+    display: flex;
+    gap: 4px;
+    padding: 8px 12px 0 12px;
+    border-bottom: 1px solid #ddd;
+}
+#tabs button {
+    border-radius: 6px 6px 0 0;
+    border-bottom: none;
+    background: #e0e0e0;
+}
+#tabs button.active {
+    background: #fff;
+    font-weight: bold;
+}
+#plots {
+    flex: 1;
+    overflow: auto;
+    padding: 12px;
+    background: #fff;
+}
+#plots h2 {
     font-size: 14px;
     font-family: monospace;
-    width: 300px;
+    margin: 0 0 10px 0;
 }
-.session-nav .counter {
-    font-size: 13px;
-    color: #888;
-    margin-left: auto;
-}
-.subpanel-nav {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 16px;
-    padding: 8px 10px;
-    background: #e8f0fe;
-    border-radius: 6px;
-}
-.subpanel-nav button {
-    padding: 4px 12px;
-    border: 1px solid #b0c4de;
-    background: #fff;
-    cursor: pointer;
-    border-radius: 4px;
-    font-size: 16px;
-    line-height: 1;
-}
-.subpanel-nav button:hover {
-    background: #dce8f5;
-}
-.subpanel-nav .subpanel-label {
-    font-size: 14px;
-    font-weight: bold;
-    color: #333;
-}
-.subpanel-nav .subpanel-counter {
-    font-size: 12px;
-    color: #888;
-    margin-left: auto;
-}
-.subpanel-nav .hint {
-    font-size: 11px;
-    color: #aaa;
-}
-.session-panel {
-    display: none;
-}
-.session-panel.active {
-    display: block;
-}
-.subpanel {
-    display: none;
-}
-.subpanel.active {
-    display: block;
-}
-.subpanel img {
+#plots img {
     max-width: 100%;
-    max-height: calc(80vh - 280px);
     display: block;
-    margin: 4px auto;
-    border: 1px solid #eee;
-}
-.subpanel iframe {
-    width: 100%;
-    height: 350px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    margin: 4px 0;
-}
-.image-row {
-    display: flex;
-    gap: 10px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin: 12px 0;
-}
-.image-row-item {
-    flex: 1;
-    min-width: 0;
-    text-align: center;
-}
-.image-row-item img {
-    max-width: 100%;
-    max-height: 200px;
-    border: 1px solid #eee;
+    margin: 0 auto 10px auto;
 }
 .placeholder {
     background: #eee;
@@ -243,494 +202,341 @@ h1 {
     padding: 40px;
     text-align: center;
     border-radius: 4px;
-    margin: 8px auto;
     font-style: italic;
-}
-.file-label {
-    font-size: 12px;
-    color: #888;
-    margin: 12px 0 2px 0;
-    text-align: center;
-}
-.summary-box {
-    background: #f8f8f8;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 10px 14px;
-    margin-bottom: 12px;
-    font-size: 13px;
-    line-height: 1.6;
-}
-.summary-box .label {
-    color: #888;
-    font-size: 12px;
-}
-.summary-box .bad {
-    color: #c0392b;
-    font-weight: bold;
-}
-.footer {
-    margin-top: 30px;
-    padding-top: 15px;
-    border-top: 1px solid #ddd;
-    font-size: 12px;
-    color: #999;
 }
 """
 
 JS = """
-var sessions = SESSION_LIST;
-var currentStep = 1;
-var currentIdx = {};       // per-step session index
-var currentSubpanel = {};  // per-step subpanel index
-var subpanelCounts = SUBPANEL_COUNTS;  // {step: count}
+const columns = DATA.columns, rows = DATA.rows, tabs = Object.keys(DATA.tabs);
+const nInfo = 3;  // id, subject and head model come before the metrics
+const pageSize = 200;
+let order = [], selected = 0, tab = 0, sortColumn = null, ascending = true;
 
-// Initialise each step to session 0, subpanel 0
-STEP_NUMS.forEach(function(s) {
-    currentIdx[s] = 0;
-    currentSubpanel[s] = 0;
-});
-
-function switchTab(step) {
-    currentStep = step;
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.getElementById('btn-' + step).classList.add('active');
-    document.getElementById('tab-' + step).classList.add('active');
-    showSession(step, currentIdx[step]);
+// Values far from the rest of a column are highlighted: more than 5 scaled
+// median absolute deviations from the median (and anything that is true)
+const medians = {}, mads = {};
+for (let c = nInfo; c < columns.length; c++) {
+    const x = rows.map(r => r[c]).filter(v => typeof v === 'number');
+    if (x.length === 0) continue;
+    medians[c] = median(x);
+    mads[c] = 1.4826 * median(x.map(v => Math.abs(v - medians[c])));
 }
 
-function showSession(step, idx) {
-    if (idx < 0) idx = 0;
-    if (idx >= sessions.length) idx = sessions.length - 1;
-    currentIdx[step] = idx;
-
-    var panels = document.querySelectorAll('#tab-' + step + ' .session-panel');
-    panels.forEach(p => p.classList.remove('active'));
-
-    var panel = document.getElementById('step-' + step + '-session-' + idx);
-    if (panel) panel.classList.add('active');
-
-    var input = document.getElementById('input-' + step);
-    var counter = document.getElementById('counter-' + step);
-    input.value = sessions[idx];
-    counter.textContent = (idx + 1) + ' / ' + sessions.length;
-
-    showSubpanel(step, currentSubpanel[step]);
+function median(x) {
+    const s = [...x].sort((a, b) => a - b), m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-function showSubpanel(step, spIdx) {
-    var count = subpanelCounts[step] || 1;
-    if (spIdx < 0) spIdx = 0;
-    if (spIdx >= count) spIdx = count - 1;
-    currentSubpanel[step] = spIdx;
+function flagged(row, c) {
+    const v = row[c];
+    if (v === true) return true;
+    if (typeof v !== 'number' || !mads[c]) return false;
+    return Math.abs(v - medians[c]) / mads[c] > 5;
+}
 
-    // Hide all subpanels in the current session panel
-    var sessionIdx = currentIdx[step];
-    var panel = document.getElementById('step-' + step + '-session-' + sessionIdx);
-    if (!panel) return;
-    var subs = panel.querySelectorAll('.subpanel');
-    subs.forEach(s => s.classList.remove('active'));
-    var target = panel.querySelector('.subpanel[data-sp-idx="' + spIdx + '"]');
-    if (target) target.classList.add('active');
+function format(v) {
+    if (v === null) return '-';
+    if (typeof v === 'number') return String(parseFloat(v.toPrecision(3)));
+    return String(v);
+}
 
-    // Update subpanel nav label and counter
-    var label = document.getElementById('sp-label-' + step);
-    var spCounter = document.getElementById('sp-counter-' + step);
-    if (label && target) {
-        label.textContent = target.getAttribute('data-sp-name') || '';
+function update() {
+    const text = document.getElementById('filter').value.toLowerCase();
+    const onlyFlagged = document.getElementById('only-flagged').checked;
+    order = [];
+    rows.forEach((row, i) => {
+        if (text && !row[0].toLowerCase().includes(text)) return;
+        if (onlyFlagged && !columns.some((_, c) => c >= nInfo && flagged(row, c))) return;
+        order.push(i);
+    });
+    if (sortColumn !== null) {
+        order.sort((a, b) => {
+            const x = rows[a][sortColumn], y = rows[b][sortColumn];
+            if (x === y) return a - b;
+            if (x === null) return 1;
+            if (y === null) return -1;
+            return (x < y ? -1 : 1) * (ascending ? 1 : -1);
+        });
     }
-    if (spCounter) {
-        spCounter.textContent = (spIdx + 1) + ' / ' + count;
+    selected = 0;
+    render();
+}
+
+function sortBy(c) {
+    ascending = sortColumn === c ? !ascending : true;
+    sortColumn = c;
+    update();
+}
+
+function render() {
+    // Table, one page at a time
+    const page = Math.floor(selected / pageSize);
+    const nPages = Math.max(1, Math.ceil(order.length / pageSize));
+    let html = '<thead><tr>';
+    columns.forEach((name, c) => {
+        if (c > 0 && c < nInfo) return;
+        const n = rows.filter(r => r[c] !== null).length;
+        const arrow = sortColumn === c ? (ascending ? ' &#9650;' : ' &#9660;') : '';
+        html += `<th onclick="sortBy(${c})">${name}${arrow}<span class="count">${n}</span></th>`;
+    });
+    html += '</tr></thead><tbody>';
+    for (let i = page * pageSize; i < Math.min(order.length, (page + 1) * pageSize); i++) {
+        const row = rows[order[i]];
+        html += `<tr id="row-${i}" class="${i === selected ? 'selected' : ''}" onclick="select(${i})">`;
+        row.forEach((v, c) => {
+            if (c > 0 && c < nInfo) return;
+            const cls = v === null ? 'missing' : (c >= nInfo && flagged(row, c) ? 'flag' : '');
+            html += `<td class="${cls}">${format(v)}</td>`;
+        });
+        html += '</tr>';
     }
-}
+    document.getElementById('table').innerHTML = html + '</tbody>';
+    document.getElementById('page').textContent = `Page ${page + 1} / ${nPages}`;
+    document.getElementById('count').textContent = `${order.length} / ${rows.length} sessions`;
+    const tr = document.getElementById(`row-${selected}`);
+    if (tr) tr.scrollIntoView({block: 'nearest'});
 
-function prevSubpanel(step) {
-    showSubpanel(step, currentSubpanel[step] - 1);
-}
+    // Tabs
+    document.getElementById('tabs').innerHTML = tabs.map((name, t) =>
+        `<button class="${t === tab ? 'active' : ''}" onclick="showTab(${t})">${name}</button>`
+    ).join('');
 
-function nextSubpanel(step) {
-    showSubpanel(step, currentSubpanel[step] + 1);
-}
-
-function prevSession(step) {
-    showSession(step, currentIdx[step] - 1);
-}
-
-function nextSession(step) {
-    showSession(step, currentIdx[step] + 1);
-}
-
-function jumpToSession(step) {
-    var input = document.getElementById('input-' + step);
-    var val = input.value.trim().toLowerCase();
-    for (var i = 0; i < sessions.length; i++) {
-        if (sessions[i].toLowerCase() === val) {
-            showSession(step, i);
-            return;
-        }
-    }
-    for (var i = 0; i < sessions.length; i++) {
-        if (sessions[i].toLowerCase().indexOf(val) !== -1) {
-            showSession(step, i);
-            return;
-        }
-    }
-}
-
-document.addEventListener('keydown', function(e) {
-    if (document.activeElement.tagName === 'INPUT') {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            jumpToSession(currentStep);
-        }
+    // Plots of the selected session
+    const plots = document.getElementById('plots');
+    if (order.length === 0) {
+        plots.innerHTML = '<div class="placeholder">No sessions</div>';
         return;
     }
-    if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        prevSession(currentStep);
-    } else if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        nextSession(currentStep);
-    } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        prevSubpanel(currentStep);
-    } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        nextSubpanel(currentStep);
+    const [id, subject, headModel] = rows[order[selected]];
+    const path = file => file.replace('{id}', id).replace('{subject}', subject)
+        .replace('{head_model}', headModel);
+    plots.innerHTML = `<h2>${id}</h2>` + DATA.tabs[tabs[tab]].map(file =>
+        `<img src="${path(file)}" onerror="missing(this)">`
+    ).join('') + '<div class="placeholder" id="placeholder" hidden>Not available</div>';
+}
+
+function missing(img) {
+    img.remove();
+    if (!document.querySelector('#plots img')) {
+        document.getElementById('placeholder').hidden = false;
     }
+}
+
+function select(i) {
+    if (i < 0 || i >= order.length) return;
+    selected = i;
+    render();
+}
+
+function showTab(t) {
+    tab = (t + tabs.length) % tabs.length;
+    render();
+}
+
+document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT' && e.target.type === 'text') return;
+    if (e.key === 'ArrowDown') select(selected + 1);
+    else if (e.key === 'ArrowUp') select(selected - 1);
+    else if (e.key === 'ArrowRight') showTab(tab + 1);
+    else if (e.key === 'ArrowLeft') showTab(tab - 1);
+    else return;
+    e.preventDefault();
 });
+
+update();
 """
 
 
-def _build_summary(session_dir: Path) -> str:
-    """Build HTML for a preprocessing summary box, if summary exists."""
-    summary_file = session_dir / "1_summary.json"
-    if not summary_file.exists():
-        return ""
-    with open(summary_file) as f:
-        s = json.load(f)
-    total = s["total_duration_s"]
-    bad = s["bad_duration_s"]
-    pct = s["bad_percent"]
-    n_bad_ch = s["n_bad_channels"]
-    bad_chs = ", ".join(s["bad_channels"]) if s["bad_channels"] else "none"
-    html = (
-        f'<div class="summary-box">'
-        f'<span class="label">Duration:</span> {total:.1f}s &nbsp; | &nbsp; '
-        f'<span class="label">Bad segments:</span> '
-        f'<span class="bad">{bad:.1f}s ({pct:.1f}%)</span> &nbsp; | &nbsp; '
-        f'<span class="label">Bad channels ({n_bad_ch}):</span> {bad_chs}'
-    )
-    if "ica_n_excluded" in s:
-        n_exc = s["ica_n_excluded"]
-        n_tot = s["ica_n_components"]
-        ica_labels = ", ".join(s.get("ica_excluded_labels", []))
-        if not ica_labels:
-            ica_labels = "none"
-        html += (
-            f" &nbsp; | &nbsp; "
-            f'<span class="label">ICA excluded ({n_exc}/{n_tot}):</span> '
-            f"{ica_labels}"
-        )
-    html += "</div>"
-    return html
+def _read_json(path: Path) -> dict | None:
+    """Read a JSON file, or return None if it has not been saved."""
+    try:
+        with open(path) as file:
+            return json.load(file)
+    except (OSError, ValueError):
+        return None
 
 
-def _img_tag(session_id: str, filename: str) -> str:
-    """Return an img tag with a relative path and lazy loading."""
-    return f'<img src="{session_id}/{filename}" loading="lazy">'
-
-
-def _embed_html(filepath: Path) -> str:
-    """Embed an HTML file as an iframe with srcdoc."""
-    content = filepath.read_text(errors="replace")
-    escaped = html.escape(content, quote=True)
-    return f'<iframe srcdoc="{escaped}" loading="lazy"></iframe>'
-
-
-def _build_step_tab(
-    step_num: int,
-    step_info: dict,
+def _session_row(
+    id: str,
+    info: dict | None,
     plots_dir: Path,
-    session_ids: list[str],
-) -> tuple[str, int, int]:
-    """Build the HTML content for a single step tab."""
-    subpanels = step_info["subpanels"]
+    output_dir: Path | None,
+    registrations: dict,
+) -> dict:
+    """Get the report's row for a session: the numbers its steps saved.
 
-    # Collect all files across subpanels
-    all_files = []
-    for sp in subpanels:
-        all_files.extend(sp["files"])
+    Parameters
+    ----------
+    id : str
+        Session ID.
+    info : dict
+        Session info. The surfaces are looked up with its 'subject'.
+    plots_dir : Path
+        Path to the plots directory.
+    output_dir : Path
+        Path to the derivatives directory.
+    registrations : dict
+        MNI registration quality of the subjects read so far, which is
+        shared by all the sessions of a subject.
 
-    # Count how many sessions have at least one file for this step
-    done = 0
-    for session_id in session_ids:
-        session_dir = plots_dir / session_id
-        if any((session_dir / f).exists() for f in all_files):
-            done += 1
-    total = len(session_ids)
+    Returns
+    -------
+    row : dict
+        Session ID, subject, the ID owning the coregistration and the metrics
+        that have been saved.
+    """
+    subject = info.get("subject") if isinstance(info, dict) else None
+    row = {"Session": id, "subject": subject, "head_model": id}
 
-    parts = []
+    summary = _read_json(plots_dir / id / "1_summary.json")
+    if summary is not None:
+        row["Bad segments (%)"] = summary["bad_percent"]
+        row["Bad channels"] = summary["n_bad_channels"]
+        if "ica_n_excluded" in summary:
+            row["ICA excluded"] = summary["ica_n_excluded"]
 
-    # Session navigator (left/right arrows)
-    parts.append(f'<div class="session-nav">')
-    parts.append(f'<button onclick="prevSession({step_num})">&#9664;</button>')
-    parts.append(
-        f'<input type="text" id="input-{step_num}" '
-        f'value="{session_ids[0] if session_ids else ""}" '
-        f"onkeydown=\"if(event.key==='Enter')jumpToSession({step_num})\" "
-        f'placeholder="Type session ID...">'
-    )
-    parts.append(f'<button onclick="nextSession({step_num})">&#9654;</button>')
-    parts.append(f'<span class="counter" id="counter-{step_num}">1 / {total}</span>')
-    parts.append("</div>")
+    if output_dir is None:
+        return row
 
-    # Subpanel navigator (up/down arrows) — only if more than 1 subpanel
-    if len(subpanels) > 1:
-        parts.append(f'<div class="subpanel-nav">')
-        parts.append(f'<button onclick="prevSubpanel({step_num})">&#9650;</button>')
-        parts.append(
-            f'<span class="subpanel-label" '
-            f'id="sp-label-{step_num}">{subpanels[0]["name"]}</span>'
-        )
-        parts.append(f'<button onclick="nextSubpanel({step_num})">&#9660;</button>')
-        parts.append(
-            f'<span class="subpanel-counter" '
-            f'id="sp-counter-{step_num}">1 / {len(subpanels)}</span>'
-        )
-        parts.append(f'<span class="hint">&#8593;&#8595; to switch plots</span>')
-        parts.append("</div>")
-
-    # Session panels
-    for idx, session_id in enumerate(session_ids):
-        session_dir = plots_dir / session_id
-        active = " active" if idx == 0 else ""
-        parts.append(
-            f'<div class="session-panel{active}" '
-            f'id="step-{step_num}-session-{idx}">'
-        )
-
-        # Add preprocessing summary if this is step 1
-        if step_num == 1:
-            parts.append(_build_summary(session_dir))
-
-        # Build subpanels
-        for sp_idx, sp in enumerate(subpanels):
-            sp_active = " active" if sp_idx == 0 else ""
-            sp_name = sp["name"]
-            # Check if any file in this subpanel exists
-            has_files = any((session_dir / f).exists() for f in sp["files"])
-
-            parts.append(
-                f'<div class="subpanel{sp_active}" '
-                f'data-sp-idx="{sp_idx}" data-sp-name="{sp_name}">'
+    if subject is not None:
+        if subject not in registrations:
+            registrations[subject] = _read_json(
+                output_dir / "anat_surfaces" / subject / "mni_registration.json"
             )
+        registration = registrations[subject]
+        if registration is not None:
+            used = registration.get("nonlinear", registration["affine"])
+            row["MNI overlap"] = used["dice"]
+            row["MNI MI"] = used["mutual_information"]
 
-            if has_files:
-                for filename in sp["files"]:
-                    filepath = session_dir / filename
-                    if filepath.exists():
-                        if filename.endswith(".png"):
-                            parts.append(_img_tag(session_id, filename))
-                        elif filename.endswith(".html"):
-                            parts.append(_embed_html(filepath))
-                    else:
-                        parts.append('<div class="placeholder">Pending</div>')
-            else:
-                parts.append('<div class="placeholder">Pending</div>')
+        # The coregistration may be a property of the subject rather than the
+        # session, and so shared by all of a subject's sessions (see
+        # head_model_id in Session)
+        if not (output_dir / "osl" / id / "coreg").is_dir():
+            row["head_model"] = subject
 
-            parts.append("</div>")
+    coreg = _read_json(output_dir / "osl" / row["head_model"] / "coreg" / "coreg.json")
+    if coreg is not None:
+        row["Coreg rms (mm)"] = coreg["rms"]
 
-        parts.append("</div>")
-
-    return "\n".join(parts), done, total
+    return row
 
 
-def _copy_surface_plots(
-    plots_dir: Path,
-    sessions: dict,
-    output_dir: Path,
-) -> None:
-    """Copy surface extraction PNGs from the derivatives directory.
+def _copy_plots(table: pd.DataFrame, plots_dir: Path, output_dir: Path) -> None:
+    """Copy the plots saved in the derivatives directory to the plots directory.
 
-    Looks up the subject for each session and copies any surface PNGs
-    from output_dir/anat_surfaces/<subject>/ into the session's plots
-    directory with a ``2_`` prefix.
+    The surfaces are copied once per subject and the coregistration once per
+    head model, to the paths in TABS. Plots that have not changed since they
+    were last copied are skipped.
 
     Parameters
     ----------
+    table : pd.DataFrame
+        Session ID, subject and head model of each session.
     plots_dir : Path
         Path to the plots directory.
-    sessions : dict
-        Sessions dictionary mapping session IDs to info dicts.
     output_dir : Path
         Path to the derivatives directory.
     """
-    for session_id, info in sessions.items():
-        subject = info.get("subject")
-        if subject is None:
-            continue
-        surfaces_dir = output_dir / "anat_surfaces" / subject
-        if not surfaces_dir.exists():
-            continue
-        session_plots_dir = plots_dir / session_id
-        session_plots_dir.mkdir(parents=True, exist_ok=True)
-        for png in surfaces_dir.glob("*.png"):
-            shutil.copy(png, session_plots_dir / f"2_{png.name}")
+    copies = []
+    for subject in table["subject"].dropna().unique():
+        surfaces = ["inskull", "outskull", "outskin", "outskin_plus_nose"]
+        for name in surfaces + ["mni_registration"]:
+            source = output_dir / "anat_surfaces" / subject / f"{name}.png"
+            copies.append((source, plots_dir / "2_surfaces" / subject / source.name))
+    for head_model in table["head_model"].unique():
+        source = output_dir / "osl" / head_model / "coreg" / "coreg.png"
+        copies.append((source, plots_dir / "3_coreg" / head_model / source.name))
+    for id in table["Session"]:
+        for name in ["psd_topo", "power_maps"]:
+            source = output_dir / "osl" / id / f"{name}.png"
+            copies.append((source, plots_dir / id / f"5_{source.name}"))
 
+    def copy(files):
+        source, destination = files
+        if not source.exists():
+            return
+        if (
+            destination.exists()
+            and destination.stat().st_mtime >= source.stat().st_mtime
+        ):
+            return
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
 
-def _copy_coreg_plots(
-    plots_dir: Path,
-    sessions: dict,
-    output_dir: Path,
-) -> None:
-    """Copy coregistration PNGs from the derivatives directory.
-
-    Copies ``coreg.png`` from ``output_dir/osl/<session_id>/coreg/``
-    into the session's plots directory as ``3_coreg.png``.
-
-    Parameters
-    ----------
-    plots_dir : Path
-        Path to the plots directory.
-    sessions : dict
-        Sessions dictionary mapping session IDs to info dicts.
-    output_dir : Path
-        Path to the derivatives directory.
-    """
-    for session_id, info in sessions.items():
-        coreg_png = output_dir / "osl" / session_id / "coreg" / "coreg.png"
-        if not coreg_png.exists():
-            # The coregistration may be a property of the subject rather than
-            # the session, and so shared by all of a subject's sessions (this
-            # is the case when the head shape does not vary between sessions,
-            # e.g. EEG with a template montage). Fall back to the subject.
-            subject = info.get("subject") if isinstance(info, dict) else None
-            if subject is None:
-                continue
-            coreg_png = output_dir / "osl" / subject / "coreg" / "coreg.png"
-            if not coreg_png.exists():
-                continue
-        session_plots_dir = plots_dir / session_id
-        session_plots_dir.mkdir(parents=True, exist_ok=True)
-        shutil.copy(coreg_png, session_plots_dir / "3_coreg.png")
-
-
-def _copy_parc_plots(
-    plots_dir: Path,
-    sessions: dict,
-    output_dir: Path,
-) -> None:
-    """Copy parcellation QC PNGs from the derivatives directory.
-
-    Copies ``psd_topo.png`` from ``output_dir/osl/<session_id>/``
-    into the session's plots directory as ``5_psd_topo.png``.
-
-    Parameters
-    ----------
-    plots_dir : Path
-        Path to the plots directory.
-    sessions : dict
-        Sessions dictionary mapping session IDs to info dicts.
-    output_dir : Path
-        Path to the derivatives directory.
-    """
-    for session_id in sessions:
-        session_plots_dir = plots_dir / session_id
-        osl_dir = output_dir / "osl" / session_id
-        for src_name, dst_name in [
-            ("psd_topo.png", "5_psd_topo.png"),
-            ("power_maps.png", "5_power_maps.png"),
-        ]:
-            src = osl_dir / src_name
-            if src.exists():
-                session_plots_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy(src, session_plots_dir / dst_name)
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        list(pool.map(copy, copies))
 
 
 def generate_report(
     plots_dir: str | Path,
     sessions: dict,
     output_dir: str | Path | None = None,
+    qc: pd.DataFrame | None = None,
     output_file: str = "report.html",
 ) -> None:
     """Generate a QC summary HTML report.
 
-    Scans the plots directory for existing QC files and builds a
-    self-contained HTML report with tabs for each pipeline step.
-    Sessions are navigated with left/right arrows or a text input field.
-    Within each step, subpanels are navigated with up/down arrows.
+    Builds a table with one row per session from the QC files the pipeline
+    steps have saved so far, shown next to the QC plots of the selected
+    session. The table can be sorted by each metric and filtered, and values
+    far from the rest of their column are highlighted. Sessions are navigated
+    with the up/down arrows and the plots with the left/right arrows.
 
     Parameters
     ----------
     plots_dir : str or Path
         Path to the plots directory containing per-session subdirectories.
+        The report is written here.
     sessions : dict
         Dictionary of sessions (same format as the pipeline scripts).
     output_dir : str or Path, optional
-        Path to the derivatives directory. If provided, surface extraction,
-        coregistration, and parcellation plots are copied from here into
-        the plots directory.
+        Path to the derivatives directory. If provided, the surface
+        extraction, coregistration and parcellation QC is read from here and
+        their plots are copied to the plots directory.
+    qc : pd.DataFrame, optional
+        More columns for the table (e.g. statistics of the parcellated data),
+        indexed by session ID. Numbers and booleans are highlighted like the
+        other metrics.
     output_file : str, optional
         Filename for the report. Written to plots_dir/output_file.
     """
     plots_dir = Path(plots_dir)
-    session_ids = list(sessions.keys())
-
-    # Copy plots from derivatives if available
     if output_dir is not None:
-        _copy_surface_plots(plots_dir, sessions, Path(output_dir))
-        _copy_coreg_plots(plots_dir, sessions, Path(output_dir))
-        _copy_parc_plots(plots_dir, sessions, Path(output_dir))
+        output_dir = Path(output_dir)
 
-    # Add power maps to step 5 if any session has them
-    has_power_maps = any(
-        (plots_dir / sid / "5_power_maps.png").exists() for sid in session_ids
-    )
-    steps = {k: dict(v) for k, v in STEPS.items()}
-    if has_power_maps:
-        steps[5] = dict(steps[5])
-        steps[5]["subpanels"] = list(steps[5]["subpanels"]) + [
-            {
-                "name": "Power Maps",
-                "files": ["5_power_maps.png"],
-            }
-        ]
-
-    # Build subpanel counts for JS
-    subpanel_counts = {k: len(v["subpanels"]) for k, v in steps.items()}
-
-    # Build tab buttons and content
-    tab_buttons = []
-    tab_contents = []
-
-    first = True
-    for step_num, step_info in steps.items():
-        content, done, total = _build_step_tab(
-            step_num, step_info, plots_dir, session_ids
+    # One row per session, keeping the metrics that at least one session has.
+    # The QC files are read in threads, a large dataset has tens of thousands
+    registrations = {}
+    metrics = [
+        "Bad segments (%)",
+        "Bad channels",
+        "ICA excluded",
+        "MNI overlap",
+        "MNI MI",
+        "Coreg rms (mm)",
+    ]
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        rows = pool.map(
+            lambda item: _session_row(*item, plots_dir, output_dir, registrations),
+            sessions.items(),
         )
-        active = " active" if first else ""
-        tab_buttons.append(
-            f'<button class="tab-btn{active}" id="btn-{step_num}" '
-            f'onclick="switchTab({step_num})">'
-            f'Step {step_num}: {step_info["name"]} ({done}/{total})'
-            f"</button>"
+        table = pd.DataFrame(
+            rows, columns=["Session", "subject", "head_model"] + metrics
         )
-        tab_contents.append(
-            f'<div class="tab-content{active}" id="tab-{step_num}">' f"{content}</div>"
-        )
-        first = False
+    table = table.drop(columns=[m for m in metrics if table[m].isna().all()])
+    if output_dir is not None:
+        _copy_plots(table, plots_dir, output_dir)
+    if qc is not None:
+        table = table.join(qc, on="Session")
 
+    data = json.loads(table.to_json(orient="split", double_precision=6))
+    data = {
+        "columns": data["columns"],
+        "rows": data["data"],
+        "tabs": TABS,
+    }
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Inject session list, step numbers, and subpanel counts into JS
-    session_list_js = json.dumps(session_ids)
-    step_nums_js = json.dumps(list(steps.keys()))
-    subpanel_counts_js = json.dumps(subpanel_counts)
-    js = JS.replace("SESSION_LIST", session_list_js)
-    js = js.replace("STEP_NUMS", step_nums_js)
-    js = js.replace("SUBPANEL_COUNTS", subpanel_counts_js)
 
     report = f"""<!DOCTYPE html>
 <html>
@@ -740,13 +546,28 @@ def generate_report(
 <style>{CSS}</style>
 </head>
 <body>
+<header>
 <h1>QC Report</h1>
-<div class="tabs">
-{"".join(tab_buttons)}
+<input type="text" id="filter" placeholder="Filter sessions..." oninput="update()">
+<label><input type="checkbox" id="only-flagged" onchange="update()"> highlighted only</label>
+<span id="count"></span>
+<span class="info">&#8593;&#8595; sessions &nbsp; &#8592;&#8594; plots &nbsp; | &nbsp; Generated: {timestamp}</span>
+</header>
+<main>
+<div id="table-pane">
+<div id="table-scroll"><table id="table"></table></div>
+<div id="pager">
+<button onclick="select((Math.floor(selected / pageSize) - 1) * pageSize)">&#9664;</button>
+<span id="page"></span>
+<button onclick="select((Math.floor(selected / pageSize) + 1) * pageSize)">&#9654;</button>
 </div>
-{"".join(tab_contents)}
-<div class="footer">Generated: {timestamp}</div>
-<script>{js}</script>
+</div>
+<div id="plot-pane">
+<div id="tabs"></div>
+<div id="plots"></div>
+</div>
+</main>
+<script>const DATA = {json.dumps(data).replace("</", "<\\/")};{JS}</script>
 </body>
 </html>"""
 

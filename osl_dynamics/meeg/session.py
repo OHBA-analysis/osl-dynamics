@@ -104,6 +104,9 @@ class CoregFilenames:
         self.head_lpa_file = f"{root}/head_lpa.txt"
         self.head_headshape_file = f"{root}/head_headshape.txt"
 
+        # Distance of the headshape points from the scalp
+        self.coreg_quality_file = f"{root}/coreg.json"
+
         # Freesurfer mesh in native space
         self.bet_outskin_surf_file = f"{root}/scaled_outskin.surf"
         self.bet_outskin_plus_nose_surf_file = f"{root}/scaled_outskin_plus_nose.surf"

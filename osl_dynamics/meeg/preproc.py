@@ -1033,10 +1033,12 @@ def save_qc_plots(
     show: bool = False,
     ica: Any = None,
     ic_labels: dict | None = None,
+    psd_only: bool = False,
 ) -> None:
     """Save preprocessing QC plots and summary.
 
-    Saves the following files to output_dir:
+    Saves the following files to output_dir (only the first two if
+    ``psd_only=True``):
 
     - ``1_summary.json``: preprocessing summary stats
     - ``1_psd.png``: sensor-level PSD
@@ -1060,6 +1062,9 @@ def save_qc_plots(
         ICA component topography plot.
     ic_labels : dict, optional
         ICA label dictionary from ``ica_label``.
+    psd_only : bool, optional
+        Should we only save the summary and the PSD? Worth doing for large
+        datasets, where the other plots are rarely looked at.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1091,6 +1096,9 @@ def save_qc_plots(
     plt.savefig(output_dir / "1_psd.png", dpi=150, bbox_inches="tight")
     if not show:
         plt.close("all")
+
+    if psd_only:
+        return
 
     # Sum-square time series
     plot_sum_square_time_series(raw)

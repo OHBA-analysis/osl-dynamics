@@ -133,7 +133,8 @@ def run(
         Directory for per-item log files.
     output_dir : str or Path, optional
         Derivatives directory. Passed to report generation for
-        copying surface extraction plots.
+        reading the surface extraction, coregistration and parcellation QC
+        and copying their plots.
     plots_dir : str or Path, optional
         If provided, generate a QC report after processing.
     maxtasksperchild : int, optional

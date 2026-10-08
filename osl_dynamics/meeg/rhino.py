@@ -1705,9 +1705,14 @@ def coregister_head_and_mri(
     # ----------------------------------
 
     dist = coreg_error(session, include_nose=use_nose)
+    quality = {
+        "rms": float(np.sqrt(np.mean(dist**2))),
+        "max": float(np.max(np.abs(dist))),
+    }
+    save_params(session.coreg.coreg_quality_file, quality)
     print(
-        f"Headshape points to scalp: rms {np.sqrt(np.mean(dist**2)):.1f} mm, "
-        f"max {np.max(np.abs(dist)):.1f} mm"
+        f"Headshape points to scalp: rms {quality['rms']:.1f} mm, "
+        f"max {quality['max']:.1f} mm"
     )
 
     if plot_type is not None:

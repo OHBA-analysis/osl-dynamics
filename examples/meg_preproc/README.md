@@ -113,18 +113,23 @@ plots/
 │   ├── 1_sum_square_exclude_bads.png
 │   ├── 1_channel_stds.png
 │   ├── 1_ica_components.png
-│   ├── 3_coreg.png
 │   └── 5_psd_topo.png
 ├── sub-02_task-rest/
+│   └── ...
+├── 2_surfaces/
+│   ├── sub-01/
+│   └── ...
+├── 3_coreg/
+│   ├── sub-01_task-rest/
 │   └── ...
 └── report.html
 ```
 
 ## QC Report
 
-A self-contained HTML report (`plots/report.html`) is automatically generated after steps 1, 3 and 5 complete. It contains tabs for each pipeline step with all session QC plots embedded. Open it in a browser to review results.
+An HTML report (`plots/report.html`) is automatically generated after steps 1, 3, 4 and 5 complete. It is a table with one row per session, holding the numbers each step saves (bad segments, MNI registration, coregistration error), next to the QC plots of the selected session. Sort the table by a column to see the worst sessions first; values far from the rest of their column are highlighted. Open it in a browser to review results.
 
-The report updates incrementally — after step 1 you'll see preprocessing plots, after step 3 coregistration and surfaces appear, etc. Surface extraction (step 2), coregistration (step 3), and parcellation (step 5) plots are automatically copied from the derivatives directory when the report is generated.
+The report updates incrementally — after step 1 you'll see preprocessing plots, after step 3 coregistration and surfaces appear, etc. The surface extraction (step 2), coregistration (step 3) and parcellation (step 5) plots are copied from the derivatives directory when the report is generated (the surfaces once per subject), so the `plots` directory can be moved or served on its own.
 
 ## Logging
 
