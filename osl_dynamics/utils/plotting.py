@@ -918,7 +918,7 @@ def plot_violin(
 
     # Plot violins
     x = np.concatenate([[x_] * len(y) for x_, y in zip(x, data)])
-    y = data.flatten()
+    y = np.concatenate(data)
     ax = sns.violinplot(x=x, y=y, hue=x, ax=ax, legend=False, **sns_kwargs)
 
     # Set title and axis labels

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from mne.preprocessing import ICA
 from mne_icalabel import label_components
 from scipy import stats
-from scipy.ndimage.filters import uniform_filter1d
+from scipy.ndimage import uniform_filter1d
 
 
 def detect_bad_segments(

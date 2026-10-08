@@ -7,6 +7,12 @@ from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 
+try:
+    from numpy.lib.array_utils import normalize_axis_tuple
+except ImportError:
+    # NumPy < 2.0
+    from numpy.core.numeric import normalize_axis_tuple
+
 
 def get_one_hot(values: np.ndarray, n_states: Optional[int] = None) -> np.ndarray:
     """Expand a categorical variable to a series of boolean columns (one-hot encoding).
@@ -250,7 +256,7 @@ def sliding_window_view(
                 f"and `x.ndim` is {x.ndim}."
             )
     else:
-        axis = np.core.numeric.normalize_axis_tuple(
+        axis = normalize_axis_tuple(
             axis,
             x.ndim,
             allow_duplicate=True,
