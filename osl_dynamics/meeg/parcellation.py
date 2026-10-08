@@ -284,7 +284,7 @@ def parcellate_lcmv(
     parcellation_file: str,
     orthogonalisation: str | None = None,
     raw: mne.io.Raw | mne.Epochs | None = None,
-    reject_by_annotation: str | list[str] | None = "omit",
+    reject_by_annotation: str | None = "omit",
 ) -> np.ndarray:
     """Calculate parcel time courses from sensor data with the LCMV filters.
 
@@ -308,9 +308,9 @@ def parcellate_lcmv(
     raw : mne.io.Raw or mne.Epochs, optional
         The data to calculate parcel time courses for.
         If None, session.preproc_file is used.
-    reject_by_annotation : str | list of str | None
-        Annotation descriptions to omit when getting the data from a Raw
-        object. If None, all time points are used.
+    reject_by_annotation : str | None
+        How to treat the samples of a Raw object in annotations starting with
+        'bad': 'omit' drops them, None keeps them.
 
     Returns
     -------
@@ -666,9 +666,11 @@ def _get_parcel_weights(
 
         # The sign and scale of the parcel time course is taken from the
         # voxels with a weight greater than 0.5 (the threshold used in
-        # fslnets)
-        this_mask = spatial_map > 0.5
-        if not np.any(this_mask & (temporal_std > 0)):
+        # fslnets), or from every voxel with a dipole if none of those has one
+        this_mask = (spatial_map > 0.5) & (temporal_std > 0)
+        if not np.any(this_mask):
+            this_mask = temporal_std > 0
+        if not np.any(this_mask):
             empty_parcels.append(pp)
             continue
 

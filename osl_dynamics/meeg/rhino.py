@@ -2390,7 +2390,9 @@ def forward_model(
     os.makedirs(session.coreg_dir, exist_ok=True)
 
     _write_bem_surfaces(session)
-    src = _setup_mni_grid_source_space(session, gridstep=gridstep, exclude=exclude)
+    grid_file = f"{session.coreg_dir}/tmp-mni-grid.nii.gz"
+    _make_mni_grid(gridstep, grid_file)
+    src = _setup_mni_grid_source_space(session, grid_file, exclude=exclude)
 
     # Save the BEM solution so we can compute the forward model for other
     # dipole locations later, see source_recon.virtual_electrodes
@@ -2413,6 +2415,7 @@ def forward_model(
     )
     print(f"{fwd['nsource']} dipoles inside the inner skull")
     mne.write_forward_solution(session.fwd_model_file, fwd, overwrite=True)
+    os.replace(grid_file, session.mni_grid_file)
 
     # Keep what the forward model was computed with next to it
     save_params(
@@ -2553,22 +2556,21 @@ def _write_bem_surfaces(session: Session) -> None:
 
 
 def _setup_mni_grid_source_space(
-    session: Session, gridstep: int = 8, exclude: float = 0.0
+    session: Session, grid_file: str, exclude: float = 0.0
 ) -> mne.SourceSpaces:
     """Set up a source space with a dipole at each voxel of an MNI grid.
 
-    The voxels of the MNI152 brain mask at a resolution of gridstep are
-    transformed into the subject's (scaled) MRI space, so every subject has a
-    dipole at the same MNI coordinates. The MNI grid is saved to
-    session.mni_grid_file. Dipoles outside the inner skull surface (or closer than
-    mindist to it) are excluded when the forward model is computed.
+    The voxels of the grid are transformed into the subject's (scaled) MRI
+    space, so every subject has a dipole at the same MNI coordinates. Dipoles
+    outside the inner skull surface (or closer than mindist to it) are
+    excluded when the forward model is computed.
 
     Parameters
     ----------
     session : Session
         Files of the session.
-    gridstep : int, optional
-        Resolution of the MNI grid in mm.
+    grid_file : str
+        MNI grid (mask) file, see :func:`_make_mni_grid`.
     exclude : float, optional
         Exclude points closer than this distance (mm) from the center of mass
         of the inner skull surface.
@@ -2579,11 +2581,9 @@ def _setup_mni_grid_source_space(
         A single discrete source space in MRI space. The order of the dipoles
         is the order of the voxels returned by :code:`_mni_grid_coords`.
     """
-    _make_mni_grid(session, gridstep)
-    coords_mni = _mni_grid_coords(session.mni_grid_file)
-    print(f"MNI grid: {len(coords_mni)} voxels ({gridstep} mm)")
+    coords_mni = _mni_grid_coords(grid_file)
+    print(f"MNI grid: {len(coords_mni)} voxels")
     src = _mni_source_space(session, coords_mni)
-
     if exclude > 0:
         # Exclude points close to the centre of mass of the inner skull
         surf = mne.surface.read_surface(
@@ -2593,7 +2593,6 @@ def _setup_mni_grid_source_space(
         src[0]["inuse"][dist < exclude] = 0
         src[0]["vertno"] = np.flatnonzero(src[0]["inuse"])
         src[0]["nuse"] = len(src[0]["vertno"])
-
     return src
 
 
@@ -2620,27 +2619,34 @@ def _mni_source_space(session: Session, coords_mni: np.ndarray) -> mne.SourceSpa
     )
 
 
-def _make_mni_grid(session: Session, gridstep: int) -> None:
-    """Save the MNI152 brain mask at a resolution of gridstep to session.mni_grid_file.
+def _make_mni_grid(gridstep: int, grid_file: str) -> None:
+    """Save the MNI152 brain mask at a resolution of gridstep.
+
+    The masks in osl-files share the origin of the MNI152 template, so the
+    voxels of the grid line up with those of the parcellation files. A
+    resolution that osl-files does not have is made by resampling the 1 mm
+    mask onto a grid with the same origin.
 
     Parameters
     ----------
-    session : Session
-        Files of the session.
     gridstep : int
         Resolution in mm.
+    grid_file : str
+        Output file.
     """
     try:
-        mask = files.mask.file(f"MNI152_T1_{int(gridstep)}mm_brain.nii.gz")
-        shutil.copyfile(mask, session.mni_grid_file)
-    except FileNotFoundError:
-        # No mask with this resolution in osl-files
-        fsl_wrappers.flirt(
-            session.surfaces.std_brain_file,
-            session.surfaces.std_brain_file,
-            out=session.mni_grid_file,
-            applyisoxfm=int(gridstep),
+        shutil.copyfile(
+            files.mask.file(f"MNI152_T1_{int(gridstep)}mm_brain.nii.gz"), grid_file
         )
+    except FileNotFoundError:
+        img = nib.load(files.mask.file("MNI152_T1_1mm_brain.nii.gz"))
+        affine = np.diag([-gridstep, gridstep, gridstep, 1.0])
+        affine[:3, 3] = img.affine[:3, 3]
+        shape = np.ceil(np.array(img.shape) / gridstep).astype(int)
+        grid = nil.image.resample_img(
+            img, affine, shape, interpolation="nearest", force_resample=True
+        )
+        nib.save(nil.image.binarize_img(grid, 0, copy_header=True), grid_file)
 
 
 def _mni_grid_coords(grid_file: str) -> np.ndarray:
@@ -2876,19 +2882,18 @@ def _mni_to_mri(surfaces: SurfaceFilenames, coords_mni: np.ndarray) -> np.ndarra
     #          -warp <mri2mni_warp_file> -mm -
     result = subprocess.run(
         [
-            "std2imgcoord",
+            f"{surfaces.fsl_dir}/bin/std2imgcoord",
             *["-img", surfaces.mri_file, "-std", surfaces.std_head_2mm_file],
             *["-warp", surfaces.mri2mni_warp_file, "-mm", "-"],
         ],
         input="\n".join(" ".join(f"{c:.6f}" for c in xyz) for xyz in coords_mni),
         capture_output=True,
         text=True,
-        check=True,
     )
     coords_mri = np.array(
         [line.split() for line in result.stdout.strip().splitlines()], dtype=float
     )
-    if coords_mri.shape != coords_mni.shape:
+    if result.returncode != 0 or coords_mri.shape != coords_mni.shape:
         raise RuntimeError(f"std2imgcoord failed:\n{result.stderr}")
     return coords_mri
 

@@ -166,6 +166,7 @@ class Session:
 
     def __init__(
         self,
+        *,
         outdir: str,
         id: str,
         surfaces_dir: str,

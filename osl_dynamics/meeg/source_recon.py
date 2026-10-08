@@ -215,7 +215,7 @@ def lcmv_beamformer(
         bilateral_tol_midline=bilateral_tol_midline,
     )
 
-    os.makedirs(session.src_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(session.filters_file), exist_ok=True)
     print(f"Saving {session.filters_file}")
     filters.save(session.filters_file, overwrite=True)
 
@@ -309,7 +309,7 @@ def _data_and_noise_covariance(
 def apply_lcmv_beamformer(
     session: Session,
     raw: mne.io.Raw | mne.Epochs | None = None,
-    reject_by_annotation: str | list[str] | None = "omit",
+    reject_by_annotation: str | None = "omit",
     reference_brain: str = "mni",
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply an LCMV beamformer.
@@ -321,10 +321,9 @@ def apply_lcmv_beamformer(
     raw : instance of mne.io.Raw or mne.Epochs, optional
         The data to apply the LCMV filter to.
         If None, session.preproc_file is used.
-    reject_by_annotation : str | list of str | None
-        If string, the annotation description to use to reject epochs.
-        If list of str, the annotation descriptions to use to reject epochs.
-        If None, do not reject epochs.
+    reject_by_annotation : str | None
+        How to treat the samples of a Raw object in annotations starting with
+        'bad': 'omit' drops them, None keeps them.
     reference_brain : str, optional
         Either 'head' or 'mni'. If 'mni', the data is returned for each voxel
         of the MNI grid of the forward model (session.mni_grid_file). Voxels without a
@@ -391,7 +390,7 @@ def virtual_electrodes(
     session: Session,
     coords: list | np.ndarray,
     raw: mne.io.Raw | mne.Epochs | None = None,
-    reject_by_annotation: str | list[str] | None = "omit",
+    reject_by_annotation: str | None = "omit",
     use_bilateral_pairs: bool | None = None,
 ) -> np.ndarray:
     """Beamform the activity at MNI coordinates (virtual electrodes).
@@ -411,14 +410,17 @@ def virtual_electrodes(
         (n_coords, 3). The coordinates must be inside the inner skull.
     raw : mne.io.Raw or mne.Epochs, optional
         The data to beamform. If None, session.preproc_file is used.
-    reject_by_annotation : str | list of str | None
-        Annotation descriptions to omit when getting the data from a Raw
-        object. If None, all time points are used.
+    reject_by_annotation : str | None
+        How to treat the samples of a Raw object in annotations starting with
+        'bad': 'omit' drops them, None keeps them.
     use_bilateral_pairs : bool, optional
         Should we compute joint beamformer weights with the coordinate
-        mirrored across the midline? Coordinates close to the midline use a
-        single dipole. If None, we do this if the filters were computed with
-        :code:`use_bilateral_pairs=True`.
+        mirrored across the midline (x = 0)? Coordinates close to the midline,
+        or whose mirror image is outside the inner skull, use a single dipole.
+        If None, we do this if the filters were computed with
+        :code:`use_bilateral_pairs=True`. Note the dipoles of the MNI grid are
+        paired across the grid's own plane of symmetry, which can be up to half
+        a voxel from x = 0.
 
     Returns
     -------
@@ -456,7 +458,7 @@ def virtual_electrodes(
     eeg = len(mne.pick_types(fwd["info"], meg=False, eeg=True)) > 0
 
     # Dipole locations: the coordinates, then (for bilateral pairs) their
-    # mirror images across the midline of the MNI grid, as in lcmv_beamformer
+    # mirror images across the midline
     positions = coords
     if use_bilateral_pairs:
         tol_midline = bilateral["bilateral_tol_midline"]
@@ -464,10 +466,8 @@ def virtual_electrodes(
             tol_midline = bilateral["bilateral_tol"]
         if tol_midline is None:
             tol_midline = _get_gridstep(_get_mni_grid(session, fwd) / 1000) / 2
-        midline_x = _get_midline_x(session)
-        paired = np.flatnonzero(np.abs(coords[:, 0] - midline_x) >= tol_midline)
-        mirrored = coords[paired] * [-1, 1, 1] + [2 * midline_x, 0, 0]
-        positions = np.concatenate([coords, mirrored])
+        paired = np.flatnonzero(np.abs(coords[:, 0]) >= tol_midline)
+        positions = np.concatenate([coords, coords[paired] * [-1, 1, 1]])
 
     # Lead fields at the exact locations
     ve_fwd, inside = _forward_model_at_coords(session, positions, meg=meg, eeg=eeg)
@@ -582,7 +582,7 @@ def _use_unit_noise_gain(lcmv_params: dict) -> None:
 def _get_filter_input_data(
     session: Session,
     raw: mne.io.Raw | mne.Epochs | None,
-    reject_by_annotation: str | list[str] | None,
+    reject_by_annotation: str | None,
     filters: Beamformer | None = None,
 ) -> tuple[np.ndarray, Beamformer, tuple | None]:
     """Get the sensor data that the LCMV weights are applied to.
@@ -593,9 +593,9 @@ def _get_filter_input_data(
         Files of the session.
     raw : mne.io.Raw or mne.Epochs
         Data. If None, session.preproc_file is used.
-    reject_by_annotation : str | list of str | None
-        Annotation descriptions to omit when getting the data from a Raw
-        object.
+    reject_by_annotation : str | None
+        How to treat the samples of a Raw object in annotations starting with
+        'bad': 'omit' drops them, None keeps them.
     filters : Beamformer, optional
         LCMV filters. If None, session.filters_file is used.
 
@@ -658,8 +658,8 @@ def plot_bilateral_pairs(
         Should we show the plot?
     """
     if filename is None:
-        os.makedirs(session.src_dir, exist_ok=True)
         filename = f"{session.src_dir}/bilateral_dipoles.png"
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
 
     fwd = mne.read_forward_solution(session.fwd_model_file, verbose=False)
     src_coords_mni = _get_source_coords_mni(session, fwd)
