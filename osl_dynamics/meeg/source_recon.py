@@ -489,7 +489,10 @@ def virtual_electrodes(
         ]
         single_dipoles = np.setdiff1d(np.arange(n_coords), paired[has_mirror])
         print(f"Using bilateral pairs for {len(multi_dipoles)} coordinate(s)")
-        _use_unit_noise_gain(lcmv_params)
+        if multi_dipoles:
+            _use_unit_noise_gain(lcmv_params)
+        else:
+            multi_dipoles = single_dipoles = None
 
     # Beamformer weights with the settings used for the MNI grid
     info = mne.pick_info(
