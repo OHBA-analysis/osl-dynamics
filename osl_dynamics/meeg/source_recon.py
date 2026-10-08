@@ -492,7 +492,8 @@ def virtual_electrodes(
         if multi_dipoles:
             _use_unit_noise_gain(lcmv_params)
         else:
-            multi_dipoles = single_dipoles = None
+            multi_dipoles = None
+            single_dipoles = None
 
     # Beamformer weights with the settings used for the MNI grid
     info = mne.pick_info(
