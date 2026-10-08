@@ -956,7 +956,7 @@ def extract_fiducials_and_headshape_from_pos(fns: OSLFilenames) -> None:
     print(f"Saving fiducials/headshape points from {fns.pos_file}")
 
     # These values are in cm in HEAD space
-    num_headshape_pnts = int(pd.read_csv(fns.pos_file, header=None).to_numpy()[0])
+    num_headshape_pnts = int(pd.read_csv(fns.pos_file, header=None).to_numpy()[0, 0])
     data = pd.read_csv(fns.pos_file, header=None, skiprows=[0], sep=r"\s+")
 
     # RHINO is going to work with distances in mm
@@ -1620,6 +1620,16 @@ def coregister_head_and_mri(
     mrivoxel_scaledmri_t = Transform("mri_voxel", "mri", nativeindex_scalednative_t)
     _create_freesurfer_meshes_from_bet_surfaces(cfns, mrivoxel_scaledmri_t["trans"])
 
+    if use_nose:
+        # Not needed by the forward model, but used to report and plot the
+        # coregistration
+        _create_freesurfer_mesh_from_bet_surface(
+            infile=cfns.bet_outskin_plus_nose_mesh_file,
+            surf_outfile=cfns.bet_outskin_plus_nose_surf_file,
+            nii_mesh_file=cfns.bet_outskin_plus_nose_mesh_file,
+            xform_mri_voxel2mri=mrivoxel_scaledmri_t["trans"],
+        )
+
     # ----------------------------------
     # Report and plot the coregistration
     # ----------------------------------
@@ -1887,7 +1897,9 @@ def plot_coregistration(
 
             for coil, coil_trans in zip(coils, coil_transs):
                 try:
-                    rrs, tris = mne.viz._3d._sensor_shape(coil)
+                    rrs, tris, *extra_z = mne.viz._3d._sensor_shape(coil)
+                    if extra_z:
+                        rrs = rrs + [0.0, 0.0, extra_z[0]]
                 except Exception as exc:
                     is_qhull = (
                         isinstance(exc, RuntimeError)
