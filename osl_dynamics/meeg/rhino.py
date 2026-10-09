@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import copy
 import shutil
 import subprocess
 import warnings
@@ -14,6 +13,8 @@ import pandas as pd
 import nibabel as nib
 import nilearn as nil
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+from matplotlib.lines import Line2D
 from sklearn.mixture import GaussianMixture
 from skimage import measure
 from numba import cfunc, carray
@@ -852,48 +853,67 @@ def extract_surfaces(
 
 
 def plot_surfaces(outdir: str, include_nose: bool = True) -> None:
-    """Plot a structural MRI and extracted surfaces.
+    """Plot the extracted surfaces on the structural MRI.
+
+    The surfaces are drawn on one plot, saved to surfaces.png: the brain
+    surface in yellow, the inner skull in cyan and the scalp in magenta. Each
+    should follow its anatomical boundary and lie inside the next.
 
     Parameters
     ----------
     outdir : str
         Directory with the surfaces, see :func:`extract_surfaces`.
     include_nose : bool, optional
-        Should we also plot the outskin surface including the nose?
+        Should we plot the scalp surface including the nose?
     """
     surfaces = SurfaceFilenames(outdir)
 
-    # Surfaces to plot
-    names = ["inskull", "outskull", "outskin"]
-    if include_nose:
-        names.append("outskin_plus_nose")
-    output_files = [f"{surfaces.root}/{name}.png" for name in names]
+    # Surfaces to plot. Note the names BET gives the files: inskull is the
+    # brain surface and outskull is the inner skull
+    scalp = "outskin_plus_nose" if include_nose else "outskin"
+    colours = {
+        "Brain": ("inskull", "#FFD400"),
+        "Inner skull": ("outskull", "#00C8FF"),
+        "Scalp": (scalp, "#FF4FD8"),
+    }
 
     # Check surfaces exist
-    for name in names:
+    for name, _ in colours.values():
         file = Path(getattr(surfaces, f"bet_{name}_mesh_file"))
         if not file.exists():
             raise ValueError(f"{file} does not exist")
 
-    # Plot the structural MRI
+    # Plot the structural MRI and each surface, on slices through the middle
+    # of the brain (the middle of the MRI can be well below it)
     from nilearn import plotting
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        display = plotting.plot_anat(surfaces.mri_file)
+        display = plotting.plot_anat(
+            surfaces.mri_file,
+            cut_coords=plotting.find_xyz_cut_coords(surfaces.bet_inskull_mesh_file),
+            draw_cross=False,
+            colorbar=False,
+        )
+        for name, colour in colours.values():
+            display.add_overlay(
+                getattr(surfaces, f"bet_{name}_mesh_file"),
+                cmap=ListedColormap([colour]),
+                threshold=0.5,
+            )
+    display.frame_axes.legend(
+        handles=[
+            Line2D([], [], color=colour, label=label)
+            for label, (_, colour) in colours.items()
+        ],
+        loc="lower center",
+        ncol=len(colours),
+        frameon=False,
+        labelcolor="white",
+    )
 
-    # Plot each surface
-    for name, output_file in zip(names, output_files):
-        display_copy = copy.deepcopy(display)
-        nii_file = getattr(surfaces, f"bet_{name}_mesh_file")
-        img = nil.image.load_img(nii_file)
-        data = nil.image.get_data(img)
-        vmin = np.nanmin(data)
-        vmax = np.nanmax(data)
-        display_copy.add_overlay(img, vmin=vmin, vmax=vmax)
-
-        print(f"Saving {output_file}")
-        display_copy.savefig(output_file)
+    print(f"Saving {surfaces.surfaces_plot_file}")
+    display.savefig(surfaces.surfaces_plot_file, dpi=150)
 
 
 def extract_fiducials_and_headshape_from_fif(

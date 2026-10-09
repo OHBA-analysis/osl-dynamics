@@ -213,10 +213,12 @@ Output is written to ``derivatives/``.
 #
 # We extract three surfaces from the structural MRI using FSL BET:
 #
-# - **Inner skull (inskull)** — used for the forward model.
-# - **Outer skull (outskull)** — boundary between skull and scalp.
-# - **Outer skin (outskin)** — scalp surface (used for coregistration).
-# - **Outer skin (outskin_plus_nose)** — scalp surface including the nose, only generated if ``include_nose=True``.
+# - **Brain surface (inskull)** — used for the forward model.
+# - **Inner skull (outskull)** — boundary between the brain cavity and the skull.
+# - **Scalp (outskin)** — used for coregistration.
+# - **Scalp including the nose (outskin_plus_nose)** — only generated if ``include_nose=True``.
+#
+# The names in brackets are the ones BET gives the files, which are misleading: ``inskull`` is the brain surface and ``outskull`` is the inner skull.
 #
 # These surfaces define the geometry needed for coregistration and source reconstruction.
 #
@@ -224,7 +226,7 @@ Output is written to ``derivatives/``.
 #
 #     **No structural MRI?** If you don't have a subject-specific MRI, you can skip this step and use the standard MNI152 brain bundled with osl-dynamics. Set ``surfaces_dir = files.mni152_surfaces.directory`` in Step 3 and pass ``allow_mri_scaling=True`` during coregistration.
 #
-# The output plots overlay each extracted surface (yellow line) on the structural MRI. Check that each surface matches the corresponding anatomical boundary. If they don't, consider using the standard MNI152 brain as a fallback.
+# The output plot (``surfaces.png``) overlays the extracted surfaces on the structural MRI: the brain surface in yellow, the inner skull in cyan and the scalp in magenta. Check that each surface matches the corresponding anatomical boundary and lies inside the next. If they don't, consider using the standard MNI152 brain as a fallback.
 #
 # The MRI is also registered to MNI space, which is how the dipoles and parcels (defined in MNI space) are placed in the subject's head. By default this is a nonlinear registration with FSL's FNIRT, which follows the subject's anatomy more closely than an affine registration and so places the parcels more accurately, at the cost of a few minutes per subject. The ``mni_registration.png`` plot shows the edges of the MNI152 template (red) on the registered MRI, check they match the anatomy. Its title gives the overlap of the skull-stripped brain with the MNI152 brain mask and the mutual information with the template, for the registration that is used and (in brackets) the other one; these are also saved to ``mni_registration.json``. FNIRT increases the mutual information when it works, so if it does not the affine registration is used instead. A warning is printed if the registration looks poor, in which case check the plot.
 #

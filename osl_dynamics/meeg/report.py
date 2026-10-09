@@ -31,10 +31,7 @@ TABS = {
         "preproc/{id}/ica_components.webp",
     ],
     "Surfaces": [
-        "surfaces/{subject}/inskull.webp",
-        "surfaces/{subject}/outskull.webp",
-        "surfaces/{subject}/outskin.webp",
-        "surfaces/{subject}/outskin_plus_nose.webp",
+        "surfaces/{subject}/surfaces.webp",
     ],
     "MNI Registration": [
         "surfaces/{subject}/mni_registration.webp",
@@ -50,6 +47,10 @@ TABS = {
 
 # Notes shown under the plots of a tab
 CAPTIONS = {
+    "Surfaces": (
+        "Yellow: brain surface, cyan: inner skull, magenta: scalp. Each should "
+        "follow its boundary and lie inside the next."
+    ),
     "MNI Registration": (
         "Red: edges of the MNI152 template. They should follow the anatomy."
     ),
@@ -458,8 +459,7 @@ def _copy_plots(table: pd.DataFrame, qc_dir: Path, output_dir: Path) -> None:
     """
     copies = []
     for subject in table["subject"].dropna().unique():
-        surfaces = ["inskull", "outskull", "outskin", "outskin_plus_nose"]
-        for name in surfaces + ["mni_registration"]:
+        for name in ["surfaces", "mni_registration"]:
             source = output_dir / "anat_surfaces" / subject / f"{name}.png"
             destination = qc_dir / "surfaces" / subject / f"{name}.webp"
             copies.append((source, destination))

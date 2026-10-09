@@ -37,6 +37,7 @@ class SurfaceFilenames:
         self.mri2mni_warp_file = f"{root}/mri2mni_warpcoef.nii.gz"
         self.mri_mni_nonlinear_file = f"{root}/smri_mni_nonlinear.nii.gz"
         self.mni_registration_plot_file = f"{root}/mni_registration.png"
+        self.surfaces_plot_file = f"{root}/surfaces.png"
         self.mni_registration_quality_file = f"{root}/mni_registration.json"
 
         # BET mesh / surfaces

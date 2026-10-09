@@ -147,10 +147,11 @@ Prerequisites
 # Step 3: Surface Extraction
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
-# We extract the inner skull, outer skull and scalp surfaces from the
-# structural MRI using FSL BET. The output plots overlay each extracted
-# surface (yellow line) on the structural MRI — check that each surface
-# matches the corresponding anatomical boundary.
+# We extract the brain, inner skull and scalp surfaces from the
+# structural MRI using FSL BET. The output plot (``surfaces.png``) overlays
+# the extracted surfaces on the structural MRI: the brain surface in yellow,
+# the inner skull in cyan and the scalp in magenta — check that each surface
+# matches the corresponding anatomical boundary and lies inside the next.
 #
 # .. code-block:: python
 #

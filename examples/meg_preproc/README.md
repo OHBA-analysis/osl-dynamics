@@ -86,9 +86,8 @@ derivatives/
 │   └── ...
 ├── anat_surfaces/
 │   ├── sub-01/
-│   │   ├── inskull.png
-│   │   ├── outskin.png
-│   │   ├── outskull.png
+│   │   ├── surfaces.png
+│   │   ├── mni_registration.png
 │   │   └── ...
 │   └── ...
 └── osl/
@@ -116,9 +115,7 @@ qc/
 │   └── ...
 ├── surfaces/
 │   ├── sub-01/
-│   │   ├── inskull.webp
-│   │   ├── outskull.webp
-│   │   ├── outskin.webp
+│   │   ├── surfaces.webp
 │   │   └── mni_registration.webp
 │   └── ...
 ├── coreg/
