@@ -2917,6 +2917,11 @@ def _mni_to_mri(surfaces: SurfaceFilenames, coords_mni: np.ndarray) -> np.ndarra
         mni_mri_t = read_trans(surfaces.mni_mri_t_file)["trans"]
         return _xform_points(mni_mri_t, coords_mni.T).T
 
+    # std2imgcoord stops reading at a coordinate that repeats the one before
+    # it, so each coordinate is passed once
+    lines = [" ".join(f"{c:.6f}" for c in xyz) for xyz in coords_mni]
+    unique_lines, inverse = np.unique(lines, return_inverse=True)
+
     # Command: std2imgcoord -img <mri_file> -std <MNI152_T1_2mm> \
     #          -warp <mri2mni_warp_file> -mm -
     result = subprocess.run(
@@ -2925,16 +2930,16 @@ def _mni_to_mri(surfaces: SurfaceFilenames, coords_mni: np.ndarray) -> np.ndarra
             *["-img", surfaces.mri_file, "-std", surfaces.std_head_2mm_file],
             *["-warp", surfaces.mri2mni_warp_file, "-mm", "-"],
         ],
-        input="\n".join(" ".join(f"{c:.6f}" for c in xyz) for xyz in coords_mni),
+        input="\n".join(unique_lines),
         capture_output=True,
         text=True,
     )
     coords_mri = np.array(
         [line.split() for line in result.stdout.strip().splitlines()], dtype=float
     )
-    if result.returncode != 0 or coords_mri.shape != coords_mni.shape:
+    if result.returncode != 0 or coords_mri.shape != (len(unique_lines), 3):
         raise RuntimeError(f"std2imgcoord failed:\n{result.stderr}")
-    return coords_mri
+    return coords_mri[inverse]
 
 
 def _mni_to_scaledmri(session: Session, coords_mni: np.ndarray) -> np.ndarray:

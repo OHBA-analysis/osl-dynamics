@@ -287,12 +287,13 @@ Prerequisites
 # simply pass ``use_bilateral_pairs=True``:
 #
 # - Dipoles are mirrored across the midline of the MNI grid and paired with
-#   the closest dipole in the opposite hemisphere within ``bilateral_tol`` mm.
-#   Because the dipoles are on an MNI grid, the mirror image of a dipole is
-#   exactly on the grid, so almost all pairs are exact mirror images (a
-#   dipole whose mirror image is outside the brain is paired with the closest
-#   dipole). ``bilateral_tol`` defaults to half the grid spacing (here: 8 mm
-#   grid, so 4 mm).
+#   the closest dipole in the opposite hemisphere within the tolerance
+#   ``bilateral_tol``. Because the dipoles are on an MNI grid, the mirror
+#   image of a dipole is exactly on the grid, so almost all pairs are exact
+#   mirror images. ``bilateral_tol`` is the mean absolute difference between
+#   the x, y and z coordinates of the mirrored dipoles and defaults to half
+#   the grid spacing (here: 8 mm grid, so 4 mm), so a dipole whose mirror
+#   image is outside the brain can be paired with a neighbouring dipole.
 # - Dipoles within ``bilateral_tol_midline`` of the midline, and dipoles with
 #   no match, are beamformed as usual (defaults to ``bilateral_tol``).
 # - Joint weights are computed for each pair by concatenating the two lead
@@ -303,7 +304,7 @@ Prerequisites
 #
 # .. code-block:: python
 #
-#     session.filters_file = f"{session.src_dir}/filters-lcmv-bilateral.h5"
+#     session.filters_file = f"{session.src_dir}/filters-bilateral-lcmv.h5"
 #
 #     source_recon.lcmv_beamformer(
 #         session,
@@ -327,9 +328,9 @@ Prerequisites
 
 #%%
 # The beamformer prints how many pairs were found. To check the pairing, we
-# plot it (saved to ``session.src_dir/bilateral_dipoles.png``). Red lines connect
-# paired dipoles, blue dots are midline dipoles, grey dots are unpaired
-# dipoles.
+# plot it (saved to ``session.src_dir/bilateral_dipoles.png``). Paired dipoles
+# are red and joined by a line, blue dots are midline dipoles, grey circles
+# are unpaired dipoles.
 #
 # .. code-block:: python
 #

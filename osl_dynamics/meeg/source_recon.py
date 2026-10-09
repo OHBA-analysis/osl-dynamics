@@ -104,8 +104,11 @@ def lcmv_beamformer(
         incompatible with weight_norm='unit-noise-gain-invariant'
         (weight_norm='unit-noise-gain' is used if weight_norm is not passed).
     bilateral_tol : float
-        Distance threshold (in mm) for pairing dipoles mirrored across the
-        midline. If None, half the gridstep of the dipole grid is used.
+        Tolerance (in mm) for pairing dipoles mirrored across the midline:
+        the mean absolute difference between the x, y and z coordinates of a
+        dipole and the mirror image of its partner. If None, half the gridstep
+        of the dipole grid is used, which pairs a dipole with its mirror image
+        or, if there is no dipole there, with a dipole one gridstep from it.
         Recommended value: gridstep / 2.
     bilateral_tol_midline : float
         Dipoles closer (in mm) than this to the midline (x = 0 in MNI space)
@@ -651,8 +654,9 @@ def plot_bilateral_pairs(
     session : Session
         Files of the session.
     bilateral_tol : float, optional
-        Distance threshold (in mm) for pairing dipoles mirrored across the
-        midline. If None, half the gridstep of the dipole grid is used.
+        Tolerance (in mm) for pairing dipoles mirrored across the midline,
+        see :func:`lcmv_beamformer`. If None, half the gridstep of the dipole
+        grid is used.
     bilateral_tol_midline : float, optional
         Dipoles closer (in mm) than this to the midline are not paired.
         If None, bilateral_tol is used.
@@ -1564,8 +1568,10 @@ def _find_bilateral_pairs(
         (n_sources, 3) dipole coordinates in MNI space in mm. The x-axis
         indexes left vs right hemisphere.
     bilateral_tol : float, optional
-        Distance threshold (in mm) for pairing dipoles mirrored across the
-        midline. If None, half the gridstep of the dipole grid is used.
+        Tolerance (in mm) for pairing dipoles mirrored across the midline:
+        the mean absolute difference between the x, y and z coordinates of a
+        dipole and the mirror image of its partner. If None, half the gridstep
+        of the dipole grid is used.
     bilateral_tol_midline : float, optional
         Dipoles closer (in mm) than this to the midline are not paired.
         If None, bilateral_tol is used.
@@ -1693,23 +1699,35 @@ def _plot_bilateral_pairs(
     labels = ["x (mm)", "y (mm)", "z (mm)"]
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
     for ax, (view, i, j) in zip(axes, views):
-        ax.scatter(
-            src_coords_mni[single_dipoles, i],
-            src_coords_mni[single_dipoles, j],
-            s=4,
-            c="grey",
-        )
-        ax.scatter(
-            src_coords_mni[midline_points, i],
-            src_coords_mni[midline_points, j],
-            s=4,
-            c="tab:blue",
-        )
         ax.plot(
             src_coords_mni[pairs, i].T,
             src_coords_mni[pairs, j].T,
             c="tab:red",
             lw=0.4,
+            zorder=1,
+        )
+        ax.scatter(
+            src_coords_mni[midline_points, i],
+            src_coords_mni[midline_points, j],
+            s=14,
+            c="tab:blue",
+            zorder=2,
+        )
+        ax.scatter(
+            src_coords_mni[pairs.ravel(), i],
+            src_coords_mni[pairs.ravel(), j],
+            s=3,
+            c="tab:red",
+            zorder=3,
+        )
+        ax.scatter(
+            src_coords_mni[single_dipoles, i],
+            src_coords_mni[single_dipoles, j],
+            s=26,
+            facecolors="none",
+            edgecolors="grey",
+            linewidths=0.7,
+            zorder=4,
         )
         ax.set_title(view)
         ax.set_xlabel(labels[i])
@@ -1718,9 +1736,9 @@ def _plot_bilateral_pairs(
 
     # Dummy handles for the legend
     handles = [
-        plt.Line2D([], [], ls="", marker="o", ms=4, c="grey"),
+        plt.Line2D([], [], ls="", marker="o", ms=5, mfc="none", mec="grey"),
         plt.Line2D([], [], ls="", marker="o", ms=4, c="tab:blue"),
-        plt.Line2D([], [], c="tab:red"),
+        plt.Line2D([], [], marker="o", ms=2, c="tab:red"),
     ]
     fig.legend(
         handles,
