@@ -47,6 +47,13 @@ TABS = {
     ],
 }
 
+# Notes shown under the plots of a tab
+CAPTIONS = {
+    "MNI Registration": (
+        "Red: edges of the MNI152 template. They should follow the anatomy."
+    ),
+}
+
 CSS = """
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -196,6 +203,11 @@ button:hover {
     display: block;
     margin: 0 auto 10px auto;
 }
+.caption {
+    color: #666;
+    text-align: center;
+    margin: 0;
+}
 .placeholder {
     background: #eee;
     color: #999;
@@ -312,7 +324,8 @@ function render() {
         .replace('{head_model}', headModel);
     plots.innerHTML = `<h2>${id}</h2>` + DATA.tabs[tabs[tab]].map(file =>
         `<img src="${path(file)}" onerror="missing(this)">`
-    ).join('') + '<div class="placeholder" id="placeholder" hidden>Not available</div>';
+    ).join('') + `<p class="caption">${DATA.captions[tabs[tab]] || ''}</p>`
+        + '<div class="placeholder" id="placeholder" hidden>Not available</div>';
 }
 
 function missing(img) {
@@ -405,9 +418,10 @@ def _session_row(
             )
         registration = registrations[subject]
         if registration is not None:
-            used = registration.get("nonlinear", registration["affine"])
-            row["MNI overlap"] = used["dice"]
-            row["MNI MI"] = used["mutual_information"]
+            used = registration["used"]
+            row["MNI registration"] = used
+            row["MNI overlap"] = registration[used]["dice"]
+            row["MNI MI"] = registration[used]["mutual_information"]
 
         # The coregistration may be a property of the subject rather than the
         # session, and so shared by all of a subject's sessions (see
@@ -512,6 +526,7 @@ def generate_report(
         "Bad segments (%)",
         "Bad channels",
         "ICA excluded",
+        "MNI registration",
         "MNI overlap",
         "MNI MI",
         "Coreg rms (mm)",
@@ -535,6 +550,7 @@ def generate_report(
         "columns": data["columns"],
         "rows": data["data"],
         "tabs": TABS,
+        "captions": CAPTIONS,
     }
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 

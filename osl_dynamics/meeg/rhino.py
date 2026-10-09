@@ -344,9 +344,11 @@ def extract_surfaces(
         Either way, the registration is checked: the overlap (Dice) of the
         skull-stripped brain with the MNI152 brain mask and the mutual
         information of the MRI with the MNI152 template are saved to
-        mni_registration.json and shown on mni_registration.png, and a
-        warning is printed if the registration looks poor or the nonlinear
-        registration is not better than the affine one.
+        mni_registration.json and shown on mni_registration.png, which
+        plots the edges of the MNI152 template (red) on the registered MRI.
+        A warning is printed if the registration looks poor. FNIRT increases
+        the mutual information when it works, so if it does not the affine
+        registration is used instead.
     show : bool, optional
         Whether to display the surface plots interactively. Default is
         False (suitable for batch processing).
@@ -818,20 +820,25 @@ def extract_surfaces(
         )
     }
 
+    used = "affine"
     if nonlinear_registration:
         _nonlinear_registration(surfaces)
         quality["nonlinear"] = _mni_registration_quality(
             surfaces, surfaces.mri_mni_nonlinear_file, bet_kwargs
         )
-        registered_file = surfaces.mri_mni_nonlinear_file
-    else:
-        # Make sure a warp from a previous call is not used
+        # FNIRT increases the mutual information when it works, if it does
+        # not it has failed and the affine registration is used
+        affine_mi = quality["affine"]["mutual_information"]
+        if quality["nonlinear"]["mutual_information"] > affine_mi:
+            used = "nonlinear"
+
+    if used == "affine":
+        # Make sure a warp from FNIRT or a previous call is not used
         for f in [surfaces.mri2mni_warp_file, surfaces.mri_mni_nonlinear_file]:
             if os.path.exists(f):
                 os.remove(f)
-        registered_file = surfaces.mri_mni_affine_file
 
-    _report_mni_registration(surfaces, quality, registered_file)
+    _report_mni_registration(surfaces, quality, used)
 
     print("Cleaning up FLIRT files")
     system_call(f"rm -f {surfaces.root}/flirt*", verbose=False)
@@ -2764,7 +2771,7 @@ def _mni_registration_quality(
 def _report_mni_registration(
     surfaces: SurfaceFilenames,
     quality: dict[str, dict[str, float]],
-    registered_file: str,
+    used: str,
 ) -> None:
     """Save, print and plot the quality of the registration to MNI space.
 
@@ -2775,14 +2782,13 @@ def _report_mni_registration(
     quality : dict
         Quality of the 'affine' and (if done) 'nonlinear' registration, from
         _mni_registration_quality.
-    registered_file : str
-        MRI registered to MNI space with the registration that will be used.
+    used : str
+        The registration that will be used, 'affine' or 'nonlinear'.
     """
-    save_params(surfaces.mni_registration_quality_file, quality)
+    save_params(surfaces.mni_registration_quality_file, {"used": used, **quality})
 
     affine = quality["affine"]
     nonlinear = quality.get("nonlinear")
-    used = nonlinear or affine
 
     print("MNI registration:")
     for name, q in quality.items():
@@ -2790,27 +2796,35 @@ def _report_mni_registration(
             f"  {name}: brain overlap (Dice) = {q['dice']:.3f}, mutual "
             f"information with template = {q['mutual_information']:.3f}"
         )
-    if used["dice"] < MNI_REGISTRATION_MIN_DICE:
+    if quality[used]["dice"] < MNI_REGISTRATION_MIN_DICE:
         print(
             "WARNING: the registration to MNI space looks poor (brain overlap "
-            f"{used['dice']:.2f}). Check {surfaces.mni_registration_plot_file}. A "
-            "cropped field of view, a strong bias field, a wrong sform or poor "
-            "skull stripping (bet_fval) can all cause this."
+            f"{quality[used]['dice']:.2f}). Check "
+            f"{surfaces.mni_registration_plot_file}. A cropped field of view, a "
+            "strong bias field, a wrong sform or poor skull stripping (bet_fval) "
+            "can all cause this."
         )
-    if nonlinear and nonlinear["mutual_information"] < affine["mutual_information"]:
+    if nonlinear and used == "affine":
         print(
             "WARNING: the nonlinear (FNIRT) registration to MNI space is not "
-            f"better than the affine (FLIRT) one. Check "
-            f"{surfaces.mni_registration_plot_file}; if it looks wrong, rerun "
-            "with nonlinear_registration=False."
+            "better than the affine (FLIRT) one, so the affine registration "
+            "is used."
         )
 
     def summary(q):
         return f"overlap {q['dice']:.2f}, MI {q['mutual_information']:.2f}"
 
+    # The registration that is used comes first
     title = f"FLIRT: {summary(affine)}"
-    if nonlinear:
+    if used == "nonlinear":
         title = f"FNIRT: {summary(nonlinear)} ({title})"
+    elif nonlinear:
+        title = f"{title} (FNIRT: {summary(nonlinear)})"
+    registered_file = (
+        surfaces.mri_mni_nonlinear_file
+        if used == "nonlinear"
+        else surfaces.mri_mni_affine_file
+    )
     _plot_mni_registration(
         registered_file,
         surfaces.std_head_2mm_file,
