@@ -53,7 +53,7 @@ Each script has a config block at the top. Edit these variables before running:
 ```python
 input_dir = Path("BIDS")
 output_dir = Path("derivatives")
-plots_dir = Path("plots")
+qc_dir = Path("qc")
 log_dir = Path("logs/1_preproc")
 sessions = {
     "sub-01_task-rest": {"subject": "sub-01", "file": "sub-01_task-rest.fif"},
@@ -64,7 +64,7 @@ n_workers = 4
 
 - `input_dir` — Path to your BIDS directory containing the raw data.
 - `output_dir` — Path to the output directory for derivatives.
-- `plots_dir` — Directory for QC plots and the HTML report.
+- `qc_dir` — Directory for QC plots and the HTML report.
 - `log_dir` — Directory for per-session log files.
 - `sessions` — Dictionary of sessions to process. Each key is a session ID used for naming output files and logs. Each value contains the `subject` (BIDS subject directory) and `file` (MEG filename).
 - `n_workers` — Number of sessions to process in parallel.
@@ -101,35 +101,42 @@ derivatives/
     │   │   └── model-mni-grid.nii.gz
     │   ├── src/
     │   │   └── filters-lcmv.h5
-    │   ├── lcmv-parc-raw.fif
-    │   └── psd_topo.png
+    │   └── lcmv-parc-raw.fif
     └── ...
 
-plots/
-├── sub-01_task-rest/
-│   ├── 1_summary.json
-│   ├── 1_psd.png
-│   ├── 1_sum_square.png
-│   ├── 1_sum_square_exclude_bads.png
-│   ├── 1_channel_stds.png
-│   ├── 1_ica_components.png
-│   └── 5_psd_topo.png
-├── sub-02_task-rest/
-│   └── ...
-├── 2_surfaces/
-│   ├── sub-01/
-│   └── ...
-├── 3_coreg/
+qc/
+├── preproc/
 │   ├── sub-01_task-rest/
+│   │   ├── summary.json
+│   │   ├── psd.webp
+│   │   ├── sum_square.webp
+│   │   ├── sum_square_exclude_bads.webp
+│   │   ├── channel_stds.webp
+│   │   └── ica_components.webp
+│   └── ...
+├── surfaces/
+│   ├── sub-01/
+│   │   ├── inskull.webp
+│   │   ├── outskull.webp
+│   │   ├── outskin.webp
+│   │   └── mni_registration.webp
+│   └── ...
+├── coreg/
+│   ├── sub-01_task-rest/
+│   │   └── coreg.webp
+│   └── ...
+├── parc/
+│   ├── sub-01_task-rest/
+│   │   └── psd_topo.webp
 │   └── ...
 └── report.html
 ```
 
 ## QC Report
 
-An HTML report (`plots/report.html`) is automatically generated after steps 1, 3, 4 and 5 complete. It is a table with one row per session, holding the numbers each step saves (bad segments, MNI registration, coregistration error), next to the QC plots of the selected session. Sort the table by a column to see the worst sessions first; values far from the rest of their column are highlighted. Open it in a browser to review results.
+An HTML report (`qc/report.html`) is automatically generated after steps 1, 3, 4 and 5 complete. It is a table with one row per session, holding the numbers each step saves (bad segments, MNI registration, coregistration error), next to the QC plots of the selected session. Sort the table by a column to see the worst sessions first; values far from the rest of their column are highlighted. Open it in a browser to review results.
 
-The report updates incrementally — after step 1 you'll see preprocessing plots, after step 3 coregistration and surfaces appear, etc. The surface extraction (step 2), coregistration (step 3) and parcellation (step 5) plots are copied from the derivatives directory when the report is generated (the surfaces once per subject), so the `plots` directory can be moved or served on its own.
+The report updates incrementally — after step 1 you'll see preprocessing plots, after step 3 coregistration and surfaces appear, etc. The preprocessing (step 1) and parcellation (step 5) plots are saved in the `qc` directory. The surface extraction (step 2) and coregistration (step 3) plots are saved with their output and copied from the derivatives directory when the report is generated (the surfaces once per subject), so the `qc` directory can be moved or served on its own. The plots in it are WebP files, which are several times smaller than PNG.
 
 ## Logging
 

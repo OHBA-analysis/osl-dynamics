@@ -5,45 +5,46 @@ saves (bad segments, MNI registration, coregistration error, ...), next to the
 QC plots of the selected session. Sort the table by a metric to see the worst
 sessions first. Only the plots of the selected session are loaded, so the
 report works for datasets with tens of thousands of sessions. The report and
-its plots are all in the plots directory, which can be moved or served on its
+its plots are all in the QC directory, which can be moved or served on its
 own.
 """
 
 from __future__ import annotations
 
 import json
-import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+from PIL import Image
 
-# Plots shown in each tab, relative to the plots directory. Plots that have
-# not been saved are not shown.
+# Plots shown in each tab, relative to the QC directory, which has a
+# directory for each step holding a directory for each session, subject or
+# head model. Plots that have not been saved are not shown.
 TABS = {
     "Preprocessing": [
-        "{id}/1_psd.png",
-        "{id}/1_sum_square.png",
-        "{id}/1_sum_square_exclude_bads.png",
-        "{id}/1_channel_stds.png",
-        "{id}/1_ica_components.png",
+        "preproc/{id}/psd.webp",
+        "preproc/{id}/sum_square.webp",
+        "preproc/{id}/sum_square_exclude_bads.webp",
+        "preproc/{id}/channel_stds.webp",
+        "preproc/{id}/ica_components.webp",
     ],
     "Surfaces": [
-        "2_surfaces/{subject}/inskull.png",
-        "2_surfaces/{subject}/outskull.png",
-        "2_surfaces/{subject}/outskin.png",
-        "2_surfaces/{subject}/outskin_plus_nose.png",
+        "surfaces/{subject}/inskull.webp",
+        "surfaces/{subject}/outskull.webp",
+        "surfaces/{subject}/outskin.webp",
+        "surfaces/{subject}/outskin_plus_nose.webp",
     ],
     "MNI Registration": [
-        "2_surfaces/{subject}/mni_registration.png",
+        "surfaces/{subject}/mni_registration.webp",
     ],
     "Coregistration": [
-        "3_coreg/{head_model}/coreg.png",
+        "coreg/{head_model}/coreg.webp",
     ],
     "Parcellation": [
-        "{id}/5_psd_topo.png",
-        "{id}/5_power_maps.png",
+        "parc/{id}/psd_topo.webp",
+        "parc/{id}/power_maps.webp",
     ],
 }
 
@@ -372,7 +373,7 @@ def _read_json(path: Path) -> dict | None:
 def _session_row(
     id: str,
     info: dict | None,
-    plots_dir: Path,
+    qc_dir: Path,
     output_dir: Path | None,
     registrations: dict,
 ) -> dict:
@@ -384,8 +385,8 @@ def _session_row(
         Session ID.
     info : dict
         Session info. The surfaces are looked up with its 'subject'.
-    plots_dir : Path
-        Path to the plots directory.
+    qc_dir : Path
+        Path to the QC directory.
     output_dir : Path
         Path to the derivatives directory.
     registrations : dict
@@ -401,7 +402,7 @@ def _session_row(
     subject = info.get("subject") if isinstance(info, dict) else None
     row = {"Session": id, "subject": subject, "head_model": id}
 
-    summary = _read_json(plots_dir / id / "1_summary.json")
+    summary = _read_json(qc_dir / "preproc" / id / "summary.json")
     if summary is not None:
         row["Bad segments (%)"] = summary["bad_percent"]
         row["Bad channels"] = summary["n_bad_channels"]
@@ -436,19 +437,22 @@ def _session_row(
     return row
 
 
-def _copy_plots(table: pd.DataFrame, plots_dir: Path, output_dir: Path) -> None:
-    """Copy the plots saved in the derivatives directory to the plots directory.
+def _copy_plots(table: pd.DataFrame, qc_dir: Path, output_dir: Path) -> None:
+    """Copy the plots saved in the derivatives directory to the QC directory.
 
+    Surface extraction and coregistration save their plots with their output
+    (the preprocessing and parcellation plots are saved in the QC directory).
     The surfaces are copied once per subject and the coregistration once per
-    head model, to the paths in TABS. Plots that have not changed since they
-    were last copied are skipped.
+    head model, to the paths in TABS. They are saved as WebP files, which are
+    several times smaller than the PNG files the steps save and look the same.
+    Plots that have not changed since they were last copied are skipped.
 
     Parameters
     ----------
     table : pd.DataFrame
         Session ID, subject and head model of each session.
-    plots_dir : Path
-        Path to the plots directory.
+    qc_dir : Path
+        Path to the QC directory.
     output_dir : Path
         Path to the derivatives directory.
     """
@@ -457,14 +461,11 @@ def _copy_plots(table: pd.DataFrame, plots_dir: Path, output_dir: Path) -> None:
         surfaces = ["inskull", "outskull", "outskin", "outskin_plus_nose"]
         for name in surfaces + ["mni_registration"]:
             source = output_dir / "anat_surfaces" / subject / f"{name}.png"
-            copies.append((source, plots_dir / "2_surfaces" / subject / source.name))
+            destination = qc_dir / "surfaces" / subject / f"{name}.webp"
+            copies.append((source, destination))
     for head_model in table["head_model"].unique():
         source = output_dir / "osl" / head_model / "coreg" / "coreg.png"
-        copies.append((source, plots_dir / "3_coreg" / head_model / source.name))
-    for id in table["Session"]:
-        for name in ["psd_topo", "power_maps"]:
-            source = output_dir / "osl" / id / f"{name}.png"
-            copies.append((source, plots_dir / id / f"5_{source.name}"))
+        copies.append((source, qc_dir / "coreg" / head_model / "coreg.webp"))
 
     def copy(files):
         source, destination = files
@@ -476,17 +477,20 @@ def _copy_plots(table: pd.DataFrame, plots_dir: Path, output_dir: Path) -> None:
         ):
             return
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(source, destination)
+        # Moved into place when complete, so an interrupted copy is redone
+        temporary = destination.with_suffix(".tmp")
+        Image.open(source).save(temporary, "WEBP", quality=80)
+        temporary.replace(destination)
 
     with ThreadPoolExecutor(max_workers=16) as pool:
         list(pool.map(copy, copies))
 
 
 def generate_report(
-    plots_dir: str | Path,
+    qc_dir: str | Path,
     sessions: dict,
     output_dir: str | Path | None = None,
-    qc: pd.DataFrame | None = None,
+    metrics: pd.DataFrame | None = None,
     output_file: str = "report.html",
 ) -> None:
     """Generate a QC summary HTML report.
@@ -499,30 +503,30 @@ def generate_report(
 
     Parameters
     ----------
-    plots_dir : str or Path
-        Path to the plots directory containing per-session subdirectories.
-        The report is written here.
+    qc_dir : str or Path
+        Path to the QC directory. The preprocessing and parcellation QC is
+        read from here and the report is written here.
     sessions : dict
         Dictionary of sessions (same format as the pipeline scripts).
     output_dir : str or Path, optional
         Path to the derivatives directory. If provided, the surface
-        extraction, coregistration and parcellation QC is read from here and
-        their plots are copied to the plots directory.
-    qc : pd.DataFrame, optional
+        extraction and coregistration QC is read from here and their plots are
+        copied to the QC directory.
+    metrics : pd.DataFrame, optional
         More columns for the table (e.g. statistics of the parcellated data),
         indexed by session ID. Numbers and booleans are highlighted like the
         other metrics.
     output_file : str, optional
-        Filename for the report. Written to plots_dir/output_file.
+        Filename for the report. Written to qc_dir/output_file.
     """
-    plots_dir = Path(plots_dir)
+    qc_dir = Path(qc_dir)
     if output_dir is not None:
         output_dir = Path(output_dir)
 
     # One row per session, keeping the metrics that at least one session has.
     # The QC files are read in threads, a large dataset has tens of thousands
     registrations = {}
-    metrics = [
+    columns = [
         "Bad segments (%)",
         "Bad channels",
         "ICA excluded",
@@ -533,17 +537,17 @@ def generate_report(
     ]
     with ThreadPoolExecutor(max_workers=16) as pool:
         rows = pool.map(
-            lambda item: _session_row(*item, plots_dir, output_dir, registrations),
+            lambda item: _session_row(*item, qc_dir, output_dir, registrations),
             sessions.items(),
         )
         table = pd.DataFrame(
-            rows, columns=["Session", "subject", "head_model"] + metrics
+            rows, columns=["Session", "subject", "head_model"] + columns
         )
-    table = table.drop(columns=[m for m in metrics if table[m].isna().all()])
+    table = table.drop(columns=[c for c in columns if table[c].isna().all()])
     if output_dir is not None:
-        _copy_plots(table, plots_dir, output_dir)
-    if qc is not None:
-        table = table.join(qc, on="Session")
+        _copy_plots(table, qc_dir, output_dir)
+    if metrics is not None:
+        table = table.join(metrics, on="Session")
 
     data = json.loads(table.to_json(orient="split", double_precision=6))
     data = {
@@ -587,7 +591,7 @@ def generate_report(
 </body>
 </html>"""
 
-    output_path = plots_dir / output_file
+    output_path = qc_dir / output_file
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(report)
     print(f"Report saved: {output_path}")

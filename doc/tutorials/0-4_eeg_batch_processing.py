@@ -127,7 +127,7 @@ The output of this script is written to ``derivatives/``.
 #     from osl_dynamics.meeg import parallel, preproc, Session
 #
 #     output_dir = Path("derivatives")
-#     plots_dir = Path("plots")
+#     qc_dir = Path("qc")
 #     log_dir = Path("logs/1_preproc")
 #
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
@@ -201,7 +201,7 @@ The output of this script is written to ``derivatives/``.
 #         raw = raw.set_eeg_reference(projection=True)
 #
 #         logger.log("Saving QC plots...")
-#         preproc.save_qc_plots(raw, plots_dir / session["id"])
+#         preproc.save_qc_plots(qc_dir, session["id"], raw)
 #
 #         logger.log("Saving preprocessed data...")
 #         preproc_out_dir = output_dir / "preprocessed"
@@ -218,7 +218,7 @@ The output of this script is written to ``derivatives/``.
 #             items=sessions,
 #             output_dir=output_dir,
 #             log_dir=log_dir,
-#             plots_dir=plots_dir,
+#             qc_dir=qc_dir,
 #             n_workers=8,
 #         )
 
@@ -293,7 +293,7 @@ The output of this script is written to ``derivatives/``.
 #     from osl_dynamics.meeg import parallel, rhino, Session
 #
 #     output_dir = Path("derivatives")
-#     plots_dir = Path("plots")
+#     qc_dir = Path("qc")
 #     log_dir = Path("logs/3_coreg")
 #
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
@@ -364,7 +364,7 @@ The output of this script is written to ``derivatives/``.
 #             items=sessions,
 #             output_dir=output_dir,
 #             log_dir=log_dir,
-#             plots_dir=plots_dir,
+#             qc_dir=qc_dir,
 #             n_workers=8,
 #         )
 
@@ -388,7 +388,7 @@ The output of this script is written to ``derivatives/``.
 #     from osl_dynamics.meeg import parallel, rhino, source_recon, Session
 #
 #     output_dir = Path("derivatives")
-#     plots_dir = Path("plots")
+#     qc_dir = Path("qc")
 #     log_dir = Path("logs/4_source_recon")
 #
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
@@ -422,7 +422,7 @@ The output of this script is written to ``derivatives/``.
 #             items=sessions,
 #             output_dir=output_dir,
 #             log_dir=log_dir,
-#             plots_dir=plots_dir,
+#             qc_dir=qc_dir,
 #             n_workers=8,
 #         )
 
@@ -445,7 +445,7 @@ The output of this script is written to ``derivatives/``.
 #     from osl_dynamics.meeg import parallel, parcellation, Session
 #
 #     output_dir = Path("derivatives")
-#     plots_dir = Path("plots")
+#     qc_dir = Path("qc")
 #     log_dir = Path("logs/5_parc")
 #
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
@@ -484,7 +484,9 @@ The output of this script is written to ``derivatives/``.
 #         )
 #
 #         logger.log("Saving QC plots...")
-#         parcellation.save_qc_plots(parc_fif, parcellation_file)
+#         parcellation.save_qc_plots(
+#             qc_dir, session["id"], parc_fif, parcellation_file
+#         )
 #
 #         logger.log("Done.")
 #
@@ -495,9 +497,38 @@ The output of this script is written to ``derivatives/``.
 #             items=sessions,
 #             output_dir=output_dir,
 #             log_dir=log_dir,
-#             plots_dir=plots_dir,
+#             qc_dir=qc_dir,
 #             n_workers=8,
 #         )
+
+#%%
+# QC Report
+# ^^^^^^^^^
+#
+# Each step that is passed ``qc_dir`` writes ``qc/report.html`` when it
+# finishes, with what has been saved so far. Open it in a browser. It is a
+# table with one row per session next to the QC plots of the selected
+# session:
+#
+# - The table holds the numbers the steps save: the percentage of bad
+#   segments and the number of bad channels (step 1), the overlap and mutual
+#   information of the MRI with the MNI152 template after registration
+#   (step 2) and the distance of the headshape points (here the electrodes)
+#   from the scalp after coregistration (step 3). Click a column to sort by
+#   it, which puts the worst sessions first. Values far from the rest of
+#   their column are highlighted.
+# - The tabs show the plots of the selected session: the preprocessing plots
+#   (sensor-level PSD first), the extracted surfaces, the registration to MNI
+#   space (the red lines are the edges of the MNI152 template, they should
+#   follow the anatomy), the coregistration and the PSD of the parcel time
+#   courses.
+# - The up/down arrow keys move between sessions and left/right between
+#   tabs.
+#
+# With many sessions it is quicker to sort by each metric and look at the
+# plots of the worst sessions than to page through all of them. The report
+# and its plots are all in ``qc/``, so that directory can be copied or
+# served on its own.
 
 #%%
 # Summary

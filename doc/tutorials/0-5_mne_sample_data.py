@@ -88,7 +88,7 @@ Prerequisites
 #
 #     # Paths
 #     output_dir = Path("derivatives")
-#     plots_dir = Path("plots")
+#     qc_dir = Path("qc")
 
 #%%
 # Step 1: Preprocessing
@@ -272,9 +272,10 @@ Prerequisites
 # .. code-block:: python
 #
 #     parcellation.save_qc_plots(
+#         qc_dir,
+#         id,
 #         parc_fif,
 #         "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
-#         output_dir=plots_dir / id,
 #     )
 
 #%%

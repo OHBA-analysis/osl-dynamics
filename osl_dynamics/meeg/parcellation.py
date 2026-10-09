@@ -477,28 +477,33 @@ def plot_psds(
 
 
 def save_qc_plots(
+    qc_dir: str | Path,
+    id: str,
     parc_fif: str,
     parcellation_file: str,
-    output_dir: str | Path | None = None,
     power_maps: bool = False,
     show: bool = False,
     cmap: str = "hot",
 ) -> None:
     """Save parcellation QC plots.
 
-    Saves the following files to output_dir:
-    - psd_topo.png: PSD topography plot
-    - power_maps.png: composite band power maps (only if power_maps=True)
+    Saves the following files to ``qc_dir/parc/id``, where the QC report
+    looks for them:
+
+    - ``psd_topo.webp``: PSD topography plot
+    - ``power_maps.webp``: composite band power maps (only if
+      ``power_maps=True``)
 
     Parameters
     ----------
+    qc_dir : str or Path
+        QC directory.
+    id : str
+        Session identifier.
     parc_fif : str
         Path to parcellated fif file.
     parcellation_file : str
         Parcellation file name.
-    output_dir : str or Path, optional
-        Directory to save plots to. Defaults to the directory containing
-        parc_fif.
     power_maps : bool, optional
         Whether to create band power map plots. Default is False.
     show : bool, optional
@@ -506,10 +511,7 @@ def save_qc_plots(
     cmap : str, optional
         Colormap for power maps.
     """
-    if output_dir is None:
-        output_dir = Path(parc_fif).parent
-    else:
-        output_dir = Path(output_dir)
+    output_dir = Path(qc_dir) / "parc" / id
     output_dir.mkdir(parents=True, exist_ok=True)
 
     from osl_dynamics.analysis import power
@@ -535,7 +537,7 @@ def save_qc_plots(
         psd,
         parcellation_file=parcellation_file,
         frequency_range=[1, 45],
-        filename=str(output_dir / "psd_topo.png"),
+        filename=str(output_dir / "psd_topo.webp"),
     )
     if not show:
         plt.close("all")
@@ -573,7 +575,7 @@ def save_qc_plots(
         ax.axis("off")
     composite_fig.tight_layout()
     composite_fig.savefig(
-        str(output_dir / "power_maps.png"), dpi=150, bbox_inches="tight"
+        str(output_dir / "power_maps.webp"), dpi=150, bbox_inches="tight"
     )
     if not show:
         plt.close(composite_fig)

@@ -9,7 +9,7 @@ from osl_dynamics.meeg import parallel, preproc
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
 output_dir = Path("derivatives")
-plots_dir = Path("plots")
+qc_dir = Path("qc")
 log_dir = Path("logs/1_preproc")
 
 sessions = [
@@ -55,8 +55,9 @@ def process_session(session, logger):
 
     logger.log("Saving QC plots...")
     preproc.save_qc_plots(
+        qc_dir,
+        session["id"],
         raw,
-        plots_dir / session["id"],
         ica=ica,
         ic_labels=ic_labels,
     )
@@ -76,6 +77,6 @@ if __name__ == "__main__":
         items=sessions,
         output_dir=output_dir,
         log_dir=log_dir,
-        plots_dir=plots_dir,
+        qc_dir=qc_dir,
         n_workers=4,
     )

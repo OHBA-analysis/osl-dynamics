@@ -1028,8 +1028,9 @@ def _grid_average_decimate(
 
 
 def save_qc_plots(
+    qc_dir: str | Path,
+    id: str,
     raw: mne.io.Raw,
-    output_dir: str | Path,
     show: bool = False,
     ica: Any = None,
     ic_labels: dict | None = None,
@@ -1037,24 +1038,26 @@ def save_qc_plots(
 ) -> None:
     """Save preprocessing QC plots and summary.
 
-    Saves the following files to output_dir (only the first two if
-    ``psd_only=True``):
+    Saves the following files to ``qc_dir/preproc/id``, where the QC report
+    looks for them (only the first two if ``psd_only=True``):
 
-    - ``1_summary.json``: preprocessing summary stats
-    - ``1_psd.png``: sensor-level PSD
-    - ``1_sum_square.png``: sum-square time series
-    - ``1_sum_square_exclude_bads.png``: sum-square excluding bad
+    - ``summary.json``: preprocessing summary stats
+    - ``psd.webp``: sensor-level PSD
+    - ``sum_square.webp``: sum-square time series
+    - ``sum_square_exclude_bads.webp``: sum-square excluding bad
       segments/channels
-    - ``1_channel_stds.png``: channel standard deviation distributions
-    - ``1_ica_components.png``: ICA component topographies (if ``ica``
+    - ``channel_stds.webp``: channel standard deviation distributions
+    - ``ica_components.webp``: ICA component topographies (if ``ica``
       and ``ic_labels`` are provided)
 
     Parameters
     ----------
+    qc_dir : str or Path
+        QC directory.
+    id : str
+        Session identifier.
     raw : mne.io.Raw
         Preprocessed MNE Raw object.
-    output_dir : str or Path
-        Directory to save plots to.
     show : bool, optional
         Whether to display the plots interactively. Default is False.
     ica : mne.preprocessing.ICA, optional
@@ -1066,7 +1069,7 @@ def save_qc_plots(
         Should we only save the summary and the PSD? Worth doing for large
         datasets, where the other plots are rarely looked at.
     """
-    output_dir = Path(output_dir)
+    output_dir = Path(qc_dir) / "preproc" / id
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Save preprocessing summary
@@ -1088,12 +1091,21 @@ def save_qc_plots(
             f"{ic_labels['labels'][i]} ({ic_labels['y_pred_proba'][i]:.2f})"
             for i in ica.exclude
         ]
-    with open(output_dir / "1_summary.json", "w") as f:
+    with open(output_dir / "summary.json", "w") as f:
         json.dump(summary, f, indent=2)
+
+    # WebP files are several times smaller than PNG and look the same. The
+    # plots are about 1000 pixels wide, the width they are shown at in the
+    # report
+    savefig_kwargs = {
+        "dpi": 100,
+        "bbox_inches": "tight",
+        "pil_kwargs": {"quality": 80},
+    }
 
     # PSD
     raw.compute_psd(fmax=45).plot()
-    plt.savefig(output_dir / "1_psd.png", dpi=150, bbox_inches="tight")
+    plt.savefig(output_dir / "psd.webp", **savefig_kwargs)
     if not show:
         plt.close("all")
 
@@ -1102,21 +1114,19 @@ def save_qc_plots(
 
     # Sum-square time series
     plot_sum_square_time_series(raw)
-    plt.savefig(output_dir / "1_sum_square.png", dpi=150, bbox_inches="tight")
+    plt.savefig(output_dir / "sum_square.webp", **savefig_kwargs)
     if not show:
         plt.close("all")
 
     # Sum-square excluding bads
     plot_sum_square_time_series(raw, exclude_bads=True)
-    plt.savefig(
-        output_dir / "1_sum_square_exclude_bads.png", dpi=150, bbox_inches="tight"
-    )
+    plt.savefig(output_dir / "sum_square_exclude_bads.webp", **savefig_kwargs)
     if not show:
         plt.close("all")
 
     # Channel standard deviations
     plot_channel_stds(raw)
-    plt.savefig(output_dir / "1_channel_stds.png", dpi=150, bbox_inches="tight")
+    plt.savefig(output_dir / "channel_stds.webp", **savefig_kwargs)
     if not show:
         plt.close("all")
 
@@ -1124,9 +1134,7 @@ def save_qc_plots(
     if ica is not None and ic_labels is not None:
         fig = plot_ica_components(ica, ic_labels)
         if fig is not None:
-            fig.savefig(
-                output_dir / "1_ica_components.png", dpi=150, bbox_inches="tight"
-            )
+            fig.savefig(output_dir / "ica_components.webp", **savefig_kwargs)
             if not show:
                 plt.close("all")
 

@@ -7,7 +7,7 @@ from osl_dynamics.meeg import parallel, rhino, Session
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
 output_dir = Path("derivatives")
-plots_dir = Path("plots")
+qc_dir = Path("qc")
 log_dir = Path("logs/3_coreg")
 
 sessions = [
@@ -59,6 +59,6 @@ if __name__ == "__main__":
         items=sessions,
         output_dir=output_dir,
         log_dir=log_dir,
-        plots_dir=plots_dir,
+        qc_dir=qc_dir,
         n_workers=4,
     )

@@ -112,7 +112,7 @@ def run(
     n_workers: int,
     log_dir: str | Path,
     output_dir: str | Path | None = None,
-    plots_dir: str | Path | None = None,
+    qc_dir: str | Path | None = None,
     maxtasksperchild: int | None = 50,
 ) -> None:
     """Run a function over items in parallel.
@@ -133,9 +133,9 @@ def run(
         Directory for per-item log files.
     output_dir : str or Path, optional
         Derivatives directory. Passed to report generation for
-        reading the surface extraction, coregistration and parcellation QC
-        and copying their plots.
-    plots_dir : str or Path, optional
+        reading the surface extraction and coregistration QC and copying
+        their plots.
+    qc_dir : str or Path, optional
         If provided, generate a QC report after processing.
     maxtasksperchild : int, optional
         Number of items a worker processes before it is replaced by a fresh
@@ -174,9 +174,9 @@ def run(
     else:
         print(f"\nComplete.")
 
-    if plots_dir is not None:
+    if qc_dir is not None:
         report.generate_report(
-            plots_dir,
+            qc_dir,
             _items_to_sessions_dict(items),
             output_dir=output_dir,
         )

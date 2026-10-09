@@ -9,7 +9,7 @@ from osl_dynamics.meeg import parallel, parcellation, Session
 # ----------------------------------------------------------------------------
 input_dir = Path("BIDS")
 output_dir = Path("derivatives")
-plots_dir = Path("plots")
+qc_dir = Path("qc")
 log_dir = Path("logs/5_parc")
 
 sessions = [
@@ -61,7 +61,7 @@ def process_session(session, logger):
     )
 
     logger.log("Saving QC plots...")
-    parcellation.save_qc_plots(parc_fif, parcellation_file)
+    parcellation.save_qc_plots(qc_dir, session["id"], parc_fif, parcellation_file)
 
     logger.log("Done.")
 
@@ -72,6 +72,6 @@ if __name__ == "__main__":
         items=sessions,
         output_dir=output_dir,
         log_dir=log_dir,
-        plots_dir=plots_dir,
+        qc_dir=qc_dir,
         n_workers=4,
     )

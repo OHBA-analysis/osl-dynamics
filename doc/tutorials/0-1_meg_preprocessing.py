@@ -86,7 +86,7 @@ Output is written to ``derivatives/``.
 #     raw_file = bids_dir / f"sub-{subject}/meg/sub-{subject}_run-{run}_task-{task}_raw_sss.fif"
 #     mri_file = bids_dir / f"sub-{subject}/anat/sub-{subject}_T1w.nii.gz"
 #     output_dir = Path("derivatives")
-#     plots_dir = Path("plots")
+#     qc_dir = Path("qc")
 #
 #     # Preprocessing parameters
 #     resample_freq = 250  # Hz
@@ -194,7 +194,7 @@ Output is written to ``derivatives/``.
 #
 # .. code-block:: python
 #
-#     preproc.save_qc_plots(raw, plots_dir / id, show=True, ica=ica, ic_labels=ic_labels)
+#     preproc.save_qc_plots(qc_dir, id, raw, show=True, ica=ica, ic_labels=ic_labels)
 
 #%%
 # Save preprocessed data
@@ -400,7 +400,7 @@ Output is written to ``derivatives/``.
 #
 # .. code-block:: python
 #
-#     parcellation.save_qc_plots(parc_fif, parcellation_file, show=True)
+#     parcellation.save_qc_plots(qc_dir, id, parc_fif, parcellation_file, show=True)
 
 #%%
 # Summary and Next Steps
