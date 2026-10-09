@@ -621,7 +621,7 @@ def _get_filter_input_data(
     if filters is None:
         filters = mne.beamformer.read_beamformer(session.filters_file)
 
-    _check_reference(raw)
+    _check_reference(raw, filters["ch_names"])
     chan_inds = mne.utils._check_channels_spatial_filter(raw.ch_names, filters)
 
     if isinstance(raw, mne.BaseEpochs):

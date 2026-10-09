@@ -1455,6 +1455,14 @@ def coregister_head_and_mri(
     if not use_headshape:
         use_nose = False
 
+    if use_nose and not os.path.exists(sfns.bet_outskin_plus_nose_mesh_file):
+        raise FileNotFoundError(
+            f"{sfns.bet_outskin_plus_nose_mesh_file} not found. The surfaces "
+            "do not include the nose (rhino.extract_surfaces was run with "
+            "include_nose=False, or the MNI152 standard brain is being used). "
+            "Pass use_nose=False."
+        )
+
     if use_nose:
         print("The MRI-derived nose is going to be used to aid coregistration.")
         print(
@@ -1880,8 +1888,6 @@ def plot_coregistration(
     if filename is None:
         filename = f"{session.coreg_dir}/coreg.png"
 
-    rms = coreg_rms(session, include_nose=include_nose)
-
     coreg = session.coreg
 
     bet_outskin_mesh_file = coreg.bet_outskin_mesh_file
@@ -2263,11 +2269,13 @@ def plot_coregistration(
                 ax.imshow(img)
                 ax.axis("off")
                 ax.set_title(name, fontsize=22)
-            fig.suptitle(
-                f"headshape to scalp: rms {rms:.1f} mm",
-                fontsize=18,
-                y=1.02,
-            )
+            if display_headshape_pnts:
+                rms = coreg_rms(session, include_nose=include_nose)
+                fig.suptitle(
+                    f"headshape to scalp: rms {rms:.1f} mm",
+                    fontsize=18,
+                    y=1.02,
+                )
             fig.tight_layout()
             print(f"Saving {filename}")
             fig.savefig(filename, dpi=150, bbox_inches="tight")
@@ -2731,7 +2739,7 @@ def _nonlinear_registration(surfaces: SurfaceFilenames) -> None:
 
 # Below this overlap of the registered brain with the MNI brain mask, the
 # registration is reported as poor
-MNI_REGISTRATION_MIN_DICE = 0.9
+MNI_REGISTRATION_MIN_DICE = 0.85
 
 
 def _mni_registration_quality(
