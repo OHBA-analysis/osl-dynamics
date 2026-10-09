@@ -5,6 +5,7 @@ import inspect
 import logging
 import pickle
 import sys
+import warnings
 from copy import copy
 from pathlib import Path
 from shutil import rmtree
@@ -15,6 +16,31 @@ import yaml
 from yaml.constructor import ConstructorError
 
 _logger = logging.getLogger("osl-dynamics")
+
+
+def warn_mask_file_unused(mask_file: Optional[str], stacklevel: int = 3) -> None:
+    """Warn that the deprecated :code:`mask_file` argument was passed.
+
+    Since v3.7.0 brain maps are plotted on the voxel grid of the parcellation
+    file, so :code:`mask_file` is ignored. The argument will be removed in
+    v3.8.0.
+
+    Parameters
+    ----------
+    mask_file : str, optional
+        Value passed by the user. Nothing happens if this is :code:`None`.
+    stacklevel : int, optional
+        Stack level of the user's call, see :func:`warnings.warn`.
+    """
+    if mask_file is None:
+        return
+    warnings.warn(
+        "mask_file is no longer used and will be removed in v3.8.0. Brain maps "
+        "are plotted on the voxel grid of the parcellation file, so the "
+        "mask_file argument can be removed.",
+        FutureWarning,
+        stacklevel=stacklevel,
+    )
 
 
 def nextpow2(x: int) -> int:

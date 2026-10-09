@@ -15,7 +15,7 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 from nilearn.plotting import plot_markers, plot_img_on_surf
 
 from osl_dynamics.utils.array_ops import get_one_hot
-from osl_dynamics.utils.misc import override_dict_defaults
+from osl_dynamics.utils.misc import override_dict_defaults, warn_mask_file_unused
 from osl_dynamics.utils.topoplots import Topology
 from osl_dynamics.meeg.parcellation import (
     Parcellation,
@@ -1606,6 +1606,7 @@ def plot_brain_surface(
     remove_subcortical_voxels: bool = False,
     filename: Optional[str] = None,
     show_plot: Optional[bool] = None,
+    mask_file: Optional[str] = None,
 ):
     """Plot a 2D heat map on the surface of the brain.
 
@@ -1660,6 +1661,9 @@ def plot_brain_surface(
     show_plot : bool, optional
         Should we show the plot? If :code:`filename` is True, defaults
         to False, otherwise False.
+    mask_file : str, optional
+        Deprecated and ignored: brain maps are plotted on the voxel grid of
+        the parcellation file. Will be removed in v3.8.0.
 
     Returns
     -------
@@ -1668,6 +1672,7 @@ def plot_brain_surface(
     ax : plt.axes
         Matplotlib axis object. Only returned if :code:`filename` is None.
     """
+    warn_mask_file_unused(mask_file)
     if vmin is None:
         vmin = np.min(values)
     if vmax is None:

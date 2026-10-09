@@ -118,6 +118,9 @@ class Data:
     n_jobs : int, optional
         Number of processes to load the data in parallel.
         Default is 1, which loads data in serial.
+    mask_file : str, optional
+        Deprecated and ignored: brain maps are plotted on the voxel grid of
+        the parcellation file. Will be removed in v3.8.0.
     """
 
     def __init__(
@@ -142,7 +145,9 @@ class Data:
         session_labels: Optional[List["SessionLabels"]] = None,
         extra_channels: Optional[Dict] = None,
         n_jobs: int = 1,
+        mask_file: Optional[str] = None,
     ) -> None:
+        misc.warn_mask_file_unused(mask_file)
         # Unique identifier for this Data instance. We use a UUID rather
         # than id(self) because id(self) is a memory address, which can
         # be identical across different processes running the same script
@@ -154,6 +159,7 @@ class Data:
         self.original_sampling_frequency = sampling_frequency
         self.sampling_frequency = sampling_frequency
         self.parcellation_file = parcellation_file
+        self.mask_file = mask_file
         self.time_axis_first = time_axis_first
         self.load_memmaps = load_memmaps
         self.buffer_size = buffer_size
@@ -2035,6 +2041,7 @@ class Data:
             "original_sampling_frequency",
             "sampling_frequency",
             "parcellation_file",
+            "mask_file",
             "time_axis_first",
             "load_memmaps",
             "buffer_size",

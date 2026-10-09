@@ -120,6 +120,46 @@ def plot_parcellation(parcellation: str | Parcellation, **kwargs) -> object:
     )
 
 
+def parcel_vector_to_voxel_grid(
+    mask_file: str,
+    parcellation_file: str,
+    vector: np.ndarray,
+    remove_subcortical_voxels: bool = False,
+) -> np.ndarray:
+    """Deprecated, use :func:`parcel_vector_to_nifti`.
+
+    Returns :code:`parcel_vector_to_nifti(vector, parcellation_file,
+    remove_subcortical_voxels).get_fdata()`. Will be removed in v3.8.0.
+
+    Parameters
+    ----------
+    mask_file : str
+        Deprecated and ignored: the image is on the voxel grid of the
+        parcellation file.
+    parcellation_file : str
+        Parcellation file. Must be a NIFTI file.
+    vector : np.ndarray
+        Value at each parcel. Shape must be (n_parcels,).
+    remove_subcortical_voxels : bool, optional
+        Should we set the subcortical voxels to np.nan?
+
+    Returns
+    -------
+    voxel_grid : np.ndarray
+        3D array with the value at each voxel.
+    """
+    warnings.warn(
+        "parcel_vector_to_voxel_grid is deprecated and will be removed in "
+        "v3.8.0, use parcel_vector_to_nifti(vector, parcellation_file)"
+        ".get_fdata() (mask_file is no longer needed).",
+        FutureWarning,
+        stacklevel=2,
+    )
+    return parcel_vector_to_nifti(
+        vector, parcellation_file, remove_subcortical_voxels
+    ).get_fdata()
+
+
 def parcel_vector_to_nifti(
     vector: np.ndarray,
     parcellation_file: str,

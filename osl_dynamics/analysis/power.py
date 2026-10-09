@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 from osl_dynamics import files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
-from osl_dynamics.utils import array_ops, plotting
+from osl_dynamics.utils import array_ops, misc, plotting
 from osl_dynamics.meeg.parcellation import parcel_vector_to_nifti
 
 _logger = logging.getLogger("osl-dynamics")
@@ -268,6 +268,7 @@ def save(
     combined: bool = False,
     titles: Optional[List[str]] = None,
     n_rows: int = 1,
+    mask_file: Optional[str] = None,
 ) -> Optional[Tuple[List, List]]:
     """Saves power maps.
 
@@ -303,6 +304,9 @@ def save(
         List of titles for each power plot.
     n_rows : int, optional
         Number of rows in the combined image. Only used if :code:`combined=True`.
+    mask_file : str, optional
+        Deprecated and ignored: brain maps are plotted on the voxel grid of
+        the parcellation file. Will be removed in v3.8.0.
 
     Returns
     -------
@@ -313,6 +317,7 @@ def save(
         List of Matplotlib axis object(s). Only returned if
         :code:`filename=None`.
     """
+    misc.warn_mask_file_unused(mask_file)
     if plot_kwargs is None:
         plot_kwargs = {}
 
@@ -444,6 +449,7 @@ def multi_save(
     subtract_mean: bool = False,
     mean_weights: Optional[np.ndarray] = None,
     plot_kwargs: Optional[Dict] = None,
+    mask_file: Optional[str] = None,
 ) -> None:
     """Saves group level and array level power maps.
 
@@ -482,7 +488,11 @@ def multi_save(
     plot_kwargs : dict, optional
         Keyword arguments to pass to
         :func:`osl_dynamics.utils.plotting.plot_brain_surface`.
+    mask_file : str, optional
+        Deprecated and ignored: brain maps are plotted on the voxel grid of
+        the parcellation file. Will be removed in v3.8.0.
     """
+    misc.warn_mask_file_unused(mask_file)
     # Create a copy of the power maps so we don't modify them
     group_power_map = np.copy(group_power_map)
     session_power_map = np.copy(session_power_map)
