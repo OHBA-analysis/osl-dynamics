@@ -63,7 +63,7 @@ See the [tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.
 
 The recommended installation for osl-dynamics is:
 ```
-conda create -n osld -c conda-forge osl-dynamics
+mamba create -n osld -c conda-forge osl-dynamics
 conda activate osld
 ```
 

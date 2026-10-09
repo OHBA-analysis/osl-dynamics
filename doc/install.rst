@@ -6,7 +6,7 @@ osl-dynamics is available on `conda-forge <https://anaconda.org/conda-forge/osl-
 Conda installation (recommended)
 --------------------------------
 
-If you do not already have conda, install `Miniforge <https://conda-forge.org/download/>`_:
+We recommend installing osl-dynamics with `Miniforge <https://conda-forge.org/download/>`_, which provides :code:`conda` and :code:`mamba`. If you do not already have it:
 
 .. code::
 
@@ -18,10 +18,10 @@ Then create an environment with osl-dynamics in it:
 
 .. code::
 
-    conda create -n osld -c conda-forge osl-dynamics
+    mamba create -n osld -c conda-forge osl-dynamics
     conda activate osld
 
-This installs osl-dynamics with everything it needs, TensorFlow included.
+This installs osl-dynamics with everything it needs. This includes `MNE-Python <https://mne.tools/stable/index.html>`_ and `TensorFlow <https://www.tensorflow.org/>`_.
 
 Pip installation
 ----------------
@@ -59,7 +59,7 @@ and osl-dynamics can be installed with:
 
 .. code::
 
-    conda create -n osld -c conda-forge osl-dynamics
+    mamba create -n osld -c conda-forge osl-dynamics
     conda activate osld
 
 The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
