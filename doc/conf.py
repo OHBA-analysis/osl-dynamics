@@ -79,7 +79,7 @@ html_theme = "pydata_sphinx_theme"
 html_title = "osl-dynamics"
 html_short_title = "osl-dynamics"
 
-html_logo = "https://avatars.githubusercontent.com/u/15248840?s=200&v=4"
+html_logo = "https://raw.githubusercontent.com/OHBA-analysis/osl-files/main/docs/logo/ohba-logo.png"
 
 htmlhelp_basename = "osl-dynamics-doc"
 

@@ -3,11 +3,11 @@
    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em;">
      <h1 style="margin: 0;">OSL Dynamics Toolbox</h1>
      <div>
-       <a href="https://www.win.ox.ac.uk/research/our-locations/OHBA" target="_blank">
-         <img src="https://avatars.githubusercontent.com/u/15248840?s=200&v=4" width="125px">
+       <a href="https://www.oxcin.ox.ac.uk/about/our-locations/OHBA" target="_blank">
+         <img src="https://raw.githubusercontent.com/OHBA-analysis/osl-files/main/docs/logo/ohba-logo.png" width="125px">
        </a>
-       <a href="https://www.win.ox.ac.uk" target="_blank">
-         <img src="https://www.win.ox.ac.uk/images/site-logos/oxcin_logo.png" width="220px">
+       <a href="https://www.oxcin.ox.ac.uk" target="_blank">
+         <img src="https://raw.githubusercontent.com/OHBA-analysis/osl-files/main/docs/logo/oxcin-logo.png" width="220px">
        </a>
      </div>
    </div>
