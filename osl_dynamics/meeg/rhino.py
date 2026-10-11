@@ -428,25 +428,38 @@ def extract_surfaces(
     else:
         flirt_mri2mniaxes_xform = np.eye(4)
 
-    # Write xform to disk so flirt can use it
     flirt_mri2mniaxes_xform_file = f"{surfaces.root}/flirt_mri2mniaxes_xform.txt"
-    np.savetxt(flirt_mri2mniaxes_xform_file, flirt_mri2mniaxes_xform)
-
-    # Apply mri2mniaxes xform to mri to get mri_mniaxes, which means MRIs
-    # voxel indices axes are aligned to be the same as MNI's
-    # Command: flirt -in <mri_file> -ref <std_brain> -applyxfm \
-    #          -init <mri2mniaxes_xform_file> -out <mri_mni_axes_file>
     flirt_mri_mniaxes_file = f"{surfaces.root}/flirt_mri_mniaxes.nii.gz"
-    fsl_wrappers.flirt(
-        surfaces.mri_file,
-        surfaces.std_brain_file,
-        applyxfm=True,
-        init=flirt_mri2mniaxes_xform_file,
-        out=flirt_mri_mniaxes_file,
-    )
 
-    img = nib.load(flirt_mri_mniaxes_file)
-    img_latest_density = np.sum(img.get_fdata()) / np.prod(img.get_fdata().shape)
+    def _apply_mri2mniaxes_xform():
+        # Write xform to disk so flirt can use it
+        np.savetxt(flirt_mri2mniaxes_xform_file, flirt_mri2mniaxes_xform)
+
+        # Apply mri2mniaxes xform to mri to get mri_mniaxes, which means MRIs
+        # voxel indices axes are aligned to be the same as MNI's
+        # Command: flirt -in <mri_file> -ref <std_brain> -applyxfm \
+        #          -init <mri2mniaxes_xform_file> -out <mri_mni_axes_file>
+        fsl_wrappers.flirt(
+            surfaces.mri_file,
+            surfaces.std_brain_file,
+            applyxfm=True,
+            init=flirt_mri2mniaxes_xform_file,
+            out=flirt_mri_mniaxes_file,
+        )
+        img = nib.load(flirt_mri_mniaxes_file)
+        return np.sum(img.get_fdata()) / np.prod(img.get_fdata().shape)
+
+    img_latest_density = _apply_mri2mniaxes_xform()
+
+    if 5 * img_latest_density < img_density:
+        # Most of the head is outside the MNI FOV. The sform is valid but its
+        # origin is a long way from the head, e.g. the subject was lying low
+        # in the scanner. Move the head into the FOV and try again.
+        print("Head is outside the MNI FOV, centring it...")
+        flirt_mri2mniaxes_xform = _centre_head_in_fov(
+            surfaces.mri_file, surfaces.std_brain_file, flirt_mri2mniaxes_xform
+        )
+        img_latest_density = _apply_mri2mniaxes_xform()
 
     if 5 * img_latest_density < img_density:
         raise Exception(
@@ -459,7 +472,7 @@ def extract_surfaces(
             "as the structural.\n"
             "If it is not, then the sformcode in the structural image needs "
             "setting correctly.\n"
-            "Or try passing do_mri2mniaxes_xform=True."
+            "Or try passing do_mri2mniaxes_xform=False."
         )
 
     # ------------------------------------------------------
@@ -3183,6 +3196,46 @@ def _get_flirt_xform_between_axes(from_nii: str, target_nii: str) -> np.ndarray:
     fromvox2from = _get_sform(from_nii)["trans"]
     from2to = to2tovox @ fromvox2from
     return from2to
+
+
+def _centre_head_in_fov(
+    from_nii: str, target_nii: str, flirt_xform: np.ndarray
+) -> np.ndarray:
+    """
+    Translates a flirt xform so that the head in from_nii lands inside the FOV
+    of target_nii.
+
+    The head is centred left-right and front-back and its top is put just below
+    the top of the FOV, which is where the head is in the MNI template.
+
+    flirt_xform must put from_nii on the same axes as target_nii, with the last
+    axis running from the bottom to the top of the head (see
+    _get_flirt_xform_between_axes), and both images must be RADIOLOGICAL.
+    """
+    step = 4  # mm resolution is plenty for finding the head
+    img = nib.load(from_nii)
+    data = np.asarray(img.dataobj)[::step, ::step, ::step]
+
+    # Voxels in the head, with the intensity threshold BET uses
+    lower, upper = np.percentile(data, [2, 98])
+    voxels = np.argwhere(data > lower + 0.1 * (upper - lower)) * step
+
+    # Where they land in target_nii, in flirt coords (mm)
+    coords = voxels * np.array(img.header.get_zooms()[:3])
+    coords = coords @ flirt_xform[:3, :3].T + flirt_xform[:3, 3]
+
+    target = nib.load(target_nii)
+    fov = (np.array(target.shape[:3]) - 1) * target.header.get_zooms()[:3]
+
+    # The top of the head, robust to noise above it, and the head without the
+    # neck and shoulders
+    top = np.percentile(coords[:, 2], 99)
+    head = coords[coords[:, 2] > top - 120]
+
+    centred_xform = flirt_xform.copy()
+    centred_xform[:2, 3] += fov[:2] / 2 - head[:, :2].mean(axis=0)
+    centred_xform[2, 3] += fov[2] - 15 - top
+    return centred_xform
 
 
 def _get_mne_xform_from_flirt_xform(
