@@ -137,7 +137,22 @@ The report updates incrementally — after step 1 you'll see preprocessing plots
 
 ## Logging
 
-Full verbose output (from MNE, osl-dynamics, etc.) is saved to per-session log files in the `log_dir` directory, e.g. `logs/1_preproc/sub-01_task-rest.log`.
+Full verbose output (from MNE, osl-dynamics, etc.) is saved to per-session log files in the `log_dir` directory, e.g. `logs/1_preproc/sub-01_task-rest.log`. The log of a session that failed is renamed to end in `.log.err`.
+
+Only the end of each session is printed to the screen, with the time it took and how many sessions have finished:
+
+```
+[09:21:15 sub-01_task-rest] Done in 13m25s (1/20).
+```
+
+To print anything else to the screen (and the log file) from a processing function, use:
+
+- `parallel.log(msg)` for a progress message.
+- `parallel.warning(msg)` when a session finishes without everything it was meant to produce. The session is reported as partial.
+
+A session whose function raises an exception is reported as failed and the other sessions carry on.
+
+When a step finishes, the number of sessions that were ok, partial and failed is printed, with the warnings and errors they stopped on. The status, time taken and message of every session are saved to `summary.csv` in the `log_dir` directory.
 
 ## Notes
 

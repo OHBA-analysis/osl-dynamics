@@ -126,13 +126,11 @@ The output of this script is written to ``derivatives/``.
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
 #
 #
-#     def process_session(session, logger):
+#     def process_session(session):
 #         """Preprocess a single session."""
 #
-#         logger.log("Loading raw data...")
 #         raw = mne.io.read_raw_fif(session["raw_file"], preload=True)
 #
-#         logger.log("Filtering and downsampling...")
 #         raw = raw.notch_filter([50, 100])
 #         raw = raw.filter(
 #             l_freq=0.5,
@@ -142,26 +140,20 @@ The output of this script is written to ``derivatives/``.
 #         )
 #         raw = raw.resample(sfreq=250)
 #
-#         logger.log("Detecting bad segments...")
 #         raw = preproc.detect_bad_segments(raw, picks="mag")
 #         raw = preproc.detect_bad_segments(raw, picks="mag", mode="diff")
 #         raw = preproc.detect_bad_segments(raw, picks="grad")
 #         raw = preproc.detect_bad_segments(raw, picks="grad", mode="diff")
 #
-#         logger.log("Detecting bad channels...")
 #         raw = preproc.detect_bad_channels(raw, picks="mag")
 #         raw = preproc.detect_bad_channels(raw, picks="grad")
 #
-#         logger.log("Saving QC plots...")
 #         preproc.save_qc_plots(qc_dir, session["id"], raw)
 #
-#         logger.log("Saving preprocessed data...")
 #         preproc_out_dir = output_dir / "preprocessed"
 #         preproc_out_dir.mkdir(parents=True, exist_ok=True)
 #         outfile = preproc_out_dir / f"{session['id']}_preproc-raw.fif"
 #         raw.save(outfile, overwrite=True)
-#
-#         logger.log("Done.")
 #
 #
 #     if __name__ == "__main__":
@@ -200,10 +192,8 @@ The output of this script is written to ``derivatives/``.
 #         })
 #
 #
-#     def process_subject(subject, logger):
+#     def process_subject(subject):
 #         """Extract surfaces for a single subject."""
-#
-#         logger.log("Extracting surfaces...")
 #
 #         outdir = output_dir / "anat_surfaces" / subject["subject"]
 #
@@ -212,8 +202,6 @@ The output of this script is written to ``derivatives/``.
 #             outdir=str(outdir),
 #             include_nose=False,
 #         )
-#
-#         logger.log("Done.")
 #
 #
 #     if __name__ == "__main__":
@@ -277,7 +265,7 @@ The output of this script is written to ``derivatives/``.
 #         np.savetxt(coreg.head_headshape_file, hs)
 #
 #
-#     def process_session(session, logger):
+#     def process_session(session):
 #         """Coregister a single session."""
 #
 #         preproc_file = str(output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif")
@@ -290,16 +278,12 @@ The output of this script is written to ``derivatives/``.
 #             surfaces_dir=surfaces_dir,
 #         )
 #
-#         logger.log("Extracting fiducials and headshape...")
 #         rhino.extract_fiducials_and_headshape_from_fif(session_files)
 #
-#         logger.log("Fixing headshape points...")
+#         parallel.log("Fixing headshape points...")
 #         fix_headshape_points(session_files)
 #
-#         logger.log("Coregistering MEG to MRI...")
 #         rhino.coregister_head_and_mri(session_files, use_nose=False)
-#
-#         logger.log("Done.")
 #
 #
 #     if __name__ == "__main__":
@@ -334,7 +318,7 @@ The output of this script is written to ``derivatives/``.
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
 #
 #
-#     def process_session(session, logger):
+#     def process_session(session):
 #         """Source reconstruct a single session."""
 #
 #         preproc_file = str(output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif")
@@ -347,13 +331,9 @@ The output of this script is written to ``derivatives/``.
 #             surfaces_dir=surfaces_dir,
 #         )
 #
-#         logger.log("Computing forward model...")
 #         rhino.forward_model(session_files, model="Single Layer", gridstep=8)
 #
-#         logger.log("Computing LCMV beamformer...")
 #         source_recon.lcmv_beamformer(session_files, chantypes=["mag", "grad"], rank={"meg": 60})
-#
-#         logger.log("Done.")
 #
 #
 #     if __name__ == "__main__":
@@ -391,7 +371,7 @@ The output of this script is written to ``derivatives/``.
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
 #
 #
-#     def process_session(session, logger):
+#     def process_session(session):
 #         """Parcellate a single session."""
 #
 #         preproc_file = str(output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif")
@@ -406,14 +386,12 @@ The output of this script is written to ``derivatives/``.
 #
 #         parcellation_file = "atlas-DK_nparc-54_space-MNI_res-8x8x8.nii.gz"
 #
-#         logger.log("Parcellating...")
 #         parcel_data = parcellation.parcellate_lcmv(
 #             session_files,
 #             parcellation_file=parcellation_file,
 #             orthogonalisation="symmetric",
 #         )
 #
-#         logger.log("Saving parcellated data...")
 #         raw = mne.io.read_raw_fif(preproc_file, preload=True)
 #         parc_fif = str(output_dir / "osl" / session["id"] / "lcmv-parc-raw.fif")
 #         parcellation.save_as_fif(
@@ -423,12 +401,9 @@ The output of this script is written to ``derivatives/``.
 #             filename=parc_fif,
 #         )
 #
-#         logger.log("Saving QC plots...")
 #         parcellation.save_qc_plots(
 #             qc_dir, session["id"], parc_fif, parcellation_file
 #         )
-#
-#         logger.log("Done.")
 #
 #
 #     if __name__ == "__main__":
@@ -465,16 +440,13 @@ The output of this script is written to ``derivatives/``.
 #
 #     from osl_dynamics.data import sign_flipping
 #
-#     logger.log("Parcellating...")
 #     parcel_data = parcellation.parcellate_lcmv(...)  # (parcels, time)
 #
-#     logger.log("Sign flipping...")
 #     parcel_data, flips, corr = sign_flipping.sign_flip(
 #         parcel_data,
 #         template_cov="template_cov.npy",
 #     )
 #
-#     logger.log("Saving parcellated data...")
 #     parcellation.save_as_fif(parcel_data, raw, extra_chans="stim", filename=parc_fif)
 #
 # If you have already saved the parcellated fifs, you can instead flip them
@@ -516,9 +488,18 @@ The output of this script is written to ``derivatives/``.
 # ^^^^^^^
 #
 # Each step can be run as a standalone script. The ``parallel.run``
-# utility handles multiprocessing, logging, and error recovery. Logs
-# for each session are written to the ``logs/`` directory — check these
-# if a session fails.
+# utility handles multiprocessing, logging, and error recovery.
+#
+# The end of each session is printed to the screen, with the time it took.
+# Everything else (the output of MNE, osl-dynamics, etc.) is written to a
+# log file for the session in the ``logs/`` directory — check these if a
+# session fails. Use ``parallel.log`` in the processing function to print a
+# message to the screen as well, and ``parallel.warning`` for a session that
+# finishes without everything it was meant to produce.
+#
+# When a step finishes, the number of sessions that were ok, partial (had
+# warnings) and failed (raised an exception) is printed, and the status of
+# every session is saved to ``summary.csv`` in the step's log directory.
 #
 # The final parcellated data can be loaded for downstream analysis::
 #

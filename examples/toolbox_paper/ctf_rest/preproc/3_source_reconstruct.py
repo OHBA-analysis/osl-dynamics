@@ -20,7 +20,7 @@ parcellation_file = "atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz"
 # ----------------------------------------------------------------------------
 
 
-def process_session(session, logger):
+def process_session(session):
     """Source reconstruct a single session."""
 
     subject = session["subject"]
@@ -36,23 +36,18 @@ def process_session(session, logger):
         pos_file=str(pos_file),
     )
 
-    logger.log("Extracting fiducials and headshape from .pos file...")
     rhino.extract_fiducials_and_headshape_from_pos(session_files)
 
-    logger.log("Extracting surfaces...")
     rhino.extract_surfaces(
         mri_file=session["smri_file"],
         outdir=str(surfaces_dir),
         include_nose=True,
     )
 
-    logger.log("Coregistering MEG to MRI...")
     rhino.coregister_head_and_mri(session_files, use_nose=True, use_headshape=True)
 
-    logger.log("Computing forward model...")
     rhino.forward_model(session_files, model="Single Layer")
 
-    logger.log("Computing LCMV beamformer...")
     source_recon.lcmv_beamformer(
         session_files,
         chantypes="mag",
@@ -60,14 +55,12 @@ def process_session(session, logger):
         frequency_range=[1, 45],
     )
 
-    logger.log("Parcellating...")
     parcel_data = parcellation.parcellate_lcmv(
         session_files,
         parcellation_file=parcellation_file,
         orthogonalisation="symmetric",
     )
 
-    logger.log("Saving parcellated data...")
     raw = mne.io.read_raw_fif(str(preproc_file), preload=True)
     parcellation.save_as_fif(
         parcel_data,
@@ -75,8 +68,6 @@ def process_session(session, logger):
         filename=str(outdir / subject / "lcmv-parc-raw.fif"),
         extra_chans="stim",
     )
-
-    logger.log("Done.")
 
 
 if __name__ == "__main__":

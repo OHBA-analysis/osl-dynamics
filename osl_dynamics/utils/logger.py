@@ -53,6 +53,7 @@ class MEEGSessionLogger:
         self.session = session
         self.prefix = f"[{session}] "
         self.log_dir = log_dir
+        self.warnings = []
 
     def _timestamp(self) -> str:
         """Return current time as HH:MM:SS string."""
@@ -60,21 +61,30 @@ class MEEGSessionLogger:
 
         return datetime.now().strftime("%H:%M:%S")
 
-    def log(self, msg: str) -> None:
-        """Print a progress message to screen (and log file)."""
+    def _write_line(self, stream, msg: str) -> None:
+        """Write a line to a stream (the screen) and the log file."""
         line = f"[{self._timestamp()} {self.session}] {msg}\n"
-        sys.__stdout__.write(line)
-        sys.__stdout__.flush()
+        stream.write(line)
+        stream.flush()
         self._log_file.write(line)
         self._log_file.flush()
 
+    def log(self, msg: str) -> None:
+        """Print a progress message to screen (and log file)."""
+        self._write_line(sys.__stdout__, msg)
+
+    def warning(self, msg: str) -> None:
+        """Print a warning message to screen (and log file).
+
+        Warnings are kept in ``self.warnings``. They are for a session that
+        finishes without everything it was meant to produce.
+        """
+        self.warnings.append(msg)
+        self._write_line(sys.__stderr__, f"WARNING: {msg}")
+
     def error(self, msg: str) -> None:
         """Print an error message to screen (and log file)."""
-        line = f"[{self._timestamp()} {self.session}] ERROR: {msg}\n"
-        sys.__stderr__.write(line)
-        sys.__stderr__.flush()
-        self._log_file.write(line)
-        self._log_file.flush()
+        self._write_line(sys.__stderr__, f"ERROR: {msg}")
 
     def write(self, text: str) -> None:
         if text:
@@ -92,9 +102,19 @@ class MEEGSessionLogger:
         self._old_stderr = sys.stderr
         sys.stdout = self
         sys.stderr = self
+
+        # Handlers of the logging module hold the stream they were created
+        # with, so they are pointed at the log file too
+        self._old_streams = [
+            (handler, handler.setStream(self))
+            for handler in logging.getLogger().handlers
+            if type(handler) is logging.StreamHandler
+        ]
         return self
 
     def __exit__(self, *args) -> None:
+        for handler, stream in self._old_streams:
+            handler.setStream(stream)
         sys.stdout = self._old_stdout
         sys.stderr = self._old_stderr
         self._log_file.close()

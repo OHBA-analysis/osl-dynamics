@@ -161,23 +161,21 @@ The output of this script is written to ``derivatives/``.
 #         return raw
 #
 #
-#     def process_session(session, logger):
+#     def process_session(session):
 #         """Preprocess a single session."""
 #
-#         logger.log("Loading raw data...")
 #         raw = mne.io.read_raw_brainvision(session["raw_file"], preload=True)
 #
-#         logger.log("Setting channel montage...")
+#         parallel.log("Setting channel montage...")
 #         raw = set_channel_montage(raw, session["localizer_file"])
 #
-#         logger.log("Creating HEOG channel...")
+#         parallel.log("Creating HEOG channel...")
 #         raw = create_heog(raw)
 #         raw.set_channel_types({"VEOG": "eog", "HEOG": "eog"})
 #
-#         logger.log("Cropping first 15 seconds...")
+#         parallel.log("Cropping first 15 seconds...")
 #         raw = raw.crop(tmin=15)
 #
-#         logger.log("Filtering and downsampling...")
 #         raw = raw.notch_filter([50, 100])
 #         raw = raw.filter(
 #             l_freq=0.5,
@@ -187,29 +185,22 @@ The output of this script is written to ``derivatives/``.
 #         )
 #         raw = raw.resample(sfreq=250)
 #
-#         logger.log("Detecting bad channels...")
 #         raw = preproc.detect_bad_channels(raw, picks="eeg")
 #
-#         logger.log("Detecting bad segments...")
 #         raw = preproc.detect_bad_segments(raw, picks="eeg")
 #         raw = preproc.detect_bad_segments(raw, picks="eeg", mode="diff")
 #
-#         logger.log("Interpolating bad channels...")
+#         parallel.log("Interpolating bad channels...")
 #         raw = raw.interpolate_bads()
 #
-#         logger.log("Setting EEG reference...")
 #         raw = raw.set_eeg_reference(projection=True)
 #
-#         logger.log("Saving QC plots...")
 #         preproc.save_qc_plots(qc_dir, session["id"], raw)
 #
-#         logger.log("Saving preprocessed data...")
 #         preproc_out_dir = output_dir / "preprocessed"
 #         preproc_out_dir.mkdir(parents=True, exist_ok=True)
 #         outfile = preproc_out_dir / f"{session['id']}_preproc-raw.fif"
 #         raw.save(outfile, overwrite=True)
-#
-#         logger.log("Done.")
 #
 #
 #     if __name__ == "__main__":
@@ -248,10 +239,8 @@ The output of this script is written to ``derivatives/``.
 #         })
 #
 #
-#     def process_subject(subject, logger):
+#     def process_subject(subject):
 #         """Extract surfaces for a single subject."""
-#
-#         logger.log("Extracting surfaces...")
 #
 #         outdir = output_dir / "anat_surfaces" / subject["subject"]
 #
@@ -260,8 +249,6 @@ The output of this script is written to ``derivatives/``.
 #             outdir=str(outdir),
 #             include_nose=False,
 #         )
-#
-#         logger.log("Done.")
 #
 #
 #     if __name__ == "__main__":
@@ -299,7 +286,7 @@ The output of this script is written to ``derivatives/``.
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
 #
 #
-#     def fix_headshape_fiducials(session_files, logger):
+#     def fix_headshape_fiducials(session_files):
 #         """Shrink headshape and shift fiducials for EEG coregistration."""
 #
 #         coreg = session_files.coreg
@@ -322,14 +309,14 @@ The output of this script is written to ``derivatives/``.
 #         lpa[1] -= 10
 #         rpa[1] -= 10
 #
-#         logger.log(f"Overwriting {coreg.head_headshape_file}")
+#         parallel.log(f"Overwriting {coreg.head_headshape_file}")
 #         np.savetxt(coreg.head_nasion_file, nas)
 #         np.savetxt(coreg.head_lpa_file, lpa)
 #         np.savetxt(coreg.head_rpa_file, rpa)
 #         np.savetxt(coreg.head_headshape_file, hs)
 #
 #
-#     def process_session(session, logger):
+#     def process_session(session):
 #         """Coregister a single session."""
 #
 #         preproc_file = output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif"
@@ -342,20 +329,16 @@ The output of this script is written to ``derivatives/``.
 #             surfaces_dir=surfaces_dir,
 #         )
 #
-#         logger.log("Extracting fiducials and headshape...")
 #         rhino.extract_fiducials_and_headshape_from_fif(
 #             session_files, include_eeg_as_headshape=True,
 #         )
 #
-#         logger.log("Fixing headshape and fiducials...")
-#         fix_headshape_fiducials(session_files, logger)
+#         parallel.log("Fixing headshape and fiducials...")
+#         fix_headshape_fiducials(session_files)
 #
-#         logger.log("Coregistering EEG to MRI...")
 #         rhino.coregister_head_and_mri(
 #             session_files, use_nose=False, use_headshape=False,
 #         )
-#
-#         logger.log("Done.")
 #
 #
 #     if __name__ == "__main__":
@@ -394,7 +377,7 @@ The output of this script is written to ``derivatives/``.
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
 #
 #
-#     def process_session(session, logger):
+#     def process_session(session):
 #         """Source reconstruct a single session."""
 #
 #         preproc_file = str(output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif")
@@ -407,13 +390,9 @@ The output of this script is written to ``derivatives/``.
 #             surfaces_dir=surfaces_dir,
 #         )
 #
-#         logger.log("Computing forward model...")
 #         rhino.forward_model(session_files, model="Triple Layer", gridstep=8, eeg=True)
 #
-#         logger.log("Computing LCMV beamformer...")
 #         source_recon.lcmv_beamformer(session_files, chantypes=["eeg"], rank={"eeg": 54})
-#
-#         logger.log("Done.")
 #
 #
 #     if __name__ == "__main__":
@@ -451,7 +430,7 @@ The output of this script is written to ``derivatives/``.
 #     sessions = pd.read_csv("sessions.csv").to_dict("records")
 #
 #
-#     def process_session(session, logger):
+#     def process_session(session):
 #         """Parcellate a single session."""
 #
 #         preproc_file = str(output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif")
@@ -466,14 +445,12 @@ The output of this script is written to ``derivatives/``.
 #
 #         parcellation_file = "atlas-DK_nparc-54_space-MNI_res-8x8x8.nii.gz"
 #
-#         logger.log("Parcellating...")
 #         parcel_data = parcellation.parcellate_lcmv(
 #             session_files,
 #             parcellation_file=parcellation_file,
 #             orthogonalisation="symmetric",
 #         )
 #
-#         logger.log("Saving parcellated data...")
 #         raw = mne.io.read_raw_fif(preproc_file, preload=True)
 #         parc_fif = str(output_dir / "osl" / session["id"] / "lcmv-parc-raw.fif")
 #         parcellation.save_as_fif(
@@ -483,12 +460,9 @@ The output of this script is written to ``derivatives/``.
 #             filename=parc_fif,
 #         )
 #
-#         logger.log("Saving QC plots...")
 #         parcellation.save_qc_plots(
 #             qc_dir, session["id"], parc_fif, parcellation_file
 #         )
-#
-#         logger.log("Done.")
 #
 #
 #     if __name__ == "__main__":
@@ -535,9 +509,18 @@ The output of this script is written to ``derivatives/``.
 # ^^^^^^^
 #
 # Each step can be run as a standalone script. The ``parallel.run``
-# utility handles multiprocessing, logging, and error recovery. Logs
-# for each session are written to the ``logs/`` directory -- check these
-# if a session fails.
+# utility handles multiprocessing, logging, and error recovery.
+#
+# The end of each session is printed to the screen, with the time it took.
+# Everything else (the output of MNE, osl-dynamics, etc.) is written to a
+# log file for the session in the ``logs/`` directory -- check these if a
+# session fails. Use ``parallel.log`` in the processing function to print a
+# message to the screen as well, and ``parallel.warning`` for a session that
+# finishes without everything it was meant to produce.
+#
+# When a step finishes, the number of sessions that were ok, partial (had
+# warnings) and failed (raised an exception) is printed, and the status of
+# every session is saved to ``summary.csv`` in the step's log directory.
 #
 # The final parcellated data can be loaded for downstream analysis::
 #

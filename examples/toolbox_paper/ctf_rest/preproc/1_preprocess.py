@@ -17,19 +17,17 @@ n_workers = 16
 # ----------------------------------------------------------------------------
 
 
-def process_session(session, logger):
+def process_session(session):
     """Preprocess a single session."""
 
-    logger.log("Loading raw data...")
     raw = mne.io.read_raw_ctf(session["raw_file"], preload=True)
 
-    logger.log("Setting channel types and picking...")
+    parallel.log("Setting channel types and picking...")
     raw = raw.set_channel_types(
         {"EEG057": "eog", "EEG058": "eog", "EEG059": "ecg"}
     )
     raw = raw.pick(["mag", "eog", "ecg"])
 
-    logger.log("Filtering and downsampling...")
     raw = raw.filter(
         l_freq=1,
         h_freq=125,
@@ -39,29 +37,23 @@ def process_session(session, logger):
     raw = raw.notch_filter([50, 100])
     raw = raw.resample(sfreq=250)
 
-    logger.log("Detecting bad segments...")
     raw = preproc.detect_bad_segments(raw, picks="mag")
     raw = preproc.detect_bad_segments(raw, picks="mag", mode="diff")
 
-    logger.log("Detecting bad channels...")
     raw = preproc.detect_bad_channels(raw, picks="mag")
 
-    logger.log("Running ICA artefact rejection...")
     raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(
         raw, picks="mag", n_components=40
     )
 
-    logger.log("Interpolating bad channels...")
+    parallel.log("Interpolating bad channels...")
     raw = raw.interpolate_bads()
 
-    logger.log("Saving preprocessed data...")
     out_subject_dir = outdir / session["subject"]
     out_subject_dir.mkdir(parents=True, exist_ok=True)
     raw.save(
         out_subject_dir / f"{session['subject']}_preproc-raw.fif", overwrite=True
     )
-
-    logger.log("Done.")
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ use_mni152 = False
 # ----------------------------------------------------------------------------
 
 
-def process_session(session, logger):
+def process_session(session):
     """Source reconstruct a single session."""
 
     preproc_file = output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif"
@@ -43,13 +43,9 @@ def process_session(session, logger):
         surfaces_dir=surfaces_dir,
     )
 
-    logger.log("Computing forward model...")
     rhino.forward_model(session_files, model="Single Layer", gridstep=gridstep)
 
-    logger.log("Computing LCMV beamformer...")
     source_recon.lcmv_beamformer(session_files, chantypes=chantypes, rank=rank)
-
-    logger.log("Done.")
 
 
 if __name__ == "__main__":

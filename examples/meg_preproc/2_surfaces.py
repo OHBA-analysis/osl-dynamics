@@ -14,10 +14,8 @@ include_nose = False
 # ----------------------------------------------------------------------------
 
 
-def process_subject(subject, logger):
+def process_subject(subject):
     """Extract surfaces for a single subject."""
-
-    logger.log("Extracting surfaces...")
 
     mri_file = input_dir / subject / "anat" / f"{subject}_T1w.nii.gz"
     outdir = output_dir / "anat_surfaces" / subject
@@ -27,8 +25,6 @@ def process_subject(subject, logger):
         outdir=str(outdir),
         include_nose=include_nose,
     )
-
-    logger.log("Done.")
 
 
 if __name__ == "__main__":

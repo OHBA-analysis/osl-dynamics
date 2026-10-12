@@ -1128,9 +1128,15 @@ def extract_fiducials_and_headshape_from_elc(
     # Extract fiducials from the Positions section
     for i in range(len(lines)):
         if lines[i] == "Positions\n":
-            nasion = np.array(lines[i + 1].split()[-3:]).astype(np.float64)
-            lpa = np.array(lines[i + 2].split()[-3:]).astype(np.float64)
-            rpa = np.array(lines[i + 3].split()[-3:]).astype(np.float64)
+            try:
+                nasion = np.array(lines[i + 1].split()[-3:]).astype(np.float64)
+                lpa = np.array(lines[i + 2].split()[-3:]).astype(np.float64)
+                rpa = np.array(lines[i + 3].split()[-3:]).astype(np.float64)
+            except ValueError:
+                raise ValueError(
+                    f"{session.elc_file} must have three fiducials (nasion, LPA, "
+                    "RPA) in its Positions section."
+                )
             break
 
     # Extract headshape points from the HeadShapePoints section
@@ -1197,6 +1203,10 @@ def remove_stray_headshape_points(
         Worth turning off for sparse headshapes, where it can remove
         scalp points that are useful for the coregistration.
     """
+    print()
+    print("Removing stray headshape points")
+    print("-------------------------------")
+
     coreg = session.coreg
 
     # Load saved headshape and fiducial files
@@ -2333,6 +2343,10 @@ def repair_bem_surfaces(session: Session, max_iter: int = 50) -> None:
     RuntimeError
         If a surface still intersects after ``max_iter`` passes.
     """
+    print()
+    print("Repairing BEM surfaces")
+    print("----------------------")
+
     coreg = session.coreg
 
     # Outside to inside. Note RHINO's names are offset from what they hold:
@@ -3159,7 +3173,7 @@ def _check_nii_for_nan(filename: str) -> bool:
 def _get_flirt_xform_between_axes(from_nii: str, target_nii: str) -> np.ndarray:
     """
     Computes flirt xform that moves from_nii to have voxel indices on the same
-    axis as  the voxel indices for target_nii.
+    axis as the voxel indices for target_nii.
 
     Note that this is NOT the same as registration, i.e. the images are not aligned.
     In fact the actual coordinates (in mm) are unchanged.
@@ -3167,35 +3181,24 @@ def _get_flirt_xform_between_axes(from_nii: str, target_nii: str) -> np.ndarray:
     It is instead about putting from_nii onto the same axes so that the voxel INDICES
     are comparable. This is achieved by using a transform that sets the sform of
     from_nii to be the same as target_nii without changing the actual coordinates
-    (in mm). Transform needed to do this is:
+    (in mm).
 
-      from2targetaxes = inv(targetvox2target) * fromvox2from
+    A flirt xform acts on flirtcoords (in mm) rather than on voxel indices or
+    on the actual coordinates (see _get_flirtcoords2native_xform), so the
+    transform needed to do this is:
 
-    In more detail, we need the sform for the transformed from_nii to be the same as
-    the sform for the target_nii, without changing the actual coordinates (in mm).
-
-    In other words, we need:
-
-        fromvox2from * from_nii_vox = targetvox2target * from_nii_target_vox
+      from2targetaxes = inv(targetflirtcoords2target) * fromflirtcoords2from
 
     where
-    - fromvox2from is sform for from_nii (i.e. converts from voxel indices to
-      voxel coords in mm)
-    - targetvox2target is sform for target_nii
-    - from_nii_vox are the voxel indices for from_nii
-    - from_nii_target_vox are the voxel indices for from_nii when transformed onto
-      the target axis.
+    - fromflirtcoords2from converts from the flirtcoords of from_nii to its
+      actual coordinates
+    - targetflirtcoords2target is the same for target_nii
 
-    => from_nii_target_vox = from2targetaxes * from_nii_vox
-
-    where
-    - from2targetaxes = inv(targetvox2target) * fromvox2from
+    Both images must be RADIOLOGICAL.
     """
-
-    to2tovox = np.linalg.inv(_get_sform(target_nii)["trans"])
-    fromvox2from = _get_sform(from_nii)["trans"]
-    from2to = to2tovox @ fromvox2from
-    return from2to
+    target2targetflirtcoords = np.linalg.inv(_get_flirtcoords2native_xform(target_nii))
+    fromflirtcoords2from = _get_flirtcoords2native_xform(from_nii)
+    return target2targetflirtcoords @ fromflirtcoords2from
 
 
 def _centre_head_in_fov(

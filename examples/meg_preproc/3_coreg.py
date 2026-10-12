@@ -23,7 +23,7 @@ use_mni152 = False  # set True to use standard brain instead of subject MRI
 # ----------------------------------------------------------------------------
 
 
-def process_session(session, logger):
+def process_session(session):
     """Coregister a single session."""
 
     preproc_file = output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif"
@@ -40,17 +40,13 @@ def process_session(session, logger):
         surfaces_dir=surfaces_dir,
     )
 
-    logger.log("Extracting fiducials and headshape...")
     rhino.extract_fiducials_and_headshape_from_fif(session_files)
 
-    logger.log("Coregistering MEG to MRI...")
     rhino.coregister_head_and_mri(
         session_files,
         use_nose=use_nose,
         allow_mri_scaling=allow_mri_scaling,
     )
-
-    logger.log("Done.")
 
 
 if __name__ == "__main__":

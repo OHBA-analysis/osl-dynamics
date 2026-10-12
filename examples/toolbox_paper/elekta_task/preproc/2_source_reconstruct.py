@@ -31,11 +31,11 @@ def fix_headshape_points(session_files):
     remove = np.logical_and(hs[1] > max(lpa[1], rpa[1]), hs[2] < nas[2])
     hs = hs[:, ~remove]
 
-    print(f"overwriting {session_files.coreg.head_headshape_file}")
+    parallel.log(f"overwriting {session_files.coreg.head_headshape_file}")
     np.savetxt(session_files.coreg.head_headshape_file, hs)
 
 
-def process_session(session, logger):
+def process_session(session):
     """Source reconstruct a single session."""
 
     session_id = session["id"]
@@ -49,26 +49,20 @@ def process_session(session, logger):
         surfaces_dir=str(surfaces_dir),
     )
 
-    logger.log("Extracting fiducials and headshape from fif...")
     rhino.extract_fiducials_and_headshape_from_fif(session_files)
 
-    logger.log("Removing headshape points on the nose...")
     fix_headshape_points(session_files)
 
-    logger.log("Extracting surfaces...")
     rhino.extract_surfaces(
         mri_file=session["smri_file"],
         outdir=str(surfaces_dir),
         include_nose=False,
     )
 
-    logger.log("Coregistering MEG to MRI...")
     rhino.coregister_head_and_mri(session_files, use_nose=False, use_headshape=True)
 
-    logger.log("Computing forward model...")
     rhino.forward_model(session_files, model="Single Layer")
 
-    logger.log("Computing LCMV beamformer...")
     source_recon.lcmv_beamformer(
         session_files,
         chantypes=["mag", "grad"],
@@ -76,14 +70,12 @@ def process_session(session, logger):
         frequency_range=[1, 45],
     )
 
-    logger.log("Parcellating...")
     parcel_data = parcellation.parcellate_lcmv(
         session_files,
         parcellation_file=parcellation_file,
         orthogonalisation="symmetric",
     )
 
-    logger.log("Saving parcellated data...")
     raw = mne.io.read_raw_fif(str(preproc_file), preload=True)
     parcellation.save_as_fif(
         parcel_data,
@@ -91,8 +83,6 @@ def process_session(session, logger):
         filename=str(outdir / session_id / "lcmv-parc-raw.fif"),
         extra_chans="stim",
     )
-
-    logger.log("Done.")
 
 
 if __name__ == "__main__":

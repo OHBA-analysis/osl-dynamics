@@ -296,6 +296,7 @@ def parcellate(
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
     )
+    print(f"Using parcellation: {parcellation_file}")
 
     if method == "centroid":
         parcel_data = _get_parcel_data_centroid(
@@ -367,6 +368,7 @@ def parcellate_lcmv(
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
     )
+    print(f"Using parcellation: {parcellation_file}")
 
     check_up_to_date(session, "LCMV filters")
 

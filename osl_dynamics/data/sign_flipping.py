@@ -328,6 +328,10 @@ def sign_flip(
         Correlation between the flipped covariance and ``template_cov`` (the
         metric maximised by the flip search).
     """
+    print()
+    print("Sign flipping")
+    print("-------------")
+
     if not isinstance(template_cov, np.ndarray):
         template_cov = np.load(str(template_cov))
 
@@ -337,6 +341,10 @@ def sign_flip(
         template_cov,
         n_channels=parcel_data.shape[0],
         n_embeddings=n_embeddings,
+    )
+    print(
+        f"Flipped {(flips == -1).sum()}/{len(flips)} parcels "
+        f"(template corr {corr:.3f})"
     )
     return parcel_data * flips[:, np.newaxis], flips, corr
 

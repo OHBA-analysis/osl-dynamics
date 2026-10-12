@@ -18,18 +18,16 @@ n_runs = 6
 # ----------------------------------------------------------------------------
 
 
-def process_session(session, logger):
+def process_session(session):
     """Preprocess a single session."""
 
-    logger.log("Loading raw data...")
     raw = mne.io.read_raw_fif(session["raw_file"], preload=True)
 
-    logger.log("Setting channel types...")
+    parallel.log("Setting channel types...")
     raw = raw.set_channel_types(
         {"EEG061": "eog", "EEG062": "eog", "EEG063": "ecg"}
     )
 
-    logger.log("Filtering and downsampling...")
     raw = raw.filter(
         l_freq=0.5,
         h_freq=125,
@@ -39,32 +37,26 @@ def process_session(session, logger):
     raw = raw.notch_filter([50, 100])
     raw = raw.resample(sfreq=250)
 
-    logger.log("Detecting bad segments...")
     raw = preproc.detect_bad_segments(raw, picks="mag")
     raw = preproc.detect_bad_segments(raw, picks="grad")
     raw = preproc.detect_bad_segments(raw, picks="mag", mode="diff")
     raw = preproc.detect_bad_segments(raw, picks="grad", mode="diff")
 
-    logger.log("Detecting bad channels...")
     raw = preproc.detect_bad_channels(raw, picks="mag")
     raw = preproc.detect_bad_channels(raw, picks="grad")
 
-    logger.log("Running ICA artefact rejection...")
     raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(
         raw, picks="meg", n_components=40
     )
 
-    logger.log("Interpolating bad channels...")
+    parallel.log("Interpolating bad channels...")
     raw = raw.interpolate_bads()
 
-    logger.log("Saving preprocessed data...")
     out_session_dir = outdir / session["id"]
     out_session_dir.mkdir(parents=True, exist_ok=True)
     raw.save(
         out_session_dir / f"{session['id']}_preproc-raw.fif", overwrite=True
     )
-
-    logger.log("Done.")
 
 
 if __name__ == "__main__":

@@ -25,7 +25,7 @@ use_mni152 = False
 # ----------------------------------------------------------------------------
 
 
-def process_session(session, logger):
+def process_session(session):
     """Parcellate a single session."""
 
     preproc_file = output_dir / "preprocessed" / f"{session['id']}_preproc-raw.fif"
@@ -43,14 +43,12 @@ def process_session(session, logger):
         surfaces_dir=surfaces_dir,
     )
 
-    logger.log("Parcellating...")
     parcel_data = parcellation.parcellate_lcmv(
         session_files,
         parcellation_file=parcellation_file,
         orthogonalisation=orthogonalisation,
     )
 
-    logger.log("Saving parcellated data...")
     raw = mne.io.read_raw_fif(str(preproc_file), preload=True)
     parc_fif = str(output_dir / "osl" / session["id"] / "lcmv-parc-raw.fif")
     parcellation.save_as_fif(
@@ -60,10 +58,7 @@ def process_session(session, logger):
         filename=parc_fif,
     )
 
-    logger.log("Saving QC plots...")
     parcellation.save_qc_plots(qc_dir, session["id"], parc_fif, parcellation_file)
-
-    logger.log("Done.")
 
 
 if __name__ == "__main__":

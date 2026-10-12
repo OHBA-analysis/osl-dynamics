@@ -135,7 +135,7 @@ def lcmv_beamformer(
         if "epo.fif" in data:
             data = mne.read_epochs(data)
         else:
-            data = mne.io.read_raw_fif(data, preload=frequency_range is not None)
+            data = mne.io.read_raw_fif(data, preload=True)
 
     # Bandpass filter
     if frequency_range is not None:

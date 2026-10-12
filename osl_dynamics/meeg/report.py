@@ -558,6 +558,7 @@ def generate_report(
     }
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    data_json = json.dumps(data).replace("</", "<\\/")
     report = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -587,7 +588,7 @@ def generate_report(
 <div id="plots"></div>
 </div>
 </main>
-<script>const DATA = {json.dumps(data).replace("</", "<\\/")};{JS}</script>
+<script>const DATA = {data_json};{JS}</script>
 </body>
 </html>"""
 
