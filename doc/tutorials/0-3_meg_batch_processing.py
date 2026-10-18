@@ -498,8 +498,8 @@ The output of this script is written to ``derivatives/``.
 # finishes without everything it was meant to produce.
 #
 # When a step finishes, the number of sessions that were ok, partial (had
-# warnings) and failed (raised an exception) is printed, and the status of
-# every session is saved to ``summary.csv`` in the step's log directory.
+# warnings) and failed (raised an exception) is printed, with the warnings and
+# errors they stopped on.
 #
 # The final parcellated data can be loaded for downstream analysis::
 #

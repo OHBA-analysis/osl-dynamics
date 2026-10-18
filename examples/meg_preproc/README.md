@@ -152,7 +152,7 @@ To print anything else to the screen (and the log file) from a processing functi
 
 A session whose function raises an exception is reported as failed and the other sessions carry on.
 
-When a step finishes, the number of sessions that were ok, partial and failed is printed, with the warnings and errors they stopped on. The status, time taken and message of every session are saved to `summary.csv` in the `log_dir` directory.
+When a step finishes, the number of sessions that were ok, partial and failed is printed, with the warnings and errors they stopped on.
 
 ## Notes
 

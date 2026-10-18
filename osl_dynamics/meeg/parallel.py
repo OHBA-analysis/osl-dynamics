@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import csv
 import multiprocessing as mp
 import os
 import time
@@ -165,16 +164,8 @@ def _worker(
     return id, status, elapsed, message
 
 
-def _summarise(results: list[tuple[str, str, float, str]], log_dir: Path) -> None:
-    """Print a summary of a run and save it to ``log_dir/summary.csv``."""
-    log_dir.mkdir(parents=True, exist_ok=True)
-    summary_file = log_dir / "summary.csv"
-    with open(summary_file, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["id", "status", "seconds", "message"])
-        for id, status, elapsed, message in results:
-            writer.writerow([id, status, round(elapsed, 1), message])
-
+def _summarise(results: list[tuple[str, str, float, str]]) -> None:
+    """Print a summary of a run."""
     counts = Counter(status for _, status, _, _ in results)
     print(
         f"\nFinished {len(results)} items: {counts['ok']} ok, "
@@ -195,7 +186,6 @@ def _summarise(results: list[tuple[str, str, float, str]], log_dir: Path) -> Non
                 print(f"  {count} x {message}")
             if len(messages) > max_messages:
                 print(f"  ... and {len(messages) - max_messages} other messages")
-    print(f"\nSummary saved: {summary_file}")
 
 
 def run(
@@ -227,9 +217,7 @@ def run(
         Number of parallel workers.
     log_dir : str or Path
         Directory for per-item log files (:code:`<id>.log`, or
-        :code:`<id>.log.err` for an item that failed) and for
-        :code:`summary.csv`, which holds the status, time taken and warnings
-        or error of each item.
+        :code:`<id>.log.err` for an item that failed).
     output_dir : str or Path, optional
         Derivatives directory. Passed to report generation for
         reading the surface extraction and coregistration QC and copying
@@ -273,7 +261,7 @@ def run(
         else:
             os.environ[var] = val
 
-    _summarise(results, log_dir)
+    _summarise(results)
 
     if qc_dir is not None:
         report.generate_report(
