@@ -71,7 +71,7 @@ def logm_features(covariances: np.ndarray) -> np.ndarray:
     covariances = 0.5 * (covariances + np.swapaxes(covariances, -1, -2))
     eigenvalues, eigenvectors = np.linalg.eigh(covariances)
     # Guard against windows that are too short to be full rank
-    floor = 1e-6 * eigenvalues[..., -1:]
+    floor = np.maximum(1e-6 * eigenvalues[..., -1:], 1e-12)
     eigenvalues = np.maximum(eigenvalues, floor)
     log_cov = (eigenvectors * np.log(eigenvalues)[..., None, :]) @ np.swapaxes(
         eigenvectors, -1, -2
@@ -127,9 +127,15 @@ class InitializationMixin:
         """Settings that only apply while initializing. No-op by default."""
         yield
 
-    def _restore_initialization(self, weights: list) -> None:
-        """Load the weights of the best initialization."""
+    def _restore_initialization(self, weights: list, setup) -> None:
+        """Load the weights of the best initialization.
+
+        The candidate's setup is run again so the weight initializers hold
+        the best candidate's parameters (a later reset() returns to them).
+        """
         self.reset()
+        if setup is not None:
+            setup()
         self.set_weights(weights)
 
     @property
@@ -154,6 +160,25 @@ class InitializationMixin:
         """
         sim = HMM(trans_prob="uniform", stay_prob=stay_prob, n_states=self._n_states)
         return sim.generate_states(n_samples)
+
+    @property
+    def _supports_feature_initialization(self) -> bool:
+        """Can this model set its parameters from window features?"""
+        return hasattr(self, "set_covariances")
+
+    @property
+    def _samples_per_step(self) -> int:
+        """Number of data samples per step of the model's state dynamics."""
+        return 1
+
+    @property
+    def _min_window_samples(self) -> int:
+        """Fewest samples a window needs for its features to be meaningful.
+
+        For a Gaussian observation model the covariance needs more samples
+        than channels.
+        """
+        return 2 * self.config.n_channels
 
     def _sample_labels(self, n_samples: int, stay_prob: float) -> np.ndarray:
         """Sample a state label for each sample."""
@@ -200,6 +225,11 @@ class InitializationMixin:
             Shape is (n_states, n_features), see :meth:`_window_features`.
         """
         n_channels = self.config.n_channels
+        if not hasattr(self, "set_covariances"):
+            raise NotImplementedError(
+                f"{self.config.model_name} does not support this initialization "
+                "method."
+            )
         if getattr(self.config, "learn_means", False):
             means = features[:, :n_channels].astype(np.float32)
             features = features[:, n_channels:]
@@ -305,12 +335,13 @@ class InitializationMixin:
                 best_score = score
                 best_history = history
                 best_weights = self.get_weights()
+                best_setup = setup
 
         if best_score == np.inf:
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_name}")
-        self._restore_initialization(best_weights)
+        self._restore_initialization(best_weights, best_setup)
 
         return best_history
 
@@ -325,6 +356,7 @@ class InitializationMixin:
         select: Optional[str],
         kwargs: dict,
         window_length: Optional[int] = None,
+        uses_features: bool = False,
     ) -> Optional[dict]:
         """Common wrapper for the public initialization methods.
 
@@ -345,12 +377,21 @@ class InitializationMixin:
         window_length : int, optional
             Length of the windows the candidates are built from. Only
             used with a Data object, the default is the sequence length.
+        uses_features : bool, optional
+            Does the method set parameters from window features? If so
+            the model must support that and the windows should be long
+            enough.
 
         Returns
         -------
         history : dict
             The training history of the best initialization.
         """
+        if uses_features and not self._supports_feature_initialization:
+            raise NotImplementedError(
+                f"{self.config.model_name} does not support {name.lower()} "
+                "initialization."
+            )
         n_epochs, n_init, take, select = self._initialization_settings(
             n_epochs, n_init, take, select
         )
@@ -369,7 +410,15 @@ class InitializationMixin:
         scoring_dataset = self._scoring_dataset(training_dataset, select)
 
         # Dataset to build candidates from
-        if window_length is None or window_length == self.config.sequence_length:
+        sequence_length = self._dataset_sequence_length()
+        length = window_length or sequence_length
+        if uses_features and length < self._min_window_samples:
+            _logger.warning(
+                f"Windows of {length} samples are short for {self.config.n_channels} "
+                "channels, the initial parameters will be poorly estimated. "
+                "Consider passing a longer window_length."
+            )
+        if window_length is None or window_length == sequence_length:
             window_dataset = subset
         elif hasattr(training_data, "dataset"):
             window_dataset = training_data.dataset(
@@ -467,7 +516,8 @@ class InitializationMixin:
         session : np.ndarray
             Session index of each window.
         n_samples_per_step : int
-            Number of samples between the start of consecutive windows.
+            Number of steps of the state dynamics between the start of
+            consecutive windows.
 
         Returns
         -------
@@ -493,8 +543,20 @@ class InitializationMixin:
         counts = np.zeros(n_states)
         for batch in dataset:
             data = np.concatenate(batch["data"])
+            if data.shape[0] < n_states * self._min_window_samples:
+                raise ValueError(
+                    f"Not enough time points in a batch ({data.shape[0]}) to "
+                    f"estimate {n_states} states with {self.config.n_channels} "
+                    "channels. Increase batch_size or sequence_length."
+                )
             labels = self._sample_labels(data.shape[0], stay_prob)
-            present = [k for k in range(n_states) if np.sum(labels == k) >= 2]
+            present = [
+                k
+                for k in range(n_states)
+                if np.sum(labels == k) >= self._min_window_samples
+            ]
+            if not present:
+                continue
             features = self._window_features([data[labels == k] for k in present])
             if total is None:
                 total = np.zeros((n_states, features.shape[1]))
@@ -639,10 +701,13 @@ class InitializationMixin:
         """
 
         def make_candidates(dataset, n_init):
-            def setup():
-                self.set_random_state_time_course_initialization(dataset, stay_prob)
-
-            return [(str(n), setup) for n in range(n_init)]
+            candidates = []
+            for n in range(n_init):
+                features = self._state_time_course_features(dataset, stay_prob)
+                candidates.append(
+                    (str(n), lambda f=features: self._set_parameters_from_features(f))
+                )
+            return candidates
 
         return self._multistart(
             "Random state time course",
@@ -653,6 +718,7 @@ class InitializationMixin:
             take,
             select,
             kwargs,
+            uses_features=True,
         )
 
     def set_random_state_time_course_initialization(
@@ -721,12 +787,16 @@ class InitializationMixin:
 
         def make_candidates(dataset, n_init):
             windows = self._collect_windows(dataset, n_init * n_states)
+            if len(windows) < n_states:
+                raise ValueError(
+                    f"Only {len(windows)} windows are available but {n_states} "
+                    "are needed for one initialization. Increase take or "
+                    "reduce window_length."
+                )
             features = self._window_features(windows)
             candidates = []
-            for n in range(n_init):
+            for n in range(len(windows) // n_states):
                 f = features[n * n_states : (n + 1) * n_states]
-                if len(f) < n_states:
-                    break
                 candidates.append(
                     (str(n), lambda f=f: self._set_parameters_from_features(f))
                 )
@@ -742,6 +812,7 @@ class InitializationMixin:
             select,
             kwargs,
             window_length=window_length,
+            uses_features=True,
         )
 
     def kmeans_initialization(
@@ -821,7 +892,7 @@ class InitializationMixin:
             _logger.info("Clustering windows")
             if init_trans_prob:
                 # Windows in time order so transitions can be counted
-                length = window_length or self.config.sequence_length
+                length = window_length or self._dataset_sequence_length()
                 ordered = training_data.dataset(
                     length, self.config.batch_size, shuffle=False, concatenate=False
                 )
@@ -841,7 +912,9 @@ class InitializationMixin:
                 centres = kmeans.cluster_centers_
                 if init_trans_prob:
                     trans_prob = self._trans_prob_from_labels(
-                        kmeans.labels_, session, stride * length
+                        kmeans.labels_,
+                        session,
+                        max(1, stride * length // self._samples_per_step),
                     )
                 else:
                     trans_prob = None
@@ -864,6 +937,7 @@ class InitializationMixin:
             select,
             kwargs,
             window_length=window_length,
+            uses_features=True,
         )
 
     def single_subject_initialization(

@@ -236,7 +236,9 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
         finally:
             self.config.n_kl_annealing_epochs = original_n_kl_annealing_epochs
 
-    def _restore_initialization(self, weights: list) -> None:
+    def _restore_initialization(self, weights: list, setup) -> None:
+        if setup is not None:
+            setup()
         self.set_weights(weights)
         self.reset_kl_annealing_factor()
 

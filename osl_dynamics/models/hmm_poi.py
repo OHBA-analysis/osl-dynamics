@@ -287,10 +287,19 @@ class Model(MarkovStateInferenceModelBase):
         """Set regularizers."""
         raise NotImplementedError
 
+    @property
+    def _min_window_samples(self):
+        return 2
+
+    @property
+    def _supports_feature_initialization(self):
+        return True
+
     def _window_features(self, windows):
-        """Log of the mean rate of each channel in each window."""
-        return np.stack([np.log(np.mean(w, axis=0) + 1e-6) for w in windows])
+        """Mean rate of each channel in each window."""
+        return np.stack([np.mean(w, axis=0) for w in windows])
 
     def _set_parameters_from_features(self, features):
         if self.config.learn_log_rates:
-            self.set_rates(np.exp(features).astype(np.float32), update_initializer=True)
+            rates = np.maximum(features, 1e-6).astype(np.float32)
+            self.set_rates(rates, update_initializer=True)

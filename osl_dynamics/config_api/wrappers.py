@@ -333,7 +333,8 @@ def train_mdynemo(
     1. Build an :code:`mdynemo.Model` object.
     2. Initialize the mode correlations using sliding window and KMeans.
     3. Initialize the parameters of the model using
-       :code:`Model.random_subset_initialization`.
+       the method set by :code:`init_method` in the config
+       (:code:`Model.initialization`).
     4. Perform full training.
     5. Save the inferred parameters (mode time courses, means, stds and corrs)
        if :code:`save_inf_params=True`.
@@ -370,7 +371,8 @@ def train_mdynemo(
                 'n_epochs': 40,
             }.
     init_kwargs : dict, optional
-        Keyword arguments to pass to :code:`Model.random_subset_initialization`.
+        Keyword arguments to pass to the initialization method
+        (:code:`Model.initialization`).
         Defaults to::
 
             {'n_init': 5, 'n_epochs': 5, 'take': 1}.
@@ -470,7 +472,7 @@ def train_mdynemo(
     default_init_kwargs = {"n_init": 5, "n_epochs": 5, "take": 1}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
-    init_history = model.random_subset_initialization(data, **init_kwargs)
+    init_history = model.initialization(data, **init_kwargs)
 
     # Keyword arguments for the fit method
     default_fit_kwargs = {}
