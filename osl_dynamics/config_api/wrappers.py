@@ -79,7 +79,8 @@ def train_hmm(
 
     1. Build an :code:`hmm.Model` object.
     2. Initialize the parameters of the model using
-       :code:`Model.random_state_time_course_initialization`.
+       the method set by :code:`init_method` in the config
+       (:code:`Model.initialization`).
     3. Perform full training.
     4. Save the inferred parameters (state probabilities, means and covariances)
        if :code:`save_inf_params=True`.
@@ -106,7 +107,8 @@ def train_hmm(
              'n_epochs': 20}.
     init_kwargs : dict, optional
         Keyword arguments to pass to
-        :code:`Model.random_state_time_course_initialization`. Defaults to::
+        the initialization method (:code:`Model.initialization`).
+        Defaults to::
 
             {'n_init': 5, 'n_epochs': 2}.
     fit_kwargs : dict, optional
@@ -144,10 +146,7 @@ def train_hmm(
     default_init_kwargs = {"n_init": 5, "n_epochs": 2}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
-    init_history = model.random_state_time_course_initialization(
-        data,
-        **init_kwargs,
-    )
+    init_history = model.initialization(data, **init_kwargs)
 
     # Training
     history = model.fit(data, **fit_kwargs)
@@ -194,7 +193,8 @@ def train_dynemo(
 
     1. Build a :code:`dynemo.Model` object.
     2. Initialize the parameters of the model using
-       :code:`Model.random_subset_initialization`.
+       the method set by :code:`init_method` in the config
+       (:code:`Model.initialization`).
     3. Perform full training.
     4. Save the inferred parameters (mode mixing coefficients, means and
        covariances) if :code:`save_inf_params=True`.
@@ -231,7 +231,8 @@ def train_dynemo(
              'lr_decay': 0.1,
              'n_epochs': 40}
     init_kwargs : dict, optional
-        Keyword arguments to pass to :code:`Model.random_subset_initialization`.
+        Keyword arguments to pass to the initialization method
+        (:code:`config_kwargs['init_method']`, see :code:`Model.initialization`).
         Defaults to::
 
             {'n_init': 5, 'n_epochs': 2, 'take': 1}.
@@ -286,7 +287,7 @@ def train_dynemo(
     default_init_kwargs = {"n_init": 5, "n_epochs": 2, "take": 1}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
-    init_history = model.random_subset_initialization(data, **init_kwargs)
+    init_history = model.initialization(data, **init_kwargs)
 
     # Keyword arguments for the fit method
     default_fit_kwargs = {}
@@ -517,7 +518,8 @@ def train_hive(
 
     1. Build an :code:`hive.Model` object.
     2. Initialize the parameters of the HIVE model using
-       :code:`Model.random_state_time_course_initialization`.
+       the method set by :code:`init_method` in the config
+       (:code:`Model.initialization`).
     3. Perform full training.
     4. Save the inferred parameters (state probabilities, means,
        covariances and embeddings) if :code:`save_inf_params=True`.
@@ -558,7 +560,8 @@ def train_hive(
             }.
     init_kwargs : dict, optional
         Keyword arguments to pass to
-        :code:`Model.random_state_time_course_initialization`. Defaults to::
+        the initialization method (:code:`Model.initialization`).
+        Defaults to::
 
             {'n_init': 10, 'n_epochs': 2}.
     fit_kwargs : dict, optional
@@ -624,10 +627,7 @@ def train_hive(
 
     # Initialise HIVE
     _logger.info(f"Using init_kwargs: {init_kwargs}")
-    init_history = model.random_state_time_course_initialization(
-        data,
-        **init_kwargs,
-    )
+    init_history = model.initialization(data, **init_kwargs)
 
     # Training
     history = model.fit(data, **fit_kwargs)

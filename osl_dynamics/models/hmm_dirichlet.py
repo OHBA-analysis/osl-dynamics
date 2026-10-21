@@ -268,44 +268,37 @@ class Model(MarkovStateInferenceModelBase):
     def set_regularizers(self, training_dataset):
         raise NotImplementedError("No data-dependent Dirichlet regularizer is defined.")
 
-    def set_random_state_time_course_initialization(
-        self, training_dataset, stay_prob: float = 0.9
-    ):
-        """Fit concentrations to raw samples assigned by a window-level chain.
+    def _sample_labels(self, n_samples, stay_prob):
+        """Sample a state for each window and repeat it for its samples."""
+        n_windows = n_samples // self.config.window_size
+        states = np.argmax(self._sample_state_time_course(n_windows, stay_prob), axis=1)
+        return np.repeat(states, self.config.window_size)
 
-        Accumulate per-state sufficient statistics, avoiding the old initializer's
-        broadcast of the last state's log mean into all states.
-        """
-        from scipy.optimize import minimize
-        from scipy.special import digamma, gammaln
-
+    def _window_features(self, windows):
+        """Per-channel mean, mean square and mean log of the composition."""
         c = self.config
-        count = np.zeros(c.n_states)
-        sums = np.zeros((c.n_states, c.n_channels))
-        squares, logs = np.zeros_like(sums), np.zeros_like(sums)
-        for batch in training_dataset:
-            x = np.asarray(batch["data"], dtype=float).reshape(
-                -1, c.window_size, c.n_channels
-            )
+        features = []
+        for x in windows:
+            x = np.asarray(x, dtype=float).reshape(-1, c.n_channels)
             if not np.isfinite(x).all() or np.any(x < 0) or np.any(x.sum(-1) <= 0):
                 raise ValueError("Invalid compositional data.")
             x = np.clip(x, 1e-9, 1)
             x /= x.sum(-1, keepdims=True)
-            state = self.sample_state_time_course(len(x)).argmax(-1)
-            for k in range(c.n_states):
-                values = x[state == k].reshape(-1, c.n_channels)
-                count[k] += len(values)
-                sums[k] += values.sum(0)
-                squares[k] += (values**2).sum(0)
-                logs[k] += np.log(values).sum(0)
-        if np.any(count == 0):
-            raise ValueError(
-                "Random initialization missed a state; use more windows or random_subset."
+            features.append(
+                np.concatenate([x.mean(0), (x**2).mean(0), np.log(x).mean(0)])
             )
-        mean = sums / count[:, None]
-        var = np.maximum(squares / count[:, None] - mean**2, 1e-10)
-        log_mean = logs / count[:, None]
-        concentration = np.empty_like(sums)
+        return np.stack(features)
+
+    def _set_parameters_from_features(self, features):
+        """Maximum likelihood concentrations from the mean, variance and
+        mean log of each state."""
+        from scipy.optimize import minimize
+        from scipy.special import digamma, gammaln
+
+        c = self.config
+        mean, square, log_mean = np.split(features, 3, axis=1)
+        var = np.maximum(square - mean**2, 1e-10)
+        concentration = np.empty_like(mean)
         for k in range(c.n_states):
             precision = max(np.mean(mean[k] * (1 - mean[k]) / var[k] - 1), 1e-2)
             start = np.maximum(mean[k] * precision, 1e-3)

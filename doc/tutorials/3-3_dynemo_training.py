@@ -5,7 +5,7 @@ DyNeMo: Training
 This tutorial covers how to train a DyNeMo model. We will use MEG data in this tutorial, however, this can easily be substituted with fMRI data.
 """
 
-#%%
+# %%
 # Getting the Data
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed and prepared. This dataset is:
@@ -33,7 +33,7 @@ This tutorial covers how to train a DyNeMo model. We will use MEG data in this t
 #     # Download the dataset (approximately 21 MB)
 #     get_data("notts_meguk_giles_prepared_1_subject", rename="prepared_data")
 
-#%%
+# %%
 # Load the data
 # *************
 # We now load the data into osl-dynamics using the Data class. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
@@ -45,7 +45,7 @@ This tutorial covers how to train a DyNeMo model. We will use MEG data in this t
 #     data = Data("prepared_data")
 #     print(data)
 
-#%%
+# %%
 # If you run into an out of memory error when training, see the `Training on large datasets` section below.
 #
 # Fitting DyNeMo
@@ -93,7 +93,7 @@ config = Config(
     n_epochs=20,
 )
 
-#%%
+# %%
 # Building the model
 # ******************
 # With the Config object, we can build a model.
@@ -103,7 +103,7 @@ from osl_dynamics.models.dynemo import Model
 model = Model(config)
 model.summary()
 
-#%%
+# %%
 # Training the model
 # ******************
 # Note, this step can be time consuming.
@@ -116,8 +116,10 @@ model.summary()
 #
 #     init_history = model.random_subset_initialization(data, n_epochs=2, n_init=5, take=0.25)
 
-#%%
+# %%
 # The `take` argument is the fraction of the dataset to use for each initialization. If you are training on a particularly large dataset, initializing on the full dataset can be slow, so it is worth reducing this value further, e.g. `take=0.1`.
+#
+# Other initialization methods are available. `kmeans_initialization` clusters windows of data with k-means and starts each mode from a cluster centre, and `random_windows_initialization` starts each mode from a random window of data, so the modes start genuinely different rather than from random weights. Pass `select="free_energy"` to pick the best initialization by its free energy on a fixed set of batches rather than the training loss. The method can also be chosen in the Config with `init_method` and run with `model.initialization(data)`. To make the initialization and training reproducible, set the random seed before building the model with `osl_dynamics.utils.set_random_seed(seed)`.
 #
 # The `init_history` variable is `dict` that contains the training history (`rho`, `lr`, `loss`) for the best initialization.
 #
@@ -129,10 +131,10 @@ model.summary()
 #
 #     history = model.fit(data)
 
-#%%
+# %%
 # The `history` variable contains the training history of the `fit` method.
 
-#%%
+# %%
 # Training on large datasets
 # **************************
 # By default the Data object holds the data in memory and cuts sequences out of it on the fly, so the only extra memory used during training is the batches in flight. If your dataset does not fit in memory, save the prepared data as a TFRecord dataset, which is streamed from disk during training. This also means the data is only prepared once if you train many models on it. The `sequence_length` must match the one in the model's Config.
@@ -162,7 +164,7 @@ model.summary()
 #
 # Alternatively, the Data object can keep the data on disk as memory maps (`Data(..., load_memmaps=True)`) and read sequences from disk as they are needed, which avoids the extra step of writing TFRecords.
 
-#%%
+# %%
 # Saving a trained model
 # **********************
 # As we have just seen, training a model can be time consuming. Therefore, it is often useful to save a trained model so we can load it later. We can do this with the `save` method.
@@ -171,7 +173,7 @@ model.summary()
 #
 #     model.save("results/model")
 
-#%%
+# %%
 # This will automatically create a directory containing the trained model weights and config settings used. Note, should we wish to load the trained model we can use:
 #
 # .. code-block:: python
@@ -180,7 +182,7 @@ model.summary()
 #
 #     model = load("results/model")
 
-#%%
+# %%
 # It's also useful to save the variational free energy to compare different runs.
 #
 # .. code-block:: python
@@ -191,7 +193,7 @@ model.summary()
 #     history["free_energy"] = free_energy
 #     pickle.dump(history, open("results/model/history.pkl", "wb"))
 
-#%%
+# %%
 # Selecting a Run
 # ^^^^^^^^^^^^^^^^
 # Training DyNeMo multiple times on the same data can give different networks. The run with the lowest variational free energy is a good default choice. For an alternative based on the networks the runs found, see :doc:`DyNeMo: Selecting a Run <../tutorials_build/3-4_dynemo_selecting_a_run>`.

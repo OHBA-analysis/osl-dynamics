@@ -1,16 +1,34 @@
 """Initialization of model parameters before the full training.
 
 Every initialization method trains a few candidate initializations for a
-short time and keeps the one with the best loss. The multi-start loop
-(:meth:`InitializationMixin._run_multistart`) is shared by all models.
-A model customises it through three hooks:
+short time and keeps the best. The multi-start loop
+(:meth:`InitializationMixin._run_multistart`) is shared by all models and
+a candidate is just a function that sets the initial parameters.
+
+The candidates are built from windows of data. A window is summarised by
+a feature vector (:meth:`InitializationMixin._window_features`) and a
+model knows how to set its parameters from one feature vector per state
+(:meth:`InitializationMixin._set_parameters_from_features`). For Gaussian
+observation models the features are the mean and the matrix logarithm of
+the covariance, so averaging features is a log-Euclidean average of
+covariances and always gives a valid covariance back. The candidate
+generators are:
+
+- :code:`random_subset`: the parameters from :code:`reset()`.
+- :code:`random_state_time_course`: each state is the average of the
+  windows assigned to it by a sampled state time course.
+- :code:`random_windows`: each state is one random window.
+- :code:`kmeans`: windows are clustered with k-means and each state is a
+  cluster centre.
+
+Models customise the loop through hooks:
 
 - :meth:`InitializationMixin._initialization_context`: settings that only
   apply while initializing (e.g. the number of KL annealing epochs).
 - :meth:`InitializationMixin._restore_initialization`: how to load the
   weights of the best candidate.
-- :meth:`InitializationMixin.set_random_state_time_course_initialization`:
-  how to set the observation model from a sampled state time course.
+- :meth:`InitializationMixin._sample_labels`: how to sample a state
+  assignment for the random state time course initialization.
 """
 
 import logging
@@ -26,9 +44,68 @@ from osl_dynamics.simulation import HMM
 _logger = logging.getLogger("osl-dynamics")
 
 # A candidate initialization: a name, the dataset to train on and a
-# function that sets the initial parameters given that dataset (or None
-# to keep the parameters from reset())
+# function that sets the initial parameters (or None to keep the
+# parameters from reset())
 Candidate = Tuple[str, tf.data.Dataset, Optional[Callable]]
+
+# Number of batches used to score candidates with the free energy
+N_SCORING_BATCHES = 20
+
+
+def logm_features(covariances: np.ndarray) -> np.ndarray:
+    """Vectorise symmetric positive definite matrices by their logarithm.
+
+    The Euclidean distance between feature vectors is the Frobenius
+    distance between the matrix logarithms (log-Euclidean metric).
+
+    Parameters
+    ----------
+    covariances : np.ndarray
+        Shape is (..., n_channels, n_channels).
+
+    Returns
+    -------
+    features : np.ndarray
+        Shape is (..., n_channels * (n_channels + 1) / 2).
+    """
+    covariances = 0.5 * (covariances + np.swapaxes(covariances, -1, -2))
+    eigenvalues, eigenvectors = np.linalg.eigh(covariances)
+    # Guard against windows that are too short to be full rank
+    floor = 1e-6 * eigenvalues[..., -1:]
+    eigenvalues = np.maximum(eigenvalues, floor)
+    log_cov = (eigenvectors * np.log(eigenvalues)[..., None, :]) @ np.swapaxes(
+        eigenvectors, -1, -2
+    )
+    n_channels = covariances.shape[-1]
+    i, j = np.triu_indices(n_channels)
+    weights = np.where(i == j, 1.0, np.sqrt(2.0))
+    return log_cov[..., i, j] * weights
+
+
+def logm_features_inverse(features: np.ndarray, n_channels: int) -> np.ndarray:
+    """Inverse of :func:`logm_features`.
+
+    Parameters
+    ----------
+    features : np.ndarray
+        Shape is (..., n_channels * (n_channels + 1) / 2).
+    n_channels : int
+        Number of channels.
+
+    Returns
+    -------
+    covariances : np.ndarray
+        Shape is (..., n_channels, n_channels).
+    """
+    i, j = np.triu_indices(n_channels)
+    weights = np.where(i == j, 1.0, np.sqrt(2.0))
+    log_cov = np.zeros(features.shape[:-1] + (n_channels, n_channels))
+    log_cov[..., i, j] = features / weights
+    log_cov[..., j, i] = features / weights
+    eigenvalues, eigenvectors = np.linalg.eigh(log_cov)
+    return (eigenvectors * np.exp(eigenvalues)[..., None, :]) @ np.swapaxes(
+        eigenvectors, -1, -2
+    )
 
 
 class InitializationMixin:
@@ -41,6 +118,9 @@ class InitializationMixin:
     # Keyword arguments of the public methods that configure
     # _initialization_context rather than fit
     _initialization_context_keys = ()
+
+    # ------------------------------------------------------------------
+    # Hooks
 
     @contextmanager
     def _initialization_context(self, **kwargs):
@@ -75,12 +155,69 @@ class InitializationMixin:
         sim = HMM(trans_prob="uniform", stay_prob=stay_prob, n_states=self._n_states)
         return sim.generate_states(n_samples)
 
-    def _initialization_settings(self, n_epochs, n_init, take):
+    def _sample_labels(self, n_samples: int, stay_prob: float) -> np.ndarray:
+        """Sample a state label for each sample."""
+        return np.argmax(self._sample_state_time_course(n_samples, stay_prob), axis=1)
+
+    def _window_features(self, windows: List[np.ndarray]) -> np.ndarray:
+        """Summarise windows of data as feature vectors.
+
+        For Gaussian observation models: the mean (if means are learnt)
+        and the matrix logarithm of the covariance.
+
+        Parameters
+        ----------
+        windows : list of np.ndarray
+            Each with shape (n_samples, n_channels).
+
+        Returns
+        -------
+        features : np.ndarray
+            Shape is (n_windows, n_features).
+        """
+        n_channels = self.config.n_channels
+        for window in windows:
+            if window.shape[0] < 2:
+                raise ValueError("A window must have at least two samples.")
+        means = np.stack([np.mean(w, axis=0) for w in windows])
+        covariances = np.stack(
+            [
+                np.atleast_2d(np.cov(w, rowvar=False)).reshape(n_channels, n_channels)
+                for w in windows
+            ]
+        )
+        features = logm_features(covariances)
+        if getattr(self.config, "learn_means", False):
+            features = np.concatenate([means, features], axis=1)
+        return features
+
+    def _set_parameters_from_features(self, features: np.ndarray) -> None:
+        """Set the observation model from one feature vector per state.
+
+        Parameters
+        ----------
+        features : np.ndarray
+            Shape is (n_states, n_features), see :meth:`_window_features`.
+        """
+        n_channels = self.config.n_channels
+        if getattr(self.config, "learn_means", False):
+            means = features[:, :n_channels].astype(np.float32)
+            features = features[:, n_channels:]
+            self.set_means(means, update_initializer=True)
+        if self.config.learn_covariances:
+            covariances = logm_features_inverse(features, n_channels).astype(np.float32)
+            self.set_covariances(covariances, update_initializer=True)
+
+    # ------------------------------------------------------------------
+    # Multi-start loop
+
+    def _initialization_settings(self, n_epochs, n_init, take, select):
         """Fill in settings from the config."""
         return (
             n_epochs or self.config.n_init_epochs,
             n_init or self.config.n_init,
             take or self.config.init_take,
+            select or self.config.init_select,
         )
 
     def _split_initialization_kwargs(self, kwargs: dict) -> Tuple[dict, dict]:
@@ -101,8 +238,27 @@ class InitializationMixin:
         _logger.info(f"Using {n_batches} out of {n_total_batches} batches")
         return training_dataset.take(n_batches)
 
+    def _scoring_dataset(self, training_dataset, select: str):
+        """A fixed set of batches to score candidates with the free energy."""
+        if select == "loss":
+            return None
+        if select != "free_energy":
+            raise ValueError("select must be 'loss' or 'free_energy'.")
+        if not hasattr(self, "free_energy"):
+            raise ValueError(
+                f"{self.config.model_name} has no free_energy method, "
+                "use select='loss'."
+            )
+        # cache() fixes the batches: every candidate is scored on the same
+        # data even though the dataset is reshuffled each iteration
+        return training_dataset.take(N_SCORING_BATCHES).cache()
+
     def _run_multistart(
-        self, candidates: List[Candidate], n_epochs: int, **kwargs
+        self,
+        candidates: List[Candidate],
+        n_epochs: int,
+        scoring_dataset=None,
+        **kwargs,
     ) -> dict:
         """Train each candidate initialization and keep the best.
 
@@ -110,10 +266,13 @@ class InitializationMixin:
         ----------
         candidates : list of (str, tf.data.Dataset, callable or None)
             Name, dataset to train on and a function that sets the initial
-            parameters given that dataset. The model is reset before each
-            candidate.
+            parameters. The model is reset before each candidate.
         n_epochs : int
             Number of epochs to train each candidate.
+        scoring_dataset : tf.data.Dataset, optional
+            Batches to evaluate the free energy on after training. If
+            :code:`None`, candidates are compared by the training loss
+            of the last epoch.
         kwargs : keyword arguments, optional
             Keyword arguments for the fit method.
 
@@ -122,12 +281,12 @@ class InitializationMixin:
         history : dict
             The training history of the best initialization.
         """
-        best_loss = np.inf
+        best_score = np.inf
         for name, dataset, setup in candidates:
             _logger.info(f"Initialization {name}")
             self.reset()
             if setup is not None:
-                setup(dataset)
+                setup()
 
             try:
                 history = self.fit(dataset, epochs=n_epochs, **kwargs)
@@ -136,14 +295,18 @@ class InitializationMixin:
                 _logger.warning("Training failed! Skipping initialization.")
                 continue
 
-            loss = history["loss"][-1]
-            if loss < best_loss:
+            if scoring_dataset is None:
+                score = history["loss"][-1]
+            else:
+                score = self.free_energy(scoring_dataset)
+                _logger.info(f"Free energy: {score}")
+            if score < best_score:
                 best_name = name
-                best_loss = loss
+                best_score = score
                 best_history = history
                 best_weights = self.get_weights()
 
-        if best_loss == np.inf:
+        if best_score == np.inf:
             raise ValueError("No valid initializations were found.")
 
         _logger.info(f"Using initialization {best_name}")
@@ -151,18 +314,217 @@ class InitializationMixin:
 
         return best_history
 
+    def _multistart(
+        self,
+        name: str,
+        training_data,
+        make_candidates: Callable,
+        n_epochs: Optional[int],
+        n_init: Optional[int],
+        take: Optional[float],
+        select: Optional[str],
+        kwargs: dict,
+        window_length: Optional[int] = None,
+    ) -> Optional[dict]:
+        """Common wrapper for the public initialization methods.
+
+        Parameters
+        ----------
+        name : str
+            Name of the method for logging.
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        make_candidates : callable
+            Called with (training_dataset, n_init) and returns the list of
+            candidates to train.
+        n_epochs, n_init, take, select : optional
+            Settings, filled in from the config if :code:`None`.
+        kwargs : dict
+            Keyword arguments for the fit method, possibly including
+            context keyword arguments.
+        window_length : int, optional
+            Length of the windows the candidates are built from. Only
+            used with a Data object, the default is the sequence length.
+
+        Returns
+        -------
+        history : dict
+            The training history of the best initialization.
+        """
+        n_epochs, n_init, take, select = self._initialization_settings(
+            n_epochs, n_init, take, select
+        )
+        if not n_init:
+            _logger.info(
+                "Number of initializations was set to zero. Skipping initialization."
+            )
+            return
+        context_kwargs, kwargs = self._split_initialization_kwargs(kwargs)
+
+        _logger.info(f"{name} initialization")
+        training_dataset = self.make_dataset(
+            training_data, shuffle=True, concatenate=True
+        )
+        subset = self._subset(training_dataset, take)
+        scoring_dataset = self._scoring_dataset(training_dataset, select)
+
+        # Dataset to build candidates from
+        if window_length is None or window_length == self.config.sequence_length:
+            window_dataset = subset
+        elif hasattr(training_data, "dataset"):
+            window_dataset = training_data.dataset(
+                window_length, self.config.batch_size, shuffle=True
+            )
+        else:
+            raise ValueError(
+                "window_length can only be changed when a Data object is passed."
+            )
+
+        candidates = make_candidates(window_dataset, n_init)
+        candidates = [(name_, subset, setup) for name_, setup in candidates]
+
+        with self._initialization_context(**context_kwargs):
+            return self._run_multistart(
+                candidates, n_epochs, scoring_dataset=scoring_dataset, **kwargs
+            )
+
+    # ------------------------------------------------------------------
+    # Building candidates from windows
+
+    def _collect_windows(self, dataset, n_windows: int) -> List[np.ndarray]:
+        """Take the first n_windows sequences from a (shuffled) dataset."""
+        windows = []
+        for batch in dataset:
+            windows.extend(np.asarray(batch["data"]))
+            if len(windows) >= n_windows:
+                break
+        if len(windows) < n_windows:
+            _logger.warning(
+                f"Only {len(windows)} windows available, {n_windows} requested."
+            )
+        return windows[:n_windows]
+
+    def _collect_features(self, dataset, max_windows: int) -> np.ndarray:
+        """Features of up to max_windows sequences from a (shuffled) dataset."""
+        features = []
+        n_windows = 0
+        for batch in dataset:
+            windows = list(np.asarray(batch["data"]))
+            features.append(self._window_features(windows))
+            n_windows += len(windows)
+            if n_windows >= max_windows:
+                break
+        return np.concatenate(features)[:max_windows]
+
+    def _collect_ordered_features(self, datasets, max_windows: int):
+        """Features of every stride-th window of each session, in time order.
+
+        Parameters
+        ----------
+        datasets : list of tf.data.Dataset
+            Unshuffled dataset for each session.
+        max_windows : int
+            Maximum number of windows to keep in total.
+
+        Returns
+        -------
+        features : np.ndarray
+            Shape is (n_windows, n_features).
+        session : np.ndarray
+            Session index of each window.
+        stride : int
+            Number of windows between consecutive kept windows.
+        """
+        n_total = sum(d.osld_metadata["n_sequences"] for d in datasets)
+        stride = max(1, int(np.ceil(n_total / max_windows)))
+        features = []
+        session = []
+        n = 0
+        for i, dataset in enumerate(datasets):
+            for batch in dataset:
+                windows = list(np.asarray(batch["data"]))
+                keep = [w for j, w in enumerate(windows) if (n + j) % stride == 0]
+                n += len(windows)
+                if keep:
+                    features.append(self._window_features(keep))
+                    session.extend([i] * len(keep))
+        return np.concatenate(features), np.array(session), stride
+
+    def _trans_prob_from_labels(
+        self, labels: np.ndarray, session: np.ndarray, n_samples_per_step: int
+    ) -> np.ndarray:
+        """Transition probability matrix from a sequence of window labels.
+
+        Transitions between consecutive windows of the same session are
+        counted (with add-one smoothing) and the window-scale matrix is
+        converted to a per-sample matrix assuming at most one transition
+        per window step.
+
+        Parameters
+        ----------
+        labels : np.ndarray
+            State label of each window.
+        session : np.ndarray
+            Session index of each window.
+        n_samples_per_step : int
+            Number of samples between the start of consecutive windows.
+
+        Returns
+        -------
+        trans_prob : np.ndarray
+            Shape is (n_states, n_states).
+        """
+        n_states = self._n_states
+        counts = np.ones((n_states, n_states))
+        same_session = session[1:] == session[:-1]
+        np.add.at(counts, (labels[:-1][same_session], labels[1:][same_session]), 1)
+        window_trans_prob = counts / counts.sum(axis=1, keepdims=True)
+        trans_prob = np.eye(n_states) + (window_trans_prob - np.eye(n_states)) / (
+            n_samples_per_step
+        )
+        trans_prob = np.maximum(trans_prob, 1e-6)
+        return (trans_prob / trans_prob.sum(axis=1, keepdims=True)).astype(np.float32)
+
+    def _state_time_course_features(self, dataset, stay_prob: float) -> np.ndarray:
+        """Average features of the windows a sampled state time course
+        assigns to each state."""
+        n_states = self._n_states
+        total = None
+        counts = np.zeros(n_states)
+        for batch in dataset:
+            data = np.concatenate(batch["data"])
+            labels = self._sample_labels(data.shape[0], stay_prob)
+            present = [k for k in range(n_states) if np.sum(labels == k) >= 2]
+            features = self._window_features([data[labels == k] for k in present])
+            if total is None:
+                total = np.zeros((n_states, features.shape[1]))
+            total[present] += features
+            counts[present] += 1
+        if np.any(counts == 0):
+            raise ValueError(
+                "random_state_time_course_initialization sampled a state time "
+                "course where a state never activates. Try increasing the "
+                "batch_size or sequence_length, or use another method."
+            )
+        return total / counts[:, None]
+
+    # ------------------------------------------------------------------
+    # Public methods
+
     def random_subset_initialization(
         self,
         training_data,
         n_epochs: Optional[int] = None,
         n_init: Optional[int] = None,
         take: Optional[float] = None,
+        select: Optional[str] = None,
         **kwargs,
     ) -> Optional[dict]:
         """Random subset initialization.
 
         The model is trained for a few epochs with different random subsets
-        of the training dataset. The model with the best free energy is kept.
+        of the training dataset, starting from the parameters given by
+        :code:`reset()`. The best model is kept.
 
         Parameters
         ----------
@@ -177,6 +539,11 @@ class InitializationMixin:
         take : float, optional
             Fraction of total batches to take.
             By default we use the value passed in the config.
+        select : str, optional
+            How to pick the best initialization: :code:`'loss'` (training
+            loss of the last epoch) or :code:`'free_energy'` (free energy
+            on a fixed set of batches). By default we use the value passed
+            in the config.
         kwargs : keyword arguments, optional
             Keyword arguments for the fit method. Variational models also
             accept :code:`n_kl_annealing_epochs`.
@@ -186,23 +553,20 @@ class InitializationMixin:
         history : dict
             The training history of the best initialization.
         """
-        n_epochs, n_init, take = self._initialization_settings(n_epochs, n_init, take)
-        if not n_init:
-            _logger.info(
-                "Number of initializations was set to zero. Skipping initialization."
-            )
-            return
-        context_kwargs, kwargs = self._split_initialization_kwargs(kwargs)
 
-        _logger.info("Random subset initialization")
-        training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True
+        def make_candidates(dataset, n_init):
+            return [(str(n), None) for n in range(n_init)]
+
+        return self._multistart(
+            "Random subset",
+            training_data,
+            make_candidates,
+            n_epochs,
+            n_init,
+            take,
+            select,
+            kwargs,
         )
-        subset = self._subset(training_dataset, take)
-        candidates = [(str(n), subset, None) for n in range(n_init)]
-
-        with self._initialization_context(**context_kwargs):
-            return self._run_multistart(candidates, n_epochs, **kwargs)
 
     def multistart_initialization(
         self,
@@ -230,13 +594,17 @@ class InitializationMixin:
         n_epochs: Optional[int] = None,
         n_init: Optional[int] = None,
         take: Optional[float] = None,
+        select: Optional[str] = None,
         stay_prob: float = 0.9,
         **kwargs,
     ) -> Optional[dict]:
         """Random state time course initialization.
 
-        The model is trained for a few epochs with a sampled state time course
-        initialization. The model with the best free energy is kept.
+        A state time course is sampled and each state's parameters are set
+        from the data assigned to it. Note, with a lot of data every state
+        ends up close to the average of the whole dataset, so the
+        candidates differ little. The model is then trained for a few
+        epochs and the best candidate is kept.
 
         Parameters
         ----------
@@ -251,6 +619,10 @@ class InitializationMixin:
         take : float, optional
             Fraction of total batches to take.
             By default we use the value passed in the config.
+        select : str, optional
+            How to pick the best initialization: :code:`'loss'` or
+            :code:`'free_energy'`. By default we use the value passed in
+            the config.
         stay_prob : float, optional
             Stay probability (diagonal for the transition probability
             matrix). Other states have uniform probability. Ignored by
@@ -265,39 +637,247 @@ class InitializationMixin:
         history : dict
             The training history of the best initialization.
         """
-        n_epochs, n_init, take = self._initialization_settings(n_epochs, n_init, take)
-        if not n_init:
-            _logger.info(
-                "Number of initializations was set to zero. Skipping initialization."
-            )
-            return
-        context_kwargs, kwargs = self._split_initialization_kwargs(kwargs)
 
-        _logger.info("Random state time course initialization")
-        training_dataset = self.make_dataset(
-            training_data, shuffle=True, concatenate=True
+        def make_candidates(dataset, n_init):
+            def setup():
+                self.set_random_state_time_course_initialization(dataset, stay_prob)
+
+            return [(str(n), setup) for n in range(n_init)]
+
+        return self._multistart(
+            "Random state time course",
+            training_data,
+            make_candidates,
+            n_epochs,
+            n_init,
+            take,
+            select,
+            kwargs,
         )
-        subset = self._subset(training_dataset, take)
 
-        def setup(dataset):
-            self.set_random_state_time_course_initialization(dataset, stay_prob)
+    def set_random_state_time_course_initialization(
+        self, training_dataset: tf.data.Dataset, stay_prob: float = 0.9
+    ) -> None:
+        """Sets the observation model based on a random state time course.
 
-        candidates = [(str(n), subset, setup) for n in range(n_init)]
+        Parameters
+        ----------
+        training_dataset : tf.data.Dataset
+            Training data.
+        stay_prob : float, optional
+            Stay probability (diagonal for the transition probability
+            matrix). Other states have uniform probability.
+        """
+        _logger.info("Setting parameters from a random state time course")
+        features = self._state_time_course_features(training_dataset, stay_prob)
+        self._set_parameters_from_features(features)
 
-        with self._initialization_context(**context_kwargs):
-            return self._run_multistart(candidates, n_epochs, **kwargs)
+    def random_windows_initialization(
+        self,
+        training_data,
+        n_epochs: Optional[int] = None,
+        n_init: Optional[int] = None,
+        take: Optional[float] = None,
+        select: Optional[str] = None,
+        window_length: Optional[int] = None,
+        **kwargs,
+    ) -> Optional[dict]:
+        """Random windows initialization.
+
+        Each state's parameters are set from one randomly chosen window of
+        data, so the states start genuinely different. The model is then
+        trained for a few epochs and the best candidate is kept.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int, optional
+            Number of epochs to train the model.
+            By default we use the value passed in the config.
+        n_init : int, optional
+            Number of initializations.
+            By default we use the value passed in the config.
+        take : float, optional
+            Fraction of total batches to take.
+            By default we use the value passed in the config.
+        select : str, optional
+            How to pick the best initialization: :code:`'loss'` or
+            :code:`'free_energy'`. By default we use the value passed in
+            the config.
+        window_length : int, optional
+            Number of samples in each window. Default is the sequence
+            length. Can only be changed when a Data object is passed.
+        kwargs : keyword arguments, optional
+            Keyword arguments for the fit method. Variational models also
+            accept :code:`n_kl_annealing_epochs`.
+
+        Returns
+        -------
+        history : dict
+            The training history of the best initialization.
+        """
+        n_states = self._n_states
+
+        def make_candidates(dataset, n_init):
+            windows = self._collect_windows(dataset, n_init * n_states)
+            features = self._window_features(windows)
+            candidates = []
+            for n in range(n_init):
+                f = features[n * n_states : (n + 1) * n_states]
+                if len(f) < n_states:
+                    break
+                candidates.append(
+                    (str(n), lambda f=f: self._set_parameters_from_features(f))
+                )
+            return candidates
+
+        return self._multistart(
+            "Random windows",
+            training_data,
+            make_candidates,
+            n_epochs,
+            n_init,
+            take,
+            select,
+            kwargs,
+            window_length=window_length,
+        )
+
+    def kmeans_initialization(
+        self,
+        training_data,
+        n_epochs: Optional[int] = None,
+        n_init: Optional[int] = None,
+        take: Optional[float] = None,
+        select: Optional[str] = None,
+        window_length: Optional[int] = None,
+        max_windows: int = 20000,
+        init_trans_prob: bool = False,
+        **kwargs,
+    ) -> Optional[dict]:
+        """K-means initialization.
+
+        Windows of data are clustered with k-means (one cluster per state)
+        and each state's parameters are set from its cluster centre. Each
+        candidate is a different k-means solution. The model is then
+        trained for a few epochs and the best candidate is kept.
+
+        For Gaussian observation models the clustering is done on the
+        matrix logarithm of the window covariances (and the window means
+        if means are learnt), so the cluster centres are log-Euclidean
+        averages of covariances.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training.
+        n_epochs : int, optional
+            Number of epochs to train the model.
+            By default we use the value passed in the config.
+        n_init : int, optional
+            Number of initializations.
+            By default we use the value passed in the config.
+        take : float, optional
+            Fraction of total batches to take.
+            By default we use the value passed in the config.
+        select : str, optional
+            How to pick the best initialization: :code:`'loss'` or
+            :code:`'free_energy'`. By default we use the value passed in
+            the config.
+        window_length : int, optional
+            Number of samples in each window. Default is the sequence
+            length. Can only be changed when a Data object is passed.
+        max_windows : int, optional
+            Maximum number of windows to cluster. Windows are taken at
+            random from the dataset, or evenly spaced in time if
+            :code:`init_trans_prob=True`.
+        init_trans_prob : bool, optional
+            Should we also set the initial transition probability matrix
+            from the transitions between the cluster labels of consecutive
+            windows? Needs a Data object and a model with a transition
+            probability matrix.
+        kwargs : keyword arguments, optional
+            Keyword arguments for the fit method. Variational models also
+            accept :code:`n_kl_annealing_epochs`.
+
+        Returns
+        -------
+        history : dict
+            The training history of the best initialization.
+        """
+        from sklearn.cluster import KMeans
+
+        n_states = self._n_states
+        if init_trans_prob:
+            if not hasattr(self, "set_trans_prob"):
+                raise ValueError(
+                    f"{self.config.model_name} has no transition probability matrix."
+                )
+            if not hasattr(training_data, "dataset"):
+                raise ValueError("init_trans_prob=True needs a Data object.")
+
+        def make_candidates(dataset, n_init):
+            _logger.info("Clustering windows")
+            if init_trans_prob:
+                # Windows in time order so transitions can be counted
+                length = window_length or self.config.sequence_length
+                ordered = training_data.dataset(
+                    length, self.config.batch_size, shuffle=False, concatenate=False
+                )
+                features, session, stride = self._collect_ordered_features(
+                    ordered, max_windows
+                )
+            else:
+                features = self._collect_features(dataset, max_windows)
+
+            candidates = []
+            for n in range(n_init):
+                kmeans = KMeans(
+                    n_clusters=n_states,
+                    n_init=1,
+                    random_state=np.random.randint(2**31 - 1),
+                ).fit(features)
+                centres = kmeans.cluster_centers_
+                if init_trans_prob:
+                    trans_prob = self._trans_prob_from_labels(
+                        kmeans.labels_, session, stride * length
+                    )
+                else:
+                    trans_prob = None
+
+                def setup(centres=centres, trans_prob=trans_prob):
+                    self._set_parameters_from_features(centres)
+                    if trans_prob is not None:
+                        self.set_trans_prob(trans_prob, update_initializer=True)
+
+                candidates.append((str(n), setup))
+            return candidates
+
+        return self._multistart(
+            "K-means",
+            training_data,
+            make_candidates,
+            n_epochs,
+            n_init,
+            take,
+            select,
+            kwargs,
+            window_length=window_length,
+        )
 
     def single_subject_initialization(
         self,
         training_data,
         n_epochs: Optional[int] = None,
         n_init: Optional[int] = None,
+        select: Optional[str] = None,
         **kwargs,
     ) -> Optional[dict]:
         """Single subject initialization.
 
         Pick a subject at random, train a model, repeat a few times. Use
-        the weights from the best model (judged using the final loss).
+        the weights from the best model.
 
         Parameters
         ----------
@@ -309,6 +889,10 @@ class InitializationMixin:
         n_init : int, optional
             How many subjects should we train on?
             By default we use the value passed in the config.
+        select : str, optional
+            How to pick the best initialization: :code:`'loss'` or
+            :code:`'free_energy'`. By default we use the value passed in
+            the config.
         kwargs : keyword arguments, optional
             Keyword arguments for the fit method. Variational models also
             accept :code:`n_kl_annealing_epochs`.
@@ -318,7 +902,9 @@ class InitializationMixin:
         history : dict
             The training history of the best initialization.
         """
-        n_epochs, n_init, _ = self._initialization_settings(n_epochs, n_init, None)
+        n_epochs, n_init, _, select = self._initialization_settings(
+            n_epochs, n_init, None, select
+        )
         if not n_init:
             _logger.info(
                 "Number of initializations was set to zero. Skipping initialization."
@@ -332,97 +918,15 @@ class InitializationMixin:
             raise ValueError(
                 "training_data must be a list of Datasets or a Data object."
             )
+        scoring_dataset = self._scoring_dataset(
+            dtf.concatenate_datasets(datasets), select
+        )
 
         # Pick n_init subjects at random
         subjects = np.random.choice(len(datasets), n_init, replace=False)
         candidates = [(f"subject {s}", datasets[s], None) for s in subjects]
 
         with self._initialization_context(**context_kwargs):
-            return self._run_multistart(candidates, n_epochs, **kwargs)
-
-    def set_random_state_time_course_initialization(
-        self, training_dataset: tf.data.Dataset, stay_prob: float = 0.9
-    ) -> None:
-        """Sets the initial means/covariances based on a random state time course.
-
-        Parameters
-        ----------
-        training_dataset : tf.data.Dataset
-            Training data.
-        stay_prob : float, optional
-            Stay probability (diagonal for the transition probability
-            matrix). Other states have uniform probability.
-        """
-        _logger.info("Setting random means and covariances")
-
-        n_states = self._n_states
-        n_channels = self.config.n_channels
-
-        # Mean and covariance for each state
-        means = np.zeros([n_states, n_channels], dtype=np.float32)
-        covariances = np.zeros([n_states, n_channels, n_channels], dtype=np.float32)
-
-        n_batches = 0
-        for batch in training_dataset:
-            # Concatenate all the sequences in this batch
-            data = np.concatenate(batch["data"])
-
-            if data.shape[0] < 2 * n_channels:
-                raise ValueError(
-                    "Not enough time points in batch, "
-                    "increase batch_size or sequence_length"
-                )
-
-            # Sample a state time course using the initial transition
-            # probability matrix
-            stc = self._sample_state_time_course(data.shape[0], stay_prob)
-
-            # Make sure each state activates
-            non_active_states = np.sum(stc, axis=0) < 2 * n_channels
-            if np.any(non_active_states):
-                for _ in range(100):
-                    new_stc = self._sample_state_time_course(data.shape[0], stay_prob)
-                    new_active_states = np.sum(new_stc, axis=0) != 0
-                    for j in range(n_states):
-                        if non_active_states[j] and new_active_states[j]:
-                            stc[:, j] = new_stc[:, j]
-                    non_active_states = np.sum(stc, axis=0) < 2 * n_channels
-                    if not np.any(non_active_states):
-                        break
-
-            if np.any(non_active_states):
-                # Some states still haven't activated
-                raise ValueError(
-                    "random_state_time_course_initialization can't simulate a state "
-                    "time course where each state activates.\n"
-                    "Try increasing the batch_size or sequence_length.\n"
-                    "Or switch to using model.random_subset_initialization() instead."
-                )
-
-            # Calculate the mean/covariance for each state for this batch
-            m = []
-            C = []
-            for j in range(n_states):
-                x = data[stc[:, j] == 1]
-                mu = np.mean(x, axis=0)
-                if n_channels == 1:
-                    sigma = np.var(x).reshape(1, 1)
-                else:
-                    sigma = np.cov(x, rowvar=False)
-                m.append(mu)
-                C.append(sigma)
-            means += m
-            covariances += C
-            n_batches += 1
-
-        # Calculate the average from the running total
-        means /= n_batches
-        covariances /= n_batches
-
-        if self.config.learn_means:
-            # Set initial means
-            self.set_means(means, update_initializer=True)
-
-        if self.config.learn_covariances:
-            # Set initial covariances
-            self.set_covariances(covariances, update_initializer=True)
+            return self._run_multistart(
+                candidates, n_epochs, scoring_dataset=scoring_dataset, **kwargs
+            )

@@ -138,6 +138,10 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     init_take : float
         Fraction of dataset to use in the initialization.
         Defaults to 1.0.
+    init_select : str
+        How to pick the best initialization: :code:`'loss'` (training loss
+        of the last epoch) or :code:`'free_energy'` (free energy on a fixed
+        set of batches). Defaults to :code:`'loss'`.
 
     batch_size : int
         Mini-batch size.

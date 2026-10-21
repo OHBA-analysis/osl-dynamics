@@ -118,6 +118,11 @@ First check whether it is the GPU or the RAM that runs out. A GPU out of memory 
 
 If it is the RAM, the Data object is holding the whole dataset in memory. Save the prepared data as a TFRecord dataset with ``Data.save_tfrecord_dataset`` and load it with ``osl_dynamics.data.load_tfrecord_dataset``, which streams the data from disk. Alternatively, pass ``load_memmaps=True`` when creating the Data object to keep the data on disk as memory maps. See the `Training on large datasets` section of the :doc:`HMM training tutorial <tutorials_build/3-2_hmm_training>`. The initialization can also be done on a subset of the data by passing ``take`` (e.g. ``take=0.25``) to ``random_state_time_course_initialization``.
 
+How do I make training reproducible?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Call ``osl_dynamics.utils.set_random_seed(seed)`` before building the model. This seeds Python, NumPy and TensorFlow, which covers the initialization (random subsets, sampled state time courses, k-means), the shuffling of the training data and the model weights. Training on a GPU can still differ slightly between runs because some TensorFlow operations are non-deterministic; pass ``op_determinism=True`` to make them deterministic at the cost of speed.
+
 Modelling
 ---------
 
