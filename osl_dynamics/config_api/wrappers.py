@@ -1597,9 +1597,6 @@ def plot_group_nnmf_tde_hmm_networks(
     # Calculate coherence networks from group-level spectra
     from osl_dynamics.analysis import connectivity
 
-    # Calculate coherence networks from group-level spectra
-    from osl_dynamics.analysis import connectivity
-
     # Calculate group coherence relative to the average across states
     gc = connectivity.mean_coherence_from_spectra(f, gcoh, nnmf)
     gc -= np.mean(gc, axis=0, keepdims=True)

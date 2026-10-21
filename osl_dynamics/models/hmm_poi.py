@@ -2,12 +2,13 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import Union
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
+from osl_dynamics import data
 from osl_dynamics.inference.layers import (
     VectorsLayer,
     SeparatePoissonLogLikelihoodLayer,
