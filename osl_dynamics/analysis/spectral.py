@@ -823,7 +823,7 @@ def rescale_regression_coefs(
             "psd must have shape (n_sessions, 2, n_modes, n_channels, n_freqs)."
         )
 
-    if isinstance(alpha, np.ndarray):
+    if isinstance(alpha, np.ndarray) and alpha.ndim == 2:
         alpha = [alpha]
 
     if len(psd) != len(alpha):
