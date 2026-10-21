@@ -268,7 +268,9 @@ class Model(MarkovStateInferenceModelBase):
     def set_regularizers(self, training_dataset):
         raise NotImplementedError("No data-dependent Dirichlet regularizer is defined.")
 
-    def set_random_state_time_course_initialization(self, training_dataset):
+    def set_random_state_time_course_initialization(
+        self, training_dataset, stay_prob: float = 0.9
+    ):
         """Fit concentrations to raw samples assigned by a window-level chain.
 
         Accumulate per-state sufficient statistics, avoiding the old initializer's

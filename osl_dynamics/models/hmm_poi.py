@@ -284,7 +284,7 @@ class Model(MarkovStateInferenceModelBase):
         raise NotImplementedError
 
     def set_random_state_time_course_initialization(
-        self, training_dataset: tf.data.Dataset
+        self, training_dataset: tf.data.Dataset, stay_prob: float = 0.9
     ) -> None:
         """Sets the initial :code:`log_rates` based on a random state time course.
 
@@ -292,6 +292,8 @@ class Model(MarkovStateInferenceModelBase):
         ----------
         training_dataset : tf.data.Dataset
             Training data.
+        stay_prob : float, optional
+            Ignored, the initial transition probability matrix is used.
         """
         _logger.info("Setting random log_rates")
 

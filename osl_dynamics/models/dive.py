@@ -1011,9 +1011,3 @@ class Model(VariationalInferenceModelBase):
             group_observation_model_parameters[1],
             update_initializer=update_initializer,
         )
-
-    def random_subject_initialization(self, **kwargs) -> None:
-        """random subject initialisation not compatible with DIVE."""
-        raise AttributeError(
-            " 'Model' object has no attribute 'random_subject_initialization'."
-        )

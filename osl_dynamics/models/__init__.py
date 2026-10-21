@@ -39,6 +39,11 @@ Two parallel branches extend ``ModelBase`` for different inference paradigms:
   - :py:class:`~osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelBase`
   - Used by: HMM, HMM-Poisson, HIVE.
 
+Both branches share the initialization methods in
+:py:class:`~osl_dynamics.models.initialization.InitializationMixin`
+(``initialization.py``): a multi-start loop that trains a few candidate
+initializations briefly and keeps the best.
+
 **3. Full model**
 
 Each model combines a ``Config`` (via multiple inheritance from
