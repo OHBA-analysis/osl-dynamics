@@ -449,15 +449,13 @@ class Data:
             Defaults to True.
         """
 
-        def _n_batches(n_sequences):
-            if drop_last_batch:
-                return n_sequences // batch_size
-            return math.ceil(n_sequences / batch_size)
-
         if concatenate:
-            n_batches = _n_batches(len(index))
+            n_batches = dtf.n_batches(len(index), batch_size, drop_last_batch)
         else:
-            n_batches = sum(_n_batches(np.sum(index[:, 0] == i)) for i in self.keep)
+            n_batches = sum(
+                dtf.n_batches(np.sum(index[:, 0] == i), batch_size, drop_last_batch)
+                for i in self.keep
+            )
 
         if n_batches < 1:
             raise ValueError(
@@ -1346,18 +1344,13 @@ class Data:
             Dataset for training or evaluating the model along with the
             validation set if :code:`validation_split` was passed.
             The number of batches is known (:code:`dataset.cardinality()`)
-            and :code:`dataset.osld_metadata` holds the sequence length,
-            step size, number of sequences and number of channels.
+            and :code:`dataset.osld_metadata` records how the dataset was
+            made (sequence length, step size, number of sequences and
+            sessions, number of channels, whether it is shuffled).
         """
         step_size = step_size or sequence_length
-        if validation_split is not None and step_size != sequence_length:
-            raise ValueError(
-                "validation_split cannot be used with overlapping sequences "
-                f"(step_size={step_size} != sequence_length={sequence_length}). "
-                "The split is performed on non-overlapping sequences, so "
-                "overlapping windows would leak data between the training "
-                "and validation sets."
-            )
+        if validation_split is not None:
+            dtf.check_no_overlap(sequence_length, step_size)
 
         # Validate extra channels
         self.extra_channels = self.validate_extra_channels(
@@ -1389,21 +1382,23 @@ class Data:
                 seed=seed,
             )
 
-            def _make(index):
+            def _make(index, n_sessions):
                 dataset = dtf.dataset_from_index(index, slice_fn, **kwargs)
                 dataset.osld_metadata = {
                     "sequence_length": sequence_length,
                     "step_size": step_size,
                     "n_sequences": len(index),
+                    "n_sessions": n_sessions,
                     "n_channels": self.n_channels,
+                    "shuffle": shuffle,
                 }
                 return dataset
 
             if concatenate:
-                return _make(index)
+                return _make(index, len(self.keep))
 
             # Otherwise create a dataset for each session separately
-            return [_make(index[index[:, 0] == i]) for i in self.keep]
+            return [_make(index[index[:, 0] == i], 1) for i in self.keep]
 
         if validation_split is not None:
             train_index, val_index = dtf.split_index(
@@ -1429,7 +1424,10 @@ class Data:
                     _update(value)
             elif isinstance(obj, np.ndarray):
                 h.update(str((obj.dtype, obj.shape)).encode())
-                h.update(np.ascontiguousarray(obj).tobytes())
+                h.update(memoryview(np.ascontiguousarray(obj)))
+            elif hasattr(obj, "__dict__"):
+                # e.g. SessionLabels, repr would truncate long arrays
+                _update(vars(obj))
             else:
                 h.update(repr(obj).encode())
 
@@ -1517,14 +1515,8 @@ class Data:
 
         sequence_length = int(sequence_length)
         step_size = int(step_size or sequence_length)
-        if validation_split is not None and step_size != sequence_length:
-            raise ValueError(
-                "validation_split cannot be used with overlapping sequences "
-                f"(step_size={step_size} != sequence_length={sequence_length}). "
-                "The split is performed on non-overlapping sequences, so "
-                "overlapping windows would leak data between the training "
-                "and validation sets."
-            )
+        if validation_split is not None:
+            dtf.check_no_overlap(sequence_length, step_size)
 
         # Validate extra channels
         self.extra_channels = self.validate_extra_channels(
@@ -1571,14 +1563,16 @@ class Data:
             _logger.info(f"Reusing the TFRecord dataset in {tfrecord_dir}.")
             return
 
-        # Remove any existing dataset. The config is removed first so a
+        # Remove any existing dataset (including one written by an older
+        # version of osl-dynamics). The config is removed first so a
         # partially written dataset is never mistaken for a complete one
         os.makedirs(tfrecord_dir, exist_ok=True)
         config_path = os.path.join(tfrecord_dir, dtf.TFRECORD_CONFIG_FILE)
         if os.path.exists(config_path):
             os.remove(config_path)
-        for old_file in pathlib.Path(tfrecord_dir).glob("*.tfrecord"):
-            old_file.unlink()
+        for pattern in ["train_*.tfrecord", "val_*.tfrecord", "dataset-*.tfrecord"]:
+            for old_file in pathlib.Path(tfrecord_dir).glob(pattern):
+                old_file.unlink()
 
         # One file per session (and split)
         slice_fn = dtf.make_slice_fn(

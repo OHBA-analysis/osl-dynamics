@@ -138,6 +138,13 @@ model.summary()
 #     model.random_state_time_course_initialization(dataset, n_epochs=1, n_init=3)
 #     model.fit(dataset)
 #
+# This dataset is shuffled for training. To get inferred parameters in time order (e.g. with `get_alpha`), load an unshuffled dataset with one dataset per session.
+#
+# .. code-block:: python
+#
+#     dataset = load_tfrecord_dataset("tfrecords", batch_size=config.batch_size, shuffle=False, concatenate=False)
+#     alpha = model.get_alpha(dataset)
+#
 # The `buffer_size` argument of `load_tfrecord_dataset` sets how many sequences are held in memory for shuffling (default 4000); reduce it if you still run out of memory. If you run out of GPU memory rather than RAM, reduce the `batch_size` or `sequence_length` in the Config.
 #
 # Alternatively, the Data object can keep the data on disk as memory maps (`Data(..., load_memmaps=True)`) and read sequences from disk as they are needed, which avoids the extra step of writing TFRecords.

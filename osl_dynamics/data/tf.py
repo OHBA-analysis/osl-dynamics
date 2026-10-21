@@ -40,6 +40,48 @@ def concatenate_datasets(datasets: List):
     return full_dataset
 
 
+def n_batches(n_sequences: int, batch_size: int, drop_last_batch: bool = False) -> int:
+    """Number of batches a set of sequences is split into.
+
+    Parameters
+    ----------
+    n_sequences : int
+        Number of sequences.
+    batch_size : int
+        Number sequences in each mini-batch.
+    drop_last_batch : bool, optional
+        Should we drop the last batch if it is smaller than the batch size?
+
+    Returns
+    -------
+    n_batches : int
+        Number of batches.
+    """
+    if drop_last_batch:
+        return n_sequences // batch_size
+    return math.ceil(n_sequences / batch_size)
+
+
+def check_no_overlap(sequence_length: int, step_size: int) -> None:
+    """Raise if sequences overlap, which a validation split cannot use.
+
+    Parameters
+    ----------
+    sequence_length : int
+        Length of the segment of data to feed into the model.
+    step_size : int
+        Number of samples to slide the sequence across the data.
+    """
+    if step_size != sequence_length:
+        raise ValueError(
+            "validation_split cannot be used with overlapping sequences "
+            f"(step_size={step_size} != sequence_length={sequence_length}). "
+            "The split is performed on non-overlapping sequences, so "
+            "overlapping windows would leak data between the training "
+            "and validation sets."
+        )
+
+
 def sequence_index(
     n_samples: List[int],
     sequence_length: int,
@@ -264,7 +306,7 @@ def dataset_from_index(
     import tensorflow as tf  # moved here to avoid slow imports
 
     dataset = tf.data.Dataset.from_tensor_slices(index)
-    if shuffle:
+    if shuffle and len(index) > 1:
         dataset = dataset.shuffle(len(index), seed=seed)
     dataset = dataset.map(slice_fn, num_parallel_calls=tf.data.AUTOTUNE)
     dataset = dataset.batch(batch_size, drop_remainder=drop_last_batch)
@@ -426,8 +468,9 @@ def load_tfrecord_dataset(
         one per session, if :code:`concatenate=False`), along with the
         validation set if the dataset was written with a validation split.
         The number of batches is known (:code:`dataset.cardinality()`)
-        and :code:`dataset.osld_metadata` holds the sequence length, step
-        size, number of sequences, number of channels and channel range.
+        and :code:`dataset.osld_metadata` records how the dataset was made
+        (sequence length, step size, number of sequences and sessions,
+        number of channels, whether it is shuffled, channel range).
     """
     import tensorflow as tf  # moved here to avoid slow imports
 
@@ -449,29 +492,25 @@ def load_tfrecord_dataset(
             for name, tensor in parsed.items()
         }
 
-    def _n_batches(n_sequences):
-        if drop_last_batch:
-            return n_sequences // batch_size
-        return math.ceil(n_sequences / batch_size)
-
-    def _metadata(n_sequences):
-        return {
-            "sequence_length": config["sequence_length"],
-            "step_size": config["step_size"],
-            "n_sequences": n_sequences,
-            "n_channels": config["n_channels"],
-            "range": np.array(config["channel_range"], dtype=np.float32),
-        }
-
-    def _finish(dataset, n_sequences, shuffle):
+    def _finish(dataset, n_sequences, shuffle, n_sessions):
         if shuffle:
             dataset = dataset.shuffle(buffer_size, seed=seed)
         dataset = dataset.batch(batch_size, drop_remainder=drop_last_batch)
         dataset = dataset.apply(
-            tf.data.experimental.assert_cardinality(_n_batches(n_sequences))
+            tf.data.experimental.assert_cardinality(
+                n_batches(n_sequences, batch_size, drop_last_batch)
+            )
         )
         dataset = dataset.prefetch(tf.data.AUTOTUNE)
-        dataset.osld_metadata = _metadata(n_sequences)
+        dataset.osld_metadata = {
+            "sequence_length": config["sequence_length"],
+            "step_size": config["step_size"],
+            "n_sequences": n_sequences,
+            "n_sessions": n_sessions,
+            "n_channels": config["n_channels"],
+            "shuffle": shuffle,
+            "range": np.array(config["channel_range"], dtype=np.float32),
+        }
         return dataset
 
     def _create_dataset(split, shuffle):
@@ -502,14 +541,14 @@ def load_tfrecord_dataset(
                 deterministic=not shuffle,
             )
             dataset = dataset.map(_parse_example, num_parallel_calls=tf.data.AUTOTUNE)
-            return _finish(dataset, sum(n_sequences), shuffle)
+            return _finish(dataset, sum(n_sequences), shuffle, len(keep))
 
         # Otherwise create a dataset for each session separately
         datasets = []
         for filename, n in zip(filenames, n_sequences):
             dataset = tf.data.TFRecordDataset(filename)
             dataset = dataset.map(_parse_example, num_parallel_calls=tf.data.AUTOTUNE)
-            datasets.append(_finish(dataset, n, shuffle))
+            datasets.append(_finish(dataset, n, shuffle, 1))
         return datasets
 
     if config["validation_split"] is None:

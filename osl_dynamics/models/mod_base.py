@@ -630,7 +630,8 @@ class ModelBase:
             (e.g. from :func:`osl_dynamics.data.load_tfrecord_dataset`) or
             list of datasets is passed through.
         shuffle : bool, optional
-            Should we shuffle the data? Ignored for a prebuilt dataset.
+            Should we shuffle the data? A prebuilt dataset is used as is,
+            but a shuffled one is rejected if :code:`shuffle=False`.
         concatenate : bool, optional
             Should we return a single TensorFlow Dataset or a list of Datasets.
         step_size : int, optional
@@ -670,18 +671,30 @@ class ModelBase:
                 drop_last_batch=drop_last_batch,
             )
 
-        # Prebuilt dataset(s): the sequences were cut when the dataset was
-        # made, so we can only check the step size matches
-        if step_size is not None:
-            datasets = inputs if isinstance(inputs, list) else [inputs]
-            for dataset in datasets:
-                metadata = getattr(dataset, "osld_metadata", None)
-                if metadata is None or metadata["step_size"] != step_size:
+        # Prebuilt dataset(s): the sequences were cut and shuffled when the
+        # dataset was made, so we can only check it was made the way we need
+        for dataset in inputs if isinstance(inputs, list) else [inputs]:
+            metadata = getattr(dataset, "osld_metadata", {})
+            if not shuffle and metadata.get("shuffle", False):
+                raise ValueError(
+                    "An unshuffled dataset is needed here, e.g. to keep the "
+                    "time points in order. Load the dataset with "
+                    "shuffle=False (and concatenate=False for one output "
+                    "per session)."
+                )
+            if step_size is not None:
+                if metadata.get("step_size") != step_size:
                     raise ValueError(
                         f"A dataset made with step_size={step_size} is needed "
                         "(e.g. to remove edge effects). Pass the Data object "
                         "instead, or save a TFRecord dataset with "
                         f"step_size={step_size}."
+                    )
+                if metadata.get("n_sessions", 1) > 1:
+                    raise ValueError(
+                        "A dataset with one session per dataset is needed "
+                        "(e.g. to remove edge effects). Load the dataset "
+                        "with concatenate=False."
                     )
 
         if isinstance(inputs, Dataset) and not concatenate:

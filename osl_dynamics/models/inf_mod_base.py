@@ -21,6 +21,27 @@ from osl_dynamics.utils.misc import replace_argument
 _logger = logging.getLogger("osl-dynamics")
 
 
+def _edge_effects_step_size(sequence_length: int) -> int:
+    """Step size for sequences with 50% overlap.
+
+    Parameters
+    ----------
+    sequence_length : int
+        Length of the segment of data to feed into the model. Must be even.
+
+    Returns
+    -------
+    step_size : int
+        :code:`sequence_length // 2`.
+    """
+    if sequence_length % 2:
+        raise ValueError(
+            "remove_edge_effects requires an even sequence_length, "
+            f"got {sequence_length}."
+        )
+    return sequence_length // 2
+
+
 def _remove_edge_effects(x: np.ndarray, step_size: int) -> List[np.ndarray]:
     """Trim predictions made on sequences with 50% overlap.
 
@@ -45,10 +66,7 @@ def _remove_edge_effects(x: np.ndarray, step_size: int) -> List[np.ndarray]:
     """
     n_sequences, sequence_length = x.shape[:2]
     if 2 * step_size != sequence_length:
-        raise ValueError(
-            "remove_edge_effects requires an even sequence_length, "
-            f"got {sequence_length}."
-        )
+        raise ValueError("Sequences must have 50% overlap.")
     trim_start = (sequence_length - step_size) // 2
     trim_end = sequence_length - step_size - trim_start
     if n_sequences == 1:
@@ -716,7 +734,7 @@ class VariationalInferenceModelBase(ModelBase):
             )
 
         if remove_edge_effects:
-            step_size = self.config.sequence_length // 2  # 50% overlap
+            step_size = _edge_effects_step_size(self.config.sequence_length)
         else:
             step_size = None
 
@@ -786,7 +804,7 @@ class VariationalInferenceModelBase(ModelBase):
             raise ValueError("Please use get_theta for a single time scale model.")
 
         if remove_edge_effects:
-            step_size = self.config.sequence_length // 2  # 50% overlap
+            step_size = _edge_effects_step_size(self.config.sequence_length)
         else:
             step_size = None
 
@@ -864,7 +882,7 @@ class VariationalInferenceModelBase(ModelBase):
             )
 
         if remove_edge_effects:
-            step_size = self.config.sequence_length // 2  # 50% overlap
+            step_size = _edge_effects_step_size(self.config.sequence_length)
         else:
             step_size = None
 
@@ -936,7 +954,7 @@ class VariationalInferenceModelBase(ModelBase):
             raise ValueError("Please use get_alpha for a single time scale model.")
 
         if remove_edge_effects:
-            step_size = self.config.sequence_length // 2  # 50% overlap
+            step_size = _edge_effects_step_size(self.config.sequence_length)
         else:
             step_size = None
 
@@ -1202,7 +1220,7 @@ class MarkovStateInferenceModelBase(ModelBase):
             )
 
         if remove_edge_effects:
-            step_size = self.config.sequence_length // 2  # 50% overlap
+            step_size = _edge_effects_step_size(self.config.sequence_length)
         else:
             step_size = None
 
