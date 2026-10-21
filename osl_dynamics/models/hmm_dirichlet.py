@@ -11,7 +11,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
-from osl_dynamics import data
 from osl_dynamics.inference import optimizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
@@ -22,6 +21,7 @@ from osl_dynamics.inference.layers import (
 )
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.models.inf_mod_base import (
+    _remove_edge_effects,
     MarkovStateInferenceModelConfig,
     MarkovStateInferenceModelBase,
 )
@@ -167,52 +167,8 @@ class Model(MarkovStateInferenceModelBase):
             )
         ModelBase.compile(self, optimizer=optimizer, **kwargs)
 
-    def make_dataset(
-        self,
-        inputs,
-        shuffle=False,
-        concatenate=False,
-        step_size=None,
-        drop_last_batch=False,
-    ):
-        """Convert Data into a TensorFlow Dataset using the original batching.
-
-        step_size is in raw samples. Prebuilt datasets are passed through;
-        a single dataset is wrapped in a list when concatenate=False.
-        """
-        if isinstance(inputs, str) or isinstance(inputs, np.ndarray):
-            # str or numpy array -> Data object
-            inputs = data.Data(inputs)
-
-        if isinstance(inputs, data.Data):
-            sequence_length = self.config.sequence_length * self.config.window_size
-            if inputs.use_tfrecord:
-                outputs = inputs.tfrecord_dataset(
-                    sequence_length,
-                    self.config.batch_size,
-                    shuffle=shuffle,
-                    concatenate=concatenate,
-                    step_size=step_size,
-                    drop_last_batch=drop_last_batch,
-                    overwrite=True,
-                )
-            else:
-                outputs = inputs.dataset(
-                    sequence_length,
-                    self.config.batch_size,
-                    shuffle=shuffle,
-                    concatenate=concatenate,
-                    step_size=step_size,
-                    drop_last_batch=drop_last_batch,
-                )
-
-        elif isinstance(inputs, tf.data.Dataset) and not concatenate:
-            outputs = [inputs]
-
-        else:
-            outputs = inputs
-
-        return outputs
+    def _dataset_sequence_length(self) -> int:
+        return self.raw_sequence_length
 
     def get_training_time_series(self, training_data, prepared=True, concatenate=False):
         return training_data.trim_time_series(
@@ -258,21 +214,8 @@ class Model(MarkovStateInferenceModelBase):
         if self.is_multi_gpu:
             raise ValueError("Load with single_gpu=True before inference.")
         length = self.config.sequence_length
-        if remove_edge_effects and length % 4:
-            raise ValueError(
-                "Overlapping inference requires sequence_length divisible by four."
-            )
-        if remove_edge_effects and (
-            isinstance(dataset, tf.data.Dataset)
-            or (
-                isinstance(dataset, list)
-                and dataset
-                and isinstance(dataset[0], tf.data.Dataset)
-            )
-        ):
-            raise ValueError(
-                "Pass raw arrays or Data for overlapping inference, not prebatched datasets."
-            )
+        if remove_edge_effects and length % 2:
+            raise ValueError("Overlapping inference requires an even sequence_length.")
         datasets = self.make_dataset(
             dataset,
             step_size=self.raw_sequence_length // 2 if remove_edge_effects else None,
@@ -283,10 +226,8 @@ class Model(MarkovStateInferenceModelBase):
             if not batches:
                 raise ValueError("A session contains no complete sequence.")
             a = np.concatenate(batches)
-            if remove_edge_effects and len(a) > 1:
-                trim = length // 4
-                pieces = [a[0, :-trim], *list(a[1:-1, trim:-trim]), a[-1, trim:]]
-                result.append(np.concatenate(pieces))
+            if remove_edge_effects:
+                result.append(np.concatenate(_remove_edge_effects(a, length // 2)))
             else:
                 result.append(a.reshape(-1, self.config.n_states))
         return np.concatenate(result) if concatenate or len(result) == 1 else result

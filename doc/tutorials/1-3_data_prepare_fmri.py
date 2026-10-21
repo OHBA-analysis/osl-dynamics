@@ -139,6 +139,13 @@ data = Data("prepared_data")
 print(data)
 
 #%%
+# If the dataset is too large to fit in memory, you can save it as a TFRecord dataset instead, which can be streamed from disk during training. See the `Training on large datasets` section of the :doc:`HMM training tutorial <3-2_hmm_training>`.
+#
+# .. code-block:: python
+#
+#     data.save_tfrecord_dataset("tfrecords", sequence_length=200)
+
+#%%
 # Note, if we saved data that included PCA in preparation. The `pca_components` attribute will be loaded from the pickle file when we load data using the Data class.
 #
 # Next steps

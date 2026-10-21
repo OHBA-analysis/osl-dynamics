@@ -16,8 +16,8 @@ Modules
   different file formats.
 - :py:mod:`~osl_dynamics.data.task` — Utilities for epoching and working
   with task data.
-- :py:mod:`~osl_dynamics.data.tf` — TensorFlow dataset utilities (TFRecord
-  I/O, batching).
+- :py:mod:`~osl_dynamics.data.tf` — TensorFlow dataset utilities (sequence
+  indexing, batching, TFRecord I/O).
 
 Tutorials
 ---------
@@ -28,6 +28,6 @@ Tutorials
 """
 
 from osl_dynamics.data.base import Data, SessionLabels
-from osl_dynamics.data.tf import load_tfrecord_dataset
+from osl_dynamics.data.tf import load_tfrecord_config, load_tfrecord_dataset
 
-__all__ = ["Data", "SessionLabels", "load_tfrecord_dataset"]
+__all__ = ["Data", "SessionLabels", "load_tfrecord_config", "load_tfrecord_dataset"]
