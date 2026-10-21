@@ -63,8 +63,13 @@ class Permutation:
             X_copy[:, permute_indx] *= signs[:, None]
         else:
             # Randomly shuffle the rows
-            row_indx = np.random.permutation(self.glm.n_samples)
-            X_copy[:, permute_indx] = X_copy[np.ix_(row_indx, permute_indx)]
+            rows = np.arange(self.glm.n_samples)
+            feature_types = np.array(self.glm.feature_types)[permute_indx]
+            if np.all(feature_types == "categorical"):
+                # Only shuffle the rows that belong to the groups in the contrast
+                rows = rows[np.any(X_copy[:, permute_indx] != 0, axis=1)]
+            row_indx = np.random.permutation(rows)
+            X_copy[np.ix_(rows, permute_indx)] = X_copy[np.ix_(row_indx, permute_indx)]
 
         return X_copy
 

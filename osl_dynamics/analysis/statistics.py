@@ -77,6 +77,7 @@ def group_diff_max_stat_perm(
     data: np.ndarray,
     assignments: np.ndarray,
     n_perm: int,
+    groups: Optional[Tuple] = None,
     covariates: Optional[Dict[str, np.ndarray]] = None,
     metric: str = "tstats",
     n_jobs: int = 1,
@@ -86,7 +87,9 @@ def group_diff_max_stat_perm(
     This function fits a General Linear Model (GLM) with ordinary least
     squares and performs a row-shuffle permutation to build a null distribution
     using maximum statistic across the target dimensions (target_dims)
-    for the difference between two groups.
+    for the difference between two groups. Each unique value in
+    :code:`assignments` is modelled as a separate group, but only the two
+    groups being compared are permuted.
 
     Parameters
     ----------
@@ -95,9 +98,13 @@ def group_diff_max_stat_perm(
         Shape is (n_samples, \*target_dims).
     assignments : np.ndarray
         Group assignments. Shape is (n_samples,).
-        Must have exactly two unique values.
     n_perm : int
         Number of permutations.
+    groups : tuple, optional
+        The two group labels to compare, :code:`(group1, group2)`. The
+        difference returned is :code:`group1 - group2`. Required if
+        :code:`assignments` has more than two unique values. Defaults to the
+        two unique values in :code:`assignments` in sorted order.
     covariates : dict, optional
         Dictionary of continuous covariates to include as confound regressors.
         Each key is a covariate name and each value is a 1D array of length
@@ -124,26 +131,39 @@ def group_diff_max_stat_perm(
     if covariates is None:
         covariates = {}
 
+    assignments = np.asarray(assignments)
     unique_groups = np.unique(assignments)
-    if len(unique_groups) != 2:
-        raise ValueError("assignments must have exactly two unique values.")
+    if len(unique_groups) < 2:
+        raise ValueError("assignments must have at least two unique values.")
+
+    if groups is None:
+        if len(unique_groups) != 2:
+            raise ValueError(
+                "groups must be specified if assignments has more than two "
+                f"unique values, got {unique_groups}."
+            )
+        groups = tuple(unique_groups)
+    if len(groups) != 2 or groups[0] == groups[1]:
+        raise ValueError(f"groups must be two different group labels, got {groups}.")
+    for group in groups:
+        if group not in unique_groups:
+            raise ValueError(f"group {group} not found in assignments.")
 
     features = [
         {
-            "name": "Group1",
-            "values": (assignments == unique_groups[0]).astype(int),
+            "name": f"Group_{group}",
+            "values": (assignments == group).astype(int),
             "feature_type": "categorical",
-        },
-        {
-            "name": "Group2",
-            "values": (assignments == unique_groups[1]).astype(int),
-            "feature_type": "categorical",
-        },
+        }
+        for group in unique_groups
     ]
     for key, value in covariates.items():
         features.append({"name": key, "values": value, "feature_type": "continuous"})
 
-    contrasts = [{"name": "GroupDiff", "values": [1, -1] + [0] * len(covariates)}]
+    contrast_values = [0] * len(features)
+    contrast_values[list(unique_groups).index(groups[0])] = 1
+    contrast_values[list(unique_groups).index(groups[1])] = -1
+    contrasts = [{"name": "GroupDiff", "values": contrast_values}]
 
     DC = DesignConfig(features=features, contrasts=contrasts)
     design = DC.create_design()
