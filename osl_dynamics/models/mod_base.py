@@ -624,18 +624,22 @@ class ModelBase:
 
         Parameters
         ----------
-        inputs : osl_dynamics.data.Data or str or np.ndarray
+        inputs : osl_dynamics.data.Data or str or np.ndarray or tf.data.Dataset
             Data object. If a :code:`str` or :np.ndarray: is passed this
-            function will first convert it into a Data object.
+            function will first convert it into a Data object. A dataset
+            (e.g. from :func:`osl_dynamics.data.load_tfrecord_dataset`) or
+            list of datasets is passed through.
         shuffle : bool, optional
-            Should we shuffle the data?
+            Should we shuffle the data? Ignored for a prebuilt dataset.
         concatenate : bool, optional
             Should we return a single TensorFlow Dataset or a list of Datasets.
         step_size : int, optional
             Number of samples to slide the sequence across the dataset.
-            Default is no overlap.
+            Default is no overlap. A prebuilt dataset must have been made
+            with the requested step size.
         drop_last_batch : bool, optional
             Should we drop the last batch if it is smaller than the batch size?
+            Ignored for a prebuilt dataset.
 
         Returns
         -------
@@ -648,47 +652,47 @@ class ModelBase:
             inputs = data.Data(inputs)
 
         if isinstance(inputs, data.Data):
-            # Validation
-            if (
-                isinstance(self.config.strategy, MirroredStrategy)
-                and not inputs.use_tfrecord
-            ):
+            if isinstance(self.config.strategy, MirroredStrategy):
                 _logger.warning(
-                    "Using a multiple GPUs with a non-TFRecord dataset. "
-                    "This will result in poor performance. "
-                    "Consider using a TFRecord dataset with Data(..., use_tfrecord=True)."
+                    "Using multiple GPUs with a Data object. Consider a "
+                    "TFRecord dataset (Data.save_tfrecord_dataset and "
+                    "load_tfrecord_dataset) for better performance."
                 )
 
             # Data object -> list of Dataset if concatenate=False
             # or Data object -> Dataset if concatenate=True
-            if inputs.use_tfrecord:
-                outputs = inputs.tfrecord_dataset(
-                    self.config.sequence_length,
-                    self.config.batch_size,
-                    shuffle=shuffle,
-                    concatenate=concatenate,
-                    step_size=step_size,
-                    drop_last_batch=drop_last_batch,
-                    overwrite=True,
-                )
-            else:
-                outputs = inputs.dataset(
-                    self.config.sequence_length,
-                    self.config.batch_size,
-                    shuffle=shuffle,
-                    concatenate=concatenate,
-                    step_size=step_size,
-                    drop_last_batch=drop_last_batch,
-                )
+            return inputs.dataset(
+                self._dataset_sequence_length(),
+                self.config.batch_size,
+                shuffle=shuffle,
+                concatenate=concatenate,
+                step_size=step_size,
+                drop_last_batch=drop_last_batch,
+            )
 
-        elif isinstance(inputs, Dataset) and not concatenate:
+        # Prebuilt dataset(s): the sequences were cut when the dataset was
+        # made, so we can only check the step size matches
+        if step_size is not None:
+            datasets = inputs if isinstance(inputs, list) else [inputs]
+            for dataset in datasets:
+                metadata = getattr(dataset, "osld_metadata", None)
+                if metadata is None or metadata["step_size"] != step_size:
+                    raise ValueError(
+                        f"A dataset made with step_size={step_size} is needed "
+                        "(e.g. to remove edge effects). Pass the Data object "
+                        "instead, or save a TFRecord dataset with "
+                        f"step_size={step_size}."
+                    )
+
+        if isinstance(inputs, Dataset) and not concatenate:
             # Dataset -> list of Dataset if concatenate=False
-            outputs = [inputs]
+            return [inputs]
 
-        else:
-            outputs = inputs
+        return inputs
 
-        return outputs
+    def _dataset_sequence_length(self) -> int:
+        """Sequence length to cut the data into when making a dataset."""
+        return self.config.sequence_length
 
     def get_training_time_series(
         self,

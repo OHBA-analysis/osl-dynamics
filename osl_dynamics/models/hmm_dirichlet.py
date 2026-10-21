@@ -11,7 +11,6 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
-from osl_dynamics import data
 from osl_dynamics.inference import optimizers
 from osl_dynamics.inference.initializers import WeightInitializer
 from osl_dynamics.inference.layers import (
@@ -167,52 +166,8 @@ class Model(MarkovStateInferenceModelBase):
             )
         ModelBase.compile(self, optimizer=optimizer, **kwargs)
 
-    def make_dataset(
-        self,
-        inputs,
-        shuffle=False,
-        concatenate=False,
-        step_size=None,
-        drop_last_batch=False,
-    ):
-        """Convert Data into a TensorFlow Dataset using the original batching.
-
-        step_size is in raw samples. Prebuilt datasets are passed through;
-        a single dataset is wrapped in a list when concatenate=False.
-        """
-        if isinstance(inputs, str) or isinstance(inputs, np.ndarray):
-            # str or numpy array -> Data object
-            inputs = data.Data(inputs)
-
-        if isinstance(inputs, data.Data):
-            sequence_length = self.config.sequence_length * self.config.window_size
-            if inputs.use_tfrecord:
-                outputs = inputs.tfrecord_dataset(
-                    sequence_length,
-                    self.config.batch_size,
-                    shuffle=shuffle,
-                    concatenate=concatenate,
-                    step_size=step_size,
-                    drop_last_batch=drop_last_batch,
-                    overwrite=True,
-                )
-            else:
-                outputs = inputs.dataset(
-                    sequence_length,
-                    self.config.batch_size,
-                    shuffle=shuffle,
-                    concatenate=concatenate,
-                    step_size=step_size,
-                    drop_last_batch=drop_last_batch,
-                )
-
-        elif isinstance(inputs, tf.data.Dataset) and not concatenate:
-            outputs = [inputs]
-
-        else:
-            outputs = inputs
-
-        return outputs
+    def _dataset_sequence_length(self) -> int:
+        return self.raw_sequence_length
 
     def get_training_time_series(self, training_data, prepared=True, concatenate=False):
         return training_data.trim_time_series(

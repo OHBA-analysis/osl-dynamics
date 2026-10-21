@@ -1,13 +1,14 @@
 """Base class for handling data."""
 
 import atexit
+import hashlib
+import json
 import math
 import os
 import re
 import logging
 import pathlib
 import pickle
-import random
 import uuid
 from contextlib import contextmanager
 from functools import partial
@@ -98,18 +99,11 @@ class Data:
         Should we load the data as memory maps (memmaps)? If :code:`True`, we
         will store the data on disk rather than loading it into memory.
     store_dir : str, optional
-        Directory to write temporary files to. This is used for memory maps
-        (if :code:`load_memmaps=True`) and TFRecord files (if
-        :code:`use_tfrecord=True`). Each Data instance writes to its own
-        unique sub-directory of :code:`store_dir`, which is deleted
-        automatically when the script ends (or when :code:`delete_dir` is
-        called). Default is :code:`./tmp`.
-    buffer_size : int, optional
-        Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
-        to less random shuffling but will be quicker. Default is 4000.
-    use_tfrecord : bool, optional
-        Should we save the data as a TensorFlow Record? This is recommended for
-        training on large datasets. Default is :code:`False`.
+        Directory to write memory maps to (if :code:`load_memmaps=True`).
+        Each Data instance writes to its own unique sub-directory of
+        :code:`store_dir`, which is deleted automatically when the script
+        ends (or when :code:`delete_dir` is called). Default is
+        :code:`./tmp`.
     session_labels : list of SessionLabels, optional
         Extra session labels.
     extra_channels : dict, optional
@@ -140,8 +134,6 @@ class Data:
         time_axis_first: bool = True,
         load_memmaps: bool = False,
         store_dir: str = "tmp",
-        buffer_size: int = 4000,
-        use_tfrecord: bool = False,
         session_labels: Optional[List["SessionLabels"]] = None,
         extra_channels: Optional[Dict] = None,
         n_jobs: int = 1,
@@ -162,8 +154,6 @@ class Data:
         self.mask_file = mask_file
         self.time_axis_first = time_axis_first
         self.load_memmaps = load_memmaps
-        self.buffer_size = buffer_size
-        self.use_tfrecord = use_tfrecord
         self.n_jobs = n_jobs
 
         # Validate inputs
@@ -261,32 +251,22 @@ class Data:
         """Number of arrays."""
         return len(self.arrays)
 
-    @property
-    def input_shapes(self) -> Dict:
+    def input_shapes(self, sequence_length: int) -> Dict:
         """Get the input shapes for the model.
+
+        Parameters
+        ----------
+        sequence_length : int
+            Length of the segment of data to feed into the model.
 
         Returns
         -------
         shapes : dict
             Dictionary of input shapes.
         """
-        if getattr(self, "sequence_length", None) is None:
-            raise ValueError("Data.sequence_length must be set.")
-
-        input_shapes = {"data": [self.sequence_length, self.n_channels]}
-        for session_label in self.session_labels:
-            input_shapes[session_label.name] = [self.sequence_length]
-
-        for channel_name, channel_values in self.extra_channels.items():
-            if channel_values[0].ndim == 1:
-                input_shapes[channel_name] = [self.sequence_length]
-            else:
-                input_shapes[channel_name] = [
-                    self.sequence_length,
-                    channel_values[0].shape[-1],
-                ]
-
-        return input_shapes
+        return dtf.element_shapes(
+            sequence_length, self.n_channels, self.session_labels, self.extra_channels
+        )
 
     @contextmanager
     def set_keep(self, keep: Union[int, List[int]]):
@@ -321,17 +301,6 @@ class Data:
         """
         self.original_sampling_frequency = sampling_frequency
         self.sampling_frequency = sampling_frequency
-
-    def set_buffer_size(self, buffer_size: int) -> None:
-        """Set the :code:`buffer_size` attribute.
-
-        Parameters
-        ----------
-        buffer_size : int
-            Buffer size for shuffling a TensorFlow Dataset. Smaller values will
-            lead to less random shuffling but will be quicker.
-        """
-        self.buffer_size = buffer_size
 
     def time_series(
         self, prepared: bool = True, concatenate: bool = False
@@ -458,24 +427,20 @@ class Data:
 
     def _validate_batching(
         self,
-        sequence_length: int,
+        index: np.ndarray,
         batch_size: int,
-        step_size: Optional[int] = None,
         drop_last_batch: bool = False,
         concatenate: bool = True,
     ) -> None:
-        """Validate the batching process.
+        """Check the data can be split into at least one batch.
 
         Parameters
         ----------
-        sequence_length : int
-            Length of the segment of data to feed into the model.
+        index : np.ndarray
+            Sequence index from :func:`osl_dynamics.data.tf.sequence_index`.
         batch_size : int
             Number sequences in each mini-batch which is used to train the
             model.
-        step_size : int, optional
-            Number of samples to slide the sequence across the dataset.
-            Default is no overlap.
         drop_last_batch : bool, optional
             Should we drop the last batch if it is smaller than the batch size?
             Defaults to False.
@@ -484,26 +449,15 @@ class Data:
             Defaults to True.
         """
 
-        # Calculate number of sequences per session
-        n_sequences_per_session = [
-            (array.shape[0] - sequence_length) // step_size + 1 for array in self.arrays
-        ]
+        def _n_batches(n_sequences):
+            if drop_last_batch:
+                return n_sequences // batch_size
+            return math.ceil(n_sequences / batch_size)
 
-        # Calculate number of batches
         if concatenate:
-            # Calculate total batches across concatenated sequences
-            total_n_sequences = sum(n_sequences_per_session)
-            n_batches = total_n_sequences // batch_size
-            # Add one more batch if the last incomplete batch is not dropped
-            if not drop_last_batch and total_n_sequences % batch_size != 0:
-                n_batches += 1
+            n_batches = _n_batches(len(index))
         else:
-            # Calculate batches per session individually, then sum
-            n_batches_per_session = [
-                n // batch_size + (0 if drop_last_batch or n % batch_size == 0 else 1)
-                for n in n_sequences_per_session
-            ]
-            n_batches = sum(n_batches_per_session)
+            n_batches = sum(_n_batches(np.sum(index[:, 0] == i)) for i in self.keep)
 
         if n_batches < 1:
             raise ValueError(
@@ -1343,147 +1297,6 @@ class Data:
 
         return trimmed_time_series
 
-    def count_sequences(
-        self, sequence_length: int, step_size: Optional[int] = None
-    ) -> np.ndarray:
-        """Count sequences.
-
-        Parameters
-        ----------
-        sequence_length : int
-            Length of the segment of data to feed into the model.
-        step_size : int, optional
-            The number of samples by which to move the sliding window between
-            sequences. Defaults to :code:`sequence_length`.
-
-        Returns
-        -------
-        n : np.ndarray
-            Number of sequences for each session's data.
-        """
-        return np.array(
-            [
-                dtf.get_n_sequences(array, sequence_length, step_size)
-                for array in self.arrays
-            ]
-        )
-
-    def _create_data_dict(
-        self, i: int, array: np.ndarray, extra_channels: Dict
-    ) -> Dict:
-        """Create a dictionary of data for a single session.
-
-        Parameters
-        ----------
-        i : int
-            Index of the session.
-        array : np.ndarray
-            Time series data for a single session.
-        extra_channels : dict
-            Dictionary of extra channels to add to the data.
-
-        Returns
-        -------
-        data : dict
-            Dictionary of data for a single session.
-        """
-        data = {"data": array}
-
-        # Add other session labels
-        placeholder = np.zeros(array.shape[0], dtype=np.float32)
-        for session_label in self.session_labels:
-            label_name = session_label.name
-            label_values = session_label.values
-            data[label_name] = placeholder + label_values[i]
-
-        # Add extra channels
-        for k, v in extra_channels.items():
-            if k in data:
-                raise ValueError(f"Channel name '{k}' already exists.")
-            data[k] = v[i]
-
-        return data
-
-    def _trim_data(
-        self, data: List[np.ndarray], sequence_length: int, n_sequences: np.ndarray
-    ) -> List[np.ndarray]:
-        """Trim data to be an integer multiple of the sequence length."""
-        X = []
-        for i in range(self.n_sessions):
-            X.append(data[i][: n_sequences[i] * sequence_length])
-        return X
-
-    def _validation_split(
-        self,
-        X: List[np.ndarray],
-        extra_channels: Dict,
-        validation_split: float,
-        validation_split_seed: Optional[int] = None,
-    ) -> Tuple[List[np.ndarray], List[np.ndarray], Dict, Dict]:
-        """Split the data into training and validation sets."""
-        if self.step_size != self.sequence_length:
-            raise ValueError(
-                "validation_split cannot be used with overlapping sequences "
-                f"(step_size={self.step_size} != "
-                f"sequence_length={self.sequence_length}). The split is "
-                "performed on non-overlapping sequences, so overlapping "
-                "windows would leak data between the training and "
-                "validation sets."
-            )
-
-        rng = np.random.default_rng(validation_split_seed)
-
-        def _split_data(d, val_indx, train_indx):
-            # 1D (extra channel) input is temporarily given a channel axis,
-            # which we remove again before returning. Note, we must not
-            # squeeze 2D input as this would corrupt single-channel data
-            original_ndim = d.ndim
-            if d.ndim == 1:
-                d = d[:, None]
-            n_channels = d.shape[-1]
-            d = d.reshape(-1, self.sequence_length, n_channels)
-            d_train = d[train_indx].reshape(-1, n_channels)
-            d_val = d[val_indx].reshape(-1, n_channels)
-            if original_ndim == 1:
-                d_train = d_train[:, 0]
-                d_val = d_val[:, 0]
-            return d_train, d_val
-
-        n_sequences = self.count_sequences(self.sequence_length)
-
-        # Number of sequences that should be in the validation set
-        n_val_sequences = (validation_split * n_sequences).astype(int)
-
-        if np.all(n_val_sequences == 0):
-            raise ValueError(
-                "No full sequences could be assigned to the validation set. "
-                "Consider reducing the sequence_length."
-            )
-
-        X_train = []
-        X_val = []
-        extra_channels_train = {k: [] for k in extra_channels.keys()}
-        extra_channels_val = {k: [] for k in extra_channels.keys()}
-
-        for i in range(self.n_sessions):
-            # Randomly pick sequences
-            val_indx = rng.choice(
-                n_sequences[i], size=n_val_sequences[i], replace=False
-            )
-            train_indx = np.setdiff1d(np.arange(n_sequences[i]), val_indx)
-
-            # Split data
-            x_train, x_val = _split_data(X[i], val_indx, train_indx)
-            X_train.append(x_train)
-            X_val.append(x_val)
-
-            for k in extra_channels.keys():
-                x_train, x_val = _split_data(extra_channels[k][i], val_indx, train_indx)
-                extra_channels_train[k].append(x_train)
-                extra_channels_val[k].append(x_val)
-
-        return X_train, X_val, extra_channels_train, extra_channels_val
-
     def dataset(
         self,
         sequence_length: int,
@@ -1494,8 +1307,14 @@ class Data:
         step_size: Optional[int] = None,
         drop_last_batch: bool = False,
         validation_split_seed: Optional[int] = None,
+        seed: Optional[int] = None,
     ):
         """Create a Tensorflow Dataset for training or evaluation.
+
+        Sequences are cut out of the arrays on the fly, so the arrays are
+        not copied. If the data was loaded with :code:`load_memmaps=True`
+        only the sequences in flight are held in memory. Shuffling is a
+        perfect shuffle of the sequences, redone every epoch.
 
         Parameters
         ----------
@@ -1505,7 +1324,7 @@ class Data:
             Number sequences in each mini-batch which is used to train the
             model.
         shuffle : bool, optional
-            Should we shuffle sequences (within a batch) and batches.
+            Should we shuffle the sequences?
         validation_split : float, optional
             Ratio to split the dataset into a training and validation set.
         concatenate : bool, optional
@@ -1518,121 +1337,137 @@ class Data:
         validation_split_seed : int, optional
             Seed for the training/validation split, pass to make the split
             reproducible. Only used if :code:`validation_split` is passed.
+        seed : int, optional
+            Seed for shuffling.
 
         Returns
         -------
         dataset : tf.data.Dataset or tuple of tf.data.Dataset
             Dataset for training or evaluating the model along with the
             validation set if :code:`validation_split` was passed.
+            The number of batches is known (:code:`dataset.cardinality()`)
+            and :code:`dataset.osld_metadata` holds the sequence length,
+            step size, number of sequences and number of channels.
         """
-        self.sequence_length = sequence_length
-        self.batch_size = batch_size
-        self.step_size = step_size or sequence_length
-        self.validation_split = validation_split
-
-        # Validate batching
-        self._validate_batching(
-            sequence_length,
-            batch_size,
-            step_size=self.step_size,
-            drop_last_batch=drop_last_batch,
-            concatenate=concatenate,
-        )
+        step_size = step_size or sequence_length
+        if validation_split is not None and step_size != sequence_length:
+            raise ValueError(
+                "validation_split cannot be used with overlapping sequences "
+                f"(step_size={step_size} != sequence_length={sequence_length}). "
+                "The split is performed on non-overlapping sequences, so "
+                "overlapping windows would leak data between the training "
+                "and validation sets."
+            )
 
         # Validate extra channels
         self.extra_channels = self.validate_extra_channels(
             self.arrays, self.extra_channels
         )
 
-        n_sequences = self.count_sequences(self.sequence_length)
+        # Index of every sequence (session, start sample)
+        index = dtf.sequence_index(
+            [array.shape[0] for array in self.arrays],
+            sequence_length,
+            step_size,
+            keep=self.keep,
+        )
+        self._validate_batching(index, batch_size, drop_last_batch, concatenate)
 
-        def _create_dataset(X, extra_channels, shuffle=shuffle):
-            # X is a list of np.ndarray
+        # Function to cut a sequence out of the arrays
+        slice_fn = dtf.make_slice_fn(
+            self.arrays,
+            sequence_length,
+            self.session_labels,
+            self.extra_channels,
+        )
 
-            # Create datasets for each array
-            datasets = []
-            for i in range(self.n_sessions):
-                if i not in self.keep:
-                    continue
-                data = self._create_data_dict(i, X[i], extra_channels)
-                dataset = dtf.create_dataset(
-                    data,
-                    self.sequence_length,
-                    self.step_size,
-                )
-                datasets.append(dataset)
-
-            # Create a dataset from all the arrays concatenated
+        def _create_dataset(index, shuffle=shuffle):
+            kwargs = dict(
+                batch_size=batch_size,
+                shuffle=shuffle,
+                drop_last_batch=drop_last_batch,
+                seed=seed,
+            )
             if concatenate:
-                if shuffle:
-                    # Do a perfect shuffle then concatenate across arrays
-                    random.shuffle(datasets)
-                    full_dataset = dtf.concatenate_datasets(datasets)
+                dataset = dtf.dataset_from_index(index, slice_fn, **kwargs)
+                dataset.osld_metadata = {
+                    "sequence_length": sequence_length,
+                    "step_size": step_size,
+                    "n_sequences": len(index),
+                    "n_channels": self.n_channels,
+                }
+                return dataset
 
-                    # Shuffle sequences
-                    full_dataset = full_dataset.shuffle(self.buffer_size)
-
-                    # Group into mini-batches
-                    full_dataset = full_dataset.batch(
-                        self.batch_size, drop_remainder=drop_last_batch
-                    )
-
-                    # Shuffle mini-batches
-                    full_dataset = full_dataset.shuffle(self.buffer_size)
-
-                else:
-                    # Concatenate across arrays
-                    full_dataset = dtf.concatenate_datasets(datasets)
-
-                    # Group into mini-batches
-                    full_dataset = full_dataset.batch(
-                        self.batch_size, drop_remainder=drop_last_batch
-                    )
-
-                import tensorflow as tf  # moved here to avoid slow imports
-
-                return full_dataset.prefetch(tf.data.AUTOTUNE)
-
-            # Otherwise create a dataset for each array separately
-            else:
-                full_datasets = []
-                for i, ds in enumerate(datasets):
-                    if shuffle:
-                        # Shuffle sequences
-                        ds = ds.shuffle(self.buffer_size)
-
-                    # Group into batches
-                    ds = ds.batch(self.batch_size, drop_remainder=drop_last_batch)
-
-                    if shuffle:
-                        # Shuffle batches
-                        ds = ds.shuffle(self.buffer_size)
-
-                    import tensorflow as tf  # moved here to avoid slow imports
-
-                    full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
-
-                return full_datasets
-
-        # Trim data to be an integer multiple of the sequence length
-        X = self._trim_data(self.arrays, sequence_length, n_sequences)
-        extra_channels = {}
-        for k, v in self.extra_channels.items():
-            extra_channels[k] = self._trim_data(v, sequence_length, n_sequences)
+            # Otherwise create a dataset for each session separately
+            datasets = []
+            for i in self.keep:
+                datasets.append(
+                    dtf.dataset_from_index(index[index[:, 0] == i], slice_fn, **kwargs)
+                )
+            return datasets
 
         if validation_split is not None:
-            X_train, X_val, extra_channels_train, extra_channels_val = (
-                self._validation_split(
-                    X, extra_channels, validation_split, validation_split_seed
+            train_index, val_index = dtf.split_index(
+                index, validation_split, validation_split_seed
+            )
+            return _create_dataset(train_index), _create_dataset(
+                val_index, shuffle=False
+            )
+
+        return _create_dataset(index)
+
+    def _fingerprint(self) -> str:
+        """Hash identifying the input data and how it was prepared."""
+        h = hashlib.sha256()
+
+        def _update(obj):
+            if isinstance(obj, dict):
+                for key in sorted(obj, key=str):
+                    _update(key)
+                    _update(obj[key])
+            elif isinstance(obj, (list, tuple)):
+                for value in obj:
+                    _update(value)
+            elif isinstance(obj, np.ndarray):
+                h.update(str((obj.dtype, obj.shape)).encode())
+                h.update(np.ascontiguousarray(obj).tobytes())
+            else:
+                h.update(repr(obj).encode())
+
+        _update(self.inputs)
+        _update([array.shape[0] for array in self.arrays])
+        _update(self._preparation_settings())
+        _update(self.session_labels)
+        _update(self.extra_channels)
+        return h.hexdigest()
+
+    def _tfrecords_up_to_date(self, tfrecord_dir: str, config: Dict) -> bool:
+        """Can an existing TFRecord dataset be reused?"""
+        if not os.path.exists(os.path.join(tfrecord_dir, dtf.TFRECORD_CONFIG_FILE)):
+            return False
+
+        existing = dtf.load_tfrecord_config(tfrecord_dir)
+        for key, value in config.items():
+            if existing.get(key) != value:
+                _logger.info(
+                    f"{key} has changed. Rewriting the TFRecord dataset "
+                    f"in {tfrecord_dir}."
                 )
-            )
+                return False
 
-            return _create_dataset(X_train, extra_channels_train), _create_dataset(
-                X_val, extra_channels_val, shuffle=False
-            )
+        splits = ["train"] if config["validation_split"] is None else ["train", "val"]
+        for i in range(self.n_sessions):
+            for split in splits:
+                if not os.path.exists(
+                    dtf.tfrecord_filename(tfrecord_dir, split, i, self.n_sessions)
+                ):
+                    _logger.info(
+                        f"TFRecord file missing. Rewriting the TFRecord dataset "
+                        f"in {tfrecord_dir}."
+                    )
+                    return False
 
-        else:
-            return _create_dataset(X, extra_channels)
+        return True
 
     def save_tfrecord_dataset(
         self,
@@ -1640,15 +1475,24 @@ class Data:
         sequence_length: int,
         step_size: Optional[int] = None,
         validation_split: Optional[float] = None,
-        overwrite: bool = False,
         validation_split_seed: Optional[int] = None,
+        overwrite: bool = False,
     ) -> None:
-        """Save the data as TFRecord files.
+        """Save the data as a TFRecord dataset.
+
+        Writes one file per session (two if :code:`validation_split` is
+        passed) and a :code:`tfrecord_config.json` describing them. Load
+        the dataset with :func:`osl_dynamics.data.load_tfrecord_dataset`.
+
+        If :code:`tfrecord_dir` already holds a dataset written from the
+        same data with the same settings it is reused, otherwise it is
+        rewritten.
 
         Parameters
         ----------
         tfrecord_dir : str
-            Directory to save the TFRecord datasets.
+            Directory to write the TFRecord dataset to. Must not be inside
+            :code:`store_dir`, which is deleted when the script ends.
         sequence_length : int
             Length of the segment of data to feed into the model.
         step_size : int, optional
@@ -1656,266 +1500,128 @@ class Data:
             Default is no overlap.
         validation_split : float, optional
             Ratio to split the dataset into a training and validation set.
-        overwrite : bool, optional
-            Should we overwrite the existing TFRecord datasets if there is a need?
         validation_split_seed : int, optional
             Seed for the training/validation split, pass to make the split
             reproducible. Only used if :code:`validation_split` is passed.
+        overwrite : bool, optional
+            Rewrite the dataset even if the existing one is up to date.
         """
-        os.makedirs(tfrecord_dir, exist_ok=True, mode=0o700)
-
-        self.sequence_length = sequence_length
-        self.step_size = step_size or sequence_length
-        self.validation_split = validation_split
-        self.validation_split_seed = validation_split_seed
-
-        def _check_rewrite():
-            if not os.path.exists(f"{tfrecord_dir}/tfrecord_config.pkl"):
-                _logger.warning(
-                    "No tfrecord_config.pkl file found. Rewriting TFRecords."
-                )
-                return True
-
-            if overwrite:
-                _logger.info("overwrite=True. Rewriting TFRecords.")
-                return True
-
-            # Check the existing TFRecord datasets are consistent with the
-            # current settings. If they are, we can reuse them, otherwise
-            # we need to rewrite them.
-            tfrecord_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
-
-            if "identifier" in tfrecord_config:
-                # This directory was created by an older version of
-                # osl-dynamics (which used a unique identifier in the
-                # filenames), rewrite it in the new format
-                _logger.warning(
-                    "TFRecords were created by an older version of "
-                    "osl-dynamics. Rewriting TFRecords."
-                )
-                return True
-
-            if tfrecord_config["sequence_length"] != self.sequence_length:
-                _logger.warning("Sequence length has changed. Rewriting TFRecords.")
-                return True
-
-            if tfrecord_config["n_channels"] != self.n_channels:
-                _logger.warning("Number of channels has changed. Rewriting TFRecords.")
-                return True
-
-            if tfrecord_config["step_size"] != self.step_size:
-                _logger.warning("Step size has changed. Rewriting TFRecords.")
-                return True
-
-            if tfrecord_config["validation_split"] != self.validation_split:
-                _logger.warning("Validation split has changed. Rewriting TFRecords.")
-                return True
-
-            if (
-                tfrecord_config.get("validation_split_seed")
-                != self.validation_split_seed
-            ):
-                _logger.warning(
-                    "Validation split seed has changed. Rewriting TFRecords."
-                )
-                return True
-
-            if tfrecord_config["n_sessions"] != self.n_sessions:
-                _logger.warning("Number of sessions has changed. Rewriting TFRecords.")
-                return True
-
-            input_shapes = tfrecord_config["input_shapes"]
-            for input_name, input_shape in self.input_shapes.items():
-                if input_name not in input_shapes:
-                    _logger.warning(
-                        f"Input shape {input_name} not found. Rewriting TFRecords."
-                    )
-                    return True
-                if input_shapes[input_name] != input_shape:
-                    _logger.warning(
-                        f"Input shape {input_name} has changed. Rewriting TFRecords."
-                    )
-                    return True
-
-            return False
-
-        # Number of sequences
-        n_sequences = self.count_sequences(self.sequence_length)
-
-        # Path to TFRecord file
-        tfrecord_path = (
-            f"{tfrecord_dir}"
-            "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}.tfrecord"
-        )
-
-        # TFRecords we need to save
-        tfrecord_filenames = []
-        tfrecords_to_save = []
-        rewrite = _check_rewrite()
-        if rewrite:
-            # Delete existing TFRecord files, they may be from an older
-            # version of osl-dynamics or a different configuration (e.g.
-            # one with more sessions), and would otherwise be orphaned
-            for old_file in pathlib.Path(tfrecord_dir).glob("dataset-*.tfrecord"):
-                old_file.unlink()
-        for i in self.keep:
-            filepath = tfrecord_path.format(
-                array=i,
-                val="{val}",
-                n_session=self.n_sessions - 1,
-                v=len(str(self.n_sessions - 1)),
+        tfrecord_dir = str(tfrecord_dir)
+        resolved = pathlib.Path(tfrecord_dir).resolve()
+        store_dir = self.store_dir.resolve()
+        if resolved == store_dir or store_dir in resolved.parents:
+            raise ValueError(
+                f"tfrecord_dir={tfrecord_dir} is inside store_dir, which is "
+                "deleted when the script ends. Pass a directory outside "
+                "store_dir."
             )
-            tfrecord_filenames.append(filepath)
 
-            rewrite_ = rewrite or not os.path.exists(filepath.format(val=0))
-            if validation_split is not None:
-                rewrite_ = rewrite_ or not os.path.exists(filepath.format(val=1))
-            if rewrite_:
-                tfrecords_to_save.append((i, filepath))
+        sequence_length = int(sequence_length)
+        step_size = int(step_size or sequence_length)
+        if validation_split is not None and step_size != sequence_length:
+            raise ValueError(
+                "validation_split cannot be used with overlapping sequences "
+                f"(step_size={step_size} != sequence_length={sequence_length}). "
+                "The split is performed on non-overlapping sequences, so "
+                "overlapping windows would leak data between the training "
+                "and validation sets."
+            )
 
         # Validate extra channels
         self.extra_channels = self.validate_extra_channels(
             self.arrays, self.extra_channels
         )
 
-        # Trim data to be an integer multiple of the sequence length
-        X = self._trim_data(self.arrays, sequence_length, n_sequences)
-        extra_channels = {}
-        for k, v in self.extra_channels.items():
-            extra_channels[k] = self._trim_data(v, sequence_length, n_sequences)
+        # Index of every sequence (session, start sample)
+        index = dtf.sequence_index(
+            [array.shape[0] for array in self.arrays], sequence_length, step_size
+        )
+        if len(index) == 0:
+            raise ValueError(
+                f"No session has {sequence_length} samples. "
+                "Please reduce the sequence_length."
+            )
 
         if validation_split is not None:
-            X_train, X_val, extra_channels_train, extra_channels_val = (
-                self._validation_split(
-                    X, extra_channels, validation_split, validation_split_seed
+            train_index, val_index = dtf.split_index(
+                index, validation_split, validation_split_seed
+            )
+        else:
+            train_index, val_index = index, None
+
+        def _per_session(index):
+            if index is None:
+                return None
+            return [int(np.sum(index[:, 0] == i)) for i in range(self.n_sessions)]
+
+        config = {
+            "format_version": dtf.TFRECORD_FORMAT_VERSION,
+            "sequence_length": sequence_length,
+            "step_size": step_size,
+            "n_channels": self.n_channels,
+            "n_sessions": self.n_sessions,
+            "input_shapes": self.input_shapes(sequence_length),
+            "validation_split": validation_split,
+            "validation_split_seed": validation_split_seed,
+            "n_sequences": _per_session(train_index),
+            "n_val_sequences": _per_session(val_index),
+            "fingerprint": self._fingerprint(),
+        }
+
+        if not overwrite and self._tfrecords_up_to_date(tfrecord_dir, config):
+            _logger.info(f"Reusing the TFRecord dataset in {tfrecord_dir}.")
+            return
+
+        # Remove any existing dataset. The config is removed first so a
+        # partially written dataset is never mistaken for a complete one
+        os.makedirs(tfrecord_dir, exist_ok=True)
+        config_path = os.path.join(tfrecord_dir, dtf.TFRECORD_CONFIG_FILE)
+        if os.path.exists(config_path):
+            os.remove(config_path)
+        for old_file in pathlib.Path(tfrecord_dir).glob("*.tfrecord"):
+            old_file.unlink()
+
+        # One file per session (and split)
+        slice_fn = dtf.make_slice_fn(
+            self.arrays, sequence_length, self.session_labels, self.extra_channels
+        )
+        jobs = []
+        for i in range(self.n_sessions):
+            jobs.append(
+                (
+                    dtf.tfrecord_filename(tfrecord_dir, "train", i, self.n_sessions),
+                    train_index[train_index[:, 0] == i],
                 )
             )
-
-        # Function for saving a single TFRecord
-        def _save_tfrecord(i, filepath):
-            if validation_split is not None:
-                dtf.save_tfrecord(
-                    self._create_data_dict(i, X_train[i], extra_channels_train),
-                    self.sequence_length,
-                    self.step_size,
-                    filepath.format(val=0),
-                )
-                dtf.save_tfrecord(
-                    self._create_data_dict(i, X_val[i], extra_channels_val),
-                    self.sequence_length,
-                    self.step_size,
-                    filepath.format(val=1),
+            if val_index is not None:
+                jobs.append(
+                    (
+                        dtf.tfrecord_filename(tfrecord_dir, "val", i, self.n_sessions),
+                        val_index[val_index[:, 0] == i],
+                    )
                 )
 
-            else:
-                dtf.save_tfrecord(
-                    self._create_data_dict(i, X[i], extra_channels),
-                    self.sequence_length,
-                    self.step_size,
-                    filepath.format(val=0),
-                )
+        def _save(filepath, index):
+            return dtf.save_tfrecord(filepath, index, slice_fn)
 
-        # Save TFRecords
-        if len(tfrecords_to_save) > 0:
-            results = pqdm(
-                array=tfrecords_to_save,
-                function=_save_tfrecord,
-                n_jobs=self.n_jobs,
-                desc="Creating TFRecord datasets",
-                argument_type="args",
-                total=len(tfrecords_to_save),
-            )
-            _raise_exceptions(results, "TFRecord")
-
-        # Save tfrecords config
-        if rewrite:
-            tfrecord_config = {
-                "sequence_length": self.sequence_length,
-                "n_channels": self.n_channels,
-                "step_size": self.step_size,
-                "validation_split": self.validation_split,
-                "validation_split_seed": self.validation_split_seed,
-                "n_sessions": self.n_sessions,
-                "input_shapes": self.input_shapes,
-            }
-            misc.save(f"{tfrecord_dir}/tfrecord_config.pkl", tfrecord_config)
-
-    def tfrecord_dataset(
-        self,
-        sequence_length: int,
-        batch_size: int,
-        shuffle: bool = True,
-        validation_split: Optional[float] = None,
-        concatenate: bool = True,
-        step_size: Optional[int] = None,
-        drop_last_batch: bool = False,
-        tfrecord_dir: Optional[str] = None,
-        overwrite: bool = False,
-        validation_split_seed: Optional[int] = None,
-    ):
-        """Create a TFRecord Dataset for training or evaluation.
-
-        Parameters
-        ----------
-        sequence_length : int
-            Length of the segment of data to feed into the model.
-        batch_size : int
-            Number sequences in each mini-batch which is used to train the model.
-        shuffle : bool, optional
-            Should we shuffle sequences (within a batch) and batches.
-        validation_split : float, optional
-            Ratio to split the dataset into a training and validation set.
-        concatenate : bool, optional
-            Should we concatenate the datasets for each array?
-        step_size : int, optional
-            Number of samples to slide the sequence across the dataset.
-            Default is no overlap.
-        drop_last_batch : bool, optional
-            Should we drop the last batch if it is smaller than the batch size?
-        tfrecord_dir : str, optional
-            Directory to save the TFRecord datasets. If :code:`None`, then
-            :code:`Data.store_dir` is used.
-        overwrite : bool, optional
-            Should we overwrite the existing TFRecord datasets if there is a need?
-        validation_split_seed : int, optional
-            Seed for the training/validation split, pass to make the split
-            reproducible. Only used if :code:`validation_split` is passed.
-
-        Returns
-        -------
-        dataset : tf.data.TFRecordDataset or tuple of tf.data.TFRecordDataset
-            Dataset for training or evaluating the model along with the
-            validation set if :code:`validation_split` was passed.
-        """
-        tfrecord_dir = tfrecord_dir or self.store_dir
-
-        # Validate batching
-        self._validate_batching(
-            sequence_length,
-            batch_size,
-            step_size=(step_size or sequence_length),
-            drop_last_batch=drop_last_batch,
-            concatenate=concatenate,
+        results = pqdm(
+            array=jobs,
+            function=_save,
+            n_jobs=self.n_jobs,
+            desc="Creating TFRecord dataset",
+            argument_type="args",
+            total=len(jobs),
         )
+        _raise_exceptions(results, "TFRecord")
 
-        # Save and load the TFRecord files
-        self.save_tfrecord_dataset(
-            tfrecord_dir=tfrecord_dir,
-            sequence_length=sequence_length,
-            step_size=step_size,
-            validation_split=validation_split,
-            overwrite=overwrite,
-            validation_split_seed=validation_split_seed,
-        )
-        return dtf.load_tfrecord_dataset(
-            tfrecord_dir=tfrecord_dir,
-            batch_size=batch_size,
-            shuffle=shuffle,
-            concatenate=concatenate,
-            drop_last_batch=drop_last_batch,
-            buffer_size=self.buffer_size,
-            keep=self.keep,
-        )
+        # Range of each channel in the training data
+        train_results = results if val_index is None else results[::2]
+        amin = np.min([r[0] for r in train_results], axis=0)
+        amax = np.max([r[1] for r in train_results], axis=0)
+        config["channel_range"] = (amax - amin).tolist()
+
+        with open(config_path, "w") as file:
+            json.dump(config, file, indent=2)
 
     def add_session_labels(
         self, label_name: str, label_values: np.ndarray, label_type: str
@@ -2005,7 +1711,11 @@ class Data:
         if n_batches > 150:
             learning_rate = 0.001
             n_epochs = 15
-            print("Data(..., use_tfrecord=True) is recommended")
+            print(
+                "This is a large dataset. If you run out of memory, load the "
+                "data with Data(..., load_memmaps=True) or save it as a "
+                "TFRecord dataset with Data.save_tfrecord_dataset."
+            )
 
         # Print info
         print(
@@ -2021,16 +1731,8 @@ class Data:
         print(f"Total number of sequences: {n_sequences}")
         print(f"Total number of batches/parameter updates: {n_batches}")
 
-    def save_preparation(self, output_dir: str = ".") -> None:
-        """Save a pickle file containing preparation settings.
-
-        Parameters
-        ----------
-        output_dir : str
-            Path to save data files to. Default is the current working
-            directory. Created if it does not already exist.
-        """
-        os.makedirs(output_dir, exist_ok=True)
+    def _preparation_settings(self) -> Dict:
+        """Settings and parameters from preparing the data."""
         attributes = list(self.__dict__.keys())
         dont_keep = [
             "_identifier",
@@ -2044,7 +1746,6 @@ class Data:
             "mask_file",
             "time_axis_first",
             "load_memmaps",
-            "buffer_size",
             "n_jobs",
             "prepared_data_filenames",
             "inputs",
@@ -2054,14 +1755,25 @@ class Data:
             "n_raw_data_channels",
             "arrays",
             "keep",
-            "use_tfrecord",
             "session_labels",
             "extra_channels",
         ]
         for item in dont_keep:
             if item in attributes:
                 attributes.remove(item)
-        preparation = {a: getattr(self, a) for a in attributes}
+        return {a: getattr(self, a) for a in attributes}
+
+    def save_preparation(self, output_dir: str = ".") -> None:
+        """Save a pickle file containing preparation settings.
+
+        Parameters
+        ----------
+        output_dir : str
+            Path to save data files to. Default is the current working
+            directory. Created if it does not already exist.
+        """
+        os.makedirs(output_dir, exist_ok=True)
+        preparation = self._preparation_settings()
         pickle.dump(preparation, open(f"{output_dir}/preparation.pkl", "wb"))
 
     def load_preparation(self, inputs: str) -> None:
@@ -2112,7 +1824,7 @@ class Data:
 
         # Create output directory
         output_dir = pathlib.Path(output_dir)
-        output_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         # Function to save a single array
         def _save(i):

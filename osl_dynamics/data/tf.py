@@ -1,46 +1,24 @@
-"""Function related to TensorFlow datasets."""
+"""Functions related to TensorFlow datasets.
 
-import logging
+Two routes produce the same batched dataset of dictionaries (keyed by model
+input name):
+
+- In memory / memory maps: :func:`sequence_index` lists every sequence as a
+  (session, start) pair, :func:`make_slice_fn` cuts a sequence out of the
+  arrays with numpy and :func:`dataset_from_index` shuffles the index (a
+  perfect shuffle, no buffer) and batches.
+- TFRecords: :meth:`Data.save_tfrecord_dataset` writes one file per session
+  and a JSON config, :func:`load_tfrecord_dataset` streams them back
+  (shuffled files, interleaved reads, a bounded shuffle buffer of
+  sequences).
+"""
+
+import json
+import math
 import os
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-
-from osl_dynamics.utils import misc
-
-_logger = logging.getLogger("osl-dynamics")
-
-
-def get_n_sequences(
-    arr: np.ndarray, sequence_length: int, step_size: Optional[int] = None
-) -> int:
-    """Calculate the number of sequences an array will be split into.
-
-    Parameters
-    ----------
-    arr : np.ndarray
-        Time series data.
-    sequence_length : int
-        Length of sequences which the data will be segmented in to.
-    step_size : int, optional
-        The number of samples by which to move the sliding window between
-        sequences.
-
-    Returns
-    -------
-    n : int
-        Number of sequences.
-    """
-    n_samples = arr.shape[0]
-
-    # Number of non-overlapping sequences
-    n_sequences = n_samples // sequence_length
-
-    if step_size is not None:
-        # Number of overlapping sequences
-        n_sequences += (n_samples - step_size) // sequence_length
-
-    return n_sequences
 
 
 def concatenate_datasets(datasets: List):
@@ -62,101 +40,339 @@ def concatenate_datasets(datasets: List):
     return full_dataset
 
 
-def create_dataset(data: Dict, sequence_length: int, step_size: int):
-    """Creates a TensorFlow dataset of batched time series data.
+def sequence_index(
+    n_samples: List[int],
+    sequence_length: int,
+    step_size: Optional[int] = None,
+    keep: Optional[List[int]] = None,
+) -> np.ndarray:
+    """Index of every sequence that can be cut from a set of sessions.
 
     Parameters
     ----------
-    data : dict
-        Dictionary containing data to batch. Keys correspond to the input name
-        for the model and the value is the data.
+    n_samples : list of int
+        Number of samples in each session.
     sequence_length : int
-        Sequence length to batch the data.
-    step_size : int
+        Length of the segment of data to feed into the model.
+    step_size : int, optional
         Number of samples to slide the sequence across the data.
+        Default is no overlap.
+    keep : list of int, optional
+        Sessions to include. Default is all sessions.
+
+    Returns
+    -------
+    index : np.ndarray
+        Array of shape (n_sequences, 2). Each row is the session index
+        and the sample the sequence starts at. Rows are ordered by session
+        then start.
+    """
+    step_size = step_size or sequence_length
+    keep = range(len(n_samples)) if keep is None else keep
+    rows = []
+    for i in keep:
+        n_sequences = (n_samples[i] - sequence_length) // step_size + 1
+        if n_sequences > 0:
+            starts = np.arange(n_sequences) * step_size
+            rows.append(np.stack([np.full(n_sequences, i), starts], axis=1))
+    if len(rows) == 0:
+        return np.empty((0, 2), dtype=np.int64)
+    return np.concatenate(rows).astype(np.int64)
+
+
+def split_index(
+    index: np.ndarray,
+    validation_split: float,
+    seed: Optional[int] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Split a sequence index into training and validation sets.
+
+    The split is done within each session, so every session contributes
+    sequences to both sets.
+
+    Parameters
+    ----------
+    index : np.ndarray
+        Sequence index from :func:`sequence_index`.
+    validation_split : float
+        Fraction of each session's sequences to put in the validation set.
+    seed : int, optional
+        Seed for picking the validation sequences.
+
+    Returns
+    -------
+    train_index : np.ndarray
+        Index of training sequences.
+    val_index : np.ndarray
+        Index of validation sequences.
+    """
+    rng = np.random.default_rng(seed)
+    train_rows = []
+    val_rows = []
+    for session in np.unique(index[:, 0]):
+        rows = np.where(index[:, 0] == session)[0]
+        n_val = int(validation_split * len(rows))
+        val = rng.choice(rows, size=n_val, replace=False)
+        train_rows.append(np.setdiff1d(rows, val))
+        val_rows.append(np.sort(val))
+    train_index = index[np.concatenate(train_rows)]
+    val_index = index[np.concatenate(val_rows)]
+    if len(val_index) == 0:
+        raise ValueError(
+            "No full sequences could be assigned to the validation set. "
+            "Consider reducing the sequence_length."
+        )
+    return train_index, val_index
+
+
+def element_shapes(
+    sequence_length: int,
+    n_channels: int,
+    session_labels: Optional[List] = None,
+    extra_channels: Optional[Dict] = None,
+) -> Dict:
+    """Shape of each element in a dataset (before batching).
+
+    Parameters
+    ----------
+    sequence_length : int
+        Length of the segment of data to feed into the model.
+    n_channels : int
+        Number of channels in the data.
+    session_labels : list of SessionLabels, optional
+        Session labels to add as inputs.
+    extra_channels : dict, optional
+        Extra channels to add as inputs. Keys are input names and values
+        are lists of arrays (one per session).
+
+    Returns
+    -------
+    shapes : dict
+        Dictionary mapping input names to their shape.
+    """
+    shapes = {"data": [sequence_length, n_channels]}
+    for label in session_labels or []:
+        shapes[label.name] = [sequence_length]
+    for name, values in (extra_channels or {}).items():
+        if values[0].ndim == 1:
+            shapes[name] = [sequence_length]
+        else:
+            shapes[name] = [sequence_length, values[0].shape[-1]]
+    return shapes
+
+
+def make_slice_fn(
+    arrays: List[np.ndarray],
+    sequence_length: int,
+    session_labels: Optional[List] = None,
+    extra_channels: Optional[Dict] = None,
+):
+    """Create a function that cuts one sequence out of the data.
+
+    The function takes a row of a sequence index (see :func:`sequence_index`)
+    and returns a dictionary of inputs for the model. The slicing is done
+    with numpy, so the arrays can be memory maps and nothing other than the
+    sequence itself is loaded into memory.
+
+    Parameters
+    ----------
+    arrays : list of np.ndarray
+        Time series data for each session. Can be memory maps.
+    sequence_length : int
+        Length of the segment of data to feed into the model.
+    session_labels : list of SessionLabels, optional
+        Session labels to add as inputs.
+    extra_channels : dict, optional
+        Extra channels to add as inputs. Keys are input names and values
+        are lists of arrays (one per session).
+
+    Returns
+    -------
+    slice_fn : callable
+        Function mapping an index row to a dictionary of tensors. The
+        shape of each element is available as :code:`slice_fn.shapes`.
+    """
+    import tensorflow as tf  # moved here to avoid slow imports
+
+    session_labels = session_labels or []
+    extra_channels = extra_channels or {}
+    shapes = element_shapes(
+        sequence_length, arrays[0].shape[-1], session_labels, extra_channels
+    )
+    names = list(shapes.keys())
+
+    def _slice(session, start):
+        session = int(session)
+        start = int(start)
+        stop = start + sequence_length
+        outputs = [np.ascontiguousarray(arrays[session][start:stop], dtype=np.float32)]
+        for label in session_labels:
+            outputs.append(np.full(sequence_length, label.values[session], np.float32))
+        for values in extra_channels.values():
+            outputs.append(
+                np.ascontiguousarray(values[session][start:stop], dtype=np.float32)
+            )
+        return outputs
+
+    def slice_fn(row):
+        tensors = tf.numpy_function(
+            _slice, [row[0], row[1]], [tf.float32] * len(names), stateful=False
+        )
+        for tensor, name in zip(tensors, names):
+            tensor.set_shape(shapes[name])
+        return dict(zip(names, tensors))
+
+    slice_fn.shapes = shapes
+    slice_fn.numpy = _slice
+    return slice_fn
+
+
+def dataset_from_index(
+    index: np.ndarray,
+    slice_fn,
+    batch_size: int,
+    shuffle: bool = True,
+    drop_last_batch: bool = False,
+    seed: Optional[int] = None,
+):
+    """Create a batched dataset from a sequence index.
+
+    Shuffling is done on the index (which is tiny), so it is a perfect
+    shuffle without a buffer. The index is reshuffled every epoch.
+
+    Parameters
+    ----------
+    index : np.ndarray
+        Sequence index from :func:`sequence_index`.
+    slice_fn : callable
+        Function from :func:`make_slice_fn`.
+    batch_size : int
+        Number sequences in each mini-batch which is used to train the model.
+    shuffle : bool, optional
+        Should we shuffle the sequences?
+    drop_last_batch : bool, optional
+        Should we drop the last batch if it is smaller than the batch size?
+    seed : int, optional
+        Seed for shuffling.
 
     Returns
     -------
     dataset : tf.data.Dataset
-        TensorFlow dataset.
+        Batched dataset. The number of batches is known
+        (:code:`dataset.cardinality()`).
     """
-    from tensorflow.data import Dataset  # moved here to avoid slow imports
+    import tensorflow as tf  # moved here to avoid slow imports
 
-    # Generate a non-overlapping sequence dataset
-    if step_size == sequence_length:
-        dataset = Dataset.from_tensor_slices(data)
-        dataset = dataset.batch(sequence_length, drop_remainder=True)
-
-    # Create an overlapping multiple model input dataset
-    else:
-
-        def batch_windows(*windows):
-            batched = [w.batch(sequence_length, drop_remainder=True) for w in windows]
-            return Dataset.zip(tuple(batched))
-
-        def tuple_to_dict(*d):
-            names = list(data.keys())
-            inputs = {}
-            for i in range(len(data)):
-                inputs[names[i]] = d[i]
-            return inputs
-
-        dataset = tuple([Dataset.from_tensor_slices(v) for v in data.values()])
-        dataset = Dataset.zip(dataset)
-        dataset = dataset.window(
-            sequence_length,
-            step_size,
-            drop_remainder=True,
-        )
-        dataset = dataset.flat_map(batch_windows)
-        dataset = dataset.map(tuple_to_dict)
-
-    return dataset
+    dataset = tf.data.Dataset.from_tensor_slices(index)
+    if shuffle:
+        dataset = dataset.shuffle(len(index), seed=seed)
+    dataset = dataset.map(slice_fn, num_parallel_calls=tf.data.AUTOTUNE)
+    dataset = dataset.batch(batch_size, drop_remainder=drop_last_batch)
+    return dataset.prefetch(tf.data.AUTOTUNE)
 
 
-def save_tfrecord(
-    data: Dict, sequence_length: int, step_size: int, filepath: str
-) -> None:
-    """Save dataset to a TFRecord file.
+TFRECORD_CONFIG_FILE = "tfrecord_config.json"
+
+# Bump this when the TFRecord file or config format changes, existing
+# directories are then rewritten rather than reused
+TFRECORD_FORMAT_VERSION = 1
+
+
+def tfrecord_filename(tfrecord_dir: str, split: str, session: int, n_sessions: int):
+    """Path of the TFRecord file for one session.
 
     Parameters
     ----------
-    data : dict
-        Dictionary containing data to batch. Keys correspond to the input name
-        for the model and the value is the data.
-    sequence_length : int
-        Sequence length to batch the data.
-    step_size : int
-        Number of samples to slide the sequence across the data.
+    tfrecord_dir : str
+        Directory containing the TFRecord dataset.
+    split : str
+        :code:`"train"` or :code:`"val"`.
+    session : int
+        Session index.
+    n_sessions : int
+        Total number of sessions (sets the zero padding).
+
+    Returns
+    -------
+    filename : str
+        Path to the TFRecord file.
+    """
+    width = len(str(n_sessions - 1))
+    return os.path.join(tfrecord_dir, f"{split}_{session:0{width}d}.tfrecord")
+
+
+def load_tfrecord_config(tfrecord_dir: str) -> Dict:
+    """Load the config describing a TFRecord dataset.
+
+    Parameters
+    ----------
+    tfrecord_dir : str
+        Directory containing the TFRecord dataset.
+
+    Returns
+    -------
+    config : dict
+        Settings the dataset was written with: :code:`sequence_length`,
+        :code:`step_size`, :code:`n_channels`, :code:`n_sessions`,
+        :code:`input_shapes`, :code:`validation_split`,
+        :code:`validation_split_seed`, :code:`n_sequences` (per session),
+        :code:`n_val_sequences` (per session, or :code:`None`) and
+        :code:`channel_range` (max - min of each channel in the training
+        data).
+    """
+    path = os.path.join(tfrecord_dir, TFRECORD_CONFIG_FILE)
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"{path} not found. Create the TFRecord dataset with "
+            "Data.save_tfrecord_dataset."
+        )
+    with open(path) as file:
+        return json.load(file)
+
+
+def save_tfrecord(filepath: str, index: np.ndarray, slice_fn) -> Tuple:
+    """Write sequences to a TFRecord file.
+
+    Parameters
+    ----------
     filepath : str
-        Path to save the TFRecord file.
+        Path to the TFRecord file.
+    index : np.ndarray
+        Rows of a sequence index (see :func:`sequence_index`) to write.
+    slice_fn : callable
+        Function from :func:`make_slice_fn`.
+
+    Returns
+    -------
+    amin : np.ndarray
+        Minimum of each data channel over the sequences written.
+    amax : np.ndarray
+        Maximum of each data channel over the sequences written.
     """
     import tensorflow as tf  # moved here to avoid slow imports
-    from tensorflow.train import Feature, Features, Example, BytesList
+    from tensorflow.train import BytesList, Example, Feature, Features
 
-    dataset = create_dataset(data, sequence_length, step_size)
+    names = list(slice_fn.shapes.keys())
+    n_channels = slice_fn.shapes["data"][-1]
+    amin = np.full(n_channels, np.inf, dtype=np.float32)
+    amax = np.full(n_channels, -np.inf, dtype=np.float32)
 
-    # Helper function to serialize a sequence to a tensorflow example
-    # byte string
-    def _make_example(sequence):
-        # Note this function assumes all features are tf tensors
-        # and can be converted to bytes
-        features = Features(
-            feature={
-                k: Feature(
-                    bytes_list=BytesList(
-                        value=[tf.io.serialize_tensor(v).numpy()],
-                    )
-                )
-                for k, v in sequence.items()
-            }
-        )
-        return Example(features=features).SerializeToString()
-
-    # Serialize each sequence and write to a TFRecord file
     with tf.io.TFRecordWriter(filepath) as writer:
-        for sequence in dataset:
-            writer.write(_make_example(sequence))
+        for session, start in index:
+            arrays = slice_fn.numpy(session, start)
+            amin = np.minimum(amin, arrays[0].min(axis=0))
+            amax = np.maximum(amax, arrays[0].max(axis=0))
+            feature = {
+                name: Feature(
+                    bytes_list=BytesList(value=[tf.io.serialize_tensor(a).numpy()])
+                )
+                for name, a in zip(names, arrays)
+            }
+            writer.write(
+                Example(features=Features(feature=feature)).SerializeToString()
+            )
+
+    return amin, amax
 
 
 def load_tfrecord_dataset(
@@ -166,192 +382,140 @@ def load_tfrecord_dataset(
     concatenate: bool = True,
     drop_last_batch: bool = False,
     buffer_size: int = 4000,
+    cycle_length: Optional[int] = None,
     keep: Optional[List[int]] = None,
+    seed: Optional[int] = None,
 ):
-    """Load a TFRecord dataset.
+    """Load a TFRecord dataset written by :meth:`Data.save_tfrecord_dataset`.
+
+    The data is streamed from disk. When shuffling, the session files are
+    read in a random order, :code:`cycle_length` files are read at the same
+    time (round robin) and the resulting stream of sequences is shuffled
+    with a buffer of :code:`buffer_size` sequences. Memory use is therefore
+    roughly :code:`buffer_size` sequences plus prefetched batches, whatever
+    the size of the dataset.
 
     Parameters
     ----------
     tfrecord_dir : str
-        Directory containing the TFRecord datasets.
+        Directory containing the TFRecord dataset.
     batch_size : int
         Number sequences in each mini-batch which is used to train the model.
     shuffle : bool, optional
-        Should we shuffle sequences (within a batch) and batches.
+        Should we shuffle the sequences?
     concatenate : bool, optional
-        Should we concatenate the datasets for each array?
+        Should we concatenate the datasets for each session?
     drop_last_batch : bool, optional
         Should we drop the last batch if it is smaller than the batch size?
     buffer_size : int, optional
-        Buffer size for shuffling a TensorFlow Dataset. Smaller values will lead
-        to less random shuffling but will be quicker. Default is 100000.
+        Number of sequences held in memory for shuffling. Larger values
+        mix sessions better at the cost of memory. Default is 4000.
+    cycle_length : int, optional
+        Number of session files read at the same time. More files gives a
+        better mix of sessions in each batch. Default is the number of
+        sessions, capped at 64.
     keep : list of int, optional
-        List of session indices to keep. If :code:`None`, then all sessions
-        are kept.
+        Sessions to load. Default is all sessions.
+    seed : int, optional
+        Seed for shuffling.
 
     Returns
     -------
-    dataset : tf.data.TFRecordDataset or tuple of tf.data.TFRecordDataset
-        Dataset for training or evaluating the model along with the
-        validation set :code:`validation_split` is present in the config.
+    dataset : tf.data.Dataset or tuple of tf.data.Dataset
+        Dataset for training or evaluating the model (or a list of datasets,
+        one per session, if :code:`concatenate=False`), along with the
+        validation set if the dataset was written with a validation split.
+        The number of batches is known (:code:`dataset.cardinality()`)
+        and :code:`dataset.osld_metadata` holds the sequence length, step
+        size, number of sequences, number of channels and channel range.
     """
     import tensorflow as tf  # moved here to avoid slow imports
 
-    tfrecord_config = misc.load(f"{tfrecord_dir}/tfrecord_config.pkl")
-    validation_split = tfrecord_config["validation_split"]
-    n_sessions = tfrecord_config["n_sessions"]
-    input_shapes = tfrecord_config["input_shapes"]
+    config = load_tfrecord_config(tfrecord_dir)
+    n_sessions = config["n_sessions"]
+    input_shapes = config["input_shapes"]
+    keep = list(range(n_sessions)) if keep is None else keep
 
-    keep = keep or list(range(n_sessions))
+    feature_description = {
+        name: tf.io.FixedLenFeature([], tf.string) for name in input_shapes
+    }
 
-    # Helper functions
     def _parse_example(example):
-        feature_description = {
-            name: tf.io.FixedLenFeature([], tf.string) for name in input_shapes.keys()
-        }
-        parsed_example = tf.io.parse_single_example(
-            example,
-            feature_description,
-        )
+        parsed = tf.io.parse_single_example(example, feature_description)
         return {
             name: tf.ensure_shape(
-                tf.io.parse_tensor(tensor, tf.float32),
-                input_shapes[name],
+                tf.io.parse_tensor(tensor, tf.float32), input_shapes[name]
             )
-            for name, tensor in parsed_example.items()
+            for name, tensor in parsed.items()
         }
 
-    def _create_dataset(filenames, shuffle=shuffle):
+    def _n_batches(n_sequences):
+        if drop_last_batch:
+            return n_sequences // batch_size
+        return math.ceil(n_sequences / batch_size)
+
+    def _metadata(n_sequences):
+        return {
+            "sequence_length": config["sequence_length"],
+            "step_size": config["step_size"],
+            "n_sequences": n_sequences,
+            "n_channels": config["n_channels"],
+            "range": np.array(config["channel_range"], dtype=np.float32),
+        }
+
+    def _finish(dataset, n_sequences, shuffle):
+        if shuffle:
+            dataset = dataset.shuffle(buffer_size, seed=seed)
+        dataset = dataset.batch(batch_size, drop_remainder=drop_last_batch)
+        dataset = dataset.apply(
+            tf.data.experimental.assert_cardinality(_n_batches(n_sequences))
+        )
+        dataset = dataset.prefetch(tf.data.AUTOTUNE)
+        dataset.osld_metadata = _metadata(n_sequences)
+        return dataset
+
+    def _create_dataset(split, shuffle):
+        filenames = [
+            tfrecord_filename(tfrecord_dir, split, i, n_sessions) for i in keep
+        ]
+        for filename in filenames:
+            if not os.path.exists(filename):
+                raise FileNotFoundError(
+                    f"{filename} not found. Regenerate the TFRecord dataset "
+                    "with Data.save_tfrecord_dataset."
+                )
+        key = "n_sequences" if split == "train" else "n_val_sequences"
+        n_sequences = [config[key][i] for i in keep]
+
         if concatenate:
-            filenames = tf.data.Dataset.from_tensor_slices(filenames)
-
+            files = tf.data.Dataset.from_tensor_slices(filenames)
             if shuffle:
-                # First shuffle the shards
-                filenames = filenames.shuffle(len(filenames))
-
-                # Create the TFRecord dataset
-                full_dataset = filenames.interleave(
-                    tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
-                )
-
-                # Parse the examples
-                full_dataset = full_dataset.map(_parse_example)
-
-                # Shuffle sequences
-                full_dataset = full_dataset.shuffle(buffer_size)
-
-                # Group into batches
-                full_dataset = full_dataset.batch(
-                    batch_size, drop_remainder=drop_last_batch
-                )
-
-                # Shuffle batches
-                full_dataset = full_dataset.shuffle(buffer_size)
-
+                files = files.shuffle(len(filenames), seed=seed)
+                n_files = cycle_length or min(len(filenames), 64)
             else:
-                # Create the TFRecord dataset
-                full_dataset = filenames.interleave(
-                    tf.data.TFRecordDataset, num_parallel_calls=tf.data.AUTOTUNE
-                )
-
-                # Parse the examples
-                full_dataset = full_dataset.map(_parse_example)
-
-                # Group into batches
-                full_dataset = full_dataset.batch(
-                    batch_size, drop_remainder=drop_last_batch
-                )
-
-            return full_dataset.prefetch(tf.data.AUTOTUNE)
-
-        # Otherwise create a dataset for each array separately
-        else:
-            full_datasets = []
-            for filename in filenames:
-                ds = tf.data.TFRecordDataset(filename)
-
-                # Parse the examples
-                ds = ds.map(_parse_example)
-
-                if shuffle:
-                    # Shuffle sequences
-                    ds = ds.shuffle(buffer_size)
-
-                # Group into batches
-                ds = ds.batch(batch_size, drop_remainder=drop_last_batch)
-
-                if shuffle:
-                    # Shuffle batches
-                    ds = ds.shuffle(buffer_size)
-
-                full_datasets.append(ds.prefetch(tf.data.AUTOTUNE))
-
-            return full_datasets
-
-    # Path to TFRecord files.
-    # Note, directories created by older versions of osl-dynamics included
-    # a unique identifier in the filenames, which is stored in the config,
-    # so we can still load them
-    identifier = tfrecord_config.get("identifier")
-    if identifier is not None:
-        filename_suffix = f"_{identifier}.tfrecord"
-    else:
-        filename_suffix = ".tfrecord"
-    tfrecord_path = (
-        f"{tfrecord_dir}"
-        "/dataset-{val}_{array:0{v}d}-of-{n_session:0{v}d}" + filename_suffix
-    )
-
-    # Check the first TFRecord file exists
-    first_file = tfrecord_path.format(
-        array=keep[0],
-        val=0,
-        n_session=n_sessions - 1,
-        v=len(str(n_sessions - 1)),
-    )
-    if not os.path.exists(first_file):
-        raise FileNotFoundError(
-            f"{first_file} not found. Please regenerate the TFRecords "
-            "with Data.save_tfrecord_dataset."
-        )
-
-    if validation_split is None:
-        # Only create one dataset
-        filenames = []
-        for i in keep:
-            filepath = tfrecord_path.format(
-                array=i,
-                val=0,
-                n_session=n_sessions - 1,
-                v=len(str(n_sessions - 1)),
+                # Read one file at a time so sessions stay in order
+                n_files = 1
+            dataset = files.interleave(
+                tf.data.TFRecordDataset,
+                cycle_length=n_files,
+                num_parallel_calls=tf.data.AUTOTUNE,
+                deterministic=not shuffle,
             )
-            filenames.append(filepath)
+            dataset = dataset.map(_parse_example, num_parallel_calls=tf.data.AUTOTUNE)
+            return _finish(dataset, sum(n_sequences), shuffle)
 
-        return _create_dataset(filenames)
+        # Otherwise create a dataset for each session separately
+        datasets = []
+        for filename, n in zip(filenames, n_sequences):
+            dataset = tf.data.TFRecordDataset(filename)
+            dataset = dataset.map(_parse_example, num_parallel_calls=tf.data.AUTOTUNE)
+            datasets.append(_finish(dataset, n, shuffle))
+        return datasets
 
-    else:
-        # Create two datasets
-        train_filenames = []
-        val_filenames = []
-        for i in keep:
-            filepath = tfrecord_path.format(
-                array=i,
-                val=0,
-                n_session=n_sessions - 1,
-                v=len(str(n_sessions - 1)),
-            )
-            train_filenames.append(filepath)
-            filepath = tfrecord_path.format(
-                array=i,
-                val=1,
-                n_session=n_sessions - 1,
-                v=len(str(n_sessions - 1)),
-            )
-            val_filenames.append(filepath)
+    if config["validation_split"] is None:
+        return _create_dataset("train", shuffle)
 
-        return _create_dataset(train_filenames, shuffle=shuffle), _create_dataset(
-            val_filenames, shuffle=False
-        )
+    return _create_dataset("train", shuffle), _create_dataset("val", False)
 
 
 def _validate_tf_dataset(dataset):
@@ -467,14 +631,20 @@ def get_n_sequences_and_range(dataset) -> Tuple[int, np.ndarray]:
     Returns
     -------
     n_sequences : int
-        Number of batches.
+        Number of sequences.
     range_ : np.ndarray
         Range of each channel.
     """
+    dataset = _validate_tf_dataset(dataset)
+
+    # Datasets loaded from TFRecords know this already
+    metadata = getattr(dataset, "osld_metadata", {})
+    if "range" in metadata:
+        return metadata["n_sequences"], metadata["range"]
+
     n_sequences = 0
     amax = []
     amin = []
-    dataset = _validate_tf_dataset(dataset)
     for batch in dataset:
         if isinstance(batch, dict):
             batch = batch["data"]
