@@ -49,7 +49,6 @@ with open("data_files.txt", "r") as file:
 # Create Data object for training
 data = Data(
     inputs,
-    store_dir=f"tmp_{id}",
     n_jobs=8,
 )
 

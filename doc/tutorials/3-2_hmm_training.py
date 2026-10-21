@@ -46,7 +46,7 @@ This tutorial covers how to train an HMM. We will use MEG data in this tutorial,
 #     print(data)
 
 #%%
-# Note, we can pass `use_tfrecord=True` when creating the Data object if we are training on large datasets and run into an out of memory error.
+# If you run into an out of memory error when training, see the `Training on large datasets` section below.
 #
 # Fitting an HMM
 # ^^^^^^^^^^^^^^
@@ -118,7 +118,31 @@ model.summary()
 
 #%%
 # The `history` variable contains the training history of the `fit` method.
+
+#%%
+# Training on large datasets
+# **************************
+# By default the Data object holds the data in memory and cuts sequences out of it on the fly, so the only extra memory used during training is the batches in flight. If your dataset does not fit in memory, save the prepared data as a TFRecord dataset, which is streamed from disk during training. This also means the data is only prepared once if you train many models on it. The `sequence_length` must match the one in the model's Config.
 #
+# .. code-block:: python
+#
+#     data.save_tfrecord_dataset("tfrecords", sequence_length=200)
+#
+# Then in your training script, load the dataset and pass it to the model in place of the Data object.
+#
+# .. code-block:: python
+#
+#     from osl_dynamics.data import load_tfrecord_dataset
+#
+#     dataset = load_tfrecord_dataset("tfrecords", batch_size=config.batch_size)
+#     model.random_state_time_course_initialization(dataset, n_epochs=1, n_init=3)
+#     model.fit(dataset)
+#
+# The `buffer_size` argument of `load_tfrecord_dataset` sets how many sequences are held in memory for shuffling (default 4000); reduce it if you still run out of memory. If you run out of GPU memory rather than RAM, reduce the `batch_size` or `sequence_length` in the Config.
+#
+# Alternatively, the Data object can keep the data on disk as memory maps (`Data(..., load_memmaps=True)`) and read sequences from disk as they are needed, which avoids the extra step of writing TFRecords.
+
+#%%
 # Saving a trained model
 # **********************
 # As we have just seen, training a model can be time consuming. Therefore, it is often useful to save a trained model so we can load it later. We can do this with the `save` method.
