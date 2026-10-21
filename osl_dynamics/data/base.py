@@ -1388,7 +1388,8 @@ class Data:
                 drop_last_batch=drop_last_batch,
                 seed=seed,
             )
-            if concatenate:
+
+            def _make(index):
                 dataset = dtf.dataset_from_index(index, slice_fn, **kwargs)
                 dataset.osld_metadata = {
                     "sequence_length": sequence_length,
@@ -1398,13 +1399,11 @@ class Data:
                 }
                 return dataset
 
+            if concatenate:
+                return _make(index)
+
             # Otherwise create a dataset for each session separately
-            datasets = []
-            for i in self.keep:
-                datasets.append(
-                    dtf.dataset_from_index(index[index[:, 0] == i], slice_fn, **kwargs)
-                )
-            return datasets
+            return [_make(index[index[:, 0] == i]) for i in self.keep]
 
         if validation_split is not None:
             train_index, val_index = dtf.split_index(

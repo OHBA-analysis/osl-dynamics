@@ -216,17 +216,6 @@ class Model(MarkovStateInferenceModelBase):
         length = self.config.sequence_length
         if remove_edge_effects and length % 2:
             raise ValueError("Overlapping inference requires an even sequence_length.")
-        if remove_edge_effects and (
-            isinstance(dataset, tf.data.Dataset)
-            or (
-                isinstance(dataset, list)
-                and dataset
-                and isinstance(dataset[0], tf.data.Dataset)
-            )
-        ):
-            raise ValueError(
-                "Pass raw arrays or Data for overlapping inference, not prebatched datasets."
-            )
         datasets = self.make_dataset(
             dataset,
             step_size=self.raw_sequence_length // 2 if remove_edge_effects else None,
