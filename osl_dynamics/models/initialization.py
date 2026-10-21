@@ -37,6 +37,7 @@ from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
+from threadpoolctl import threadpool_limits
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.simulation import HMM
@@ -50,6 +51,17 @@ Candidate = Tuple[str, tf.data.Dataset, Optional[Callable]]
 
 # Number of batches used to score candidates with the free energy
 N_SCORING_BATCHES = 20
+
+
+def _eigh(matrices: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Eigendecomposition of a stack of symmetric matrices.
+
+    Uses a single BLAS thread: with a multi-threaded OpenBLAS the many
+    small decompositions are orders of magnitude slower when the CPU is
+    busy, e.g. with the data pipeline threads during training.
+    """
+    with threadpool_limits(limits=1, user_api="blas"):
+        return np.linalg.eigh(matrices)
 
 
 def logm_features(covariances: np.ndarray) -> np.ndarray:
@@ -69,7 +81,7 @@ def logm_features(covariances: np.ndarray) -> np.ndarray:
         Shape is (..., n_channels * (n_channels + 1) / 2).
     """
     covariances = 0.5 * (covariances + np.swapaxes(covariances, -1, -2))
-    eigenvalues, eigenvectors = np.linalg.eigh(covariances)
+    eigenvalues, eigenvectors = _eigh(covariances)
     # Guard against windows that are too short to be full rank
     floor = np.maximum(1e-6 * eigenvalues[..., -1:], 1e-12)
     eigenvalues = np.maximum(eigenvalues, floor)
@@ -102,7 +114,7 @@ def logm_features_inverse(features: np.ndarray, n_channels: int) -> np.ndarray:
     log_cov = np.zeros(features.shape[:-1] + (n_channels, n_channels))
     log_cov[..., i, j] = features / weights
     log_cov[..., j, i] = features / weights
-    eigenvalues, eigenvectors = np.linalg.eigh(log_cov)
+    eigenvalues, eigenvectors = _eigh(log_cov)
     return (eigenvectors * np.exp(eigenvalues)[..., None, :]) @ np.swapaxes(
         eigenvectors, -1, -2
     )
