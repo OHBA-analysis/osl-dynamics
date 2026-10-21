@@ -21,6 +21,53 @@ from osl_dynamics.utils.misc import replace_argument
 _logger = logging.getLogger("osl-dynamics")
 
 
+def _remove_edge_effects(x: np.ndarray, step_size: int) -> List[np.ndarray]:
+    """Trim predictions made on sequences with 50% overlap.
+
+    Each sequence is cut down to its central :code:`step_size` samples, so
+    the pieces tile the time axis with no gaps or duplicates. The first and
+    last sequence keep their outer edge. The output is truncated to the
+    number of samples covered by non-overlapping sequences, so it lines up
+    with :code:`Data.trim_time_series(sequence_length=...)`.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Predictions with shape (n_sequences, sequence_length, ...).
+    step_size : int
+        Number of samples between the start of consecutive sequences,
+        :code:`sequence_length // 2`.
+
+    Returns
+    -------
+    pieces : list of np.ndarray
+        Trimmed predictions for each sequence, to be concatenated.
+    """
+    n_sequences, sequence_length = x.shape[:2]
+    if 2 * step_size != sequence_length:
+        raise ValueError(
+            "remove_edge_effects requires an even sequence_length, "
+            f"got {sequence_length}."
+        )
+    trim_start = (sequence_length - step_size) // 2
+    trim_end = sequence_length - step_size - trim_start
+    if n_sequences == 1:
+        pieces = [x[0]]
+    else:
+        pieces = (
+            [x[0, :-trim_end]]
+            + list(x[1:-1, trim_start:-trim_end])
+            + [x[-1, trim_start:]]
+        )
+
+    # Number of samples covered by non-overlapping sequences
+    n_keep = ((n_sequences + 1) // 2) * sequence_length
+    n_covered = sum(len(piece) for piece in pieces)
+    if n_covered > n_keep:
+        pieces[-1] = pieces[-1][: len(pieces[-1]) - (n_covered - n_keep)]
+    return pieces
+
+
 @dataclass
 class VariationalInferenceModelConfig:
     """Settings needed for the inference model."""
@@ -688,12 +735,7 @@ class VariationalInferenceModelBase(ModelBase):
             predictions = self.predict(dataset[i], **kwargs)
             theta_ = predictions["theta"]
             if remove_edge_effects:
-                trim = step_size // 2  # throw away 25%
-                theta_ = (
-                    [theta_[0, :-trim]]
-                    + list(theta_[1:-1, trim:-trim])
-                    + [theta_[-1, trim:]]
-                )
+                theta_ = _remove_edge_effects(theta_, step_size)
             theta.append(np.concatenate(theta_))
 
         if concatenate or len(theta) == 1:
@@ -765,17 +807,8 @@ class VariationalInferenceModelBase(ModelBase):
             power_theta_ = predictions["power_theta"]
             fc_theta_ = predictions["fc_theta"]
             if remove_edge_effects:
-                trim = step_size // 2  # throw away 25%
-                power_theta_ = (
-                    [power_theta_[0, :-trim]]
-                    + list(power_theta_[1:-1, trim:-trim])
-                    + [power_theta_[-1, trim:]]
-                )
-                fc_theta_ = (
-                    [fc_theta_[0, :-trim]]
-                    + list(fc_theta_[1:-1, trim:-trim])
-                    + [fc_theta_[-1, trim:]]
-                )
+                power_theta_ = _remove_edge_effects(power_theta_, step_size)
+                fc_theta_ = _remove_edge_effects(fc_theta_, step_size)
             power_theta.append(np.concatenate(power_theta_))
             fc_theta.append(np.concatenate(fc_theta_))
 
@@ -852,12 +885,7 @@ class VariationalInferenceModelBase(ModelBase):
             theta = predictions["theta"]
             alpha_ = alpha_layer(theta)
             if remove_edge_effects:
-                trim = step_size // 2  # throw away 25%
-                alpha_ = (
-                    [alpha_[0, :-trim]]
-                    + list(alpha_[1:-1, trim:-trim])
-                    + [alpha_[-1, trim:]]
-                )
+                alpha_ = _remove_edge_effects(alpha_, step_size)
             alpha.append(np.concatenate(alpha_))
 
         if concatenate or len(alpha) == 1:
@@ -933,17 +961,8 @@ class VariationalInferenceModelBase(ModelBase):
             alpha_ = alpha_layer(power_theta)
             beta_ = beta_layer(fc_theta)
             if remove_edge_effects:
-                trim = step_size // 2  # throw away 25%
-                alpha_ = (
-                    [alpha_[0, :-trim]]
-                    + list(alpha_[1:-1, trim:-trim])
-                    + [alpha_[-1, trim:]]
-                )
-                beta_ = (
-                    [beta_[0, :-trim]]
-                    + list(beta_[1:-1, trim:-trim])
-                    + [beta_[-1, trim:]]
-                )
+                alpha_ = _remove_edge_effects(alpha_, step_size)
+                beta_ = _remove_edge_effects(beta_, step_size)
             alpha.append(np.concatenate(alpha_))
             beta.append(np.concatenate(beta_))
 
@@ -1205,12 +1224,7 @@ class MarkovStateInferenceModelBase(ModelBase):
                 alp.append(pred["gamma"])
             alpha_ = np.concatenate(alp)  # concat over batches
             if remove_edge_effects:
-                trim = step_size // 2  # throw away 25%
-                alpha_ = (
-                    [alpha_[0, :-trim]]
-                    + list(alpha_[1:-1, trim:-trim])
-                    + [alpha_[-1, trim:]]
-                )
+                alpha_ = _remove_edge_effects(alpha_, step_size)
             alpha.append(np.concatenate(alpha_))
 
         if concatenate or len(alpha) == 1:

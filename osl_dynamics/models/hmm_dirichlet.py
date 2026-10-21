@@ -21,6 +21,7 @@ from osl_dynamics.inference.layers import (
 )
 from osl_dynamics.models.mod_base import BaseModelConfig, ModelBase
 from osl_dynamics.models.inf_mod_base import (
+    _remove_edge_effects,
     MarkovStateInferenceModelConfig,
     MarkovStateInferenceModelBase,
 )
@@ -213,10 +214,8 @@ class Model(MarkovStateInferenceModelBase):
         if self.is_multi_gpu:
             raise ValueError("Load with single_gpu=True before inference.")
         length = self.config.sequence_length
-        if remove_edge_effects and length % 4:
-            raise ValueError(
-                "Overlapping inference requires sequence_length divisible by four."
-            )
+        if remove_edge_effects and length % 2:
+            raise ValueError("Overlapping inference requires an even sequence_length.")
         if remove_edge_effects and (
             isinstance(dataset, tf.data.Dataset)
             or (
@@ -238,10 +237,8 @@ class Model(MarkovStateInferenceModelBase):
             if not batches:
                 raise ValueError("A session contains no complete sequence.")
             a = np.concatenate(batches)
-            if remove_edge_effects and len(a) > 1:
-                trim = length // 4
-                pieces = [a[0, :-trim], *list(a[1:-1, trim:-trim]), a[-1, trim:]]
-                result.append(np.concatenate(pieces))
+            if remove_edge_effects:
+                result.append(np.concatenate(_remove_edge_effects(a, length // 2)))
             else:
                 result.append(a.reshape(-1, self.config.n_states))
         return np.concatenate(result) if concatenate or len(result) == 1 else result
