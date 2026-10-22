@@ -5,7 +5,6 @@ from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
-import mne
 
 from osl_dynamics.meeg import parallel, parcellation, rhino, source_recon, Session
 
@@ -61,10 +60,9 @@ def process_session(session):
         orthogonalisation="symmetric",
     )
 
-    raw = mne.io.read_raw_fif(str(preproc_file), preload=True)
     parcellation.save_as_fif(
         parcel_data,
-        raw,
+        session_files.preproc_file,
         filename=str(outdir / subject / "lcmv-parc-raw.fif"),
         extra_chans="stim",
     )

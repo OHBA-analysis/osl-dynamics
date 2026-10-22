@@ -23,7 +23,12 @@ from mne.minimum_norm.inverse import (
 )
 from mne.utils import logger as mne_logger, warn
 
-from osl_dynamics.meeg.session import Session, check_up_to_date
+from osl_dynamics.meeg.session import (
+    Session,
+    _replace_deprecated_raw,
+    check_up_to_date,
+    read_data,
+)
 
 from . import rhino
 
@@ -53,9 +58,10 @@ def lcmv_beamformer(
     session : Session
         Files of the session.
     data : str | instance of mne.Raw | mne.Epochs, optional
-        The measurement data to specify the channels to include. Bad channels
-        in info['bads'] are not used. Will also be used to calculate data_cov.
-        If None, session.preproc_file is used.
+        The measurement data, or the path to a fif file containing it, to
+        specify the channels to include. Bad channels in info['bads'] are not
+        used. Will also be used to calculate data_cov. If None,
+        session.preproc_file is used.
     chantypes : list or str
         List of channel types to use to calculate the noise covariance.
         E.g. ['eeg'], ['mag', 'grad'], ['eeg', 'mag', 'grad'].
@@ -121,8 +127,6 @@ def lcmv_beamformer(
     print("----------------------")
 
     check_up_to_date(session, "forward model")
-    if data is None:
-        data = session.preproc_file
 
     if chantypes is None:
         raise ValueError("chantypes must be passed.")
@@ -131,14 +135,13 @@ def lcmv_beamformer(
         chantypes = [chantypes]
 
     # Load data
-    if isinstance(data, str):
-        if "epo.fif" in data:
-            data = mne.read_epochs(data)
-        else:
-            data = mne.io.read_raw_fif(data, preload=True)
+    passed_object = isinstance(data, (mne.io.BaseRaw, mne.BaseEpochs))
+    data = read_data(data, session)
 
-    # Bandpass filter
+    # Bandpass filter (on a copy so that the data passed is not modified)
     if frequency_range is not None:
+        if passed_object:
+            data = data.copy()
         data.filter(
             l_freq=frequency_range[0],
             h_freq=frequency_range[1],
@@ -311,9 +314,10 @@ def _data_and_noise_covariance(
 
 def apply_lcmv_beamformer(
     session: Session,
-    raw: mne.io.Raw | mne.Epochs | None = None,
+    data: str | mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | None = "omit",
     reference_brain: str = "mni",
+    raw: str | mne.io.Raw | mne.Epochs | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply an LCMV beamformer.
 
@@ -321,9 +325,9 @@ def apply_lcmv_beamformer(
     ----------
     session : Session
         Files of the session.
-    raw : instance of mne.io.Raw or mne.Epochs, optional
-        The data to apply the LCMV filter to.
-        If None, session.preproc_file is used.
+    data : str | instance of mne.io.Raw | mne.Epochs, optional
+        The data to apply the LCMV filter to, or the path to a fif file
+        containing it. If None, session.preproc_file is used.
     reject_by_annotation : str | None
         How to treat the samples of a Raw object in annotations starting with
         'bad': 'omit' drops them, None keeps them.
@@ -331,6 +335,8 @@ def apply_lcmv_beamformer(
         Either 'head' or 'mni'. If 'mni', the data is returned for each voxel
         of the MNI grid of the forward model (session.mni_grid_file). Voxels without a
         dipole (outside the inner skull) are zero.
+    raw : str | mne.io.Raw | mne.Epochs, optional
+        Deprecated, use data.
 
     Returns
     -------
@@ -346,29 +352,29 @@ def apply_lcmv_beamformer(
     print("Applying LCMV beamformer")
     print("------------------------")
 
+    data = _replace_deprecated_raw(data, raw, "apply_lcmv_beamformer")
     check_up_to_date(session, "LCMV filters")
-    if raw is None:
-        raw = mne.io.read_raw_fif(session.preproc_file, preload=True)
+    inst = read_data(data, session)
 
     # Load filters
     filters = mne.beamformer.read_beamformer(session.filters_file)
 
     # Pick chantypes that were used to make the beamformer in the data
-    raw = raw.copy().pick(filters["ch_names"])
+    inst = inst.copy().pick(filters["ch_names"])
 
-    if isinstance(raw, mne.BaseEpochs):
+    if isinstance(inst, mne.BaseEpochs):
         # Apply filters to an Epochs object
-        stc = mne.beamformer.apply_lcmv_epochs(raw, filters)
+        stc = mne.beamformer.apply_lcmv_epochs(inst, filters)
         voxel_data_head = np.transpose([s.data for s in stc], axes=[1, 2, 0])
     else:
         # Apply filters to a Raw object
-        _check_reference(raw)
-        data, times = raw.get_data(
+        _check_reference(inst)
+        data, times = inst.get_data(
             return_times=True, reject_by_annotation=reject_by_annotation
         )
-        chan_inds = mne.utils._check_channels_spatial_filter(raw.ch_names, filters)
+        chan_inds = mne.utils._check_channels_spatial_filter(inst.ch_names, filters)
         data = data[chan_inds]
-        stc = _apply_lcmv(data=data, filters=filters, info=raw.info, tmin=times[0])
+        stc = _apply_lcmv(data=data, filters=filters, info=inst.info, tmin=times[0])
         voxel_data_head = next(stc).data
 
     # Get coordinates in head space
@@ -392,9 +398,10 @@ def apply_lcmv_beamformer(
 def virtual_electrodes(
     session: Session,
     coords: list | np.ndarray,
-    raw: mne.io.Raw | mne.Epochs | None = None,
+    data: str | mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | None = "omit",
     use_bilateral_pairs: bool | None = None,
+    raw: str | mne.io.Raw | mne.Epochs | None = None,
 ) -> np.ndarray:
     """Beamform the activity at MNI coordinates (virtual electrodes).
 
@@ -411,8 +418,9 @@ def virtual_electrodes(
     coords : list | np.ndarray
         MNI coordinates (in mm). Shape is (3,) for a single coordinate or
         (n_coords, 3). The coordinates must be inside the inner skull.
-    raw : mne.io.Raw or mne.Epochs, optional
-        The data to beamform. If None, session.preproc_file is used.
+    data : str | mne.io.Raw | mne.Epochs, optional
+        The data to beamform, or the path to a fif file containing it.
+        If None, session.preproc_file is used.
     reject_by_annotation : str | None
         How to treat the samples of a Raw object in annotations starting with
         'bad': 'omit' drops them, None keeps them.
@@ -424,6 +432,8 @@ def virtual_electrodes(
         :code:`use_bilateral_pairs=True`. Note the dipoles of the MNI grid are
         paired across the grid's own plane of symmetry, which can be up to half
         a voxel from x = 0.
+    raw : str | mne.io.Raw | mne.Epochs, optional
+        Deprecated, use data.
 
     Returns
     -------
@@ -441,9 +451,9 @@ def virtual_electrodes(
     coords = np.atleast_2d(coords)
     n_coords = len(coords)
 
+    data = _replace_deprecated_raw(data, raw, "virtual_electrodes")
     check_up_to_date(session, "LCMV filters")
-    if raw is None:
-        raw = mne.io.read_raw_fif(session.preproc_file, preload=True)
+    inst = read_data(data, session)
 
     # Settings used to compute the filters on the MNI grid
     filters = mne.beamformer.read_beamformer(session.filters_file)
@@ -500,7 +510,7 @@ def virtual_electrodes(
 
     # Beamformer weights with the settings used for the MNI grid
     info = mne.pick_info(
-        raw.info, mne.pick_channels(raw.ch_names, filters["ch_names"], ordered=False)
+        inst.info, mne.pick_channels(inst.ch_names, filters["ch_names"], ordered=False)
     )
     ve_filters = _make_lcmv(
         info,
@@ -514,7 +524,7 @@ def virtual_electrodes(
 
     # Apply to the data
     data, _, epochs_shape = _get_filter_input_data(
-        session, raw, reject_by_annotation, filters=ve_filters
+        session, inst, reject_by_annotation, filters=ve_filters
     )
     ve_data = ve_filters["weights"][:n_coords] @ data
     if epochs_shape is not None:
@@ -588,7 +598,7 @@ def _use_unit_noise_gain(lcmv_params: dict) -> None:
 
 def _get_filter_input_data(
     session: Session,
-    raw: mne.io.Raw | mne.Epochs | None,
+    data: str | mne.io.Raw | mne.Epochs | None,
     reject_by_annotation: str | None,
     filters: Beamformer | None = None,
 ) -> tuple[np.ndarray, Beamformer, tuple | None]:
@@ -598,8 +608,9 @@ def _get_filter_input_data(
     ----------
     session : Session
         Files of the session.
-    raw : mne.io.Raw or mne.Epochs
-        Data. If None, session.preproc_file is used.
+    data : str | mne.io.Raw | mne.Epochs
+        Data, or the path to a fif file containing it. If None,
+        session.preproc_file is used.
     reject_by_annotation : str | None
         How to treat the samples of a Raw object in annotations starting with
         'bad': 'omit' drops them, None keeps them.
@@ -616,23 +627,22 @@ def _get_filter_input_data(
     epochs_shape : tuple
         (time, epochs) shape of the samples for Epochs, None for Raw.
     """
-    if raw is None:
-        raw = mne.io.read_raw_fif(session.preproc_file, preload=True)
+    inst = read_data(data, session)
     if filters is None:
         filters = mne.beamformer.read_beamformer(session.filters_file)
 
-    _check_reference(raw, filters["ch_names"])
-    chan_inds = mne.utils._check_channels_spatial_filter(raw.ch_names, filters)
+    _check_reference(inst, filters["ch_names"])
+    chan_inds = mne.utils._check_channels_spatial_filter(inst.ch_names, filters)
 
-    if isinstance(raw, mne.BaseEpochs):
-        data = raw.get_data(picks=chan_inds)  # (epochs, channels, time)
+    if isinstance(inst, mne.BaseEpochs):
+        data = inst.get_data(picks=chan_inds)  # (epochs, channels, time)
         epochs_shape = (data.shape[2], data.shape[0])
         data = np.transpose(data, (1, 2, 0)).reshape(data.shape[1], -1)
     else:
-        data = raw.get_data(picks=chan_inds, reject_by_annotation=reject_by_annotation)
+        data = inst.get_data(picks=chan_inds, reject_by_annotation=reject_by_annotation)
         epochs_shape = None
 
-    projs = mne.pick_info(raw.info, chan_inds)["projs"]
+    projs = mne.pick_info(inst.info, chan_inds)["projs"]
     data = _proj_whiten_data(data, projs, filters)
     return data, filters, epochs_shape
 

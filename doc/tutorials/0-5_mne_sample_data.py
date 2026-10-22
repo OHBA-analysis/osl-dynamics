@@ -220,7 +220,7 @@ Prerequisites
 #
 # .. code-block:: python
 #
-#     source_recon.lcmv_beamformer(session, raw, chantypes=["mag", "grad"])
+#     source_recon.lcmv_beamformer(session, chantypes=["mag", "grad"])
 
 #%%
 # .. note::
@@ -253,14 +253,13 @@ Prerequisites
 #         session,
 #         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
 #         orthogonalisation=None,
-#         raw=raw,
 #     )
 #     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
 #
 #     parc_fif = str(output_dir / "osl" / id / "lcmv-parc-raw.fif")
 #     parcellation.save_as_fif(
 #         parcel_data,
-#         raw,
+#         session.preproc_file,
 #         extra_chans="stim",
 #         filename=parc_fif,
 #     )
@@ -308,7 +307,6 @@ Prerequisites
 #
 #     source_recon.lcmv_beamformer(
 #         session,
-#         raw,
 #         chantypes=["mag", "grad"],
 #         use_bilateral_pairs=True,
 #     )
@@ -316,12 +314,11 @@ Prerequisites
 #         session,
 #         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
 #         orthogonalisation=None,
-#         raw=raw,
 #     )
 #     bilateral_parc_fif = str(output_dir / "osl" / id / "lcmv-bilateral-parc-raw.fif")
 #     parcellation.save_as_fif(
 #         parcel_data,
-#         raw,
+#         session.preproc_file,
 #         extra_chans="stim",
 #         filename=bilateral_parc_fif,
 #     )
@@ -453,7 +450,7 @@ Prerequisites
 #         preload=True,
 #     )
 #     ve_data = source_recon.virtual_electrodes(
-#         session, [[-52, -19, 7], [52, -19, 7]], raw=epochs
+#         session, [[-52, -19, 7], [52, -19, 7]], data=epochs
 #     )
 #     print(f"Virtual electrode data shape: {ve_data.shape} (coords x time x epochs)")
 #

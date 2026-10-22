@@ -359,7 +359,6 @@ The output of this script is written to ``derivatives/``.
 #
 #     from pathlib import Path
 #     import pandas as pd
-#     import mne
 #     import matplotlib
 #     matplotlib.use("Agg")
 #     from osl_dynamics.meeg import parallel, parcellation, Session
@@ -392,11 +391,10 @@ The output of this script is written to ``derivatives/``.
 #             orthogonalisation="symmetric",
 #         )
 #
-#         raw = mne.io.read_raw_fif(preproc_file, preload=True)
 #         parc_fif = str(output_dir / "osl" / session["id"] / "lcmv-parc-raw.fif")
 #         parcellation.save_as_fif(
 #             parcel_data,
-#             raw,
+#             preproc_file,
 #             extra_chans="stim",
 #             filename=parc_fif,
 #         )
@@ -447,7 +445,7 @@ The output of this script is written to ``derivatives/``.
 #         template_cov="template_cov.npy",
 #     )
 #
-#     parcellation.save_as_fif(parcel_data, raw, extra_chans="stim", filename=parc_fif)
+#     parcellation.save_as_fif(parcel_data, preproc_file, extra_chans="stim", filename=parc_fif)
 #
 # If you have already saved the parcellated fifs, you can instead flip them
 # as a separate step with :func:`sign_flipping.sign_flip_mne_raw

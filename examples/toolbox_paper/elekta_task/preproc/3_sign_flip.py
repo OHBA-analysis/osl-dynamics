@@ -7,8 +7,6 @@ the sign-flipped data back to a fif file alongside the original.
 
 from glob import glob
 
-import mne
-
 from osl_dynamics.data import Data
 from osl_dynamics.meeg import parcellation
 
@@ -23,11 +21,10 @@ data = Data(files, picks="misc", reject_by_annotation="omit", n_jobs=n_jobs)
 data.align_channel_signs(n_embeddings=15, standardize=True)
 
 for file, aligned in zip(files, data.arrays):
-    raw = mne.io.read_raw_fif(file, preload=True)
     out_file = file.replace("lcmv-parc-raw.fif", "sflip-lcmv-parc-raw.fif")
     parcellation.save_as_fif(
         aligned.T,
-        raw,
+        file,
         filename=out_file,
         extra_chans="stim",
     )

@@ -1,7 +1,6 @@
 """Step 5: Parcellation."""
 
 from pathlib import Path
-import mne
 import matplotlib
 matplotlib.use("Agg")
 from osl_dynamics.meeg import parallel, parcellation, Session
@@ -49,11 +48,10 @@ def process_session(session):
         orthogonalisation=orthogonalisation,
     )
 
-    raw = mne.io.read_raw_fif(str(preproc_file), preload=True)
     parc_fif = str(output_dir / "osl" / session["id"] / "lcmv-parc-raw.fif")
     parcellation.save_as_fif(
         parcel_data,
-        raw,
+        session_files.preproc_file,
         extra_chans="stim",
         filename=parc_fif,
     )

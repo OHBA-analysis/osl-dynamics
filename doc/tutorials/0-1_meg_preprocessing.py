@@ -341,12 +341,14 @@ Output is written to ``derivatives/``.
 # - ``chantypes=["mag", "grad"]`` — Use both magnetometers and gradiometers (Elekta systems). For CTF, use ``["mag"]``.
 # - ``rank={"meg": 60}`` — Effective rank of the data after MaxFilter. Elekta data is typically rank 60-64.
 #
+# The sensor data is read from ``session.preproc_file``. The source reconstruction and parcellation functions also accept ``data``, a Raw/Epochs object or the path to a fif file, if you want to use different data.
+#
 # Compute beamformer weights
 # **************************
 #
 # .. code-block:: python
 #
-#     source_recon.lcmv_beamformer(session, raw, chantypes=chantypes, rank=rank)
+#     source_recon.lcmv_beamformer(session, chantypes=chantypes, rank=rank)
 
 #%%
 # Step 6: Parcellation
@@ -365,7 +367,6 @@ Output is written to ``derivatives/``.
 #         session,
 #         parcellation_file,
 #         orthogonalisation="symmetric",
-#         raw=raw,
 #     )
 #     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
 
@@ -374,11 +375,11 @@ Output is written to ``derivatives/``.
 #
 # .. code-block:: python
 #
-#     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(session, raw)
+#     voxel_data, voxel_coords = source_recon.apply_lcmv_beamformer(session)
 #     print(f"Voxel data shape: {voxel_data.shape} (voxels x time)")
 #
 #     # Time courses at MNI coordinates (in mm)
-#     ve_data = source_recon.virtual_electrodes(session, [[-42, -22, 10], [42, -22, 10]], raw=raw)
+#     ve_data = source_recon.virtual_electrodes(session, [[-42, -22, 10], [42, -22, 10]])
 
 #%%
 # Save parcellated data
@@ -391,7 +392,7 @@ Output is written to ``derivatives/``.
 #     parc_fif = str(output_dir / "osl" / id / "lcmv-parc-raw.fif")
 #     parcellation.save_as_fif(
 #         parcel_data,
-#         raw,
+#         session.preproc_file,
 #         extra_chans="stim",
 #         filename=parc_fif,
 #     )

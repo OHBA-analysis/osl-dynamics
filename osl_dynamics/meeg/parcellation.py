@@ -15,7 +15,12 @@ from nilearn import plotting as nilearn_plotting
 
 from osl_dynamics import files
 from osl_dynamics.utils import misc
-from osl_dynamics.meeg.session import Session, check_up_to_date
+from osl_dynamics.meeg.session import (
+    Session,
+    _replace_deprecated_raw,
+    check_up_to_date,
+    read_data,
+)
 
 from . import source_recon
 
@@ -324,8 +329,9 @@ def parcellate_lcmv(
     session: Session,
     parcellation_file: str,
     orthogonalisation: str | None = None,
-    raw: mne.io.Raw | mne.Epochs | None = None,
+    data: str | mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | None = "omit",
+    raw: str | mne.io.Raw | mne.Epochs | None = None,
 ) -> np.ndarray:
     """Calculate parcel time courses from sensor data with the LCMV filters.
 
@@ -346,12 +352,14 @@ def parcellate_lcmv(
         non-negative.
     orthogonalisation : str, optional
         Method for orthogonalising the data. Can be None or 'symmetric'.
-    raw : mne.io.Raw or mne.Epochs, optional
-        The data to calculate parcel time courses for.
-        If None, session.preproc_file is used.
+    data : str | mne.io.Raw | mne.Epochs, optional
+        The data to calculate parcel time courses for, or the path to a fif
+        file containing it. If None, session.preproc_file is used.
     reject_by_annotation : str | None
         How to treat the samples of a Raw object in annotations starting with
         'bad': 'omit' drops them, None keeps them.
+    raw : str | mne.io.Raw | mne.Epochs, optional
+        Deprecated, use data.
 
     Returns
     -------
@@ -362,6 +370,7 @@ def parcellate_lcmv(
     print("Parcellating data")
     print("-----------------")
 
+    data = _replace_deprecated_raw(data, raw, "parcellate_lcmv")
     if orthogonalisation not in [None, "symmetric"]:
         raise ValueError("orthogonalisation must be None or 'symmetric'.")
 
@@ -374,7 +383,7 @@ def parcellate_lcmv(
 
     # Sensor data after projection/whitening, shape is (channels, samples)
     data, filters, epochs_shape = source_recon._get_filter_input_data(
-        session, raw, reject_by_annotation
+        session, data, reject_by_annotation
     )
     if filters["is_free_ori"]:
         raise ValueError(
@@ -424,7 +433,7 @@ def parcellate_lcmv(
 
 def save_as_fif(
     parcel_data: np.ndarray,
-    raw: mne.io.Raw | mne.Epochs,
+    raw: str | mne.io.Raw | mne.Epochs,
     filename: str,
     extra_chans: str | list[str] | None = None,
 ) -> None:
@@ -434,8 +443,9 @@ def save_as_fif(
     ----------
     parcel_data : np.ndarray
         (parcels, time) or (parcels, time, epochs) data.
-    raw : mne.Raw or mne.Epochs
-        MNE Raw or Epochs objects to get info from.
+    raw : str | mne.Raw or mne.Epochs
+        MNE Raw or Epochs object to get info from, or the path to a fif file
+        containing it, e.g. session.preproc_file.
     filename : str
         Output file path.
     extra_chans : str or list of str
@@ -445,6 +455,7 @@ def save_as_fif(
     """
     print(f"Saving {filename}")
 
+    raw = read_data(raw, preload=False)
     if isinstance(raw, mne.BaseEpochs):
         # Save as a MNE Epochs object
         parc_epo = _convert2mne_epochs(parcel_data, raw)
@@ -977,7 +988,7 @@ def _symmetric_orthogonalisation(
 
 def convert_to_mne_raw(
     data: np.ndarray,
-    raw: mne.io.Raw,
+    raw: str | mne.io.Raw,
     ch_names: list[str] | None = None,
     extra_chans: str | list[str] | None = None,
 ) -> mne.io.Raw:
@@ -990,9 +1001,10 @@ def convert_to_mne_raw(
     ----------
     data : np.ndarray
         (n_channels, n_samples) data array.
-    raw : mne.io.Raw
-        Reference Raw object. Timing, annotations, filter settings,
-        description and extra channels are copied from this object.
+    raw : str | mne.io.Raw
+        Reference Raw object, or the path to a fif file containing it.
+        Timing, annotations, filter settings, description and extra channels
+        are copied from this object.
     ch_names : list of str, optional
         Channel names. Defaults to ``channel_0, ..., channel_{n-1}``.
     extra_chans : str or list of str, optional
@@ -1009,8 +1021,10 @@ def convert_to_mne_raw(
     if isinstance(extra_chans, str):
         extra_chans = [extra_chans]
 
+    raw = read_data(raw, preload=False)
+
     # Re-insert bad segments if data is shorter than raw
-    if raw.get_data().shape[1] != data.shape[1]:
+    if raw.n_times != data.shape[1]:
         _, times = raw.get_data(reject_by_annotation="omit", return_times=True)
         indices = raw.time_as_index(times, use_rounding=True)
         indices = indices[: data.shape[1]]

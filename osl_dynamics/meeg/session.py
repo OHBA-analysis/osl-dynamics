@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import json
 import os
+import warnings
+
+import mne
 
 
 class SurfaceFilenames:
@@ -269,6 +272,61 @@ _STEPS = {
         "source_recon.lcmv_beamformer",
     ),
 }
+
+
+def read_data(
+    data: str | mne.io.Raw | mne.Epochs | None,
+    session: Session | None = None,
+    preload: bool = True,
+) -> mne.io.Raw | mne.Epochs:
+    """Get the sensor data passed to a step of the pipeline.
+
+    Parameters
+    ----------
+    data : str | mne.io.Raw | mne.Epochs | None
+        The data, or the path to a fif file containing it (Epochs if the file
+        name contains 'epo.fif', otherwise Raw). If None,
+        session.preproc_file is read.
+    session : Session, optional
+        Files of the session. Only needed if data is None.
+    preload : bool, optional
+        Should we load the data into memory when reading a file?
+
+    Returns
+    -------
+    data : mne.io.Raw | mne.Epochs
+        The data. Objects that are passed are returned as they are (not
+        copied).
+    """
+    if data is None:
+        if session is None:
+            raise ValueError("data must be passed if there is no session.")
+        data = session.preproc_file
+    if not isinstance(data, (str, os.PathLike)):
+        return data
+    data = os.fspath(data)
+    if "epo.fif" in os.path.basename(data):
+        return mne.read_epochs(data, preload=preload)
+    return mne.io.read_raw_fif(data, preload=preload)
+
+
+def _replace_deprecated_raw(
+    data: str | mne.io.Raw | mne.Epochs | None,
+    raw: str | mne.io.Raw | mne.Epochs | None,
+    function: str,
+) -> str | mne.io.Raw | mne.Epochs | None:
+    """Use the deprecated raw argument of a function as its data argument."""
+    if raw is None:
+        return data
+    warnings.warn(
+        f"The raw argument of {function} is deprecated and will be removed in "
+        "v3.9.0, use data instead.",
+        FutureWarning,
+        stacklevel=3,
+    )
+    if data is not None:
+        raise ValueError("Pass data, not both data and raw.")
+    return raw
 
 
 def check_up_to_date(session: Session, step: str) -> None:
