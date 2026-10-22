@@ -1129,7 +1129,7 @@ class Data:
             template_cov = covs[argmedian]
 
         if template_data is not None:
-            _logger.info(f"Using template data to calculate template covariance")
+            _logger.info("Using template data to calculate template covariance")
             template_cov = _calc_cov(template_data)
 
         # Perform the sign flipping

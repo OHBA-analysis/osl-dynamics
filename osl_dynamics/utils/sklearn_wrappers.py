@@ -1,7 +1,7 @@
 """Wrappers for scikit-learn."""
 
 import logging
-from typing import Dict, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import numpy as np
 from scipy import special, stats

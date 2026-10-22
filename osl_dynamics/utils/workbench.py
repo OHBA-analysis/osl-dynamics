@@ -70,7 +70,7 @@ def render(
     img = pathlib.Path(img)
 
     if ".nii" not in img.suffixes:
-        raise ValueError(f"img should be a nii or nii.gz file, got {nii}.")
+        raise ValueError(f"img should be a nii or nii.gz file, got {img}.")
 
     if not img.exists():
         raise FileNotFoundError(img)

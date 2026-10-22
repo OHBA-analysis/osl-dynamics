@@ -9,7 +9,6 @@ import traceback
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 from . import report
 from osl_dynamics.utils.logger import MEEGSessionLogger

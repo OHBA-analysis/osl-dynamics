@@ -11,12 +11,13 @@ data (with multiple dynamics).
 
 import logging
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import Tuple, Union
 
 import numpy as np
 import tensorflow as tf
 from tqdm.auto import trange
 
+from osl_dynamics import data
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
     TFConcatLayer,

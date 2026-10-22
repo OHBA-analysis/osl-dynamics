@@ -1,6 +1,6 @@
 """Helpful functions related to observation models."""
 
-from typing import Dict, List, Optional, Tuple
+from typing import Tuple
 
 import numpy as np
 import tensorflow as tf

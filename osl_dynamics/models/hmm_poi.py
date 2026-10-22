@@ -2,12 +2,13 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import Union
 
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
 
+from osl_dynamics import data
 from osl_dynamics.inference.layers import (
     VectorsLayer,
     SeparatePoissonLogLikelihoodLayer,
@@ -283,44 +284,19 @@ class Model(MarkovStateInferenceModelBase):
         """Set regularizers."""
         raise NotImplementedError
 
-    def set_random_state_time_course_initialization(
-        self, training_dataset: tf.data.Dataset
-    ) -> None:
-        """Sets the initial :code:`log_rates` based on a random state time course.
+    @property
+    def _min_window_samples(self):
+        return 2
 
-        Parameters
-        ----------
-        training_dataset : tf.data.Dataset
-            Training data.
-        """
-        _logger.info("Setting random log_rates")
+    @property
+    def _supports_feature_initialization(self):
+        return True
 
-        # Log_rate for each state
-        rates = np.zeros(
-            [self.config.n_states, self.config.n_channels], dtype=np.float32
-        )
+    def _window_features(self, windows):
+        """Mean rate of each channel in each window."""
+        return np.stack([np.mean(w, axis=0) for w in windows])
 
-        n_batches = 0
-        for batch in training_dataset:
-            # Concatenate all the sequences in this batch
-            data = np.concatenate(batch["data"])
-
-            # Sample a state time course using the initial transition
-            # probability matrix
-            stc = self.sample_state_time_course(data.shape[0])
-
-            # Calculate the mean for each state for this batch as log_rate
-            rate = []
-            for j in range(self.config.n_states):
-                x = data[stc[:, j] == 1]
-                mu = np.mean(x, axis=0)
-                rate.append(mu)
-            rates += rate
-            n_batches += 1
-
-        # Calculate the average from the running total
-        rates /= n_batches
-
+    def _set_parameters_from_features(self, features):
         if self.config.learn_log_rates:
-            # Set initial log_rates
+            rates = np.maximum(features, 1e-6).astype(np.float32)
             self.set_rates(rates, update_initializer=True)

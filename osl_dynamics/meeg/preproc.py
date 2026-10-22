@@ -630,9 +630,6 @@ def ica_ecg_eog_correlation(
     # Combine and exclude
     exclude_idx = sorted(set(ecg_indices + eog_indices))
 
-    # Capture pre-ICA PSD
-    psd_before_ica = raw.compute_psd(fmax=45)
-
     if len(exclude_idx) > 0:
         print(f"Removing {len(exclude_idx)} artefact component(s)...")
         ica.exclude = exclude_idx

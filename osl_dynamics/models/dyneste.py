@@ -4,8 +4,9 @@ See the :doc:`model description </models/dyneste>` for more details.
 """
 
 import logging
+from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -33,7 +34,6 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.utils.logger import set_logging_level
 from osl_dynamics.utils.misc import replace_argument
 
 _logger = logging.getLogger("osl-dynamics")
@@ -473,185 +473,23 @@ class Model(VariationalInferenceModelBase):
         states_layer = self.model.get_layer("states")
         states_layer.temperature.assign(self.config.initial_gs_temperature)
 
-    def random_subset_initialization(
-        self,
-        training_data,
-        n_epochs: int,
-        n_init: int,
-        take: float,
-        n_kl_annealing_epochs: Optional[int] = None,
-        do_gs_annealing: Optional[bool] = None,
-        **kwargs,
-    ) -> Optional[dict]:
-        """Random subset initialization.
+    _initialization_context_keys = ("n_kl_annealing_epochs", "do_gs_annealing")
 
-        This function inherits :code:`random_subset_initialization()` in
-        :code:`VariationalInferenceModelBase`.
+    @contextmanager
+    def _initialization_context(self, do_gs_annealing=None, **kwargs):
+        """Optionally anneal the Gumbel-Softmax temperature while initializing.
 
-        Parameters
-        ----------
-        training_data : tf.data.Dataset or osl_dynamics.data.Data
-            Dataset to use for training.
-        n_epochs : int
-            Number of epochs to train the model.
-        n_init : int
-            Number of initializations.
-        take : float
-            Fraction of total batches to take.
-        n_kl_annealing_epochs : int, optional
-            Number of KL annealing epochs.
-        do_gs_annealing : bool, optional
-            Whether to anneal the Gumbel-Softmax temperature during
-            initialization. Defaults to None, in which case the value
-            set in the configuration will be used.
-        kwargs : keyword arguments, optional
-            Keyword arguments for the fit method.
-
-        Returns
-        -------
-        history : history
-            The training history of the best initialization.
+        The temperature is reset afterwards.
         """
-        # Original Gumbel-Softmax annealing flag
         original_gs_flag = self.config.do_gs_annealing
-
-        # Use do_gs_annealing if passed
         if do_gs_annealing is not None:
             self.config.do_gs_annealing = do_gs_annealing
-
-        # Run initialization
-        history = super().random_subset_initialization(
-            training_data,
-            n_epochs,
-            n_init,
-            take,
-            n_kl_annealing_epochs=n_kl_annealing_epochs,
-            **kwargs,
-        )
-
-        # Reset Gumbel-Softmax annealing flag
-        self.config.do_gs_annealing = original_gs_flag
-
-        # The initialization may have annealed the Gumbel-Softmax temperature
-        self.reset_gs_temperature()
-
-        return history
-
-    def single_subject_initialization(
-        self,
-        training_data,
-        n_epochs: int,
-        n_init: int,
-        n_kl_annealing_epochs: Optional[int] = None,
-        do_gs_annealing: Optional[bool] = None,
-        **kwargs,
-    ) -> None:
-        """Initialization for the state means/covariances.
-
-        This function inherits :code:`single_subject_initialization()` in
-        :code:`VariationalInferenceModelBase`.
-
-        Parameters
-        ----------
-        training_data : list of tf.data.Dataset or osl_dynamics.data.Data
-            Datasets for each subject.
-        n_epochs : int
-            Number of epochs to train.
-        n_init : int
-            How many subjects should we train on?
-        n_kl_annealing_epochs : int, optional
-            Number of KL annealing epochs to use during initialization. If
-            :code:`None` then the KL annealing epochs in the :code:`config`
-            is used.
-        kwargs : keyword arguments, optional
-            Keyword arguments for the fit method.
-        """
-        # Original Gumbel-Softmax annealing flag
-        original_gs_flag = self.config.do_gs_annealing
-
-        # Use do_gs_annealing if passed
-        if do_gs_annealing is not None:
-            self.config.do_gs_annealing = do_gs_annealing
-
-        # Run initialization
-        super().single_subject_initialization(
-            training_data,
-            n_epochs,
-            n_init,
-            n_kl_annealing_epochs=n_kl_annealing_epochs,
-            **kwargs,
-        )
-
-        # Reset Gumbel-Softmax annealing flag
-        self.config.do_gs_annealing = original_gs_flag
-
-        # The initialization may have annealed the Gumbel-Softmax temperature
-        self.reset_gs_temperature()
-
-    def random_state_time_course_initialization(
-        self,
-        training_data,
-        n_epochs: int,
-        n_init: int,
-        take: float = 1,
-        stay_prob: float = 0.9,
-        do_gs_annealing: Optional[bool] = None,
-        **kwargs,
-    ) -> Optional[dict]:
-        """Random state time course initialization.
-
-        This function inherits :code:`random_state_time_course_initialization()`
-        in :code:`VariationalInferenceModelBase`.
-
-        Parameters
-        ----------
-        training_data : tf.data.Dataset or osl_dynamics.data.Data
-            Dataset to use for training.
-        n_epochs : int
-            Number of epochs to train the model.
-        n_init : int
-            Number of initializations.
-        take : float, optional
-            Fraction of total batches to take.
-        stay_prob : float, optional
-            Stay probability (diagonal for the transition probability
-            matrix). Other states have uniform probability.
-        do_gs_annealing : bool, optional
-            Whether to anneal the Gumbel-Softmax temperature during
-            initialization. Defaults to None, in which case the value
-            set in the configuration will be used.
-        kwargs : keyword arguments, optional
-            Keyword arguments for the fit method.
-
-        Returns
-        -------
-        history : history
-            The training history of the best initialization.
-        """
-        # Original Gumbel-Softmax annealing flag
-        original_gs_flag = self.config.do_gs_annealing
-
-        # Use do_gs_annealing if passed
-        if do_gs_annealing is not None:
-            self.config.do_gs_annealing = do_gs_annealing
-
-        # Run initialization
-        history = super().random_state_time_course_initialization(
-            training_data,
-            n_epochs,
-            n_init,
-            take,
-            stay_prob,
-            **kwargs,
-        )
-
-        # Reset Gumbel-Softmax annealing flag
-        self.config.do_gs_annealing = original_gs_flag
-
-        # The initialization may have annealed the Gumbel-Softmax temperature
-        self.reset_gs_temperature()
-
-        return history
+        try:
+            with super()._initialization_context(**kwargs):
+                yield
+        finally:
+            self.config.do_gs_annealing = original_gs_flag
+            self.reset_gs_temperature()
 
     def get_means(self) -> np.ndarray:
         """Get the state means.

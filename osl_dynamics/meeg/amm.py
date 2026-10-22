@@ -546,9 +546,6 @@ def _qlm_hat(major: np.ndarray, a: float, c: float, l: int, m: int) -> np.ndarra
 
     # k = 0
     lg = gammaln((1 + l + m) / 2) + gammaln((2 + l + m) / 2) - gammaln(l + 1.5)
-    F1 = np.full_like(major, np.exp(lg))
-    F2 = np.exp(lg)
-
     k = 0
     F1_tmp = np.exp(lg + 2 * k * np.log(c / major))
     F2_tmp = np.exp(lg + 2 * k * np.log(c / a))

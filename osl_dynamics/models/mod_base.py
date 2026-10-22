@@ -11,7 +11,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from io import StringIO
 from contextlib import contextmanager
-from typing import Dict, Generator, List, Optional, Tuple, Union
+from typing import Generator, List, Optional, Tuple, Union
 from packaging import version
 
 import yaml
@@ -631,7 +631,8 @@ class ModelBase:
             list of datasets is passed through.
         shuffle : bool, optional
             Should we shuffle the data? A prebuilt dataset is used as is,
-            but a shuffled one is rejected if :code:`shuffle=False`.
+            but a shuffled one is rejected if ordered per-session output
+            is needed (:code:`shuffle=False, concatenate=False`).
         concatenate : bool, optional
             Should we return a single TensorFlow Dataset or a list of Datasets.
         step_size : int, optional
@@ -675,12 +676,14 @@ class ModelBase:
         # dataset was made, so we can only check it was made the way we need
         for dataset in inputs if isinstance(inputs, list) else [inputs]:
             metadata = getattr(dataset, "osld_metadata", {})
-            if not shuffle and metadata.get("shuffle", False):
+            # Per-session outputs (concatenate=False) need the time points
+            # in order; quantities summed over the data (free energy,
+            # regularizers) do not
+            if not shuffle and not concatenate and metadata.get("shuffle", False):
                 raise ValueError(
-                    "An unshuffled dataset is needed here, e.g. to keep the "
-                    "time points in order. Load the dataset with "
-                    "shuffle=False (and concatenate=False for one output "
-                    "per session)."
+                    "An unshuffled dataset is needed here to keep the time "
+                    "points in order. Load the dataset with shuffle=False "
+                    "and concatenate=False."
                 )
             if step_size is not None:
                 if metadata.get("step_size") != step_size:

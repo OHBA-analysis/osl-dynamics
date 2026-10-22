@@ -106,6 +106,13 @@ model.summary()
 #     init_history = model.random_state_time_course_initialization(data, n_epochs=1, n_init=3, take=0.25)
 
 #%%
+# The starting state covariances of each initialization are set from a few batches of data (`n_batches=20` by default), so this step is quick even on a large dataset. Pass `n_batches=None` to use the whole dataset.
+#
+# The initialization method can also be chosen in the Config with `init_method` (and `n_init`, `n_init_epochs`, `init_take`) and run with `model.initialization(data)`.
+#
+# To make the initialization and training reproducible, set the random seed before building the model with `osl_dynamics.utils.set_random_seed(seed)`.
+
+#%%
 # The `init_history` variable is `dict` that contains the training history (`rho`, `learning_rate`, `loss`) for the best initialization.
 #
 # **Full training**

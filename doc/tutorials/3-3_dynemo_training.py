@@ -119,6 +119,8 @@ model.summary()
 #%%
 # The `take` argument is the fraction of the dataset to use for each initialization. If you are training on a particularly large dataset, initializing on the full dataset can be slow, so it is worth reducing this value further, e.g. `take=0.1`.
 #
+# The initialization method can also be chosen in the Config with `init_method` and run with `model.initialization(data)`. To make the initialization and training reproducible, set the random seed before building the model with `osl_dynamics.utils.set_random_seed(seed)`.
+#
 # The `init_history` variable is `dict` that contains the training history (`rho`, `lr`, `loss`) for the best initialization.
 #
 # **Full training**
