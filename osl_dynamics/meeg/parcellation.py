@@ -17,7 +17,6 @@ from osl_dynamics import files
 from osl_dynamics.utils import misc
 from osl_dynamics.meeg.session import (
     Session,
-    _replace_deprecated_raw,
     check_up_to_date,
     read_data,
 )
@@ -331,7 +330,6 @@ def parcellate_lcmv(
     orthogonalisation: str | None = None,
     data: str | mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | None = "omit",
-    raw: str | mne.io.Raw | mne.Epochs | None = None,
 ) -> np.ndarray:
     """Calculate parcel time courses from sensor data with the LCMV filters.
 
@@ -358,8 +356,6 @@ def parcellate_lcmv(
     reject_by_annotation : str | None
         How to treat the samples of a Raw object in annotations starting with
         'bad': 'omit' drops them, None keeps them.
-    raw : str | mne.io.Raw | mne.Epochs, optional
-        Deprecated, use data.
 
     Returns
     -------
@@ -370,7 +366,6 @@ def parcellate_lcmv(
     print("Parcellating data")
     print("-----------------")
 
-    data = _replace_deprecated_raw(data, raw, "parcellate_lcmv")
     if orthogonalisation not in [None, "symmetric"]:
         raise ValueError("orthogonalisation must be None or 'symmetric'.")
 

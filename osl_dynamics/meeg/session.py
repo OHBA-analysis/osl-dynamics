@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import os
-import warnings
 
 import mne
 
@@ -378,25 +377,6 @@ def read_data(
     if "epo.fif" in os.path.basename(data):
         return mne.read_epochs(data, preload=preload)
     return mne.io.read_raw_fif(data, preload=preload)
-
-
-def _replace_deprecated_raw(
-    data: str | mne.io.Raw | mne.Epochs | None,
-    raw: str | mne.io.Raw | mne.Epochs | None,
-    function: str,
-) -> str | mne.io.Raw | mne.Epochs | None:
-    """Use the deprecated raw argument of a function as its data argument."""
-    if raw is None:
-        return data
-    warnings.warn(
-        f"The raw argument of {function} is deprecated and will be removed in "
-        "v3.9.0, use data instead.",
-        FutureWarning,
-        stacklevel=3,
-    )
-    if data is not None:
-        raise ValueError("Pass data, not both data and raw.")
-    return raw
 
 
 def check_up_to_date(session: Session, step: str) -> None:

@@ -25,7 +25,6 @@ from mne.utils import logger as mne_logger, warn
 
 from osl_dynamics.meeg.session import (
     Session,
-    _replace_deprecated_raw,
     check_up_to_date,
     read_data,
 )
@@ -317,7 +316,6 @@ def apply_lcmv_beamformer(
     data: str | mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | None = "omit",
     reference_brain: str = "mni",
-    raw: str | mne.io.Raw | mne.Epochs | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply an LCMV beamformer.
 
@@ -335,8 +333,6 @@ def apply_lcmv_beamformer(
         Either 'head' or 'mni'. If 'mni', the data is returned for each voxel
         of the MNI grid of the forward model (session.mni_grid_file). Voxels without a
         dipole (outside the inner skull) are zero.
-    raw : str | mne.io.Raw | mne.Epochs, optional
-        Deprecated, use data.
 
     Returns
     -------
@@ -352,7 +348,6 @@ def apply_lcmv_beamformer(
     print("Applying LCMV beamformer")
     print("------------------------")
 
-    data = _replace_deprecated_raw(data, raw, "apply_lcmv_beamformer")
     check_up_to_date(session, "LCMV filters")
     inst = read_data(data, session)
 
@@ -401,7 +396,6 @@ def virtual_electrodes(
     data: str | mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | None = "omit",
     use_bilateral_pairs: bool | None = None,
-    raw: str | mne.io.Raw | mne.Epochs | None = None,
 ) -> np.ndarray:
     """Beamform the activity at MNI coordinates (virtual electrodes).
 
@@ -432,8 +426,6 @@ def virtual_electrodes(
         :code:`use_bilateral_pairs=True`. Note the dipoles of the MNI grid are
         paired across the grid's own plane of symmetry, which can be up to half
         a voxel from x = 0.
-    raw : str | mne.io.Raw | mne.Epochs, optional
-        Deprecated, use data.
 
     Returns
     -------
@@ -451,7 +443,6 @@ def virtual_electrodes(
     coords = np.atleast_2d(coords)
     n_coords = len(coords)
 
-    data = _replace_deprecated_raw(data, raw, "virtual_electrodes")
     check_up_to_date(session, "LCMV filters")
     inst = read_data(data, session)
 
