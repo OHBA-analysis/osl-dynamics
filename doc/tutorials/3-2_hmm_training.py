@@ -5,7 +5,7 @@ HMM: Training
 This tutorial covers how to train an HMM. We will use MEG data in this tutorial, however, this can easily be substituted with fMRI data.
 """
 
-# %%
+#%%
 # Getting the Data
 # ^^^^^^^^^^^^^^^^
 # We will use resting-state MEG data that has already been source reconstructed and prepared. This dataset is:
@@ -33,7 +33,7 @@ This tutorial covers how to train an HMM. We will use MEG data in this tutorial,
 #     # Download the dataset (approximately 21 MB)
 #     get_data("notts_meguk_giles_prepared_1_subject", rename="prepared_data")
 
-# %%
+#%%
 # Load the data
 # *************
 # We now load the data into osl-dynamics using the Data class. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
@@ -45,7 +45,7 @@ This tutorial covers how to train an HMM. We will use MEG data in this tutorial,
 #     data = Data("prepared_data")
 #     print(data)
 
-# %%
+#%%
 # If you run into an out of memory error when training, see the `Training on large datasets` section below.
 #
 # Fitting an HMM
@@ -73,7 +73,7 @@ config = Config(
     n_epochs=20,
 )
 
-# %%
+#%%
 # **Note**: for fMRI data the `sequence_length` used is typically much shorter, normally `sequence_length=50`.
 #
 # Building the model
@@ -85,7 +85,7 @@ from osl_dynamics.models.hmm import Model
 model = Model(config)
 model.summary()
 
-# %%
+#%%
 # Training the model
 # ******************
 # Note, this step can be time consuming.
@@ -98,25 +98,21 @@ model.summary()
 #
 #     init_history = model.random_state_time_course_initialization(data, n_epochs=1, n_init=3)
 
-# %%
+#%%
 # If you are training on a particularly large dataset, initializing on the full dataset can be slow. In this case, you can pass the `take` argument to initialize on a random subset of the data. This is the fraction of the dataset to use, e.g. `take=0.25` will use a quarter of the data for each initialization.
 #
 # .. code-block:: python
 #
 #     init_history = model.random_state_time_course_initialization(data, n_epochs=1, n_init=3, take=0.25)
 
-# %%
-# Other initialization methods are available. `kmeans_initialization` clusters windows of data with k-means and starts each state from a cluster centre, and `random_windows_initialization` starts each state from a random window of data. Both give states that start genuinely different, whereas `random_state_time_course_initialization` sets every state close to the average of the whole dataset. Pass `select="free_energy"` to pick the best initialization by its free energy on a fixed set of batches rather than the training loss.
+#%%
+# The starting state covariances of each initialization are set from a few batches of data (`n_batches=20` by default), so this step is quick even on a large dataset. Pass `n_batches=None` to use the whole dataset.
 #
-# .. code-block:: python
-#
-#     init_history = model.kmeans_initialization(data, n_epochs=1, n_init=3, select="free_energy")
-#
-# The method can also be chosen in the Config with `init_method` (and `n_init`, `n_init_epochs`, `init_take`, `init_select`) and run with `model.initialization(data)`.
+# The initialization method can also be chosen in the Config with `init_method` (and `n_init`, `n_init_epochs`, `init_take`) and run with `model.initialization(data)`.
 #
 # To make the initialization and training reproducible, set the random seed before building the model with `osl_dynamics.utils.set_random_seed(seed)`.
 
-# %%
+#%%
 # The `init_history` variable is `dict` that contains the training history (`rho`, `learning_rate`, `loss`) for the best initialization.
 #
 # **Full training**
@@ -127,10 +123,10 @@ model.summary()
 #
 #     history = model.fit(data)
 
-# %%
+#%%
 # The `history` variable contains the training history of the `fit` method.
 
-# %%
+#%%
 # Training on large datasets
 # **************************
 # By default the Data object holds the data in memory and cuts sequences out of it on the fly, so the only extra memory used during training is the batches in flight. If your dataset does not fit in memory, save the prepared data as a TFRecord dataset, which is streamed from disk during training. This also means the data is only prepared once if you train many models on it. The `sequence_length` must match the one in the model's Config.
@@ -160,7 +156,7 @@ model.summary()
 #
 # Alternatively, the Data object can keep the data on disk as memory maps (`Data(..., load_memmaps=True)`) and read sequences from disk as they are needed, which avoids the extra step of writing TFRecords.
 
-# %%
+#%%
 # Saving a trained model
 # **********************
 # As we have just seen, training a model can be time consuming. Therefore, it is often useful to save a trained model so we can load it later. We can do this with the `save` method.
@@ -169,7 +165,7 @@ model.summary()
 #
 #     model.save("results/model")
 
-# %%
+#%%
 # This will automatically create a directory containing the trained model weights and config settings used. Note, should we wish to load the trained model we can use:
 #
 # .. code-block:: python
@@ -178,7 +174,7 @@ model.summary()
 #
 #     model = load("results/model")
 
-# %%
+#%%
 # It's also useful to save the variational free energy to compare different runs.
 #
 # .. code-block:: python

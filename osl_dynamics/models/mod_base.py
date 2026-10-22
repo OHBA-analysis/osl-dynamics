@@ -60,7 +60,6 @@ class BaseModelConfig:
     n_init: int = None
     n_init_epochs: int = None
     init_take: float = 1
-    init_select: str = "loss"
 
     # Training parameters
     batch_size: int = None

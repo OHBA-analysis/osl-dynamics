@@ -1,6 +1,6 @@
 """Compare the initialization methods.
 
-For each method and selection criterion: the final free energy over runs
+For each method: the final free energy over runs
 (lower is better, and a smaller spread means the result depends less on
 the run), the time spent initializing, and how reproducible the states
 are across runs (networks found by match_runs in most runs).
@@ -15,11 +15,10 @@ from osl_dynamics.inference import modes
 results = {}
 for path in sorted(glob.glob("results/*/run*/summary.pkl")):
     summary = pickle.load(open(path, "rb"))
-    key = f"{summary['method']}_{summary['select']}"
-    results.setdefault(key, []).append(summary)
+    results.setdefault(summary["method"], []).append(summary)
 
 print(
-    f"{'method':36s} {'runs':>4s} {'FE median':>10s} {'FE best':>10s} "
+    f"{'method':26s} {'runs':>4s} {'FE median':>10s} {'FE best':>10s} "
     f"{'FE spread':>10s} {'init (s)':>9s} {'train (s)':>9s} {'networks in >=80% runs':>24s}"
 )
 for key, summaries in results.items():
@@ -37,7 +36,7 @@ for key, summaries in results.items():
     n_reliable = int(np.sum(found_in >= 0.8 * n_runs))
 
     print(
-        f"{key:36s} {n_runs:4d} {np.median(free_energy):10.3f} "
+        f"{key:26s} {n_runs:4d} {np.median(free_energy):10.3f} "
         f"{free_energy.min():10.3f} {np.ptp(free_energy):10.3f} "
         f"{init_time:9.0f} {train_time:9.0f} {n_reliable:24d}"
     )

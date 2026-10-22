@@ -1,7 +1,7 @@
 """Train an HMM with a given initialization method.
 
-Run several times (different run ids) for each method and selection
-criterion, then compare with 3_summarise.py.
+Run several times (different run ids) for each method, then compare
+with 3_summarise.py.
 """
 
 import os
@@ -9,22 +9,21 @@ import pickle
 import time
 from sys import argv
 
-if len(argv) != 4:
+if len(argv) != 3:
     print(
-        "Please pass the initialization method, selection criterion and run id, "
-        "e.g. python 1_train_hmm.py kmeans free_energy 1"
+        "Please pass the initialization method and run id, "
+        "e.g. python 1_train_hmm.py random_state_time_course 1"
     )
     exit()
 
-method = argv[1]  # random_state_time_course, random_subset, random_windows, kmeans
-select = argv[2]  # loss or free_energy
-run = int(argv[3])
+method = argv[1]  # random_state_time_course or random_subset
+run = int(argv[2])
 
 # Directory containing the TFRecord dataset (written with
 # Data.save_tfrecord_dataset, see e.g. meg_analysis/projects/camcan)
 tfrecord_dir = "dataset"
 
-output_dir = f"results/{method}_{select}/run{run:02d}"
+output_dir = f"results/{method}/run{run:02d}"
 os.makedirs(output_dir, exist_ok=True)
 
 print("Importing packages")
@@ -49,7 +48,6 @@ config = Config(
     learning_rate=0.001,
     n_epochs=15,
     init_method=method,
-    init_select=select,
     n_init=3,
     n_init_epochs=1,
 )
@@ -91,7 +89,6 @@ pickle.dump(history, open(f"{output_dir}/history.pkl", "wb"))
 pickle.dump(
     {
         "method": method,
-        "select": select,
         "run": run,
         "free_energy": free_energy,
         "init_loss": init_history["loss"][-1] if init_history else None,

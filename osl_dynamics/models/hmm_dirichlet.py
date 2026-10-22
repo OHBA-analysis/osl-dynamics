@@ -272,10 +272,6 @@ class Model(MarkovStateInferenceModelBase):
     def _supports_feature_initialization(self):
         return True
 
-    @property
-    def _samples_per_step(self):
-        return self.config.window_size
-
     def _sample_labels(self, n_samples, stay_prob):
         """Sample a state for each window and repeat it for its samples."""
         n_windows = n_samples // self.config.window_size
