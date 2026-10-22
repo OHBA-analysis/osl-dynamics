@@ -6,7 +6,7 @@ See the :doc:`model description </models/dyneste>` for more details.
 import logging
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import List, Literal, Optional, Tuple, Union
+from typing import List, Literal, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -34,7 +34,6 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
-from osl_dynamics.utils.logger import set_logging_level
 from osl_dynamics.utils.misc import replace_argument
 
 _logger = logging.getLogger("osl-dynamics")

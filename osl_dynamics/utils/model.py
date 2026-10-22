@@ -1,9 +1,7 @@
 """Utility classes and functions related to the models."""
 
 import re
-from typing import Any, List, Optional
-
-import numpy as np
+from typing import Any, List
 
 
 def tex_escape(text: str) -> str:

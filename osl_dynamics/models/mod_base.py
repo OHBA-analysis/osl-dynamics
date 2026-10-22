@@ -11,7 +11,7 @@ from abc import abstractmethod
 from dataclasses import dataclass
 from io import StringIO
 from contextlib import contextmanager
-from typing import Dict, Generator, List, Optional, Tuple, Union
+from typing import Generator, List, Optional, Tuple, Union
 from packaging import version
 
 import yaml

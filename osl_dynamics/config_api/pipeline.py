@@ -7,7 +7,7 @@ import argparse
 import logging
 import pprint
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, List, Optional, Union
 
 import numpy as np
 import yaml

@@ -1,7 +1,7 @@
 """DIVE (DyNeMo with Integrated Variability Estimation)."""
 
 import logging
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Tuple, Union
 from dataclasses import dataclass
 
 import numpy as np
@@ -9,6 +9,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import layers
 
+from osl_dynamics import data
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.models import obs_mod
 from osl_dynamics.models.mod_base import BaseModelConfig

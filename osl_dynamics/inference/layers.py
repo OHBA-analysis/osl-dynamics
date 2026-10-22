@@ -10,7 +10,6 @@ from tensorflow.keras import (
     layers,
     initializers,
     regularizers,
-    constraints,
 )
 
 import osl_dynamics.inference.initializers as osld_initializers

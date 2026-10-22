@@ -5,16 +5,16 @@ short time and keeps the best. The multi-start loop
 (:meth:`InitializationMixin._run_multistart`) is shared by all models and
 a candidate is just a function that sets the initial parameters.
 
-The candidates are built from windows of data. A window is summarised by
-a feature vector (:meth:`InitializationMixin._window_features`) and a
-model knows how to set its parameters from one feature vector per state
-(:meth:`InitializationMixin._set_parameters_from_features`). For Gaussian
-observation models the features are the mean and the covariance, so
-averaging features averages covariances. The candidate generators are:
+A candidate's parameters are set from windows of data. A window is
+summarised by a feature vector (:meth:`InitializationMixin._window_features`)
+and a model knows how to set its parameters from one feature vector per
+state (:meth:`InitializationMixin._set_parameters_from_features`). For
+Gaussian observation models the features are the mean and the covariance.
+The candidate generators are:
 
 - :code:`random_subset`: the parameters from :code:`reset()`.
-- :code:`random_state_time_course`: each state is the average of the
-  windows assigned to it by a sampled state time course.
+- :code:`random_state_time_course`: each state's window is the data
+  assigned to it by a sampled state time course.
 
 Models customise the loop through hooks:
 

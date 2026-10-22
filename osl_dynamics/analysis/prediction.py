@@ -3,7 +3,7 @@ Classes/functions for building machine learning pipelines,
 performing hyperparameter tuning, and evaluating model performance.
 """
 
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 from tqdm.auto import tqdm
@@ -26,7 +26,6 @@ from sklearn.metrics import get_scorer
 from sklearn.model_selection import (
     GridSearchCV,
     RandomizedSearchCV,
-    cross_val_score,
     KFold,
     StratifiedKFold,
 )
