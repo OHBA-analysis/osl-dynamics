@@ -270,9 +270,7 @@ class Session:
     def preproc_file(self, preproc_file: str | None) -> None:
         preproc_file = _check_file(preproc_file, "preproc_file")
         # read_data and MNE read the file by its name
-        if preproc_file is not None and not preproc_file.endswith(
-            (".fif", ".fif.gz")
-        ):
+        if preproc_file is not None and not preproc_file.endswith((".fif", ".fif.gz")):
             raise ValueError(
                 f"preproc_file must be a fif file, got {preproc_file}. Save "
                 "the preprocessed data with raw.save (or epochs.save)."
