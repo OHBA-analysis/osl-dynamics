@@ -105,6 +105,7 @@ def scale_surfaces_to_headshape(
     # Load surfaces
     # -------------
     sfns = SurfaceFilenames(surfaces_dir)
+    sfns.check_files()
 
     outskin_sform = _get_sform(sfns.bet_outskin_mesh_file)["trans"]
     scalp_voxels = _niimask2indexpointcloud(sfns.bet_outskin_mesh_file)
@@ -1309,6 +1310,7 @@ def save_coregistration_files(session: Session) -> None:
     # Paths to files
     cfns = session.coreg
     sfns = session.surfaces
+    sfns.check_files()
 
     # ------------------------------------------
     # Copy fif_file to new file for modification
@@ -1474,6 +1476,7 @@ def coregister_head_and_mri(
     # Paths to files
     cfns = session.coreg
     sfns = session.surfaces
+    sfns.check_files()
 
     if not use_headshape:
         use_nose = False

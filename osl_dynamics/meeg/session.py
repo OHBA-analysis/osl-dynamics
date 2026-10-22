@@ -52,6 +52,47 @@ class SurfaceFilenames:
         self.bet_inskull_mesh_file = f"{root}/inskull_mesh.nii.gz"
         self.bet_outskull_mesh_file = f"{root}/outskull_mesh.nii.gz"
 
+    def check_files(self) -> None:
+        """Raise an error if a file needed to coregister is missing.
+
+        These are the files read by :func:`rhino.coregister_head_and_mri`,
+        :func:`rhino.save_coregistration_files` and
+        :func:`rhino.scale_surfaces_to_headshape`. The surfaces written by
+        :func:`rhino.extract_surfaces` and
+        :func:`rhino.scale_surfaces_to_headshape`, and the MNI152 surfaces
+        (:code:`files.mni152_surfaces.directory`), all have them.
+        """
+        required = [
+            self.mri_file,
+            self.mni_mri_t_file,
+            self.bet_outskin_mesh_file,
+            self.bet_inskull_mesh_file,
+            self.bet_outskull_mesh_file,
+            self.bet_outskin_mesh_vtk_file,
+            self.bet_inskull_mesh_vtk_file,
+            self.bet_outskull_mesh_vtk_file,
+        ]
+        missing = [f for f in required if not os.path.exists(f)]
+        if not missing:
+            return
+        if os.path.exists(self.mri_file):
+            # The MRI is written first, so the step writing the surfaces
+            # did not finish
+            hint = (
+                "Writing the surfaces did not finish. Rerun "
+                "rhino.extract_surfaces (or rhino.scale_surfaces_to_headshape)."
+            )
+        else:
+            hint = (
+                "Is this the directory passed to rhino.extract_surfaces? Pass "
+                "files.mni152_surfaces.directory to use the MNI152 standard "
+                "brain."
+            )
+        raise FileNotFoundError(
+            f"The surfaces in {self.root} are missing: "
+            f"{', '.join(os.path.basename(f) for f in missing)}. {hint}"
+        )
+
     # FSL's standard templates, looked up when needed so that the steps that
     # do not use FSL work without it
     @property
@@ -152,11 +193,14 @@ class Session:
         Directory with the surfaces extracted from the structural MRI by
         :func:`rhino.extract_surfaces`. Pass
         :code:`files.mni152_surfaces.directory` to use the MNI152 standard
-        brain instead of a subject's MRI.
+        brain instead of a subject's MRI. The directory must exist, the
+        files in it are checked by the steps that read them
+        (:meth:`SurfaceFilenames.check_files`).
     preproc_file : str, optional
-        Path to the preprocessed data file. Needed by the steps that use the
-        sensor data or its info (extracting fiducials, coregistration, the
-        beamformer and parcellation) unless the data is passed to them.
+        Path to the preprocessed data file (a fif file, which must exist).
+        Needed by the steps that use the sensor data or its info (extracting
+        fiducials, coregistration, the beamformer and parcellation) unless
+        the data is passed to them.
     pos_file : str, optional
         Path to a .pos file (only needed for CTF data).
     elc_file : str, optional
@@ -185,11 +229,18 @@ class Session:
         self.outdir = str(outdir)
         self.id = id
         self.head_model_id = head_model_id if head_model_id is not None else id
-        self._preproc_file = None if preproc_file is None else str(preproc_file)
-        self.pos_file = None if pos_file is None else str(pos_file)
-        self.elc_file = None if elc_file is None else str(elc_file)
+        self.preproc_file = preproc_file
+        self.pos_file = _check_file(pos_file, "pos_file")
+        self.elc_file = _check_file(elc_file, "elc_file")
 
         self.surfaces_dir = str(surfaces_dir)
+        if not os.path.isdir(self.surfaces_dir):
+            raise FileNotFoundError(
+                f"surfaces_dir {self.surfaces_dir} is not a directory. Run "
+                "rhino.extract_surfaces to create it, or pass "
+                "files.mni152_surfaces.directory to use the MNI152 standard "
+                "brain."
+            )
         self.surfaces = SurfaceFilenames(self.surfaces_dir)
 
         self.bem_dir = f"{self.outdir}/{self.head_model_id}/bem"
@@ -218,7 +269,16 @@ class Session:
 
     @preproc_file.setter
     def preproc_file(self, preproc_file: str | None) -> None:
-        self._preproc_file = None if preproc_file is None else str(preproc_file)
+        preproc_file = _check_file(preproc_file, "preproc_file")
+        # read_data and MNE read the file by its name
+        if preproc_file is not None and not preproc_file.endswith(
+            (".fif", ".fif.gz")
+        ):
+            raise ValueError(
+                f"preproc_file must be a fif file, got {preproc_file}. Save "
+                "the preprocessed data with raw.save (or epochs.save)."
+            )
+        self._preproc_file = preproc_file
 
     def __str__(self) -> str:
         lines = [
@@ -242,6 +302,16 @@ class Session:
 
     def __repr__(self) -> str:
         return f"<Session id='{self.id}' outdir='{self.outdir}'>"
+
+
+def _check_file(filename: str | None, name: str) -> str | None:
+    """Raise an error if a file passed to Session does not exist."""
+    if filename is None:
+        return None
+    filename = os.fspath(filename)
+    if not os.path.isfile(filename):
+        raise FileNotFoundError(f"{name} {filename} does not exist.")
+    return filename
 
 
 # The steps of the pipeline that read earlier output, in order: the files a
