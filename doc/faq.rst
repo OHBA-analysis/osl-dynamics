@@ -266,7 +266,7 @@ A training step whose loss or gradients contain a NaN or inf is skipped: the mod
 
 If many steps are skipped, or training stops, there a few things you can do to help resolve this:
 
-- Check your data for any periods of consecutive zeros or NaNs.
+- Check your data for any periods of consecutive zeros or NaNs. MaxFilter sets stretches of its output to zero when too many channels are bad; :code:`osl_dynamics.meeg.preproc.detect_flat_segments` marks these as bad (run it before filtering).
 - Remove bad segments (with abnormally high variance). You can use :code:`osl_dynamics.meeg.preproc.detect_bad_segments` to mark them in the M/EEG data before source reconstruction.
 - If you are loading fif files, make sure you have specified :code:`Data(..., picks="...", reject_by_annotation="omit")` correctly.
 - Lower the learning rate and/or increase the batch size.

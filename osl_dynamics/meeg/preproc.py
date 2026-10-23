@@ -247,6 +247,109 @@ def detect_bad_channels(
     return raw
 
 
+def detect_flat_segments(
+    raw: mne.io.Raw,
+    picks: str = "meg",
+    min_duration: float = 0.1,
+    pad: float = 1.0,
+    ref_meg: str = "auto",
+) -> mne.io.Raw:
+    """Mark segments where every channel is constant as bad.
+
+    Finds stretches where all the picked channels hold their value from one
+    sample to the next, for example output that MaxFilter set to zero (it
+    zeroes a whole tSSS buffer when too many channels are bad in it) or an
+    acquisition drop-out. :func:`detect_bad_segments` only catches short
+    stretches like these: it marks at most :code:`maximum_fraction` of the
+    data, and many flat windows lower the mean and standard deviation it
+    compares each window with.
+
+    Run this before filtering: a filter turns the flat stretches into small
+    values that are no longer constant. The segments are annotated as
+    :code:`bad_segment_flat`, so :func:`detect_bad_segments` run afterwards
+    leaves them out.
+
+    Parameters
+    ----------
+    raw : mne.io.Raw
+        MNE Raw object.
+    picks : str, optional
+        Channel type to pick: 'meg', 'mag', 'grad' or 'eeg'.
+    min_duration : float, optional
+        Shortest flat stretch to mark, in seconds.
+    pad : float, optional
+        Seconds to also mark on either side of each flat stretch, for the
+        response of later filtering to the step into and out of it.
+    ref_meg : str, optional
+        ref_meg argument to pass to mne.pick_types.
+
+    Returns
+    -------
+    raw : mne.io.Raw
+        MNE Raw object.
+    """
+    print()
+    print("Flat segment detection")
+    print("----------------------")
+
+    # Pick channels
+    if picks in ["mag", "grad"]:
+        chs = mne.pick_types(raw.info, meg=picks, ref_meg=ref_meg, exclude="bads")
+    elif picks == "meg":
+        chs = mne.pick_types(raw.info, meg=True, ref_meg=ref_meg, exclude="bads")
+    elif picks == "eeg":
+        chs = mne.pick_types(raw.info, eeg=True, exclude="bads")
+    else:
+        raise NotImplementedError(f"picks={picks} not available.")
+
+    # same[i] is True if every channel has the same value at samples i and
+    # i + 1. The data is read in chunks to avoid a copy of all of it
+    sfreq = raw.info["sfreq"]
+    n_times = raw.n_times
+    same = np.zeros(n_times - 1, dtype=bool)
+    chunk = int(10 * sfreq)
+    for start in range(0, n_times - 1, chunk):
+        stop = min(start + chunk + 1, n_times)
+        data = raw.get_data(picks=chs, start=start, stop=stop)
+        same[start : stop - 1] = np.all(np.diff(data, axis=1) == 0, axis=0)
+
+    # Flat stretches: a run of equal neighbours from i to j covers samples
+    # i to j + 1. Keep the long enough ones and pad them
+    edges = np.diff(np.r_[0, same.astype(int), 0])
+    starts = np.where(edges == 1)[0]
+    stops = np.where(edges == -1)[0] + 1
+    keep = (stops - starts) / sfreq >= min_duration
+    n_flat = int(keep.sum())
+    flat_time = (stops[keep] - starts[keep]).sum() / sfreq
+    bad = np.zeros(n_times, dtype=bool)
+    n_pad = int(round(pad * sfreq))
+    for start, stop in zip(starts[keep], stops[keep]):
+        bad[max(start - n_pad, 0) : stop + n_pad] = True
+
+    # Bad segments, merging stretches that overlap after padding
+    edges = np.diff(np.r_[0, bad.astype(int), 0])
+    onsets = np.where(edges == 1)[0]
+    offsets = np.where(edges == -1)[0]
+    durations = (offsets - onsets) / sfreq
+    onsets = (raw.first_samp + onsets) / sfreq
+
+    # Annotate the Raw object
+    raw.annotations.append(
+        onsets, durations, np.repeat("bad_segment_flat", len(onsets))
+    )
+
+    # Print useful summary information
+    total_time = n_times / sfreq
+    print(f"Modality: {picks}")
+    print(f"Found {n_flat} flat stretches: {flat_time:.1f}/{total_time:.1f} seconds")
+    print(
+        f"Marked {len(onsets)} bad segments with {pad} s padding: "
+        f"{durations.sum():.1f} seconds ({100 * durations.sum() / total_time:.1f}%)"
+    )
+
+    return raw
+
+
 def _gesd(
     X: np.ndarray,
     alpha: float,
