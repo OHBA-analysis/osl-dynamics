@@ -2232,11 +2232,16 @@ def plot_coregistration(
                 backface_culling=False,
             )
 
+        # Centre the camera on everything plotted (the origin of the
+        # coordinate frame is not the centre of the head)
+        bounds = np.reshape(renderer.figure.plotter.bounds, (3, 2))
+        focalpoint = tuple(bounds.mean(axis=1))
+
         renderer.set_camera(
             azimuth=90,
             elevation=90,
             distance=600,
-            focalpoint=(0.0, 0.0, 0.0),
+            focalpoint=focalpoint,
         )
 
         # Save
@@ -2255,7 +2260,7 @@ def plot_coregistration(
                         azimuth=90,
                         elevation=90,
                         distance=600,
-                        focalpoint=(0.0, 0.0, 0.0),
+                        focalpoint=focalpoint,
                     ),
                 ),
                 (
@@ -2264,7 +2269,7 @@ def plot_coregistration(
                         azimuth=0,
                         elevation=90,
                         distance=600,
-                        focalpoint=(0.0, 0.0, 0.0),
+                        focalpoint=focalpoint,
                     ),
                 ),
                 (
@@ -2273,7 +2278,7 @@ def plot_coregistration(
                         azimuth=90,
                         elevation=0,
                         distance=600,
-                        focalpoint=(0.0, 0.0, 0.0),
+                        focalpoint=focalpoint,
                     ),
                 ),
             ]

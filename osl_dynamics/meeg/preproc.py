@@ -855,6 +855,49 @@ def decimate_headshape_points(
     return raw.set_montage(montage)
 
 
+def scale_eeg_positions(
+    montage: mne.channels.DigMontage,
+    scale: float | tuple[float, float, float],
+) -> mne.channels.DigMontage:
+    """Scale the EEG electrode positions of a montage.
+
+    Useful for fitting a montage to the scalp of a structural MRI. The
+    montage is transformed to the head coordinate frame (defined by the
+    fiducials) and the EEG electrode positions are multiplied by the scale
+    factors. The origin of the head coordinate frame is the midpoint of the
+    LPA and RPA, the x-axis points to the RPA, the y-axis to the nasion and
+    the z-axis up. The fiducials are not changed.
+
+    Parameters
+    ----------
+    montage : mne.channels.DigMontage
+        Montage containing EEG electrode positions and fiducials. E.g. a
+        standard montage from :code:`mne.channels.make_standard_montage`.
+    scale : float or tuple of float
+        Scale factor. Either a single value applied to all axes or
+        (x, y, z) scale factors.
+
+    Returns
+    -------
+    montage : mne.channels.DigMontage
+        Montage (in the head coordinate frame) with scaled EEG positions.
+        The montage passed is not modified.
+    """
+    scale = np.broadcast_to(np.asarray(scale, dtype=float), (3,))
+
+    # Transform to the head coordinate frame
+    montage = montage.copy()
+    head_t = mne.channels.compute_native_head_t(montage)
+    montage.apply_trans(head_t)
+
+    # Scale the EEG electrode positions
+    for d in montage.dig:
+        if d["kind"] == mne.io.constants.FIFF.FIFFV_POINT_EEG:
+            d["r"] = d["r"] * scale
+
+    return montage
+
+
 def _decimate_headshape(
     headshape: np.ndarray,
     decimate_amount: float = 0.015,

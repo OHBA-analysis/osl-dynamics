@@ -4,6 +4,7 @@ Example use of osl-dynamics
 This directory contains:
 
 - `decoding`: scripts for decoding (predicting quantities based on neuroimaging features).
+- `eeg_preproc`: scripts for preparing EEG data for source reconstruction.
 - `fmri`: scripts for analysing fMRI data.
 - `meg_analysis`: scripts for training dynamic network models on MEG data.
 - `meg_preproc`: scripts for preprocessing, source reconstruction and parcellation of MEG data.
