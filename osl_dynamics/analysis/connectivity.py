@@ -94,7 +94,7 @@ def sliding_window_connectivity(
     results = parallel_map(
         _swc,
         kwargs,
-        desc="Sliding window connectivity",
+        desc="Calculating sliding window connectivity",
         n_jobs=n_jobs,
         argument_type="kwargs",
         label="session",

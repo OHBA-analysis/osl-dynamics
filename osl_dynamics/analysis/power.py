@@ -88,7 +88,7 @@ def sliding_window_power(
     results = parallel_map(
         _swp,
         kwargs,
-        desc="Sliding window power",
+        desc="Calculating sliding window power",
         n_jobs=n_jobs,
         argument_type="kwargs",
         label="session",

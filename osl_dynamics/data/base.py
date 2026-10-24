@@ -717,7 +717,7 @@ class Data:
         self.arrays = parallel_map(
             _apply,
             args,
-            desc="PCA",
+            desc="Applying PCA",
             n_jobs=self.n_jobs,
             argument_type="args",
             label="session",
@@ -762,7 +762,7 @@ class Data:
         self.arrays = parallel_map(
             _apply,
             args,
-            desc="TDE",
+            desc="Applying TDE",
             n_jobs=self.n_jobs,
             argument_type="args",
             label="session",
@@ -872,7 +872,7 @@ class Data:
         self.arrays = parallel_map(
             _apply,
             args,
-            desc="TDE-PCA",
+            desc="Applying TDE-PCA",
             n_jobs=self.n_jobs,
             argument_type="args",
             label="session",
@@ -906,7 +906,7 @@ class Data:
         self.arrays = parallel_map(
             _apply,
             args,
-            desc="Amplitude envelope",
+            desc="Calculating amplitude envelope",
             n_jobs=self.n_jobs,
             argument_type="args",
             label="session",
@@ -946,7 +946,7 @@ class Data:
         self.arrays = parallel_map(
             _apply,
             args,
-            desc="Sliding window",
+            desc="Applying sliding window",
             n_jobs=self.n_jobs,
             argument_type="args",
             label="session",
@@ -980,7 +980,7 @@ class Data:
         self.arrays = parallel_map(
             _apply,
             args,
-            desc="Standardize",
+            desc="Standardizing",
             n_jobs=self.n_jobs,
             argument_type="args",
             label="session",

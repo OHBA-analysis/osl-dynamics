@@ -222,7 +222,7 @@ class Model(MarkovStateInferenceModelBase):
         )
         verbose = kwargs.pop("verbose", 1)
         result = []
-        for ds in self._session_batches(datasets, "Getting alpha", verbose):
+        for ds in self._session_batches(datasets, "Inferring alpha", verbose):
             batches = [
                 self.predict(batch, verbose=0, **kwargs)["gamma"] for batch in ds
             ]

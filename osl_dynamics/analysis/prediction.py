@@ -435,7 +435,7 @@ class ModelSelection:
 
         outer_scores = []
         for train_idx, test_idx in progress(
-            outer_split.split(X, y), desc="Nested CV", total=outer_cv
+            outer_split.split(X, y), desc="Running nested CV", total=outer_cv
         ):
             X_train, X_test = X[train_idx], X[test_idx]
             y_train, y_test = y[train_idx], y[test_idx]

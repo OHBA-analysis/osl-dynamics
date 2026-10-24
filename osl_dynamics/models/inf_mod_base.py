@@ -332,7 +332,7 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
         dataset = self.make_dataset(dataset, step_size=step_size)
 
         theta = []
-        for predictions in self._predict_sessions(dataset, "Getting theta", **kwargs):
+        for predictions in self._predict_sessions(dataset, "Inferring theta", **kwargs):
             theta_ = predictions["theta"]
             if remove_edge_effects:
                 theta_ = _remove_edge_effects(theta_, step_size)
@@ -395,7 +395,7 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
         power_theta = []
         fc_theta = []
         for predictions in self._predict_sessions(
-            dataset, "Getting mode logits", **kwargs
+            dataset, "Inferring mode logits", **kwargs
         ):
             power_theta_ = predictions["power_theta"]
             fc_theta_ = predictions["fc_theta"]
@@ -465,7 +465,7 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
         alpha_layer = self.model.get_layer("alpha")
 
         alpha = []
-        for predictions in self._predict_sessions(dataset, "Getting alpha", **kwargs):
+        for predictions in self._predict_sessions(dataset, "Inferring alpha", **kwargs):
             theta = predictions["theta"]
             alpha_ = alpha_layer(theta)
             if remove_edge_effects:
@@ -531,7 +531,7 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
         alpha = []
         beta = []
         for predictions in self._predict_sessions(
-            dataset, "Getting mode time courses", **kwargs
+            dataset, "Inferring mode time courses", **kwargs
         ):
             power_theta = predictions["power_theta"]
             fc_theta = predictions["fc_theta"]
@@ -573,7 +573,7 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
 
         dataset = self.make_dataset(dataset, concatenate=True)
         predictions = next(
-            self._predict_sessions([dataset], "Getting losses", **kwargs)
+            self._predict_sessions([dataset], "Calculating losses", **kwargs)
         )
         ll_loss = np.mean(predictions["ll_loss"])
         kl_loss = np.mean(predictions["kl_loss"])
@@ -788,7 +788,7 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
 
         verbose = kwargs.pop("verbose", 1)
         alpha = []
-        for batches in self._session_batches(dataset, "Getting alpha", verbose):
+        for batches in self._session_batches(dataset, "Inferring alpha", verbose):
             alp = []
             for batch in batches:
                 pred = self.predict(batch, verbose=0, **kwargs)
@@ -859,7 +859,7 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
 
         dataset = self.make_dataset(dataset)
         viterbi_path = []
-        for batches in self._session_batches(dataset, "Getting Viterbi path"):
+        for batches in self._session_batches(dataset, "Calculating Viterbi path"):
             path = []
             for data in batches:
                 x = data["data"]  # (batch_size, sequence_length, n_states)
@@ -1145,7 +1145,7 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
 
         free_energy = []
         weights = []
-        for batch in progress(dataset, desc="Getting free energy"):
+        for batch in progress(dataset, desc="Calculating free energy"):
             predictions = self.predict(batch, verbose=0)
             nll = predictions["ll_loss"][0]
             entropy = self.get_posterior_entropy(
@@ -1221,7 +1221,7 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
         dataset = self.make_dataset(dataset, concatenate=True)
 
         evidence = []
-        for batch in progress(dataset, desc="Getting evidence"):
+        for batch in progress(dataset, desc="Calculating evidence"):
             data = batch["data"]
             batch_size = tf.shape(data)[0]
             batch_evidence = np.zeros(batch_size, dtype=np.float32)
