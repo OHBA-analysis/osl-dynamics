@@ -353,10 +353,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
             # Note, we always monitor the loss in "min" mode
             self.best = np.inf
             self._activated = True
-            print(
-                f"\nEpoch {epoch + 1}: SaveBestCallback activated. "
-                f"Initial best loss/metric set to {self.best:.4f}."
-            )
+            _logger.info(f"Epoch {epoch + 1}: SaveBestCallback activated")
 
         super().on_epoch_end(epoch, logs)
 
@@ -565,8 +562,9 @@ class TensorBoardCallback(callbacks.TensorBoard):
                 writer.flush()  # ensure all buffered data are written to disk
 
             self.initial_weights_logged = True
-            print(
-                "Initial weights logged. You can launch TensorBoard to view the histograms."
+            _logger.info(
+                "Initial weights logged. You can launch TensorBoard to view "
+                "the histograms."
             )
 
     def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
