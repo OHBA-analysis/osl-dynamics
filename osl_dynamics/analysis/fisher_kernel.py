@@ -13,7 +13,8 @@ import logging
 from typing import Dict, Optional, Tuple
 
 import numpy as np
-from tqdm.auto import trange
+
+from osl_dynamics.utils.progress import progress
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -66,7 +67,7 @@ class FisherKernel:
 
         # Initialise list to hold features for each session
         features = []
-        for i in trange(n_sessions, desc="Getting features"):
+        for i in progress(range(n_sessions), desc="Getting features"):
             # Initialise dictionary for holding gradients
             d_model = dict()
 

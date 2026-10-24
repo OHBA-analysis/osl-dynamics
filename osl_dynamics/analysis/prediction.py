@@ -6,7 +6,6 @@ performing hyperparameter tuning, and evaluating model performance.
 from typing import Dict, List, Optional, Union
 
 import numpy as np
-from tqdm.auto import tqdm
 
 from sklearn.base import clone
 from sklearn.pipeline import Pipeline
@@ -29,6 +28,8 @@ from sklearn.model_selection import (
     KFold,
     StratifiedKFold,
 )
+
+from osl_dynamics.utils.progress import progress
 
 
 class PipelineBuilder:
@@ -433,7 +434,7 @@ class ModelSelection:
             )
 
         outer_scores = []
-        for train_idx, test_idx in tqdm(
+        for train_idx, test_idx in progress(
             outer_split.split(X, y), desc="Nested CV", total=outer_cv
         ):
             X_train, X_test = X[train_idx], X[test_idx]

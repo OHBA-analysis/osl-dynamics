@@ -9,7 +9,6 @@ from typing import List, Literal, Optional, Tuple, Union
 import numpy as np
 import tensorflow as tf
 from scipy.special import xlogy, logsumexp
-from tqdm.auto import tqdm, trange
 
 from osl_dynamics.simulation import HMM
 from osl_dynamics.inference import callbacks, optimizers
@@ -18,6 +17,7 @@ from osl_dynamics.models.initialization import InitializationMixin
 from osl_dynamics.models.mod_base import ModelBase
 from osl_dynamics.utils import array_ops
 from osl_dynamics.utils.misc import replace_argument
+from osl_dynamics.utils.progress import progress
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -333,7 +333,7 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
-            iterator = trange(n_datasets, desc="Getting theta")
+            iterator = progress(range(n_datasets), desc="Getting theta")
             kwargs["verbose"] = 0
         else:
             iterator = range(n_datasets)
@@ -403,7 +403,7 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
-            iterator = trange(n_datasets, desc="Getting mode logits")
+            iterator = progress(range(n_datasets), desc="Getting mode logits")
             kwargs["verbose"] = 0
         else:
             iterator = range(n_datasets)
@@ -482,7 +482,7 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
-            iterator = trange(n_datasets, desc="Getting alpha")
+            iterator = progress(range(n_datasets), desc="Getting alpha")
             kwargs["verbose"] = 0
         else:
             iterator = range(n_datasets)
@@ -555,7 +555,7 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
-            iterator = trange(n_datasets, desc="Getting mode time courses")
+            iterator = progress(range(n_datasets), desc="Getting mode time courses")
             kwargs["verbose"] = 0
         else:
             iterator = range(n_datasets)
@@ -819,7 +819,7 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
 
         n_datasets = len(dataset)
         if len(dataset) > 1:
-            iterator = trange(n_datasets, desc="Getting alpha")
+            iterator = progress(range(n_datasets), desc="Getting alpha")
             kwargs["verbose"] = 0
         else:
             iterator = range(n_datasets)
@@ -898,7 +898,7 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
         dataset = self.make_dataset(dataset)
         n_datasets = len(dataset)
         if len(dataset) > 1:
-            iterator = trange(n_datasets, desc="Getting Viterbi path")
+            iterator = progress(range(n_datasets), desc="Getting Viterbi path")
         else:
             iterator = range(n_datasets)
             _logger.info("Getting Viterbi path")
@@ -1190,7 +1190,7 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
 
         free_energy = []
         weights = []
-        for batch in tqdm(dataset, desc="Getting free energy"):
+        for batch in progress(dataset, desc="Getting free energy"):
             predictions = self.predict(batch, verbose=0)
             nll = predictions["ll_loss"][0]
             entropy = self.get_posterior_entropy(
@@ -1266,7 +1266,7 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
         dataset = self.make_dataset(dataset, concatenate=True)
 
         evidence = []
-        for batch in tqdm(dataset, desc="Getting evidence"):
+        for batch in progress(dataset, desc="Getting evidence"):
             data = batch["data"]
             batch_size = tf.shape(data)[0]
             batch_evidence = np.zeros(batch_size, dtype=np.float32)

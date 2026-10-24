@@ -12,6 +12,8 @@ Modules
   configs and weights).
 - :py:mod:`~osl_dynamics.utils.plotting` — Plotting functions (brain
   surfaces, power maps, PSDs, state time courses, networks).
+- :py:mod:`~osl_dynamics.utils.progress` — Progress bars, including for
+  functions applied in parallel.
 - :py:mod:`~osl_dynamics.utils.sklearn_wrappers` — Scikit-learn compatible
   wrappers for osl-dynamics models.
 - :py:mod:`~osl_dynamics.utils.topoplots` — Sensor-space topographic plots.
@@ -25,6 +27,7 @@ from osl_dynamics.utils import (
     misc,
     model,
     plotting,
+    progress,
     sklearn_wrappers,
     topoplots,
     workbench,

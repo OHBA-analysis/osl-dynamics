@@ -62,7 +62,6 @@ dependencies = [
     "packaging",
     "pooch",
     "pandas",
-    "pqdm",
     "pyside6",
     "pyvista",
     "pyvistaqt",

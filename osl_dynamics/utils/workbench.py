@@ -11,9 +11,9 @@ import warnings
 from typing import Optional
 
 import nibabel as nib
-from tqdm.auto import trange
 
 from osl_dynamics import files
+from osl_dynamics.utils.progress import progress
 
 
 def _surfs():
@@ -225,7 +225,7 @@ def image(
     pathlib.Path(file_path).parent.mkdir(exist_ok=True, parents=True)
     file_pattern = f"{file_path}{{:0{max_int_length}d}}{suffix}"
 
-    for i in trange(n_modes, desc="Saving images"):
+    for i in progress(range(n_modes), desc="Saving images"):
         subprocess.run(
             [
                 "wb_command",

@@ -10,7 +10,6 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
-from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
@@ -34,6 +33,7 @@ from osl_dynamics.models.inf_mod_base import (
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.utils.logger import set_logging_level
+from osl_dynamics.utils.progress import progress
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -529,7 +529,7 @@ class Model(VariationalInferenceModelBase):
 
         # Sample the mode fixing factors
         alpha = np.empty([n_samples, self.config.n_modes], dtype=np.float32)
-        for i in trange(n_samples, desc="Sampling mode time course"):
+        for i in progress(range(n_samples), desc="Sampling mode time course"):
             # If there are leading zeros we trim theta so that we don't pass
             # the zeros
             trimmed_theta = theta[~np.all(theta == 0, axis=1)][np.newaxis, :, :]
@@ -606,11 +606,13 @@ class Model(VariationalInferenceModelBase):
         alpha = []
         means = []
         covariances = []
+        # Make the progress bar before silencing osl-dynamics, so it's shown
+        sessions = progress(range(training_data.n_sessions), desc="Fine tuning")
         with (
             self.set_trainable(fixed_layers, False),
             set_logging_level(_logger, logging.WARNING),
         ):
-            for i in trange(training_data.n_sessions, desc="Fine tuning"):
+            for i in sessions:
                 # Train on this session
                 with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)
@@ -702,7 +704,7 @@ class Model(VariationalInferenceModelBase):
             else:
                 n_sessions = training_data.n_sessions
 
-            for i in trange(n_sessions, desc="Dual estimation"):
+            for i in progress(range(n_sessions), desc="Dual estimation"):
                 # Train on this session
                 if isinstance(training_data, list):
                     self.fit(training_data[i], verbose=0)

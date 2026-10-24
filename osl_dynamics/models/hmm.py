@@ -21,7 +21,6 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference.layers import (
@@ -40,6 +39,7 @@ from osl_dynamics.models.inf_mod_base import (
 )
 from osl_dynamics.analysis.post_hoc import hmm_dual_estimation
 from osl_dynamics.utils.logger import set_logging_level
+from osl_dynamics.utils.progress import progress
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -513,11 +513,13 @@ class Model(MarkovStateInferenceModelBase):
         alpha = []
         means = []
         covariances = []
+        # Make the progress bar before silencing osl-dynamics, so it's shown
+        sessions = progress(range(training_data.n_sessions), desc="Fine tuning")
         with (
             self.set_trainable(fixed_layers, False),
             set_logging_level(_logger, logging.WARNING),
         ):
-            for i in trange(training_data.n_sessions, desc="Fine tuning"):
+            for i in sessions:
                 # Train on this session
                 with training_data.set_keep(i):
                     self.fit(training_data, verbose=0)

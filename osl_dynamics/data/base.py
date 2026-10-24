@@ -16,31 +16,12 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
-from pqdm.threads import pqdm
-from threadpoolctl import threadpool_limits
-from tqdm.auto import tqdm
 
 from osl_dynamics.data import processing, rw, sign_flipping, tf as dtf
 from osl_dynamics.utils import misc
+from osl_dynamics.utils.progress import parallel_map, progress
 
 _logger = logging.getLogger("osl-dynamics")
-
-
-def _raise_exceptions(results: list, what: str = "array") -> None:
-    """Log all exceptions in a list of pqdm results and raise the first.
-
-    pqdm returns exceptions raised in worker threads as items in the
-    results list rather than raising them.
-    """
-    first_exception = None
-    for i, e in enumerate(results):
-        if isinstance(e, Exception):
-            e.args = (f"{what} {i}: {e}",)
-            _logger.exception(e, exc_info=False)
-            if first_exception is None:
-                first_exception = e
-    if first_exception is not None:
-        raise first_exception
 
 
 class Data:
@@ -369,15 +350,14 @@ class Data:
             return raw_data_mmap
 
         # Load data
-        memmaps = pqdm(
-            array=zip(self.inputs, raw_data_filenames),
-            function=_make_memmap,
-            n_jobs=self.n_jobs,
+        memmaps = parallel_map(
+            _make_memmap,
+            zip(self.inputs, raw_data_filenames),
             desc="Loading files",
+            n_jobs=self.n_jobs,
             argument_type="args",
-            total=len(self.inputs),
+            label="file",
         )
-        _raise_exceptions(memmaps, "file")
 
         return memmaps, raw_data_filenames
 
@@ -527,7 +507,7 @@ class Data:
 
         # Select channels
         new_arrays = []
-        for i in tqdm(sessions, desc="Selecting channels/sessions"):
+        for i in progress(sessions, desc="Selecting channels/sessions"):
             array = arrays[i][:, channels]
             if self.load_memmaps:
                 array = misc.array_to_memmap(self.prepared_data_filenames[i], array)
@@ -592,15 +572,14 @@ class Data:
         # Prepare the data in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
         args = zip(arrays, self.prepared_data_filenames)
-        self.arrays = pqdm(
+        self.arrays = parallel_map(
+            _apply,
             args,
-            function=_apply,
             desc="Filtering",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_sessions,
+            label="session",
         )
-        _raise_exceptions(self.arrays)
 
         return self
 
@@ -644,15 +623,14 @@ class Data:
         # Prepare the data in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
         args = zip(arrays, self.prepared_data_filenames)
-        self.arrays = pqdm(
+        self.arrays = parallel_map(
+            _apply,
             args,
-            function=_apply,
             desc="Downsampling",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_sessions,
+            label="session",
         )
-        _raise_exceptions(self.arrays)
 
         # Update sampling_frequency attributes
         self.sampling_frequency = freq
@@ -709,7 +687,7 @@ class Data:
             # Calculate covariance of the data
             n_channels = arrays[0].shape[-1]
             covariance = np.zeros((n_channels, n_channels), dtype=np.float64)
-            for array in tqdm(arrays, desc="Calculating PCA components"):
+            for array in progress(arrays, desc="Calculating PCA components"):
                 std_data = processing.standardize(array)
                 covariance += std_data.T @ std_data
 
@@ -736,16 +714,14 @@ class Data:
 
         # Apply PCA in parallel
         args = zip(arrays, self.prepared_data_filenames)
-        with threadpool_limits(limits=1 if self.n_jobs > 1 else None):
-            self.arrays = pqdm(
-                args,
-                function=_apply,
-                desc="PCA",
-                n_jobs=self.n_jobs,
-                argument_type="args",
-                total=self.n_sessions,
-            )
-        _raise_exceptions(self.arrays)
+        self.arrays = parallel_map(
+            _apply,
+            args,
+            desc="PCA",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            label="session",
+        )
 
         return self
 
@@ -783,15 +759,14 @@ class Data:
         # Apply TDE in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
         args = zip(arrays, self.prepared_data_filenames)
-        self.arrays = pqdm(
+        self.arrays = parallel_map(
+            _apply,
             args,
-            function=_apply,
             desc="TDE",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_sessions,
+            label="session",
         )
-        _raise_exceptions(self.arrays)
 
         return self
 
@@ -865,7 +840,7 @@ class Data:
             covariance = np.zeros(
                 (self.n_te_channels, self.n_te_channels), dtype=np.float64
             )
-            for array in tqdm(arrays, desc="Calculating PCA components"):
+            for array in progress(arrays, desc="Calculating PCA components"):
                 std_data = processing.standardize(array)
                 te_std_data = processing.time_embed(std_data, n_embeddings)
                 covariance += te_std_data.T @ te_std_data
@@ -894,16 +869,14 @@ class Data:
 
         # Apply TDE and PCA in parallel
         args = zip(arrays, self.prepared_data_filenames)
-        with threadpool_limits(limits=1 if self.n_jobs > 1 else None):
-            self.arrays = pqdm(
-                args,
-                function=_apply,
-                desc="TDE-PCA",
-                n_jobs=self.n_jobs,
-                argument_type="args",
-                total=self.n_sessions,
-            )
-        _raise_exceptions(self.arrays)
+        self.arrays = parallel_map(
+            _apply,
+            args,
+            desc="TDE-PCA",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            label="session",
+        )
 
         return self
 
@@ -930,15 +903,14 @@ class Data:
         # Prepare the data in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
         args = zip(arrays, self.prepared_data_filenames)
-        self.arrays = pqdm(
+        self.arrays = parallel_map(
+            _apply,
             args,
-            function=_apply,
             desc="Amplitude envelope",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_sessions,
+            label="session",
         )
-        _raise_exceptions(self.arrays)
 
         return self
 
@@ -971,15 +943,14 @@ class Data:
         # Prepare the data in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
         args = zip(arrays, self.prepared_data_filenames)
-        self.arrays = pqdm(
+        self.arrays = parallel_map(
+            _apply,
             args,
-            function=_apply,
             desc="Sliding window",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_sessions,
+            label="session",
         )
-        _raise_exceptions(self.arrays)
 
         return self
 
@@ -1006,15 +977,14 @@ class Data:
         # Apply standardisation to each array in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
         args = zip(arrays, self.prepared_data_filenames)
-        self.arrays = pqdm(
-            array=args,
-            function=_apply,
+        self.arrays = parallel_map(
+            _apply,
+            args,
             desc="Standardize",
             n_jobs=self.n_jobs,
             argument_type="args",
-            total=self.n_sessions,
+            label="session",
         )
-        _raise_exceptions(self.arrays)
 
         return self
 
@@ -1084,7 +1054,7 @@ class Data:
 
         def _calc_metrics(covs):
             metric = np.zeros([self.n_sessions, self.n_sessions])
-            for i in tqdm(range(self.n_sessions), desc="Comparing sessions"):
+            for i in progress(range(self.n_sessions), desc="Comparing sessions"):
                 for j in range(i + 1, self.n_sessions):
                     metric[i, j] = sign_flipping.calc_corr(
                         covs[i], covs[j], n_embeddings, mode="abs"
@@ -1109,16 +1079,14 @@ class Data:
         arrays = self.raw_data_arrays if use_raw else self.arrays
 
         # Calculate covariance of each session
-        with threadpool_limits(limits=1 if self.n_jobs > 1 else None):
-            covs = pqdm(
-                array=zip(arrays),
-                function=_calc_cov,
-                desc="Calculating covariances",
-                n_jobs=self.n_jobs,
-                argument_type="args",
-                total=self.n_sessions,
-            )
-        _raise_exceptions(covs)
+        covs = parallel_map(
+            _calc_cov,
+            zip(arrays),
+            desc="Calculating covariances",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            label="session",
+        )
 
         # Calculate/get template covariances
         if template_cov is None and template_data is None:
@@ -1135,16 +1103,14 @@ class Data:
         # Perform the sign flipping
         tcovs = [template_cov] * self.n_sessions
         indices = range(self.n_sessions)
-        with threadpool_limits(limits=1 if self.n_jobs > 1 else None):
-            results = pqdm(
-                array=zip(covs, tcovs, arrays, indices),
-                function=_find_and_apply_flips,
-                desc="Sign flipping",
-                n_jobs=self.n_jobs,
-                argument_type="args",
-                total=self.n_sessions,
-            )
-        _raise_exceptions(results)
+        results = parallel_map(
+            _find_and_apply_flips,
+            zip(covs, tcovs, arrays, indices),
+            desc="Sign flipping",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            label="session",
+        )
 
         self.arrays = [array for array, _ in results]
         corrs = [metric for _, metric in results]
@@ -1597,15 +1563,14 @@ class Data:
         def _save(filepath, index):
             return dtf.save_tfrecord(filepath, index, slice_fn)
 
-        results = pqdm(
-            array=jobs,
-            function=_save,
-            n_jobs=self.n_jobs,
+        results = parallel_map(
+            _save,
+            jobs,
             desc="Creating TFRecord dataset",
+            n_jobs=self.n_jobs,
             argument_type="args",
-            total=len(jobs),
+            label="TFRecord",
         )
-        _raise_exceptions(results, "TFRecord")
 
         # Range of each channel in the training data
         train_results = results if val_index is None else results[::2]
@@ -1825,14 +1790,13 @@ class Data:
             np.save(filename, self.arrays[i])
 
         # Save arrays in parallel
-        results = pqdm(
-            range(self.n_sessions),
+        results = parallel_map(
             _save,
+            range(self.n_sessions),
             desc="Saving data",
             n_jobs=self.n_jobs,
-            total=self.n_sessions,
+            label="session",
         )
-        _raise_exceptions(results)
 
         # Save preparation settings
         self.save_preparation(output_dir)

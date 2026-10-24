@@ -12,7 +12,6 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 from tensorflow.keras import layers
-from tqdm.auto import trange
 
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import callbacks
@@ -35,6 +34,7 @@ from osl_dynamics.models.inf_mod_base import (
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.utils.misc import replace_argument
+from osl_dynamics.utils.progress import progress
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -678,7 +678,9 @@ class Model(VariationalInferenceModelBase):
 
         # Sample the state probability time course
         alpha = np.empty([n_samples, self.config.n_states], dtype=np.float32)
-        for i in trange(n_samples, desc="Sampling state probability time course"):
+        for i in progress(
+            range(n_samples), desc="Sampling state probability time course"
+        ):
             # If there are leading zeros we trim the state time course so that
             # we don't pass the zeros
             trimmed_states = states[~np.all(states == 0, axis=1)][np.newaxis, :, :]

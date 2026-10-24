@@ -10,7 +10,6 @@ from typing import Callable, Dict, List, Optional, Tuple, Union
 import mne
 import numpy as np
 import matplotlib.pyplot as plt
-from tqdm.auto import trange
 from scipy import cluster, spatial, optimize
 from sklearn.cluster import AgglomerativeClustering
 
@@ -18,6 +17,7 @@ from osl_dynamics.analysis import post_hoc
 from osl_dynamics.inference import metrics
 from osl_dynamics.utils import array_ops, sklearn_wrappers, plotting
 from osl_dynamics.utils.misc import override_dict_defaults
+from osl_dynamics.utils.progress import progress
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -126,7 +126,7 @@ def gmm_time_courses(
 
     gmm_tcs = []
     gmm_metrics = []
-    for sub in trange(n_sessions, desc="Fitting GMMs"):
+    for sub in progress(range(n_sessions), desc="Fitting GMMs"):
         # Initialise an array to hold the gmm thresholded time course
         gmm_tc = np.empty(alpha[sub].shape, dtype=int)
         gmm_metric = []

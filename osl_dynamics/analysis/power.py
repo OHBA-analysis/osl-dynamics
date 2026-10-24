@@ -7,13 +7,12 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import nibabel as nib
-from tqdm.auto import trange
-from pqdm.threads import pqdm
 import matplotlib.pyplot as plt
 
 from osl_dynamics import files
 from osl_dynamics.analysis.spectral import get_frequency_args_range
 from osl_dynamics.utils import array_ops, misc, plotting
+from osl_dynamics.utils.progress import parallel_map, progress
 from osl_dynamics.meeg.parcellation import parcel_vector_to_nifti
 
 _logger = logging.getLogger("osl-dynamics")
@@ -86,23 +85,14 @@ def sliding_window_power(
     # Setup keyword arguments to pass to the helper function
     kwargs = [{"x": x} for x in data]
 
-    if len(data) == 1:
-        _logger.info("Sliding window power")
-        results = [_swp(**kwargs[0])]
-
-    elif n_jobs == 1:
-        results = []
-        for i in trange(len(data), desc="Sliding window power"):
-            results.append(_swp(**kwargs[i]))
-
-    else:
-        _logger.info("Sliding window power")
-        results = pqdm(
-            kwargs,
-            _swp,
-            argument_type="kwargs",
-            n_jobs=n_jobs,
-        )
+    results = parallel_map(
+        _swp,
+        kwargs,
+        desc="Sliding window power",
+        n_jobs=n_jobs,
+        argument_type="kwargs",
+        label="session",
+    )
 
     if concatenate or len(results) == 1:
         results = np.concatenate(results)
@@ -380,7 +370,7 @@ def save(
     # Just display the power map
     if filename is None:
         figures, axes = [], []
-        for i in trange(n_modes, desc="Saving images"):
+        for i in progress(range(n_modes), desc="Saving images"):
             fig, ax = plotting.plot_brain_surface(
                 power_map[i],
                 parcellation_file=parcellation_file,
@@ -405,7 +395,7 @@ def save(
         else:
             # Save each map as an image
             output_files = []
-            for i in trange(n_modes, desc="Saving images"):
+            for i in progress(range(n_modes), desc="Saving images"):
                 output_file = "{fn.parent}/{fn.stem}{i:0{w}d}{fn.suffix}".format(
                     fn=Path(filename), i=i, w=len(str(n_modes))
                 )

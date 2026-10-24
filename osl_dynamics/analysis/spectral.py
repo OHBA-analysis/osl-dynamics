@@ -7,13 +7,11 @@ import numpy as np
 from scipy import signal
 from scipy.signal._spectral_py import _median_bias
 from sklearn.decomposition import non_negative_factorization
-from pqdm.threads import pqdm
-from threadpoolctl import threadpool_limits
-from tqdm.auto import trange
 
 from osl_dynamics.utils import array_ops
 from osl_dynamics.utils.sklearn_wrappers import linear_regression
 from osl_dynamics.utils.misc import nextpow2
+from osl_dynamics.utils.progress import parallel_map
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -271,23 +269,14 @@ def welch_spectra(
         )
 
     # Main calculation of spectra
-    if len(data) == 1:
-        # We only have one array so we don't need to parallelise
-        # the calculation
-        _logger.info("Calculating spectra")
-        results = [_welch(**kwargs[0])]
-
-    elif n_jobs == 1:
-        # We have multiple arrays but we're running in serial
-        results = []
-        for i in trange(len(data), desc="Calculating spectra"):
-            results.append(_welch(**kwargs[i]))
-
-    else:
-        # Calculate spectra in parallel
-        _logger.info("Calculating spectra")
-        with threadpool_limits(limits=1):
-            results = pqdm(kwargs, _welch, n_jobs=n_jobs, argument_type="kwargs")
+    results = parallel_map(
+        _welch,
+        kwargs,
+        desc="Calculating spectra",
+        n_jobs=n_jobs,
+        argument_type="kwargs",
+        label="session",
+    )
 
     # Unpack the results
     if calc_coh:
@@ -481,28 +470,14 @@ def multitaper_spectra(
         )
 
     # Main calculation of spectra
-    if len(data) == 1:
-        # We only have one array so we don't need to parallelise
-        # the calculation
-        _logger.info("Calculating spectra")
-        results = [_multitaper(**kwargs[0])]
-
-    elif n_jobs == 1:
-        # We have multiple arrays but we're running in serial
-        results = []
-        for i in trange(len(data), desc="Calculating spectra"):
-            results.append(_multitaper(**kwargs[i]))
-
-    else:
-        # Calculate spectra in parallel
-        _logger.info("Calculating spectra")
-        with threadpool_limits(limits=1):
-            results = pqdm(
-                kwargs,
-                _multitaper,
-                n_jobs=n_jobs,
-                argument_type="kwargs",
-            )
+    results = parallel_map(
+        _multitaper,
+        kwargs,
+        desc="Calculating spectra",
+        n_jobs=n_jobs,
+        argument_type="kwargs",
+        label="session",
+    )
 
     # Unpack the results
     if calc_coh:
@@ -681,28 +656,14 @@ def regression_spectra(
         )
 
     # Main calculation of spectra
-    if len(data) == 1:
-        # We only have one array so we don't need to parallelise the
-        # calculation
-        _logger.info("Calculating spectra")
-        results = [_regress_welch_spectrogram(**kwargs[0])]
-
-    elif n_jobs == 1:
-        # We have multiple arrays but we're running in serial
-        results = []
-        for i, kws in enumerate(kwargs):
-            _logger.info(f"Calculating spectra {i}")
-            results.append(_regress_welch_spectrogram(**kws))
-    else:
-        # Calculate a time-varying PSD and regress to get the mode PSDs
-        _logger.info("Calculating spectra")
-        with threadpool_limits(limits=1):
-            results = pqdm(
-                kwargs,
-                _regress_welch_spectrogram,
-                n_jobs=n_jobs,
-                argument_type="kwargs",
-            )
+    results = parallel_map(
+        _regress_welch_spectrogram,
+        kwargs,
+        desc="Calculating spectra",
+        n_jobs=n_jobs,
+        argument_type="kwargs",
+        label="session",
+    )
 
     # Unpack results
     Pj = []
@@ -1060,13 +1021,9 @@ def partial_directed_coherence_spectra(
     kwargs = [{"cpsd": S} for S in flattened_cpsd]
 
     # Main calculation
-    if len(kwargs) == 1:
-        _logger.info("Calculating PDC")
-        results = [_calc_pdc(**kwargs[0])]
-    else:
-        results = []
-        for i in trange(len(kwargs), desc="Calculating PDC"):
-            results.append(_calc_pdc(**kwargs[i]))
+    results = parallel_map(
+        _calc_pdc, kwargs, desc="Calculating PDC", argument_type="kwargs"
+    )
 
     # Put the results back into the original shape
     pdc = np.array(results).reshape(original_shape)

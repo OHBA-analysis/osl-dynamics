@@ -8,13 +8,12 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 from nilearn import plotting
 from scipy import stats
-from tqdm.auto import trange
-from pqdm.threads import pqdm
 import matplotlib.pyplot as plt
 
 from osl_dynamics.analysis.spectral import get_frequency_args_range
 from osl_dynamics.utils import array_ops
 from osl_dynamics.utils.misc import override_dict_defaults
+from osl_dynamics.utils.progress import parallel_map, progress
 from osl_dynamics.meeg.parcellation import Parcellation
 from osl_dynamics.utils.sklearn_wrappers import fit_gaussian_mixture
 
@@ -92,23 +91,14 @@ def sliding_window_connectivity(
     # Setup keyword arguments to pass to the helper function
     kwargs = [{"x": x} for x in data]
 
-    if len(data) == 1:
-        _logger.info("Sliding window connectivity")
-        results = [_swc(**kwargs[0])]
-
-    elif n_jobs == 1:
-        results = []
-        for i in trange(len(data), desc="Sliding window connectivity"):
-            results.append(_swc(**kwargs[i]))
-
-    else:
-        _logger.info("Sliding window connectivity")
-        results = pqdm(
-            kwargs,
-            _swc,
-            argument_type="kwargs",
-            n_jobs=n_jobs,
-        )
+    results = parallel_map(
+        _swc,
+        kwargs,
+        desc="Sliding window connectivity",
+        n_jobs=n_jobs,
+        argument_type="kwargs",
+        label="session",
+    )
 
     if concatenate or len(results) == 1:
         results = np.concatenate(results)
@@ -882,7 +872,7 @@ def save(
     n_modes = conn_map.shape[0]
     axes = axes or [None] * n_modes
     output_files = []
-    for i in trange(n_modes, desc="Saving images"):
+    for i in progress(range(n_modes), desc="Saving images"):
         # Overwrite keyword arguments if passed
         kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
@@ -1009,7 +999,7 @@ def save_interactive(
 
     # Loop through each connectivity map
     n_modes = conn_map.shape[0]
-    for i in trange(n_modes, desc="Saving images"):
+    for i in progress(range(n_modes), desc="Saving images"):
         # Overwrite keyword arguments if passed
         kwargs = override_dict_defaults(default_plot_kwargs, plot_kwargs)
 
