@@ -15,7 +15,6 @@ from typing import Tuple, Union
 
 import numpy as np
 import tensorflow as tf
-from tqdm.auto import trange
 
 from osl_dynamics import data
 import osl_dynamics.data.tf as dtf
@@ -41,6 +40,7 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelConfig,
 )
 from osl_dynamics.models.mod_base import BaseModelConfig
+from osl_dynamics.utils.progress import progress
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -694,7 +694,7 @@ class Model(VariationalInferenceModelBase):
         # Sample the mode time courses
         alpha = np.empty([n_samples, self.config.n_modes])
         beta = np.empty([n_samples, self.config.n_corr_modes])
-        for i in trange(n_samples, desc="Sampling mode time courses"):
+        for i in progress(range(n_samples), desc="Sampling mode time courses"):
             # If there are leading zeros we trim theta so that we don't pass
             # the zeros
             trimmed_power_theta = power_theta[~np.all(power_theta == 0, axis=1)][

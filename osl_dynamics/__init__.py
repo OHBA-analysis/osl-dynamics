@@ -1,5 +1,14 @@
 import logging
+import os
 from importlib.metadata import PackageNotFoundError, version
+
+# Hide the INFO messages of TensorFlow's C++ code (it must be set before
+# TensorFlow is imported)
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "1")
+
+from osl_dynamics.utils.logger import _setup_logger, set_verbosity
+
+_setup_logger()
 
 from osl_dynamics.config_api.pipeline import run_pipeline
 from osl_dynamics import meeg
@@ -12,12 +21,5 @@ except PackageNotFoundError:
 finally:
     del version, PackageNotFoundError
 
-# Configure logging
-logging.basicConfig(
-    format="%(asctime)s %(levelname)s %(name)s [%(filename)s:%(lineno)d:%(funcName)s]: %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.INFO,
-)
-logger = logging.getLogger("osl-dynamics")
-logger.debug("Version %s", __version__)
-del logger, logging
+logging.getLogger("osl-dynamics").debug("Version %s", __version__)
+del logging, os, _setup_logger

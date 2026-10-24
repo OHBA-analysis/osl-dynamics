@@ -5,11 +5,10 @@ from typing import Dict, Optional
 
 import numpy as np
 from scipy import stats
-from pqdm.processes import pqdm
-from tqdm.auto import trange
 
 from osl_dynamics.glm.base import Design, GLM
 from osl_dynamics.glm.ols import osl_fit
+from osl_dynamics.utils.progress import parallel_map
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -95,32 +94,19 @@ class Permutation:
             )
 
         # Run permutations
-        if len(kwargs) == 1:
-            _logger.info(
-                "Running permutations on contrast "
-                f"{self.glm.contrast_names[self.contrast_indx]}."
-            )
-            results = [osl_fit(**kwargs[0])]
-        elif self.n_jobs == 1:
-            _logger.info(
-                f"Running on contrast {self.glm.contrast_names[self.contrast_indx]} "
-                f"permutations with {self.n_jobs} jobs."
-            )
-            results = []
-            for i in trange(self.n_perm, desc="Running permutations"):
-                results.append(osl_fit(**kwargs[i]))
-        else:
-            _logger.info(
-                f"Running on contrast {self.glm.contrast_names[self.contrast_indx]} "
-                f"permutations with {self.n_jobs} jobs."
-            )
-            results = pqdm(
-                kwargs,
-                osl_fit,
-                argument_type="kwargs",
-                n_jobs=self.n_jobs,
-                desc="Running permutations",
-            )
+        _logger.info(
+            "Running permutations on contrast "
+            f"{self.glm.contrast_names[self.contrast_indx]}"
+        )
+        results = parallel_map(
+            osl_fit,
+            kwargs,
+            desc="Running permutations",
+            n_jobs=self.n_jobs,
+            argument_type="kwargs",
+            backend="processes",
+            label="permutation",
+        )
 
         # Unpack results
         null_copes, null_tstats = [], []

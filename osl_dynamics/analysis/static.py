@@ -5,12 +5,10 @@ from typing import Callable, List, Optional, Union
 
 import numpy as np
 from sklearn.covariance import LedoitWolf
-from pqdm.threads import pqdm
-from threadpoolctl import threadpool_limits
-from tqdm.auto import trange
 
 from osl_dynamics.analysis import spectral
 from osl_dynamics.utils import array_ops
+from osl_dynamics.utils.progress import parallel_map
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -141,21 +139,9 @@ def functional_connectivity(
         measure = conn_type
 
     # Calculate networks
-    if len(data) == 1:
-        # Don't need to parallelise
-        results = [measure(data[0])]
-
-    elif n_jobs == 1:
-        # We have multiple arrays but we're running in serial
-        results = []
-        for i in trange(len(data), desc="Calculating FC"):
-            results.append(measure(data[i]))
-
-    else:
-        # Calculate in parallel
-        _logger.info("Calculating FC")
-        with threadpool_limits(limits=1):
-            results = pqdm(data, measure, n_jobs=n_jobs)
+    results = parallel_map(
+        measure, data, desc="Calculating FC", n_jobs=n_jobs, label="session"
+    )
 
     return np.squeeze(results)
 

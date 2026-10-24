@@ -6,10 +6,9 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from scipy import signal
-from pqdm.threads import pqdm
-from threadpoolctl import threadpool_limits
 
 from osl_dynamics.utils import array_ops
+from osl_dynamics.utils.progress import parallel_map
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -974,15 +973,14 @@ def hmm_dual_estimation(
         results = [_calc(a, x) for a, x in zip(alpha, data)]
     else:
         # Calculate in parallel
-        with threadpool_limits(limits=1 if n_jobs > 1 else None):
-            results = pqdm(
-                array=zip(alpha, data),
-                function=_calc,
-                n_jobs=n_jobs,
-                desc="Dual estimation",
-                argument_type="args",
-                total=len(data),
-            )
+        results = parallel_map(
+            _calc,
+            zip(alpha, data),
+            desc="Dual estimation",
+            n_jobs=n_jobs,
+            argument_type="args",
+            label="session",
+        )
 
     # Unpack results
     means = []
@@ -1107,14 +1105,13 @@ def hmm_features(
         return np.concatenate([sum_stats, trans_prob, obs_mod])
 
     # Calculate in parallel
-    with threadpool_limits(limits=1 if n_jobs > 1 else None):
-        features = pqdm(
-            array=zip(alpha, data),
-            function=_calc,
-            n_jobs=n_jobs,
-            desc="Calculating HMM features",
-            argument_type="args",
-            total=len(data),
-        )
+    features = parallel_map(
+        _calc,
+        zip(alpha, data),
+        desc="Calculating HMM features",
+        n_jobs=n_jobs,
+        argument_type="args",
+        label="session",
+    )
 
     return np.squeeze(features)

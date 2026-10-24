@@ -20,8 +20,6 @@ import tensorflow as tf
 from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
 from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
-from tqdm.auto import tqdm as tqdm_auto
-from tqdm.keras import TqdmCallback
 
 if version.parse(tf.__version__) < version.parse("2.13"):
     from tensorflow.python.distribute.distribution_strategy_context import get_strategy
@@ -41,8 +39,14 @@ import osl_dynamics
 from osl_dynamics import data
 import osl_dynamics.data.tf as dtf
 from osl_dynamics.inference import callbacks, initializers
-from osl_dynamics.utils.misc import NumpyLoader, get_argument, replace_argument
+from osl_dynamics.utils.misc import (
+    NumpyLoader,
+    get_argument,
+    listify,
+    replace_argument,
+)
 from osl_dynamics.utils.model import HTMLTable, LatexTable
+from osl_dynamics.utils.progress import progress
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -352,8 +356,6 @@ class ModelBase:
     def fit(
         self,
         *args,
-        use_tqdm: bool = False,
-        tqdm_class=None,
         save_best_after: Optional[int] = None,
         checkpoint_freq: Optional[int] = None,
         save_filepath: Optional[str] = None,
@@ -363,15 +365,17 @@ class ModelBase:
 
         Adds callbacks and then trains the model.
 
+        Progress bars are shown with
+        :code:`osl_dynamics.inference.callbacks.ProgressBarCallback` instead
+        of the progress bars of keras. Pass :code:`verbose=0` for no
+        progress bars, :code:`verbose=1` (default) for a progress bar for
+        each epoch or :code:`verbose=2` for a single progress bar over the
+        epochs.
+
         Parameters
         ----------
         args : arguments
             Arguments for :code:`keras.Model.fit()`.
-        use_tqdm : bool, optional
-            Should we use a :code:`tqdm` progress bar instead of the usual
-            output from tensorflow.
-        tqdm_class : TqdmCallback, optional
-            Class for the :code:`tqdm` progress bar.
         save_best_after : int, optional
             Epoch number after which we should save the best model. The best
             model is that which achieves the lowest loss.
@@ -439,12 +443,6 @@ class ModelBase:
         # Callbacks to add to the ones the user passed
         additional_callbacks = []
 
-        # Callback to display a progress bar with tqdm
-        if use_tqdm:
-            tqdm_class = tqdm_class or tqdm_auto
-            tqdm_callback = TqdmCallback(verbose=0, tqdm_class=tqdm_class)
-            additional_callbacks.append(tqdm_callback)
-
         # Callback to save the best model after a certain number of epochs
         if save_best_after is not None:
             best_filepath = (
@@ -482,17 +480,35 @@ class ModelBase:
             kwargs,
             append=True,
         )
-        if use_tqdm:
+
+        # Callback to show progress bars. It's first so a progress bar is
+        # closed before other callbacks print messages at the end of an epoch
+        verbose = get_argument(self.model.fit, "verbose", args, kwargs)
+        if verbose in [None, "auto"]:
+            verbose = 1
+        if verbose:
+            mode = "steps" if verbose == 1 else "epochs"
+            fit_callbacks = get_argument(self.model.fit, "callbacks", args, kwargs)
             args, kwargs = replace_argument(
                 self.model.fit,
-                "verbose",
-                0,
+                "callbacks",
+                [callbacks.ProgressBarCallback(mode=mode)] + fit_callbacks,
                 args,
                 kwargs,
             )
+        args, kwargs = replace_argument(self.model.fit, "verbose", 0, args, kwargs)
+
+        # The dataset is already shuffled
+        args, kwargs = replace_argument(self.model.fit, "shuffle", False, args, kwargs)
 
         # Fit model
-        history = self.model.fit(*args, **kwargs)
+        try:
+            history = self.model.fit(*args, **kwargs)
+        finally:
+            # Close progress bars left open if training stopped early
+            for callback in get_argument(self.model.fit, "callbacks", args, kwargs):
+                if isinstance(callback, callbacks.ProgressBarCallback):
+                    callback.close()
 
         # Convert history from tensors to float
         history = {
@@ -500,6 +516,64 @@ class ModelBase:
         }
 
         return history
+
+    def _predict_sessions(self, datasets: list, desc: str, **kwargs) -> Generator:
+        """Predict for the dataset of each session, with a progress bar.
+
+        With more than one session, the progress bar is over sessions,
+        otherwise it's over batches.
+
+        Parameters
+        ----------
+        datasets : list of tf.data.Dataset
+            Dataset for each session.
+        desc : str
+            Description shown before the progress bar.
+        kwargs : keyword arguments, optional
+            Keyword arguments for :code:`keras.Model.predict()`. Pass
+            :code:`verbose=0` for no progress bar.
+
+        Yields
+        ------
+        predictions : dict
+            Predictions for a session.
+        """
+        verbose = kwargs.pop("verbose", 1)
+        if len(datasets) == 1:
+            if verbose:
+                kwargs["callbacks"] = listify(kwargs.get("callbacks")) + [
+                    callbacks.ProgressBarCallback(desc=desc)
+                ]
+            yield self.predict(datasets[0], verbose=0, **kwargs)
+        else:
+            for dataset in progress(datasets, desc=desc, disable=not verbose):
+                yield self.predict(dataset, verbose=0, **kwargs)
+
+    @staticmethod
+    def _session_batches(datasets: list, desc: str, verbose: int = 1) -> Generator:
+        """Iterate over the batches of each session, with a progress bar.
+
+        With more than one session, the progress bar is over sessions,
+        otherwise it's over batches.
+
+        Parameters
+        ----------
+        datasets : list of tf.data.Dataset
+            Dataset for each session.
+        desc : str
+            Description shown before the progress bar.
+        verbose : int, optional
+            Pass :code:`0` for no progress bar.
+
+        Yields
+        ------
+        batches : iterable
+            Batches of a session.
+        """
+        if len(datasets) == 1:
+            yield progress(datasets[0], desc=desc, disable=not verbose)
+        else:
+            yield from progress(datasets, desc=desc, disable=not verbose)
 
     def train(
         self,
@@ -530,7 +604,8 @@ class ModelBase:
         best_run = None
 
         for run in range(best_of):
-            _logger.info(f"Training run {run}")
+            if best_of > 1:
+                _logger.info(f"Training run {run}")
 
             # Reset model weights
             self.reset()
@@ -545,7 +620,10 @@ class ModelBase:
             data = get_argument(self.model.fit, "x", args, kwargs)
             fe = self.free_energy(data)
             history["free_energy"] = fe
-            _logger.info(f"Free energy (run {run}): {fe}")
+            if best_of > 1:
+                _logger.info(f"Free energy (run {run}): {fe:.4f}")
+            else:
+                _logger.info(f"Free energy: {fe:.4f}")
 
             if fe < best_fe:
                 best_weights = self.get_weights()
@@ -567,7 +645,8 @@ class ModelBase:
             )
 
         # Use the best model weights
-        _logger.info(f"Best run: {best_run}")
+        if best_of > 1:
+            _logger.info(f"Best run: {best_run}")
         self.reset()
         self.set_weights(best_weights)
 

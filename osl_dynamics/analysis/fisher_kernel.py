@@ -13,7 +13,8 @@ import logging
 from typing import Dict, Optional, Tuple
 
 import numpy as np
-from tqdm.auto import trange
+
+from osl_dynamics.utils.progress import progress
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -52,7 +53,6 @@ class FisherKernel:
         features : np.ndarray
             Fisher kernel matrix. Shape is (n_sessions, n_features).
         """
-        _logger.info("Getting Fisher features")
 
         n_sessions = dataset.n_sessions
         if batch_size is not None:
@@ -66,7 +66,7 @@ class FisherKernel:
 
         # Initialise list to hold features for each session
         features = []
-        for i in trange(n_sessions, desc="Getting features"):
+        for i in progress(range(n_sessions), desc="Calculating Fisher features"):
             # Initialise dictionary for holding gradients
             d_model = dict()
 
@@ -139,7 +139,7 @@ class FisherKernel:
         kernel_matrix : np.ndarray
             Fisher kernel matrix. Shape is (n_sessions, n_sessions).
         """
-        _logger.info("Getting Fisher kernel matrix")
+        _logger.info("Calculating Fisher kernel matrix")
 
         features = self.get_features(dataset, batch_size=batch_size)
 
