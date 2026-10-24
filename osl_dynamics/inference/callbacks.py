@@ -11,6 +11,7 @@ from tensorflow import tanh
 from tensorflow.keras import callbacks
 
 from osl_dynamics.inference import metrics, modes
+from osl_dynamics.utils.progress import progress
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -501,6 +502,96 @@ class SkippedStepsCallback(callbacks.Callback):
                     "learning rate or increasing the batch size (see the FAQ)."
                 )
             _logger.warning(message)
+
+
+class ProgressBarCallback(callbacks.Callback):
+    """Callback to show progress bars when training or predicting.
+
+    The progress bars are made with :func:`osl_dynamics.utils.progress.progress`
+    and show the loss terms (e.g. :code:`ll_loss` and :code:`kl_loss`) when
+    training.
+
+    This callback should be first in the list of callbacks, so the progress
+    bar of an epoch is closed before other callbacks print messages at the
+    end of the epoch.
+
+    Parameters
+    ----------
+    desc : str, optional
+        Description shown before the progress bar. When training, defaults
+        to the epoch number.
+    mode : str, optional
+        When training, show a progress bar over the steps of each epoch
+        (:code:`'steps'`) or a single progress bar over the epochs
+        (:code:`'epochs'`).
+    """
+
+    def __init__(self, desc: Optional[str] = None, mode: str = "steps") -> None:
+        super().__init__()
+        if mode not in ["steps", "epochs"]:
+            raise ValueError("mode must be 'steps' or 'epochs'.")
+        self.desc = desc
+        self.mode = mode
+        self._bar = None
+
+    @staticmethod
+    def _losses(logs: Optional[Dict]) -> Dict[str, str]:
+        """Loss terms to show after the progress bar."""
+        return {
+            key: f"{float(value):.4g}"
+            for key, value in (logs or {}).items()
+            if key.endswith("loss")
+        }
+
+    def close(self) -> None:
+        """Close the progress bar (e.g. if training stopped early)."""
+        if self._bar is not None:
+            self._bar.close()
+            self._bar = None
+
+    def on_train_begin(self, logs: Optional[Dict] = None) -> None:
+        if self.mode == "epochs":
+            self._bar = progress(
+                total=self.params["epochs"], desc=self.desc or "Training"
+            )
+
+    def on_epoch_begin(self, epoch: int, logs: Optional[Dict] = None) -> None:
+        if self.mode == "steps":
+            n_epochs = self.params["epochs"]
+            if self.desc is None:
+                desc = f"Epoch {epoch + 1}/{n_epochs}"
+            elif n_epochs > 1:
+                desc = f"{self.desc}, epoch {epoch + 1}/{n_epochs}"
+            else:
+                desc = self.desc
+            self._bar = progress(total=self.params["steps"], desc=desc)
+
+    def on_train_batch_end(self, batch: int, logs: Optional[Dict] = None) -> None:
+        if self.mode == "steps" and self._bar is not None:
+            self._bar.set_postfix(self._losses(logs), refresh=False)
+            self._bar.update()
+
+    def on_epoch_end(self, epoch: int, logs: Optional[Dict] = None) -> None:
+        # The logs of the epoch include the validation losses
+        if self._bar is not None:
+            self._bar.set_postfix(self._losses(logs), refresh=False)
+            if self.mode == "steps":
+                self.close()
+            else:
+                self._bar.update()
+
+    def on_train_end(self, logs: Optional[Dict] = None) -> None:
+        self.close()
+
+    def on_predict_begin(self, logs: Optional[Dict] = None) -> None:
+        self._bar = progress(total=self.params.get("steps"), desc=self.desc)
+
+    def on_predict_batch_end(self, batch: int, logs: Optional[Dict] = None) -> None:
+        if self._bar is not None:
+            self._bar.update()
+
+    def on_predict_end(self, logs: Optional[Dict] = None) -> None:
+        self.close()
 
 
 class TensorBoardCallback(callbacks.TensorBoard):

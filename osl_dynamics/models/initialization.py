@@ -34,7 +34,9 @@ import numpy as np
 import tensorflow as tf
 
 import osl_dynamics.data.tf as dtf
+from osl_dynamics.inference.callbacks import ProgressBarCallback
 from osl_dynamics.simulation import HMM
+from osl_dynamics.utils.misc import listify
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -235,15 +237,30 @@ class InitializationMixin:
         history : dict
             The training history of the best initialization.
         """
+        # One progress bar for each candidate
+        verbose = kwargs.pop("verbose", 1)
+        user_callbacks = kwargs.pop("callbacks", None)
+
         best_score = np.inf
         for name, dataset, setup in candidates:
-            _logger.info(f"Initialization {name}")
             self.reset()
             if setup is not None:
                 setup()
 
+            fit_callbacks = listify(user_callbacks)
+            if verbose:
+                mode = "steps" if n_epochs == 1 else "epochs"
+                bar = ProgressBarCallback(desc=f"Initialization {name}", mode=mode)
+                fit_callbacks = [bar] + fit_callbacks
+
             try:
-                history = self.fit(dataset, epochs=n_epochs, **kwargs)
+                history = self.fit(
+                    dataset,
+                    epochs=n_epochs,
+                    verbose=0,
+                    callbacks=fit_callbacks,
+                    **kwargs,
+                )
             except tf.errors.InvalidArgumentError as e:
                 _logger.warning(e)
                 _logger.warning("Training failed! Skipping initialization.")
@@ -260,7 +277,7 @@ class InitializationMixin:
         if best_score == np.inf:
             raise ValueError("No valid initializations were found.")
 
-        _logger.info(f"Using initialization {best_name}")
+        _logger.info(f"Using initialization {best_name} (loss={best_score:.4g})")
         self._restore_initialization(best_weights, best_setup)
 
         return best_history

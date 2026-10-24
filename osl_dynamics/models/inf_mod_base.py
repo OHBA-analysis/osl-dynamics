@@ -331,17 +331,8 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
 
         dataset = self.make_dataset(dataset, step_size=step_size)
 
-        n_datasets = len(dataset)
-        if len(dataset) > 1:
-            iterator = progress(range(n_datasets), desc="Getting theta")
-            kwargs["verbose"] = 0
-        else:
-            iterator = range(n_datasets)
-            _logger.info("Getting theta")
-
         theta = []
-        for i in iterator:
-            predictions = self.predict(dataset[i], **kwargs)
+        for predictions in self._predict_sessions(dataset, "Getting theta", **kwargs):
             theta_ = predictions["theta"]
             if remove_edge_effects:
                 theta_ = _remove_edge_effects(theta_, step_size)
@@ -401,18 +392,11 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
 
         dataset = self.make_dataset(dataset, step_size=step_size)
 
-        n_datasets = len(dataset)
-        if len(dataset) > 1:
-            iterator = progress(range(n_datasets), desc="Getting mode logits")
-            kwargs["verbose"] = 0
-        else:
-            iterator = range(n_datasets)
-            _logger.info("Getting mode logits")
-
         power_theta = []
         fc_theta = []
-        for i in iterator:
-            predictions = self.predict(dataset[i], **kwargs)
+        for predictions in self._predict_sessions(
+            dataset, "Getting mode logits", **kwargs
+        ):
             power_theta_ = predictions["power_theta"]
             fc_theta_ = predictions["fc_theta"]
             if remove_edge_effects:
@@ -480,17 +464,8 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
         dataset = self.make_dataset(dataset, step_size=step_size)
         alpha_layer = self.model.get_layer("alpha")
 
-        n_datasets = len(dataset)
-        if len(dataset) > 1:
-            iterator = progress(range(n_datasets), desc="Getting alpha")
-            kwargs["verbose"] = 0
-        else:
-            iterator = range(n_datasets)
-            _logger.info("Getting alpha")
-
         alpha = []
-        for i in iterator:
-            predictions = self.predict(dataset[i], **kwargs)
+        for predictions in self._predict_sessions(dataset, "Getting alpha", **kwargs):
             theta = predictions["theta"]
             alpha_ = alpha_layer(theta)
             if remove_edge_effects:
@@ -553,18 +528,11 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
         alpha_layer = self.model.get_layer("alpha")
         beta_layer = self.model.get_layer("beta")
 
-        n_datasets = len(dataset)
-        if len(dataset) > 1:
-            iterator = progress(range(n_datasets), desc="Getting mode time courses")
-            kwargs["verbose"] = 0
-        else:
-            iterator = range(n_datasets)
-            _logger.info("Getting mode time courses")
-
         alpha = []
         beta = []
-        for i in iterator:
-            predictions = self.predict(dataset[i], **kwargs)
+        for predictions in self._predict_sessions(
+            dataset, "Getting mode time courses", **kwargs
+        ):
             power_theta = predictions["power_theta"]
             fc_theta = predictions["fc_theta"]
             alpha_ = alpha_layer(power_theta)
@@ -604,8 +572,9 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
             )
 
         dataset = self.make_dataset(dataset, concatenate=True)
-        _logger.info("Getting losses")
-        predictions = self.predict(dataset, **kwargs)
+        predictions = next(
+            self._predict_sessions([dataset], "Getting losses", **kwargs)
+        )
         ll_loss = np.mean(predictions["ll_loss"])
         kl_loss = np.mean(predictions["kl_loss"])
         return ll_loss, kl_loss
@@ -817,19 +786,12 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
 
         dataset = self.make_dataset(dataset, step_size=step_size)
 
-        n_datasets = len(dataset)
-        if len(dataset) > 1:
-            iterator = progress(range(n_datasets), desc="Getting alpha")
-            kwargs["verbose"] = 0
-        else:
-            iterator = range(n_datasets)
-            _logger.info("Getting alpha")
-
+        verbose = kwargs.pop("verbose", 1)
         alpha = []
-        for i in iterator:
+        for batches in self._session_batches(dataset, "Getting alpha", verbose):
             alp = []
-            for batch in dataset[i]:
-                pred = self.predict(batch, **kwargs)
+            for batch in batches:
+                pred = self.predict(batch, verbose=0, **kwargs)
                 alp.append(pred["gamma"])
             alpha_ = np.concatenate(alp)  # concat over batches
             if remove_edge_effects:
@@ -896,17 +858,10 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
             return path
 
         dataset = self.make_dataset(dataset)
-        n_datasets = len(dataset)
-        if len(dataset) > 1:
-            iterator = progress(range(n_datasets), desc="Getting Viterbi path")
-        else:
-            iterator = range(n_datasets)
-            _logger.info("Getting Viterbi path")
-
         viterbi_path = []
-        for i in iterator:
+        for batches in self._session_batches(dataset, "Getting Viterbi path"):
             path = []
-            for data in dataset[i]:
+            for data in batches:
                 x = data["data"]  # (batch_size, sequence_length, n_states)
                 vp = np.concatenate(_viterbi_path(x))  # concat over sequences
                 path.append(vp)

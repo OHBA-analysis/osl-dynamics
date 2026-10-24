@@ -220,9 +220,12 @@ class Model(MarkovStateInferenceModelBase):
             dataset,
             step_size=self.raw_sequence_length // 2 if remove_edge_effects else None,
         )
+        verbose = kwargs.pop("verbose", 1)
         result = []
-        for ds in datasets:
-            batches = [self.predict(batch, **kwargs)["gamma"] for batch in ds]
+        for ds in self._session_batches(datasets, "Getting alpha", verbose):
+            batches = [
+                self.predict(batch, verbose=0, **kwargs)["gamma"] for batch in ds
+            ]
             if not batches:
                 raise ValueError("A session contains no complete sequence.")
             a = np.concatenate(batches)
