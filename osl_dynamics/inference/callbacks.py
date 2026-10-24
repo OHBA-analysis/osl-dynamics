@@ -536,12 +536,27 @@ class ProgressBarCallback(callbacks.Callback):
 
     @staticmethod
     def _losses(logs: Optional[Dict]) -> Dict[str, str]:
-        """Loss terms to show after the progress bar."""
-        return {
-            key: f"{float(value):.4g}"
-            for key, value in (logs or {}).items()
-            if key.endswith("loss")
-        }
+        """Loss terms to show after the progress bar.
+
+        The total loss is shown first and the terms without their
+        :code:`_loss` suffix (e.g. :code:`loss`, :code:`ll`, :code:`kl`),
+        followed by the validation losses, so the most important values are
+        kept when the line is trimmed to fit a narrow terminal.
+        """
+        losses = {}
+        for validation in [False, True]:
+            prefix = "val_" if validation else ""
+            keys = [
+                key
+                for key in (logs or {})
+                if key.endswith("loss") and key.startswith("val_") == validation
+            ]
+            for key in sorted(keys, key=lambda key: key != f"{prefix}loss"):
+                name = key
+                if key != f"{prefix}loss" and key.endswith("_loss"):
+                    name = key[: -len("_loss")]
+                losses[name] = f"{float(logs[key]):.4g}"
+        return losses
 
     def close(self) -> None:
         """Close the progress bar (e.g. if training stopped early)."""

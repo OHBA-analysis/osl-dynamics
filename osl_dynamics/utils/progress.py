@@ -21,6 +21,14 @@ _logger = logging.getLogger("osl-dynamics")
 # written to a file (e.g. the log of a job on a cluster)
 _NON_INTERACTIVE_MININTERVAL = 30
 
+# Format of a progress bar with a known total. It's tqdm's default without
+# the rate, which leaves more room for the bar and the losses in a narrow
+# terminal
+_BAR_FORMAT = (
+    "{desc}: {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt} "
+    "[{elapsed}<{remaining}{postfix}]"
+)
+
 
 def _interactive() -> bool:
     """Is the output going to a terminal or a notebook?"""
@@ -74,6 +82,19 @@ def progress(
         for name in ["mininterval", "maxinterval"]:
             if f"TQDM_{name.upper()}" not in os.environ:
                 kwargs.setdefault(name, _NON_INTERACTIVE_MININTERVAL)
+
+    # Without a total, tqdm's default (number of iterations and rate) is used
+    if total is None:
+        try:
+            total = len(iterable)
+        except TypeError:
+            pass
+    if total is not None:
+        kwargs.setdefault("bar_format", _BAR_FORMAT)
+
+    # Fit the progress bar to the width of the terminal when it's resized
+    # (e.g. when a screen or tmux session is reattached)
+    kwargs.setdefault("dynamic_ncols", True)
 
     return tqdm(iterable, desc=desc, total=total, **kwargs)
 
