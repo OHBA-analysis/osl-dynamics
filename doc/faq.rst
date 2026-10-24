@@ -313,6 +313,25 @@ See the 'Spectral Analysis' section of the :doc:`DyNeMo model description <model
 Other
 -----
 
+How do I control what osl-dynamics prints?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+osl-dynamics prints progress messages and progress bars. To only print warnings and errors, call::
+
+    import osl_dynamics
+
+    osl_dynamics.set_verbosity("WARNING")
+
+or set the environment variable ``OSL_DYNAMICS_VERBOSITY=WARNING`` before running a script. ``"INFO"`` is the default and ``"DEBUG"`` also shows where each message came from. Pass ``verbose=0`` to a model's ``fit`` or ``get_alpha`` methods for no progress bars from that call. When training, ``verbose=2`` shows a single progress bar over the epochs instead of one for each epoch.
+
+Messages are printed by the ``"osl-dynamics"`` logger, so they can also be written to a file::
+
+    import logging
+
+    logging.getLogger("osl-dynamics").addHandler(logging.FileHandler("osld.log"))
+
+When the output is not a terminal or notebook (e.g. the log of a job on a cluster), progress bars are updated every 30 seconds. This can be changed with the ``TQDM_MININTERVAL`` environment variable.
+
 I've used the Matlab HMM-MAR toolbox before, how do I switch to Python?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
