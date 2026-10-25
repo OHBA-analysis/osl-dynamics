@@ -3,8 +3,6 @@
 This script should achieve a dice coefficient of ~0.8.
 """
 
-print("Importing packages")
-
 import numpy as np
 from osl_dynamics.data import Data
 from osl_dynamics.inference import modes, metrics

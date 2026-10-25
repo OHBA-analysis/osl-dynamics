@@ -27,8 +27,6 @@ os.makedirs(plots_dir, exist_ok=True)
 
 #%% Import packages
 
-print("Importing packages")
-
 import numpy as np
 
 from osl_dynamics.analysis import power, connectivity

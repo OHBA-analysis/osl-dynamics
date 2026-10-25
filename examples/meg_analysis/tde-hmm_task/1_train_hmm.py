@@ -12,8 +12,6 @@ run = int(argv[2])
 
 #%% Import packages
 
-print("Importing packages")
-
 import pickle
 from glob import glob
 
