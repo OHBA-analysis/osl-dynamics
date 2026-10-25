@@ -29,7 +29,7 @@ from osl_dynamics.meeg.session import (
     read_data,
 )
 
-from . import rhino
+from osl_dynamics.meeg import rhino
 
 
 def lcmv_beamformer(

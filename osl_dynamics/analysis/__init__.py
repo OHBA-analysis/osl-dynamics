@@ -47,13 +47,27 @@ Python example scripts
 - `Plotting <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/plotting>`_
 """
 
-from osl_dynamics.analysis import (
-    connectivity,
-    fisher_kernel,
-    post_hoc,
-    power,
-    spectral,
-    static,
-    statistics,
-    prediction,
-)
+import importlib
+
+# Submodules are imported on first use because some (e.g. connectivity and
+# power) are slow to import
+_submodules = [
+    "connectivity",
+    "fisher_kernel",
+    "post_hoc",
+    "power",
+    "spectral",
+    "static",
+    "statistics",
+    "prediction",
+]
+
+
+def __getattr__(name):
+    if name in _submodules:
+        return importlib.import_module(f"{__name__}.{name}")
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(list(globals()) + _submodules)

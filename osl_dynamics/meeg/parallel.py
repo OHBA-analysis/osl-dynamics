@@ -10,7 +10,7 @@ from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 
-from . import report
+from osl_dynamics.meeg import report
 from osl_dynamics.utils.logger import MEEGSessionLogger
 
 _THREAD_LIMIT_VARS = [

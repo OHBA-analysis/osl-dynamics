@@ -20,4 +20,13 @@ Python example scripts
 
 from osl_dynamics.glm.base import DesignConfig, GLM
 from osl_dynamics.glm.permutation import MaxStatPermutation
-from osl_dynamics.utils.plotting import plot_design_matrix
+
+
+def __getattr__(name):
+    # Imported on first use because osl_dynamics.utils.plotting is slow to
+    # import
+    if name == "plot_design_matrix":
+        from osl_dynamics.utils.plotting import plot_design_matrix
+
+        return plot_design_matrix
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
