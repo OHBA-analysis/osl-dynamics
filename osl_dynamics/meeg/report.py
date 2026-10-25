@@ -31,10 +31,10 @@ TABS = {
         "preproc/{id}/ica_components.webp",
     ],
     "Surfaces": [
-        "surfaces/{subject}/surfaces.webp",
+        "surfaces/{surfaces}/surfaces.webp",
     ],
     "MNI Registration": [
-        "surfaces/{subject}/mni_registration.webp",
+        "surfaces/{surfaces}/mni_registration.webp",
     ],
     "Coregistration": [
         "coreg/{head_model}/coreg.webp",
@@ -222,7 +222,7 @@ button:hover {
 
 JS = """
 const columns = DATA.columns, rows = DATA.rows, tabs = Object.keys(DATA.tabs);
-const nInfo = 3;  // id, subject and head model come before the metrics
+const nInfo = 4;  // id, subject, head model and surfaces come before the metrics
 const pageSize = 200;
 let order = [], selected = 0, tab = 0, sortColumn = null, ascending = true;
 
@@ -321,9 +321,9 @@ function render() {
         plots.innerHTML = '<div class="placeholder">No sessions</div>';
         return;
     }
-    const [id, subject, headModel] = rows[order[selected]];
+    const [id, subject, headModel, surfaces] = rows[order[selected]];
     const path = file => file.replace('{id}', id).replace('{subject}', subject)
-        .replace('{head_model}', headModel);
+        .replace('{head_model}', headModel).replace('{surfaces}', surfaces);
     plots.innerHTML = `<h2>${id}</h2>` + DATA.tabs[tabs[tab]].map(file =>
         `<img src="${path(file)}" onerror="missing(this)">`
     ).join('') + `<p class="caption">${DATA.captions[tabs[tab]] || ''}</p>`
@@ -385,23 +385,24 @@ def _session_row(
     id : str
         Session ID.
     info : dict
-        Session info. The surfaces are looked up with its 'subject'.
+        Session info. The surfaces are looked up in its 'surfaces_dir', or
+        in anat_surfaces/<subject> if it has no 'surfaces_dir'.
     qc_dir : Path
         Path to the QC directory.
     output_dir : Path
         Path to the derivatives directory.
     registrations : dict
-        MNI registration quality of the subjects read so far, which is
-        shared by all the sessions of a subject.
+        MNI registration quality of the surfaces directories read so far,
+        which is shared by all the sessions using the same structural.
 
     Returns
     -------
     row : dict
-        Session ID, subject, the ID owning the coregistration and the metrics
-        that have been saved.
+        Session ID, subject, the ID owning the coregistration, the name of
+        the surfaces directory and the metrics that have been saved.
     """
     subject = info.get("subject") if isinstance(info, dict) else None
-    row = {"Session": id, "subject": subject, "head_model": id}
+    row = {"Session": id, "subject": subject, "head_model": id, "surfaces": None}
 
     summary = _read_json(qc_dir / "preproc" / id / "summary.json")
     if summary is not None:
@@ -413,18 +414,28 @@ def _session_row(
     if output_dir is None:
         return row
 
-    if subject is not None:
-        if subject not in registrations:
-            registrations[subject] = _read_json(
-                output_dir / "anat_surfaces" / subject / "mni_registration.json"
+    # A subject can have several structurals, so the surfaces directory of
+    # the session is used if it is given
+    if isinstance(info, dict) and info.get("surfaces_dir"):
+        surfaces_dir = Path(info["surfaces_dir"])
+    elif subject is not None:
+        surfaces_dir = output_dir / "anat_surfaces" / subject
+    else:
+        surfaces_dir = None
+    if surfaces_dir is not None:
+        row["surfaces"] = surfaces_dir.name
+        if surfaces_dir not in registrations:
+            registrations[surfaces_dir] = _read_json(
+                surfaces_dir / "mni_registration.json"
             )
-        registration = registrations[subject]
+        registration = registrations[surfaces_dir]
         if registration is not None:
             used = registration["used"]
             row["MNI registration"] = used
             row["MNI overlap"] = registration[used]["dice"]
             row["MNI MI"] = registration[used]["mutual_information"]
 
+    if subject is not None:
         # The coregistration may be a property of the subject rather than the
         # session, and so shared by all of a subject's sessions (see
         # head_model_id in Session)
@@ -438,15 +449,18 @@ def _session_row(
     return row
 
 
-def _copy_plots(table: pd.DataFrame, qc_dir: Path, output_dir: Path) -> None:
+def _copy_plots(
+    table: pd.DataFrame, qc_dir: Path, output_dir: Path, surfaces_dirs: list
+) -> None:
     """Copy the plots saved in the derivatives directory to the QC directory.
 
     Surface extraction and coregistration save their plots with their output
     (the preprocessing and parcellation plots are saved in the QC directory).
-    The surfaces are copied once per subject and the coregistration once per
-    head model, to the paths in TABS. They are saved as WebP files, which are
-    several times smaller than the PNG files the steps save and look the same.
-    Plots that have not changed since they were last copied are skipped.
+    The surfaces are copied once per surfaces directory and the
+    coregistration once per head model, to the paths in TABS. They are saved
+    as WebP files, which are several times smaller than the PNG files the
+    steps save and look the same. Plots that have not changed since they were
+    last copied are skipped.
 
     Parameters
     ----------
@@ -456,12 +470,14 @@ def _copy_plots(table: pd.DataFrame, qc_dir: Path, output_dir: Path) -> None:
         Path to the QC directory.
     output_dir : Path
         Path to the derivatives directory.
+    surfaces_dirs : list of Path
+        Surfaces directories of the sessions.
     """
     copies = []
-    for subject in table["subject"].dropna().unique():
+    for surfaces_dir in surfaces_dirs:
         for name in ["surfaces", "mni_registration"]:
-            source = output_dir / "anat_surfaces" / subject / f"{name}.png"
-            destination = qc_dir / "surfaces" / subject / f"{name}.webp"
+            source = surfaces_dir / f"{name}.png"
+            destination = qc_dir / "surfaces" / surfaces_dir.name / f"{name}.webp"
             copies.append((source, destination))
     for head_model in table["head_model"].unique():
         source = output_dir / "osl" / head_model / "coreg" / "coreg.png"
@@ -541,11 +557,11 @@ def generate_report(
             sessions.items(),
         )
         table = pd.DataFrame(
-            rows, columns=["Session", "subject", "head_model"] + columns
+            rows, columns=["Session", "subject", "head_model", "surfaces"] + columns
         )
     table = table.drop(columns=[c for c in columns if table[c].isna().all()])
     if output_dir is not None:
-        _copy_plots(table, qc_dir, output_dir)
+        _copy_plots(table, qc_dir, output_dir, list(registrations))
     if metrics is not None:
         table = table.join(metrics, on="Session")
 
