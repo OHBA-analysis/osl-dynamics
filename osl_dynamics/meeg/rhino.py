@@ -278,6 +278,7 @@ def extract_surfaces(
     do_mri2mniaxes_xform: bool = True,
     bet_fval: float | None = None,
     nonlinear_registration: bool = True,
+    crop_fov: bool = False,
     show: bool = False,
 ) -> None:
     """Extract surfaces.
@@ -351,6 +352,13 @@ def extract_surfaces(
         A warning is printed if the registration looks poor. FNIRT increases
         the mutual information when it works, so if it does not the affine
         registration is used instead.
+    crop_fov : bool, optional
+        Should we crop the MRI to the head with FSL's robustfov before
+        extracting the surfaces? This removes the neck and lower head,
+        keeping 170 mm along the third voxel axis (assumed to run
+        inferior-superior). The sform is kept, so the cropped MRI is in the
+        same native/MRI space. Useful for MRIs with a large field of view,
+        e.g. head-and-neck scans, whose registration to MNI space can fail.
     show : bool, optional
         Whether to display the surface plots interactively. Default is
         False (suitable for batch processing).
@@ -381,6 +389,16 @@ def extract_surfaces(
     # Copy MRI to new file for modification
     img = nib.load(mri_file)
     nib.save(img, surfaces.mri_file)
+
+    if crop_fov:
+        # Remove the neck and lower head, which can make the registration to
+        # MNI space fail. robustfov keeps the sform
+        #
+        # Command: robustfov -i <mri_file> -r <cropped_mri_file>
+        print("Cropping the field of view to the head")
+        cropped_mri_file = f"{surfaces.root}/smri_cropped.nii.gz"
+        fsl_wrappers.robustfov(surfaces.mri_file, output=cropped_mri_file)
+        os.replace(cropped_mri_file, surfaces.mri_file)
 
     # We will always use the sform, and so we will set the qform to be same
     # to stop the original qform from being used by mistake (e.g. by flirt)
@@ -2864,8 +2882,9 @@ def _report_mni_registration(
             "WARNING: the registration to MNI space looks poor (brain overlap "
             f"{quality[used]['dice']:.2f}). Check "
             f"{surfaces.mni_registration_plot_file}. A cropped field of view, a "
-            "strong bias field, a wrong sform or poor skull stripping (bet_fval) "
-            "can all cause this."
+            "large field of view including the neck (crop_fov), a strong bias "
+            "field, a wrong sform or poor skull stripping (bet_fval) can all "
+            "cause this."
         )
     if nonlinear and used == "affine":
         print(
