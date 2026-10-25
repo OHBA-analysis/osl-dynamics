@@ -3,8 +3,6 @@
 - Should achieve a dice score of ~0.99.
 """
 
-print("Importing packages")
-
 import os
 import numpy as np
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis

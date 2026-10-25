@@ -1555,8 +1555,6 @@ def plot_group_nnmf_tde_hmm_networks(
     mp = np.mean(mgpsd, axis=0)
 
     # Plot PSDs
-    from osl_dynamics.utils import plotting
-
     cmap = plt.get_cmap("tab10")
     for i in range(p.shape[0]):
         fig, ax = plotting.plot_line(

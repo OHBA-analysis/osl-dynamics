@@ -17,10 +17,6 @@ from nilearn.plotting import plot_markers, plot_img_on_surf
 from osl_dynamics.utils.array_ops import get_one_hot
 from osl_dynamics.utils.misc import override_dict_defaults, warn_mask_file_unused
 from osl_dynamics.utils.topoplots import Topology
-from osl_dynamics.meeg.parcellation import (
-    Parcellation,
-    parcel_vector_to_nifti,
-)
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -1672,6 +1668,8 @@ def plot_brain_surface(
     ax : plt.axes
         Matplotlib axis object. Only returned if :code:`filename` is None.
     """
+    from osl_dynamics.meeg.parcellation import parcel_vector_to_nifti
+
     warn_mask_file_unused(mask_file)
     if vmin is None:
         vmin = np.min(values)
@@ -2102,6 +2100,8 @@ def plot_psd_topo(
         Matplotlib axis object(s). Only returned if :code:`ax=None` and
         :code:`filename=None`.
     """
+    from osl_dynamics.meeg.parcellation import Parcellation
+
     if frequency_range is None:
         frequency_range = [f[0], f[-1]]
 

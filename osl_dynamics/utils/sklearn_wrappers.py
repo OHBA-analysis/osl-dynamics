@@ -9,8 +9,6 @@ from scipy import special, stats
 from sklearn.linear_model import LinearRegression
 from sklearn.mixture import GaussianMixture
 
-from osl_dynamics.utils import plotting
-
 _logger = logging.getLogger("osl-dynamics")
 
 
@@ -163,6 +161,8 @@ def fit_gaussian_mixture(
     threshold : float
         Threshold for the on class.
     """
+    from osl_dynamics.utils import plotting
+
     if sklearn_kwargs is None:
         sklearn_kwargs = {}
 

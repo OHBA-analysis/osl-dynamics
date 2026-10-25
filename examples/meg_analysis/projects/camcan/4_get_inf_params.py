@@ -17,7 +17,6 @@ output_dir = f"results/inf_params/{n_states:02d}_states"
 
 os.makedirs(output_dir, exist_ok=True)
 
-print("Importing packages")
 import pickle
 import numpy as np
 from osl_dynamics.data import load_tfrecord_dataset

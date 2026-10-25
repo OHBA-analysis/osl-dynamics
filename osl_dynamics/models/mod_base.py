@@ -12,19 +12,12 @@ from dataclasses import dataclass
 from io import StringIO
 from contextlib import contextmanager
 from typing import Generator, List, Optional, Tuple, Union
-from packaging import version
 
 import yaml
 import numpy as np
 import tensorflow as tf
 from tensorflow.data import Dataset
 from tensorflow.keras import optimizers
-from tensorflow.python.distribute.mirrored_strategy import MirroredStrategy
-
-if version.parse(tf.__version__) < version.parse("2.13"):
-    from tensorflow.python.distribute.distribution_strategy_context import get_strategy
-else:
-    from tensorflow.python.distribute.distribute_lib import get_strategy
 
 try:
     # Keras scales the loss by the number of GPUs and unscales it to report it
@@ -107,9 +100,9 @@ class BaseModelConfig:
 
         # Strategy for distributed learning
         if self.multi_gpu:
-            self.strategy = MirroredStrategy()
+            self.strategy = tf.distribute.MirroredStrategy()
         elif self.strategy is None:
-            self.strategy = get_strategy()
+            self.strategy = tf.distribute.get_strategy()
 
     def validate_dimension_parameters(self) -> None:
         if self.n_modes is None and self.n_states is None:
@@ -733,7 +726,7 @@ class ModelBase:
             inputs = data.Data(inputs)
 
         if isinstance(inputs, data.Data):
-            if isinstance(self.config.strategy, MirroredStrategy):
+            if isinstance(self.config.strategy, tf.distribute.MirroredStrategy):
                 _logger.warning(
                     "Using multiple GPUs with a Data object. Consider a "
                     "TFRecord dataset (Data.save_tfrecord_dataset and "
@@ -1082,4 +1075,4 @@ class ModelBase:
     @property
     def is_multi_gpu(self) -> bool:
         """Returns True if the model's strategy is MirroredStrategy."""
-        return isinstance(self.config.strategy, MirroredStrategy)
+        return isinstance(self.config.strategy, tf.distribute.MirroredStrategy)

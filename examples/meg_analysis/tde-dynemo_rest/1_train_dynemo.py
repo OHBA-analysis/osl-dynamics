@@ -12,7 +12,6 @@ run = int(argv[2])
 
 #%% Import packages
 
-print("Importing packages")
 import pickle
 from osl_dynamics.data import Data
 from osl_dynamics.models.dynemo import Config, Model

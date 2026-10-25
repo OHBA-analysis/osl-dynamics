@@ -33,4 +33,4 @@ from osl_dynamics.files import (
     scene,
     surface,
 )
-from osl_dynamics.files.functions import *
+from osl_dynamics.files.functions import check_exists

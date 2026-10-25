@@ -19,8 +19,6 @@ os.makedirs(results_dir, exist_ok=True)
 
 #%% Import packages
 
-print("Importing packages")
-
 import pickle
 import numpy as np
 

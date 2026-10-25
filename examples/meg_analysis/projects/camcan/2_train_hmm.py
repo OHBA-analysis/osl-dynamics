@@ -15,7 +15,6 @@ run = int(argv[2])
 
 output_dir = f"results/models/{n_states:02d}_states/run{run:02d}"
 
-print("Importing packages")
 import pickle
 from osl_dynamics.data import load_tfrecord_dataset
 from osl_dynamics.models.hmm import Config, Model

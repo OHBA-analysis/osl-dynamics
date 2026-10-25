@@ -17,7 +17,6 @@ import mne
 import numpy as np
 
 from osl_dynamics.data import processing
-from osl_dynamics.meeg.parcellation import convert_to_mne_raw, save_as_fif
 
 
 def calc_cov(
@@ -408,6 +407,8 @@ def sign_flip_mne_raw(
 
         raw = sign_flipping.sign_flip_mne_raw("lcmv-parc-raw.fif", "template_cov.npy")
     """
+    from osl_dynamics.meeg.parcellation import convert_to_mne_raw, save_as_fif
+
     if isinstance(fif, mne.io.BaseRaw):
         raw = fif
     else:

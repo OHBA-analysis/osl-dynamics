@@ -12,7 +12,6 @@ run = int(argv[2])
 
 #%% Import packages
 
-print("Importing packages")
 import os
 import mne
 import pickle

@@ -6,9 +6,14 @@ from importlib.metadata import PackageNotFoundError, version
 # TensorFlow is imported)
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "1")
 
-from osl_dynamics.utils.logger import _setup_logger, set_verbosity
+from osl_dynamics.utils.logger import (
+    _setup_logger,
+    _setup_tensorflow_import_message,
+    set_verbosity,
+)
 
 _setup_logger()
+_setup_tensorflow_import_message()
 
 from osl_dynamics.config_api.pipeline import run_pipeline
 from osl_dynamics import meeg
@@ -22,4 +27,4 @@ finally:
     del version, PackageNotFoundError
 
 logging.getLogger("osl-dynamics").debug("Version %s", __version__)
-del logging, os, _setup_logger
+del logging, os, _setup_logger, _setup_tensorflow_import_message

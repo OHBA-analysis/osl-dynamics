@@ -1,5 +1,6 @@
 """Logging utilities."""
 
+import importlib.abc
 import logging
 import os
 import sys
@@ -71,6 +72,28 @@ def set_verbosity(level: Union[str, int]) -> None:
         level = level.upper()
     _logger.setLevel(level)
     _handler.setFormatter(_Formatter(debug=_logger.isEnabledFor(logging.DEBUG)))
+
+
+class _TensorFlowImportMessage(importlib.abc.MetaPathFinder):
+    """Prints a message when TensorFlow is first imported.
+
+    Importing TensorFlow can take a long time (particularly on a slow
+    filesystem), so a message is printed to say what is happening. This
+    finder never finds a module itself, it just logs when the import is
+    requested and then removes itself.
+    """
+
+    def find_spec(self, name, path=None, target=None):
+        if name == "tensorflow" and "tensorflow" not in sys.modules:
+            sys.meta_path.remove(self)
+            _logger.info("Importing TensorFlow, this can take a while...")
+        return None
+
+
+def _setup_tensorflow_import_message() -> None:
+    """Print a message when TensorFlow is first imported."""
+    if "tensorflow" not in sys.modules:
+        sys.meta_path.insert(0, _TensorFlowImportMessage())
 
 
 @contextmanager

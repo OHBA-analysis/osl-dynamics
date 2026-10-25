@@ -15,7 +15,7 @@ from sklearn.cluster import AgglomerativeClustering
 
 from osl_dynamics.analysis import post_hoc
 from osl_dynamics.inference import metrics
-from osl_dynamics.utils import array_ops, sklearn_wrappers, plotting
+from osl_dynamics.utils import array_ops, sklearn_wrappers
 from osl_dynamics.utils.misc import override_dict_defaults
 from osl_dynamics.utils.progress import progress
 
@@ -115,6 +115,8 @@ def gmm_time_courses(
         GMM time courses with binary entries. Shape is
         (n_sessions, n_samples, n_modes) or (n_samples, n_modes).
     """
+    from osl_dynamics.utils import plotting
+
     if plot_kwargs is None:
         plot_kwargs = {}
 

@@ -4,8 +4,6 @@ This script should take less than a couple minutes to run and
 achieve a dice coefficient of ~0.99.
 """
 
-print("Importing packages")
-
 import os
 import pickle
 import numpy as np

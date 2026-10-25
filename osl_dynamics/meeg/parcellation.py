@@ -21,7 +21,7 @@ from osl_dynamics.meeg.session import (
     read_data,
 )
 
-from . import source_recon
+from osl_dynamics.meeg import source_recon
 
 _logger = logging.getLogger("osl-dynamics")
 
