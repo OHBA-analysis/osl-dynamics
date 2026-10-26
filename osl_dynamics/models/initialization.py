@@ -191,10 +191,11 @@ class InitializationMixin:
     # Multi-start loop
 
     def _initialization_settings(self, n_epochs, n_init, take):
-        """Fill in settings from the config."""
+        """Fill in settings from the config. n_init=0 skips the
+        initialization, so only None takes the config value."""
         return (
             n_epochs or self.config.n_init_epochs,
-            n_init or self.config.n_init,
+            self.config.n_init if n_init is None else n_init,
             take or self.config.init_take,
         )
 
