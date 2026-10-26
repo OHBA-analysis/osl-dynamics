@@ -31,7 +31,7 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelBase,
     VariationalInferenceModelConfig,
 )
-from osl_dynamics.models.initialization import nfindr_covariances
+from osl_dynamics.models.initialization import N_FEATURE_BATCHES, nfindr_covariances
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.utils.logger import set_logging_level
 from osl_dynamics.utils.progress import progress
@@ -499,6 +499,7 @@ class Model(VariationalInferenceModelBase):
         take: Optional[float] = None,
         window_length: int = 20,
         n_restarts: int = 10,
+        n_batches: Optional[int] = N_FEATURE_BATCHES,
         **kwargs,
     ) -> Optional[dict]:
         """N-FINDR initialization.
@@ -510,7 +511,8 @@ class Model(VariationalInferenceModelBase):
         :func:`osl_dynamics.models.initialization.nfindr_covariances`) and
         the model is then trained for a few epochs with different random
         subsets of the training dataset, each starting from these
-        covariances. The best model is kept.
+        covariances. The best model is kept and a later :code:`reset()`
+        returns to its covariances.
 
         Assumes zero-mean data (the means are not initialized). If the
         covariances are not learnt or :code:`initial_covariances` were
@@ -538,6 +540,12 @@ class Model(VariationalInferenceModelBase):
             length.
         n_restarts : int, optional
             Number of random starts for N-FINDR.
+        n_batches : int, optional
+            Number of batches the windows are cut from, :code:`None` for
+            the whole dataset (after :code:`take`). The windows are held in
+            memory and each one stores the upper triangle of a covariance,
+            so using the whole dataset can need more memory than the data.
+            More windows make it more likely the purest windows are found.
         kwargs : keyword arguments, optional
             Keyword arguments for the fit method. Also accepts
             :code:`n_kl_annealing_epochs`.
@@ -564,22 +572,25 @@ class Model(VariationalInferenceModelBase):
                 "not initialized."
             )
 
-        _logger.info("Setting covariances with N-FINDR")
-        dataset = self.make_dataset(training_data, shuffle=False, concatenate=True)
-        sequences = [x for batch in dataset for x in batch["data"].numpy()]
-        covariances = nfindr_covariances(
-            sequences,
-            self.config.n_modes,
-            window_length=window_length,
-            n_restarts=n_restarts,
-            random_seed=np.random.randint(2**31 - 1),
-        )
-        self.set_covariances(covariances, update_initializer=True)
-
-        # reset() returns to the N-FINDR covariances, so the candidates only
-        # differ in the other weights and the subset of data
         def make_candidates(dataset, n_init):
-            return [(str(n), None) for n in range(n_init)]
+            _logger.info("Setting covariances with N-FINDR")
+            if n_batches is not None:
+                dataset = dataset.take(n_batches)
+            sequences = [x for batch in dataset for x in batch["data"].numpy()]
+            covariances = nfindr_covariances(
+                sequences,
+                self.config.n_modes,
+                window_length=window_length,
+                n_restarts=n_restarts,
+                random_seed=np.random.randint(2**31 - 1),
+            )
+
+            # Every candidate starts from the N-FINDR covariances, so they
+            # only differ in the other weights and the order of the batches
+            def setup():
+                self.set_covariances(covariances)
+
+            return [(str(n), setup) for n in range(n_init)]
 
         return self._multistart(
             "N-FINDR",

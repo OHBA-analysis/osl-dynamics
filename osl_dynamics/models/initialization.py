@@ -671,33 +671,57 @@ def nfindr_covariances(
     end-member determination in hyperspectral data", Proc. SPIE 3753 (1999).
     """
     from scipy.optimize import nnls
+    from scipy.sparse.linalg import LinearOperator, svds
 
     if isinstance(time_series, np.ndarray) and time_series.ndim == 2:
         time_series = [time_series]
     n_channels = time_series[0].shape[-1]
     iu = np.triu_indices(n_channels)
 
-    # Window second moments (upper triangles)
-    S = []
+    # Window second moments (upper triangles). There are many more values
+    # than in the data, so they are stored in single precision and S is
+    # never copied below.
+    n_windows = sum(len(x) // window_length for x in time_series)
+    if n_windows < n_modes:
+        raise ValueError("Fewer windows than modes, use a shorter window_length.")
+    S = np.empty([n_windows, len(iu[0])], dtype=np.float32)
+    n = 0
     for x in time_series:
         x = np.asarray(x, dtype=np.float64)
         n_windows = x.shape[0] // window_length
         w = x[: n_windows * window_length].reshape(n_windows, window_length, n_channels)
-        S.append(np.einsum("wti,wtj->wij", w, w)[:, iu[0], iu[1]] / window_length)
-    S = np.concatenate(S)
-    if len(S) < n_modes:
-        raise ValueError("Fewer windows than modes, use a shorter window_length.")
+        # In chunks of windows to limit the memory for the full matrices
+        for i in range(0, n_windows, 1000):
+            c = w[i : i + 1000]
+            s = np.einsum("wti,wtj->wij", c, c)[:, iu[0], iu[1]]
+            S[n : n + len(c)] = s / window_length
+            n += len(c)
 
-    # Principal components (signal subspace of the simplex)
+    # Top principal components (signal subspace of the simplex). Only the
+    # subspace matters, not the order of the components.
+    rng = np.random.default_rng(random_seed)
     mu = S.mean(axis=0)
-    Sc = S - mu
-    _, eigvecs = np.linalg.eigh(Sc.T @ Sc)
-    Y = np.c_[np.ones(len(S)), Sc @ eigvecs[:, ::-1][:, : n_modes - 1]]
+    S -= mu
+    k = n_modes - 1
+    if 0 < k < min(S.shape):
+        # A linear operator stops svds copying S
+        operator = LinearOperator(
+            S.shape,
+            matvec=lambda v: S @ v,
+            rmatvec=lambda v: S.T @ v,
+            matmat=lambda V: S @ V,
+            rmatmat=lambda V: S.T @ V,
+            dtype=S.dtype,
+        )
+        v0 = rng.standard_normal(min(S.shape)).astype(S.dtype)
+        components = svds(operator, k=k, v0=v0)[2]
+    else:
+        components = np.linalg.svd(S, full_matrices=False)[2][:k]
+    Y = np.c_[np.ones(len(S)), S @ components.T].astype(np.float64)
 
     # N-FINDR. The simplex volume is proportional to |det(Y[idx])|, which is
     # linear in each row, so all replacements of row j are scored at once
     # with the j-th column of the adjugate.
-    rng = np.random.default_rng(random_seed)
     best_idx, best_volume = None, -np.inf
     for _ in range(n_restarts):
         idx = rng.choice(len(Y), n_modes, replace=False)
@@ -731,8 +755,11 @@ def nfindr_covariances(
         A[i] = nnls(vertices, target)[0]
     A /= A.sum(axis=1, keepdims=True)
 
-    # Least-squares covariances from all windows
-    D = np.linalg.lstsq(A, S, rcond=None)[0]
+    # Least-squares covariances from all windows, using the normal equations
+    # (lstsq on S needs several copies of it). The rows of A sum to one, so
+    # the mean removed from S is added back to every covariance.
+    AtS = (A.T.astype(S.dtype) @ S).astype(np.float64)
+    D = np.linalg.lstsq(A.T @ A, AtS, rcond=None)[0] + mu
     covariances = np.zeros([n_modes, n_channels, n_channels])
     covariances[:, iu[0], iu[1]] = D
     covariances += np.triu(covariances, 1).transpose(0, 2, 1)
