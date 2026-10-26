@@ -16,6 +16,9 @@ The candidate generators are:
 - :code:`random_state_time_course`: each state's window is the data
   assigned to it by a sampled state time course.
 
+:func:`nfindr_covariances` estimates starting covariances for a soft
+mixture of modes (used by DyNeMo's :code:`nfindr_initialization`).
+
 Models customise the loop through hooks:
 
 - :meth:`InitializationMixin._initialization_context`: settings that only
@@ -28,7 +31,7 @@ Models customise the loop through hooks:
 
 import logging
 from contextlib import contextmanager
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -609,3 +612,136 @@ class InitializationMixin:
 
         with self._initialization_context(**context_kwargs):
             return self._run_multistart(candidates, n_epochs, **kwargs)
+
+
+def nfindr_covariances(
+    time_series: Union[np.ndarray, List[np.ndarray]],
+    n_modes: int,
+    window_length: int = 20,
+    n_restarts: int = 10,
+    eigenvalue_floor: float = 1e-2,
+    random_seed: Optional[int] = None,
+) -> np.ndarray:
+    """Estimate mode covariances for a soft mixture with N-FINDR.
+
+    Under :code:`C_t = sum_k alpha_tk C_k` (zero mean), the second moment of
+    a window is linear in the window-mean alpha, which lies on the simplex:
+    :code:`E[S_w] = sum_k a_wk C_k`. So the window second moments lie in a
+    simplex whose vertices are the mode covariances (the linear mixing model
+    of hyperspectral unmixing). This function:
+
+    1. Computes second moments of non-overlapping windows.
+    2. Projects them onto their top :code:`n_modes - 1` principal
+       components.
+    3. Finds the :code:`n_modes` windows spanning the largest simplex
+       (N-FINDR, Winter 1999).
+    4. Computes each window's non-negative, sum-to-one coordinates relative
+       to those vertices and fits the covariances to all windows by least
+       squares.
+    5. Floors the eigenvalues so each covariance is positive definite.
+
+    Note, if no window is close to pure for a mode, the vertex found for it
+    is a mixture; the covariances are then a denoised estimate of the purest
+    windows rather than the pure modes.
+
+    Parameters
+    ----------
+    time_series : list of np.ndarray or np.ndarray
+        Time series for each session (or sequence). Each array has shape
+        (n_samples, n_channels). Assumed to have zero mean.
+    n_modes : int
+        Number of modes.
+    window_length : int, optional
+        Number of samples in each window.
+    n_restarts : int, optional
+        Number of random starts for N-FINDR.
+    eigenvalue_floor : float, optional
+        Eigenvalues are floored at this fraction of their mean.
+    random_seed : int, optional
+        Seed for the N-FINDR starts.
+
+    Returns
+    -------
+    covariances : np.ndarray
+        Mode covariances. Shape is (n_modes, n_channels, n_channels).
+
+    References
+    ----------
+    M. E. Winter, "N-FINDR: an algorithm for fast autonomous spectral
+    end-member determination in hyperspectral data", Proc. SPIE 3753 (1999).
+    """
+    from scipy.optimize import nnls
+
+    if isinstance(time_series, np.ndarray) and time_series.ndim == 2:
+        time_series = [time_series]
+    n_channels = time_series[0].shape[-1]
+    iu = np.triu_indices(n_channels)
+
+    # Window second moments (upper triangles)
+    S = []
+    for x in time_series:
+        x = np.asarray(x, dtype=np.float64)
+        n_windows = x.shape[0] // window_length
+        w = x[: n_windows * window_length].reshape(n_windows, window_length, n_channels)
+        S.append(np.einsum("wti,wtj->wij", w, w)[:, iu[0], iu[1]] / window_length)
+    S = np.concatenate(S)
+    if len(S) < n_modes:
+        raise ValueError("Fewer windows than modes, use a shorter window_length.")
+
+    # Principal components (signal subspace of the simplex)
+    mu = S.mean(axis=0)
+    Sc = S - mu
+    _, eigvecs = np.linalg.eigh(Sc.T @ Sc)
+    Y = np.c_[np.ones(len(S)), Sc @ eigvecs[:, ::-1][:, : n_modes - 1]]
+
+    # N-FINDR. The simplex volume is proportional to |det(Y[idx])|, which is
+    # linear in each row, so all replacements of row j are scored at once
+    # with the j-th column of the adjugate.
+    rng = np.random.default_rng(random_seed)
+    best_idx, best_volume = None, -np.inf
+    for _ in range(n_restarts):
+        idx = rng.choice(len(Y), n_modes, replace=False)
+        for _ in range(100):
+            improved = False
+            for j in range(n_modes):
+                M = Y[idx]
+                det = np.linalg.det(M)
+                if det == 0:
+                    break
+                volumes = np.abs(Y @ (det * np.linalg.inv(M)[:, j]))
+                w = np.argmax(volumes)
+                if volumes[w] > abs(det) * (1 + 1e-9):
+                    idx[j] = w
+                    improved = True
+            if not improved:
+                break
+        volume = abs(np.linalg.det(Y[idx]))
+        if volume > best_volume:
+            best_idx, best_volume = idx.copy(), volume
+
+    # Sum-to-one, non-negative coordinates of every window (the sum-to-one
+    # constraint is the heavily weighted first column of Y)
+    weight = 100
+    vertices = Y[best_idx].T.copy()
+    vertices[0] *= weight
+    A = np.empty((len(Y), n_modes))
+    for i, y in enumerate(Y):
+        target = y.copy()
+        target[0] *= weight
+        A[i] = nnls(vertices, target)[0]
+    A /= A.sum(axis=1, keepdims=True)
+
+    # Least-squares covariances from all windows
+    D = np.linalg.lstsq(A, S, rcond=None)[0]
+    covariances = np.zeros([n_modes, n_channels, n_channels])
+    covariances[:, iu[0], iu[1]] = D
+    covariances += np.triu(covariances, 1).transpose(0, 2, 1)
+
+    # Positive definite with an eigenvalue floor
+    eigvals, eigvecs = np.linalg.eigh(covariances)
+    eigvals = np.maximum(
+        eigvals, eigenvalue_floor * eigvals.mean(axis=-1, keepdims=True)
+    )
+    covariances = np.einsum("kij,kj,klj->kil", eigvecs, eigvals, eigvecs)
+
+    return covariances.astype(np.float32)
