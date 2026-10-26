@@ -17,7 +17,8 @@ The candidate generators are:
   assigned to it by a sampled state time course.
 
 :func:`nfindr_covariances` estimates starting covariances for a soft
-mixture of modes (used by DyNeMo's :code:`nfindr_initialization`).
+mixture of modes (used by :code:`nfindr_initialization`, for models that
+set :meth:`InitializationMixin._supports_nfindr_initialization`).
 
 Models customise the loop through hooks:
 
@@ -113,6 +114,16 @@ class InitializationMixin:
     def _supports_feature_initialization(self) -> bool:
         """Can this model set its parameters from window features?"""
         return hasattr(self, "set_covariances")
+
+    @property
+    def _supports_nfindr_initialization(self) -> bool:
+        """Are the covariances at each time point a mixture of the mode
+        covariances, which can be set directly?"""
+        return False
+
+    def _set_nfindr_covariances(self, covariances: np.ndarray) -> None:
+        """Set the mode covariances found with N-FINDR."""
+        self.set_covariances(covariances)
 
     @property
     def _min_window_samples(self) -> int:
@@ -561,6 +572,122 @@ class InitializationMixin:
             training_dataset, stay_prob, n_batches
         )
         self._set_parameters_from_features(features)
+
+    def nfindr_initialization(
+        self,
+        training_data,
+        n_epochs: Optional[int] = None,
+        n_init: Optional[int] = None,
+        take: Optional[float] = None,
+        window_length: int = 20,
+        n_restarts: int = 10,
+        n_batches: Optional[int] = N_FEATURE_BATCHES,
+        **kwargs,
+    ) -> Optional[dict]:
+        """N-FINDR initialization.
+
+        For models whose covariance at each time point is a sum-to-one
+        mixture of the mode covariances (e.g. DyNeMo and DIVE's group
+        covariances), the second moment of a short window of data is also a
+        mixture, so the windows lie in a simplex whose vertices are the mode
+        covariances. The mode covariances are set to the vertices found with
+        N-FINDR (see :func:`nfindr_covariances`) and the model is then
+        trained for a few epochs with different random subsets of the
+        training dataset, each starting from these covariances. The best
+        model is kept and a later :code:`reset()` returns to its
+        covariances.
+
+        Assumes zero-mean data (the means are not initialized). If the
+        covariances are not learnt or :code:`initial_covariances` were
+        passed, the covariances are left as they are and this is the same
+        as :code:`random_subset_initialization`.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training. The windows are cut from the
+            sequences the model is trained on, so for a Data object only
+            the sessions in :code:`training_data.keep` are used.
+        n_epochs : int, optional
+            Number of epochs to train the model.
+            By default we use the value passed in the config.
+        n_init : int, optional
+            Number of initializations.
+            By default we use the value passed in the config.
+        take : float, optional
+            Fraction of total batches to take.
+            By default we use the value passed in the config.
+        window_length : int, optional
+            Number of samples in each window. Shorter windows are closer to
+            a single mode but noisier. Should be at most the sequence
+            length.
+        n_restarts : int, optional
+            Number of random starts for N-FINDR.
+        n_batches : int, optional
+            Number of batches the windows are cut from, :code:`None` for
+            the whole dataset (after :code:`take`). The windows are held in
+            memory and each one stores the upper triangle of a covariance,
+            so using the whole dataset can need more memory than the data.
+            More windows make it more likely the purest windows are found.
+        kwargs : keyword arguments, optional
+            Keyword arguments for the fit method. Variational models also
+            accept :code:`n_kl_annealing_epochs`.
+
+        Returns
+        -------
+        history : dict
+            The training history of the best initialization.
+        """
+        if not self._supports_nfindr_initialization:
+            raise NotImplementedError(
+                f"{self.config.model_name} does not support N-FINDR initialization."
+            )
+        if (
+            not self.config.learn_covariances
+            or self.config.initial_covariances is not None
+        ):
+            _logger.warning(
+                "The covariances are fixed or were passed, so they are not "
+                "initialized with N-FINDR. Using random subset initialization."
+            )
+            return self.random_subset_initialization(
+                training_data, n_epochs, n_init, take, **kwargs
+            )
+        if self.config.learn_means:
+            _logger.warning(
+                "N-FINDR initialization assumes zero-mean data. The means are "
+                "not initialized."
+            )
+
+        def make_candidates(dataset, n_init):
+            _logger.info("Setting covariances with N-FINDR")
+            if n_batches is not None:
+                dataset = dataset.take(n_batches)
+            sequences = [x for batch in dataset for x in batch["data"].numpy()]
+            covariances = nfindr_covariances(
+                sequences,
+                self._n_states,
+                window_length=window_length,
+                n_restarts=n_restarts,
+                random_seed=np.random.randint(2**31 - 1),
+            )
+
+            # Every candidate starts from the N-FINDR covariances, so they
+            # only differ in the other weights and the order of the batches
+            def setup():
+                self._set_nfindr_covariances(covariances)
+
+            return [(str(n), setup) for n in range(n_init)]
+
+        return self._multistart(
+            "N-FINDR",
+            training_data,
+            make_candidates,
+            n_epochs,
+            n_init,
+            take,
+            kwargs,
+        )
 
     def single_subject_initialization(
         self,

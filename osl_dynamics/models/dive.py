@@ -131,6 +131,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
     init_method : str
         Initialization method to use. Defaults to 'random_subset'.
+        Use 'nfindr' to start the group covariances from the corners of the
+        data (:code:`nfindr_initialization`).
     n_init : int
         Number of initializations. Defaults to 5.
     n_init_epochs : int
@@ -943,6 +945,13 @@ class Model(VariationalInferenceModelBase):
             initial_embeddings,
         )
         self.reset()
+
+    @property
+    def _supports_nfindr_initialization(self) -> bool:
+        return True
+
+    def _set_nfindr_covariances(self, covariances: np.ndarray) -> None:
+        self.set_group_covariances(covariances)
 
     def set_group_means(
         self, group_means: np.ndarray, update_initializer: bool = True

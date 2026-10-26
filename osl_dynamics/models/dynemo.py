@@ -31,7 +31,6 @@ from osl_dynamics.models.inf_mod_base import (
     VariationalInferenceModelBase,
     VariationalInferenceModelConfig,
 )
-from osl_dynamics.models.initialization import N_FEATURE_BATCHES, nfindr_covariances
 from osl_dynamics.models.mod_base import BaseModelConfig
 from osl_dynamics.utils.logger import set_logging_level
 from osl_dynamics.utils.progress import progress
@@ -125,7 +124,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     init_method : str
         Initialization method to use. Defaults to 'random_subset'.
         Use 'nfindr' to start the mode covariances from the corners of the
-        data (:code:`Model.nfindr_initialization`).
+        data (:code:`nfindr_initialization`).
     n_init : int
         Number of initializations. Defaults to 5.
     n_init_epochs : int
@@ -491,116 +490,9 @@ class Model(VariationalInferenceModelBase):
                 self.config.diagonal_covariances,
             )
 
-    def nfindr_initialization(
-        self,
-        training_data,
-        n_epochs: Optional[int] = None,
-        n_init: Optional[int] = None,
-        take: Optional[float] = None,
-        window_length: int = 20,
-        n_restarts: int = 10,
-        n_batches: Optional[int] = N_FEATURE_BATCHES,
-        **kwargs,
-    ) -> Optional[dict]:
-        """N-FINDR initialization.
-
-        Under DyNeMo's model, the second moment of a short window of data is
-        a sum-to-one mixture of the mode covariances, so the windows lie in
-        a simplex whose vertices are the mode covariances. The mode
-        covariances are set to the vertices found with N-FINDR (see
-        :func:`osl_dynamics.models.initialization.nfindr_covariances`) and
-        the model is then trained for a few epochs with different random
-        subsets of the training dataset, each starting from these
-        covariances. The best model is kept and a later :code:`reset()`
-        returns to its covariances.
-
-        Assumes zero-mean data (the means are not initialized). If the
-        covariances are not learnt or :code:`initial_covariances` were
-        passed, the covariances are left as they are and this is the same
-        as :code:`random_subset_initialization`.
-
-        Parameters
-        ----------
-        training_data : tf.data.Dataset or osl_dynamics.data.Data
-            Dataset to use for training. The windows are cut from the
-            sequences the model is trained on, so for a Data object only
-            the sessions in :code:`training_data.keep` are used.
-        n_epochs : int, optional
-            Number of epochs to train the model.
-            By default we use the value passed in the config.
-        n_init : int, optional
-            Number of initializations.
-            By default we use the value passed in the config.
-        take : float, optional
-            Fraction of total batches to take.
-            By default we use the value passed in the config.
-        window_length : int, optional
-            Number of samples in each window. Shorter windows are closer to
-            a single mode but noisier. Should be at most the sequence
-            length.
-        n_restarts : int, optional
-            Number of random starts for N-FINDR.
-        n_batches : int, optional
-            Number of batches the windows are cut from, :code:`None` for
-            the whole dataset (after :code:`take`). The windows are held in
-            memory and each one stores the upper triangle of a covariance,
-            so using the whole dataset can need more memory than the data.
-            More windows make it more likely the purest windows are found.
-        kwargs : keyword arguments, optional
-            Keyword arguments for the fit method. Also accepts
-            :code:`n_kl_annealing_epochs`.
-
-        Returns
-        -------
-        history : dict
-            The training history of the best initialization.
-        """
-        if (
-            not self.config.learn_covariances
-            or self.config.initial_covariances is not None
-        ):
-            _logger.warning(
-                "The covariances are fixed or were passed, so they are not "
-                "initialized with N-FINDR. Using random subset initialization."
-            )
-            return self.random_subset_initialization(
-                training_data, n_epochs, n_init, take, **kwargs
-            )
-        if self.config.learn_means:
-            _logger.warning(
-                "N-FINDR initialization assumes zero-mean data. The means are "
-                "not initialized."
-            )
-
-        def make_candidates(dataset, n_init):
-            _logger.info("Setting covariances with N-FINDR")
-            if n_batches is not None:
-                dataset = dataset.take(n_batches)
-            sequences = [x for batch in dataset for x in batch["data"].numpy()]
-            covariances = nfindr_covariances(
-                sequences,
-                self.config.n_modes,
-                window_length=window_length,
-                n_restarts=n_restarts,
-                random_seed=np.random.randint(2**31 - 1),
-            )
-
-            # Every candidate starts from the N-FINDR covariances, so they
-            # only differ in the other weights and the order of the batches
-            def setup():
-                self.set_covariances(covariances)
-
-            return [(str(n), setup) for n in range(n_init)]
-
-        return self._multistart(
-            "N-FINDR",
-            training_data,
-            make_candidates,
-            n_epochs,
-            n_init,
-            take,
-            kwargs,
-        )
+    @property
+    def _supports_nfindr_initialization(self) -> bool:
+        return True
 
     def sample_alpha(
         self, n_samples: int, theta: Optional[np.ndarray] = None
