@@ -83,16 +83,32 @@ Once you have created the :code:`osld` conda environment (see instructions above
 Copy the source code (optional)
 -------------------------------
 
-Once you have created the :code:`osld` conda environment (see instructions above) you can install a local copy of the source code (`GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_) into it:
+If you want to make your own changes to osl-dynamics, we recommend you work on a fork of the `GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_. A fork is your own copy of the repository on GitHub, so you can save your changes there (and share them with others) without needing write access to the main repository.
+
+First, create a fork by clicking the 'Fork' button at the top right of the `GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_ webpage. Then, once you have created the :code:`osld` conda environment (see instructions above), you can install a local copy of your fork into it:
 
 .. code::
 
-    git clone https://github.com/OHBA-analysis/osl-dynamics.git
+    git clone https://github.com/<your-username>/osl-dynamics.git
     conda activate osld
     cd osl-dynamics
     pip install -e .
 
-Now you can run osl-dynamics with your own local changes to the code.
+where :code:`<your-username>` is your GitHub username. Now you can run osl-dynamics with your own local changes to the code.
+
+To get the latest changes from the main repository, add it as a remote called :code:`upstream`:
+
+.. code::
+
+    git remote add upstream https://github.com/OHBA-analysis/osl-dynamics.git
+
+Then you can update your copy with:
+
+.. code::
+
+    git pull upstream main
+
+If you would like your changes to be included in osl-dynamics, push them to your fork and open a pull request on the `GitHub repository <https://github.com/OHBA-analysis/osl-dynamics>`_.
 
 Test your GPUs are working
 --------------------------
