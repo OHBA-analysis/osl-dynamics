@@ -1217,9 +1217,17 @@ def save_qc_plots(
 
     # Save preprocessing summary
     total_duration = raw.times[-1]
-    bad_duration = sum(
-        a["duration"] for a in raw.annotations if a["description"].startswith("bad")
+    bad_segments = sorted(
+        (a["onset"], a["onset"] + a["duration"])
+        for a in raw.annotations
+        if a["description"].startswith("bad")
     )
+    bad_duration = 0.0
+    end = -np.inf
+    for start, stop in bad_segments:
+        if stop > end:
+            bad_duration += stop - max(start, end)
+            end = stop
     summary = {
         "total_duration_s": round(total_duration, 1),
         "bad_duration_s": round(bad_duration, 1),
