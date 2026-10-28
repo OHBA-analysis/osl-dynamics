@@ -677,7 +677,7 @@ class Data:
 
         self.n_pca_components = n_pca_components
         self.pca_components = pca_components
-        self.whiten = whiten
+        self.pca_whiten = whiten
 
         # What data should we apply PCA to?
         arrays = self.raw_data_arrays if use_raw else self.arrays
@@ -828,7 +828,7 @@ class Data:
         self.n_embeddings = n_embeddings
         self.n_pca_components = n_pca_components
         self.pca_components = pca_components
-        self.whiten = whiten
+        self.pca_whiten = whiten
 
         # What data should we use?
         arrays = self.raw_data_arrays if use_raw else self.arrays
@@ -985,6 +985,71 @@ class Data:
             argument_type="args",
             label="session",
         )
+
+        return self
+
+    def whiten(self, eigenvalue_floor: float = 1e-6, use_raw: bool = False) -> "Data":
+        """Whiten each session by its own static covariance.
+
+        Each session is multiplied by the inverse square root of its own
+        covariance matrix (ZCA whitening, see
+        :func:`osl_dynamics.data.processing.whitening_matrix`), so afterwards
+        every session has an identity covariance: unit variances and no static
+        correlation between channels. This is the per-session counterpart of
+        :code:`standardize`, which only equalises the variances, and differs
+        from :code:`pca(whiten=True)`, which whitens with one covariance
+        pooled over all sessions and so leaves each session's own covariance
+        structure in place.
+
+        Use it when sessions differ in their static covariance (different
+        recording systems, modalities or populations) and you want a model to
+        describe only how the covariance varies *within* a session. The
+        static structure it removes is kept in :code:`session_covariances`,
+        so a model's covariances can be mapped back to the original space with
+        :code:`C ** (1/2) @ cov @ C ** (1/2)` for a session (or mean)
+        covariance :code:`C`.
+
+        This is an in-place operation.
+
+        Parameters
+        ----------
+        eigenvalue_floor : float, optional
+            Covariance eigenvalues below this fraction of the largest are
+            raised to it before inversion.
+        use_raw : bool, optional
+            Should we prepare the original 'raw' data that we loaded?
+
+        Returns
+        -------
+        data : osl_dynamics.data.Data
+            The modified Data object, with the attribute
+            :code:`session_covariances` (shape (n_sessions, n_channels,
+            n_channels)) holding each session's covariance before whitening.
+        """
+        self.whiten_eigenvalue_floor = eigenvalue_floor
+
+        # Function to whiten a single array
+        def _apply(array, prepared_data_file):
+            covariance = np.cov(np.asarray(array, dtype=np.float64), rowvar=False)
+            W = processing.whitening_matrix(covariance, eigenvalue_floor)
+            array = (array @ W).astype(np.float32)
+            if self.load_memmaps:
+                array = misc.array_to_memmap(prepared_data_file, array)
+            return array, covariance.astype(np.float32)
+
+        # Whiten each array in parallel
+        arrays = self.raw_data_arrays if use_raw else self.arrays
+        args = zip(arrays, self.prepared_data_filenames)
+        results = parallel_map(
+            _apply,
+            args,
+            desc="Whitening",
+            n_jobs=self.n_jobs,
+            argument_type="args",
+            label="session",
+        )
+        self.arrays = [array for array, _ in results]
+        self.session_covariances = np.stack([cov for _, cov in results])
 
         return self
 
@@ -1157,6 +1222,16 @@ class Data:
                 "amplitude_envelope": {},
                 "moving_average": {"n_window": 5},
                 "standardize": {},
+            }
+            data.prepare(methods)
+
+        TDE-PCA with per-session whitening, for sessions whose static
+        covariances differ (e.g. several recording systems)::
+
+            methods = {
+                "tde_pca": {"n_embeddings": 15, "n_pca_components": 80},
+                "standardize": {},
+                "whiten": {},
             }
             data.prepare(methods)
         """

@@ -36,6 +36,36 @@ def standardize(x: np.ndarray, axis: int = 0, create_copy: bool = True) -> np.nd
     return (x - mean) / std
 
 
+def whitening_matrix(
+    covariance: np.ndarray, eigenvalue_floor: float = 1e-6
+) -> np.ndarray:
+    """Zero-phase (ZCA) whitening matrix.
+
+    Returns :code:`covariance ** (-1/2)`, the symmetric matrix :code:`W` such
+    that :code:`x @ W` has identity covariance when :code:`x` has covariance
+    :code:`covariance`. Of all whitening matrices this is the one that keeps
+    the whitened channels closest to the originals, so channel :code:`i`
+    of the output is still channel :code:`i`.
+
+    Parameters
+    ----------
+    covariance : np.ndarray
+        Covariance matrix. Shape must be (n_channels, n_channels).
+    eigenvalue_floor : float, optional
+        Eigenvalues below this fraction of the largest eigenvalue are raised
+        to it before inversion, so a rank-deficient covariance does not
+        blow up the corresponding directions.
+
+    Returns
+    -------
+    W : np.ndarray
+        Whitening matrix. Shape is (n_channels, n_channels).
+    """
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    eigenvalues = np.maximum(eigenvalues, eigenvalue_floor * eigenvalues.max())
+    return (eigenvectors / np.sqrt(eigenvalues)) @ eigenvectors.T
+
+
 def time_embed(x: np.ndarray, n_embeddings: int) -> np.ndarray:
     """Performs time embedding.
 
