@@ -16,6 +16,10 @@ The candidate generators are:
 - :code:`random_state_time_course`: each state's window is the data
   assigned to it by a sampled state time course.
 
+:func:`nfindr_covariances` estimates starting covariances for a soft
+mixture of modes (used by :code:`nfindr_initialization`, for models that
+set :meth:`InitializationMixin._supports_nfindr_initialization`).
+
 Models customise the loop through hooks:
 
 - :meth:`InitializationMixin._initialization_context`: settings that only
@@ -28,7 +32,7 @@ Models customise the loop through hooks:
 
 import logging
 from contextlib import contextmanager
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -112,6 +116,16 @@ class InitializationMixin:
         return hasattr(self, "set_covariances")
 
     @property
+    def _supports_nfindr_initialization(self) -> bool:
+        """Are the covariances at each time point a mixture of the mode
+        covariances, which can be set directly?"""
+        return False
+
+    def _set_nfindr_covariances(self, covariances: np.ndarray) -> None:
+        """Set the mode covariances found with N-FINDR."""
+        self.set_covariances(covariances)
+
+    @property
     def _min_window_samples(self) -> int:
         """Fewest samples a window needs for its features to be meaningful.
 
@@ -188,10 +202,11 @@ class InitializationMixin:
     # Multi-start loop
 
     def _initialization_settings(self, n_epochs, n_init, take):
-        """Fill in settings from the config."""
+        """Fill in settings from the config. n_init=0 skips the
+        initialization, so only None takes the config value."""
         return (
             n_epochs or self.config.n_init_epochs,
-            n_init or self.config.n_init,
+            self.config.n_init if n_init is None else n_init,
             take or self.config.init_take,
         )
 
@@ -558,6 +573,122 @@ class InitializationMixin:
         )
         self._set_parameters_from_features(features)
 
+    def nfindr_initialization(
+        self,
+        training_data,
+        n_epochs: Optional[int] = None,
+        n_init: Optional[int] = None,
+        take: Optional[float] = None,
+        window_length: int = 20,
+        n_restarts: int = 10,
+        n_batches: Optional[int] = N_FEATURE_BATCHES,
+        **kwargs,
+    ) -> Optional[dict]:
+        """N-FINDR initialization.
+
+        For models whose covariance at each time point is a sum-to-one
+        mixture of the mode covariances (e.g. DyNeMo and DIVE's group
+        covariances), the second moment of a short window of data is also a
+        mixture, so the windows lie in a simplex whose vertices are the mode
+        covariances. The mode covariances are set to the vertices found with
+        N-FINDR (see :func:`nfindr_covariances`) and the model is then
+        trained for a few epochs with different random subsets of the
+        training dataset, each starting from these covariances. The best
+        model is kept and a later :code:`reset()` returns to its
+        covariances.
+
+        Assumes zero-mean data (the means are not initialized). If the
+        covariances are not learnt or :code:`initial_covariances` were
+        passed, the covariances are left as they are and this is the same
+        as :code:`random_subset_initialization`.
+
+        Parameters
+        ----------
+        training_data : tf.data.Dataset or osl_dynamics.data.Data
+            Dataset to use for training. The windows are cut from the
+            sequences the model is trained on, so for a Data object only
+            the sessions in :code:`training_data.keep` are used.
+        n_epochs : int, optional
+            Number of epochs to train the model.
+            By default we use the value passed in the config.
+        n_init : int, optional
+            Number of initializations.
+            By default we use the value passed in the config.
+        take : float, optional
+            Fraction of total batches to take.
+            By default we use the value passed in the config.
+        window_length : int, optional
+            Number of samples in each window. Shorter windows are closer to
+            a single mode but noisier. Should be at most the sequence
+            length.
+        n_restarts : int, optional
+            Number of random starts for N-FINDR.
+        n_batches : int, optional
+            Number of batches the windows are cut from, :code:`None` for
+            the whole dataset (after :code:`take`). The windows are held in
+            memory and each one stores the upper triangle of a covariance,
+            so using the whole dataset can need more memory than the data.
+            More windows make it more likely the purest windows are found.
+        kwargs : keyword arguments, optional
+            Keyword arguments for the fit method. Variational models also
+            accept :code:`n_kl_annealing_epochs`.
+
+        Returns
+        -------
+        history : dict
+            The training history of the best initialization.
+        """
+        if not self._supports_nfindr_initialization:
+            raise NotImplementedError(
+                f"{self.config.model_name} does not support N-FINDR initialization."
+            )
+        if (
+            not self.config.learn_covariances
+            or self.config.initial_covariances is not None
+        ):
+            _logger.warning(
+                "The covariances are fixed or were passed, so they are not "
+                "initialized with N-FINDR. Using random subset initialization."
+            )
+            return self.random_subset_initialization(
+                training_data, n_epochs, n_init, take, **kwargs
+            )
+        if self.config.learn_means:
+            _logger.warning(
+                "N-FINDR initialization assumes zero-mean data. The means are "
+                "not initialized."
+            )
+
+        def make_candidates(dataset, n_init):
+            _logger.info("Setting covariances with N-FINDR")
+            if n_batches is not None:
+                dataset = dataset.take(n_batches)
+            sequences = [x for batch in dataset for x in batch["data"].numpy()]
+            covariances = nfindr_covariances(
+                sequences,
+                self._n_states,
+                window_length=window_length,
+                n_restarts=n_restarts,
+                random_seed=np.random.randint(2**31 - 1),
+            )
+
+            # Every candidate starts from the N-FINDR covariances, so they
+            # only differ in the other weights and the order of the batches
+            def setup():
+                self._set_nfindr_covariances(covariances)
+
+            return [(str(n), setup) for n in range(n_init)]
+
+        return self._multistart(
+            "N-FINDR",
+            training_data,
+            make_candidates,
+            n_epochs,
+            n_init,
+            take,
+            kwargs,
+        )
+
     def single_subject_initialization(
         self,
         training_data,
@@ -609,3 +740,163 @@ class InitializationMixin:
 
         with self._initialization_context(**context_kwargs):
             return self._run_multistart(candidates, n_epochs, **kwargs)
+
+
+def nfindr_covariances(
+    time_series: Union[np.ndarray, List[np.ndarray]],
+    n_modes: int,
+    window_length: int = 20,
+    n_restarts: int = 10,
+    eigenvalue_floor: float = 1e-2,
+    random_seed: Optional[int] = None,
+) -> np.ndarray:
+    """Estimate mode covariances for a soft mixture with N-FINDR.
+
+    Under :code:`C_t = sum_k alpha_tk C_k` (zero mean), the second moment of
+    a window is linear in the window-mean alpha, which lies on the simplex:
+    :code:`E[S_w] = sum_k a_wk C_k`. So the window second moments lie in a
+    simplex whose vertices are the mode covariances (the linear mixing model
+    of hyperspectral unmixing). This function:
+
+    1. Computes second moments of non-overlapping windows.
+    2. Projects them onto their top :code:`n_modes - 1` principal
+       components.
+    3. Finds the :code:`n_modes` windows spanning the largest simplex
+       (N-FINDR, Winter 1999).
+    4. Computes each window's non-negative, sum-to-one coordinates relative
+       to those vertices and fits the covariances to all windows by least
+       squares.
+    5. Floors the eigenvalues so each covariance is positive definite.
+
+    Note, if no window is close to pure for a mode, the vertex found for it
+    is a mixture; the covariances are then a denoised estimate of the purest
+    windows rather than the pure modes.
+
+    Parameters
+    ----------
+    time_series : list of np.ndarray or np.ndarray
+        Time series for each session (or sequence). Each array has shape
+        (n_samples, n_channels). Assumed to have zero mean.
+    n_modes : int
+        Number of modes.
+    window_length : int, optional
+        Number of samples in each window.
+    n_restarts : int, optional
+        Number of random starts for N-FINDR.
+    eigenvalue_floor : float, optional
+        Eigenvalues are floored at this fraction of their mean.
+    random_seed : int, optional
+        Seed for the N-FINDR starts.
+
+    Returns
+    -------
+    covariances : np.ndarray
+        Mode covariances. Shape is (n_modes, n_channels, n_channels).
+
+    References
+    ----------
+    M. E. Winter, "N-FINDR: an algorithm for fast autonomous spectral
+    end-member determination in hyperspectral data", Proc. SPIE 3753 (1999).
+    """
+    from scipy.optimize import nnls
+    from scipy.sparse.linalg import LinearOperator, svds
+
+    if isinstance(time_series, np.ndarray) and time_series.ndim == 2:
+        time_series = [time_series]
+    n_channels = time_series[0].shape[-1]
+    iu = np.triu_indices(n_channels)
+
+    # Window second moments (upper triangles). There are many more values
+    # than in the data, so they are stored in single precision and S is
+    # never copied below.
+    n_windows = sum(len(x) // window_length for x in time_series)
+    if n_windows < n_modes:
+        raise ValueError("Fewer windows than modes, use a shorter window_length.")
+    S = np.empty([n_windows, len(iu[0])], dtype=np.float32)
+    n = 0
+    for x in time_series:
+        x = np.asarray(x, dtype=np.float64)
+        n_windows = x.shape[0] // window_length
+        w = x[: n_windows * window_length].reshape(n_windows, window_length, n_channels)
+        # In chunks of windows to limit the memory for the full matrices
+        for i in range(0, n_windows, 1000):
+            c = w[i : i + 1000]
+            s = np.einsum("wti,wtj->wij", c, c)[:, iu[0], iu[1]]
+            S[n : n + len(c)] = s / window_length
+            n += len(c)
+
+    # Top principal components (signal subspace of the simplex). Only the
+    # subspace matters, not the order of the components.
+    rng = np.random.default_rng(random_seed)
+    mu = S.mean(axis=0)
+    S -= mu
+    k = n_modes - 1
+    if 0 < k < min(S.shape):
+        # A linear operator stops svds copying S
+        operator = LinearOperator(
+            S.shape,
+            matvec=lambda v: S @ v,
+            rmatvec=lambda v: S.T @ v,
+            matmat=lambda V: S @ V,
+            rmatmat=lambda V: S.T @ V,
+            dtype=S.dtype,
+        )
+        v0 = rng.standard_normal(min(S.shape)).astype(S.dtype)
+        components = svds(operator, k=k, v0=v0)[2]
+    else:
+        components = np.linalg.svd(S, full_matrices=False)[2][:k]
+    Y = np.c_[np.ones(len(S)), S @ components.T].astype(np.float64)
+
+    # N-FINDR. The simplex volume is proportional to |det(Y[idx])|, which is
+    # linear in each row, so all replacements of row j are scored at once
+    # with the j-th column of the adjugate.
+    best_idx, best_volume = None, -np.inf
+    for _ in range(n_restarts):
+        idx = rng.choice(len(Y), n_modes, replace=False)
+        for _ in range(100):
+            improved = False
+            for j in range(n_modes):
+                M = Y[idx]
+                det = np.linalg.det(M)
+                if det == 0:
+                    break
+                volumes = np.abs(Y @ (det * np.linalg.inv(M)[:, j]))
+                w = np.argmax(volumes)
+                if volumes[w] > abs(det) * (1 + 1e-9):
+                    idx[j] = w
+                    improved = True
+            if not improved:
+                break
+        volume = abs(np.linalg.det(Y[idx]))
+        if volume > best_volume:
+            best_idx, best_volume = idx.copy(), volume
+
+    # Sum-to-one, non-negative coordinates of every window (the sum-to-one
+    # constraint is the heavily weighted first column of Y)
+    weight = 100
+    vertices = Y[best_idx].T.copy()
+    vertices[0] *= weight
+    A = np.empty((len(Y), n_modes))
+    for i, y in enumerate(Y):
+        target = y.copy()
+        target[0] *= weight
+        A[i] = nnls(vertices, target)[0]
+    A /= A.sum(axis=1, keepdims=True)
+
+    # Least-squares covariances from all windows, using the normal equations
+    # (lstsq on S needs several copies of it). The rows of A sum to one, so
+    # the mean removed from S is added back to every covariance.
+    AtS = (A.T.astype(S.dtype) @ S).astype(np.float64)
+    D = np.linalg.lstsq(A.T @ A, AtS, rcond=None)[0] + mu
+    covariances = np.zeros([n_modes, n_channels, n_channels])
+    covariances[:, iu[0], iu[1]] = D
+    covariances += np.triu(covariances, 1).transpose(0, 2, 1)
+
+    # Positive definite with an eigenvalue floor
+    eigvals, eigvecs = np.linalg.eigh(covariances)
+    eigvals = np.maximum(
+        eigvals, eigenvalue_floor * eigvals.mean(axis=-1, keepdims=True)
+    )
+    covariances = np.einsum("kij,kj,klj->kil", eigvecs, eigvals, eigvecs)
+
+    return covariances.astype(np.float32)

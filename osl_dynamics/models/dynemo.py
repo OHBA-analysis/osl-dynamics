@@ -123,6 +123,8 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
 
     init_method : str
         Initialization method to use. Defaults to 'random_subset'.
+        Use 'nfindr' to start the mode covariances from the corners of the
+        data (:code:`nfindr_initialization`).
     n_init : int
         Number of initializations. Defaults to 5.
     n_init_epochs : int
@@ -487,6 +489,10 @@ class Model(VariationalInferenceModelBase):
                 scale_factor,
                 self.config.diagonal_covariances,
             )
+
+    @property
+    def _supports_nfindr_initialization(self) -> bool:
+        return True
 
     def sample_alpha(
         self, n_samples: int, theta: Optional[np.ndarray] = None

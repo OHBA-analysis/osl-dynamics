@@ -178,6 +178,17 @@ class Model(DynemoModel):
         name = config.model_name
         self.model = tf.keras.Model(inputs=inputs, outputs=outputs, name=name)
 
+    # The covariances are set by the oscillator parameters, so they cannot
+    # be set from data
+
+    @property
+    def _supports_feature_initialization(self) -> bool:
+        return False
+
+    @property
+    def _supports_nfindr_initialization(self) -> bool:
+        return False
+
     def get_amplitude(self) -> np.ndarray:
         """Get the amplitude of the oscillators.
 
