@@ -219,7 +219,7 @@ def detect_bad_channels(
         raise NotImplementedError(f"picks={picks} not available.")
 
     # Calculate standard deviation for each channel
-    data = raw.get_data(picks=ch_inds)
+    data = raw.get_data(picks=ch_inds, reject_by_annotation="omit")
     std = np.std(data, axis=-1)
     if log10:
         with np.errstate(divide="ignore"):
