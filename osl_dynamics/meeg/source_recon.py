@@ -776,7 +776,8 @@ def _make_lcmv(
         )
 
     # Check number of sensor types present in the data and ensure a noise cov
-    info = mne._fiff.meas_info._simplify_info(info)
+    # Keep proc_history so rank='info' can use the MaxFilter rank
+    info = mne._fiff.meas_info._simplify_info(info, keep=("proc_history",))
     noise_cov, _, allow_mismatch = mne.utils._check_one_ch_type(
         "lcmv", info, fwd, data_cov, noise_cov
     )
@@ -788,7 +789,13 @@ def _make_lcmv(
     info = mne._fiff.pick.pick_info(info, picks)
 
     data_rank = mne.rank.compute_rank(data_cov, rank=rank, info=info)
-    noise_rank = mne.rank.compute_rank(noise_cov, rank=noise_rank, info=info)
+
+    # MaxFilter does not reduce the rank of a diagonal noise covariance. Using
+    # the MaxFilter rank for it would make the whitener discard most sensors.
+    noise_info = info
+    if noise_cov["diag"]:
+        noise_info = mne._fiff.meas_info._simplify_info(info)
+    noise_rank = mne.rank.compute_rank(noise_cov, rank=noise_rank, info=noise_info)
 
     mne_logger.info(f"Making LCMV beamformer with data cov rank {data_rank}")
     mne_logger.info(f"Making LCMV beamformer with noise cov rank {noise_rank}")
