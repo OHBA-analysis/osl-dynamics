@@ -15,13 +15,16 @@ import numpy as np
 from osl_dynamics.stats.correction import CORRECTIONS, correct
 from osl_dynamics.stats.design import Design, DesignConfig
 from osl_dynamics.stats.glm import GLM
-from osl_dynamics.stats.permutation import MaxStatPermutation, Permutation
+from osl_dynamics.stats.permutation import (
+    ClusterPermutation,
+    MaxStatPermutation,
+    Permutation,
+)
 from osl_dynamics.stats.results import TestResult
 
 _logger = logging.getLogger("osl-dynamics")
 
-PERMUTATION_CORRECTIONS = ("max_stat",)
-NOT_YET_IMPLEMENTED = ("cluster", "tfce")
+PERMUTATION_CORRECTIONS = ("max_stat", "cluster", "tfce")
 
 _COMMON_PARAMETERS = """
     n_perm : int, optional
@@ -36,17 +39,22 @@ _COMMON_PARAMETERS = """
 
         - :code:`'max_stat'`: maximum statistic permutation test, controls
           the family-wise error rate (FWER). The default.
+        - :code:`'cluster'`: cluster-based permutation test, FWER control
+          with clusters formed along :code:`cluster_dims`. See
+          :class:`~osl_dynamics.stats.permutation.ClusterPermutation`.
+        - :code:`'tfce'`: threshold-free cluster enhancement, a
+          cluster-based test without a cluster-forming threshold that gives
+          per-target p-values.
         - :code:`'bonferroni'`, :code:`'holm'`: FWER control applied to
           uncorrected p-values.
         - :code:`'fdr'`: Benjamini-Hochberg false discovery rate control
           applied to uncorrected p-values.
         - :code:`None`: uncorrected p-values.
 
-        Cluster-based corrections (:code:`'cluster'`, :code:`'tfce'`) are
-        not available yet.
     metric : str, optional
-        Statistic used by permutation tests: :code:`'tstats'` or
-        :code:`'copes'`.
+        Statistic used by the :code:`'max_stat'` permutation test and
+        per-target permutation p-values: :code:`'tstats'` or
+        :code:`'copes'`. Cluster-based corrections always use t-statistics.
     tail : int, optional
         :code:`0` for a two-tailed test, :code:`1` to test for a positive
         effect, :code:`-1` for a negative effect.
@@ -54,13 +62,34 @@ _COMMON_PARAMETERS = """
         For :code:`correction='max_stat'`, the target dimensions to take the
         maximum over (0 is the first dimension after the samples). Default is
         all of them, i.e. the FWER is controlled across every target.
+    cluster_dims : int or sequence of int, optional
+        For :code:`'cluster'` and :code:`'tfce'`: target dimensions along
+        which clusters can extend (0 is the first dimension after the
+        samples), e.g. time or frequency. Neighbouring indices are adjacent
+        unless an :code:`adjacency` is given for that dimension. Clusters
+        never span two indices of other dimensions (e.g. two states).
+    adjacency : dict, optional
+        For :code:`'cluster'` and :code:`'tfce'`: adjacency matrices for
+        cluster dimensions that are not lattices, :code:`{dim: matrix}`
+        where :code:`matrix` has shape :code:`(n, n)` for a dimension of
+        size :code:`n` (dense or :mod:`scipy.sparse`, e.g. from
+        :func:`mne.channels.find_ch_adjacency`).
+    cluster_forming_threshold : float, optional
+        For :code:`'cluster'`: threshold on the t-statistic that forms
+        clusters. Default is the critical t-value at p=0.05.
+    hat : float, optional
+        'Hat' variance adjustment, a fraction of the maximum variance added
+        to every target's variance so that targets with tiny variances do
+        not produce huge t-statistics. See
+        :func:`~osl_dynamics.stats.glm.hat_adjustment`. Default is :code:`0`.
     parametric : bool, optional
         For :code:`'bonferroni'`, :code:`'holm'`, :code:`'fdr'` and
         :code:`None`: whether the uncorrected p-values come from the t
         distribution (:code:`True`, the default) or from per-target
         permutation tests (:code:`False`).
     n_jobs : int, optional
-        Number of parallel jobs. Only used by cluster-based corrections.
+        Number of processes used to find clusters in the permuted maps for
+        :code:`'cluster'` and :code:`'tfce'`. Not used otherwise.
 
     Returns
     -------
@@ -88,16 +117,15 @@ def _run(
     metric: str,
     tail: int,
     pooled_dims,
+    cluster_dims,
+    adjacency,
+    cluster_forming_threshold: Optional[float],
+    hat: float,
     parametric: bool,
     n_jobs: int,
     contrast_indx: int = 0,
 ) -> TestResult:
-    if correction in NOT_YET_IMPLEMENTED:
-        raise NotImplementedError(
-            f"correction='{correction}' is not available yet. Use 'max_stat'."
-        )
-
-    if correction in PERMUTATION_CORRECTIONS:
+    if correction == "max_stat":
         perm = MaxStatPermutation(
             design,
             contrast_indx=contrast_indx,
@@ -105,6 +133,26 @@ def _run(
             tail=tail,
             metric=metric,
             pooled_dims=pooled_dims,
+            hat=hat,
+        )
+        return perm.fit(data)
+
+    if correction in ("cluster", "tfce"):
+        if cluster_dims is None:
+            raise ValueError(
+                f"cluster_dims must be given for correction='{correction}': the "
+                "target dimension(s) along which clusters can extend, e.g. time."
+            )
+        perm = ClusterPermutation(
+            design,
+            contrast_indx=contrast_indx,
+            n_perm=n_perm,
+            tail=tail,
+            cluster_dims=cluster_dims,
+            adjacency=adjacency,
+            cluster_forming_threshold=cluster_forming_threshold,
+            tfce=correction == "tfce",
+            hat=hat,
             n_jobs=n_jobs,
         )
         return perm.fit(data)
@@ -116,12 +164,16 @@ def _run(
         )
 
     if parametric:
-        return (
-            GLM(design).fit(data).test(contrast_indx, correction=correction, tail=tail)
-        )
+        glm_result = GLM(design).fit(data, hat=hat)
+        return glm_result.test(contrast_indx, correction=correction, tail=tail)
 
     perm = Permutation(
-        design, contrast_indx=contrast_indx, n_perm=n_perm, tail=tail, metric=metric
+        design,
+        contrast_indx=contrast_indx,
+        n_perm=n_perm,
+        tail=tail,
+        metric=metric,
+        hat=hat,
     )
     result = perm.fit(data)
     n_targets = result.pvalues.size
@@ -154,6 +206,10 @@ def evoked_response(
     metric: Optional[str] = None,
     tail: int = 0,
     pooled_dims: Optional[Sequence[int]] = None,
+    cluster_dims: Optional[Sequence[int]] = None,
+    adjacency: Optional[Dict] = None,
+    cluster_forming_threshold: Optional[float] = None,
+    hat: float = 0.0,
     parametric: bool = True,
     n_jobs: int = 1,
 ) -> TestResult:
@@ -161,7 +217,8 @@ def evoked_response(
 
     A one-sample test of the mean over samples (usually subjects) at every
     target, with sign-flip permutations. The data should be baseline
-    corrected so that zero is the null.
+    corrected so that zero is the null. For cluster-based corrections,
+    clusters are formed along time (the first target dimension) by default.
 
     Parameters
     ----------
@@ -172,9 +229,23 @@ def evoked_response(
     data = np.asarray(data, dtype=float)
     if metric is None:
         metric = "copes" if correction == "max_stat" else "tstats"
+    if cluster_dims is None:
+        cluster_dims = 0  # time is the first target dimension
     design = _one_sample_design(data.shape[0], covariates, "Mean")
     return _run(
-        design, data, n_perm, correction, metric, tail, pooled_dims, parametric, n_jobs
+        design,
+        data,
+        n_perm,
+        correction,
+        metric,
+        tail,
+        pooled_dims,
+        cluster_dims,
+        adjacency,
+        cluster_forming_threshold,
+        hat,
+        parametric,
+        n_jobs,
     )
 
 
@@ -186,6 +257,10 @@ def paired_diff(
     metric: str = "tstats",
     tail: int = 0,
     pooled_dims: Optional[Sequence[int]] = None,
+    cluster_dims: Optional[Sequence[int]] = None,
+    adjacency: Optional[Dict] = None,
+    cluster_forming_threshold: Optional[float] = None,
+    hat: float = 0.0,
     parametric: bool = True,
     n_jobs: int = 1,
 ) -> TestResult:
@@ -203,7 +278,19 @@ def paired_diff(
     data = np.asarray(data, dtype=float)
     design = _one_sample_design(data.shape[0], covariates, "PairedDiff")
     return _run(
-        design, data, n_perm, correction, metric, tail, pooled_dims, parametric, n_jobs
+        design,
+        data,
+        n_perm,
+        correction,
+        metric,
+        tail,
+        pooled_dims,
+        cluster_dims,
+        adjacency,
+        cluster_forming_threshold,
+        hat,
+        parametric,
+        n_jobs,
     )
 
 
@@ -217,6 +304,10 @@ def group_diff(
     metric: str = "tstats",
     tail: int = 0,
     pooled_dims: Optional[Sequence[int]] = None,
+    cluster_dims: Optional[Sequence[int]] = None,
+    adjacency: Optional[Dict] = None,
+    cluster_forming_threshold: Optional[float] = None,
+    hat: float = 0.0,
     parametric: bool = True,
     n_jobs: int = 1,
 ) -> TestResult:
@@ -270,7 +361,19 @@ def group_diff(
     contrasts = [{"name": f"Group_{groups[0]}-Group_{groups[1]}", "values": contrast}]
     design = DesignConfig(features=features, contrasts=contrasts).create_design()
     return _run(
-        design, data, n_perm, correction, metric, tail, pooled_dims, parametric, n_jobs
+        design,
+        data,
+        n_perm,
+        correction,
+        metric,
+        tail,
+        pooled_dims,
+        cluster_dims,
+        adjacency,
+        cluster_forming_threshold,
+        hat,
+        parametric,
+        n_jobs,
     )
 
 
@@ -284,6 +387,10 @@ def regression(
     metric: str = "tstats",
     tail: int = 0,
     pooled_dims: Optional[Sequence[int]] = None,
+    cluster_dims: Optional[Sequence[int]] = None,
+    adjacency: Optional[Dict] = None,
+    cluster_forming_threshold: Optional[float] = None,
+    hat: float = 0.0,
     parametric: bool = True,
     n_jobs: int = 1,
 ) -> TestResult:
@@ -310,7 +417,19 @@ def regression(
     contrasts = [{"name": name, "values": [0, 1] + [0] * (len(features) - 2)}]
     design = DesignConfig(features=features, contrasts=contrasts).create_design()
     return _run(
-        design, data, n_perm, correction, metric, tail, pooled_dims, parametric, n_jobs
+        design,
+        data,
+        n_perm,
+        correction,
+        metric,
+        tail,
+        pooled_dims,
+        cluster_dims,
+        adjacency,
+        cluster_forming_threshold,
+        hat,
+        parametric,
+        n_jobs,
     )
 
 

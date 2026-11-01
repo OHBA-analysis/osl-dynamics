@@ -14,7 +14,10 @@ Modules
   :class:`Design` for specifying regressors and contrasts.
 - :py:mod:`~osl_dynamics.stats.glm` — :class:`GLM` fitting.
 - :py:mod:`~osl_dynamics.stats.permutation` — :class:`MaxStatPermutation`
-  (family-wise error control) and :class:`Permutation` (uncorrected).
+  and :class:`ClusterPermutation` (family-wise error control) and
+  :class:`Permutation` (uncorrected).
+- :py:mod:`~osl_dynamics.stats.cluster` — Cluster finding, adjacency and
+  threshold-free cluster enhancement.
 - :py:mod:`~osl_dynamics.stats.correction` — :func:`bonferroni`,
   :func:`holm` and :func:`fdr` corrections for p-values.
 - :py:mod:`~osl_dynamics.stats.results` — :class:`TestResult` and
@@ -39,5 +42,9 @@ from osl_dynamics.stats.inference import (
     paired_diff,
     regression,
 )
-from osl_dynamics.stats.permutation import MaxStatPermutation, Permutation
+from osl_dynamics.stats.permutation import (
+    ClusterPermutation,
+    MaxStatPermutation,
+    Permutation,
+)
 from osl_dynamics.stats.results import GLMResult, TestResult

@@ -15,12 +15,22 @@ References
 import itertools
 import logging
 import math
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
 
+from scipy import stats as scipy_stats
+
+from osl_dynamics.stats.cluster import (
+    Adjacency,
+    ClusterStructure,
+    cluster_stat_map,
+    max_cluster_stat,
+    max_tfce,
+    tfce,
+)
 from osl_dynamics.stats.design import Design
-from osl_dynamics.stats.glm import GLM, complete_case_groups, validate_y
+from osl_dynamics.stats.glm import GLM, complete_case_groups, hat_adjustment, validate_y
 from osl_dynamics.stats.results import TestResult
 from osl_dynamics.utils.progress import progress
 
@@ -62,11 +72,18 @@ class Permutation:
     metric : str, optional
         Statistic to build the null distribution from: :code:`'tstats'`
         or :code:`'copes'`.
+    hat : float, optional
+        'Hat' variance adjustment, see
+        :func:`~osl_dynamics.stats.glm.hat_adjustment`. Default is :code:`0`
+        (none).
     n_jobs : int, optional
         Number of parallel jobs. Only used by cluster-based corrections.
     """
 
     correction: Optional[str] = None
+
+    # Largest number of permutations processed at once (None: memory bound)
+    _max_batch_size: Optional[int] = None
 
     def __init__(
         self,
@@ -76,6 +93,7 @@ class Permutation:
         perm_type: Optional[str] = None,
         tail: int = 0,
         metric: str = "tstats",
+        hat: float = 0.0,
         n_jobs: int = 1,
     ) -> None:
         self.design = design
@@ -100,6 +118,10 @@ class Permutation:
         if metric not in ("tstats", "copes"):
             raise ValueError(f"metric must be 'tstats' or 'copes', got {metric}.")
         self.metric = metric
+
+        if hat < 0:
+            raise ValueError(f"hat must be non-negative, got {hat}.")
+        self.hat = hat
 
         self.n_jobs = n_jobs
         self.perm_type = self._resolve_perm_type(perm_type)
@@ -216,24 +238,46 @@ class Permutation:
             return -stat
         return stat
 
-    def _reduce(self, stat: np.ndarray) -> np.ndarray:
-        """Reduce a batch of null statistic maps to the null statistic.
+    def _transform_observed(self, stat: np.ndarray) -> np.ndarray:
+        """Transform the observed statistic map into what is compared with
+        the null (here: apply the tail).
 
         Parameters
         ----------
         stat : np.ndarray
-            Statistic maps after :meth:`_apply_tail`. Shape is
-            (batch_size, \\*target_dims).
+            Signed statistic map. Shape is (\\*target_dims).
+
+        Returns
+        -------
+        observed : np.ndarray
+            Shape is (\\*target_dims).
+        """
+        return self._apply_tail(stat)
+
+    def _reduce(self, stat: np.ndarray) -> np.ndarray:
+        """Reduce a batch of signed null statistic maps to the null statistic.
+
+        Parameters
+        ----------
+        stat : np.ndarray
+            Signed statistic maps. Shape is (batch_size, \\*target_dims).
 
         Returns
         -------
         null : np.ndarray
             Shape is (batch_size, \\*nonpooled_dims).
         """
+        stat = self._apply_tail(stat)
         if len(self.pooled_dims) == 0:
             return stat
         axes = tuple(d + 1 for d in self.pooled_dims)
         return np.nanmax(stat, axis=axes)
+
+    def _before_permutations(self, glm_result) -> None:
+        """Hook called after the GLM is fitted and before the permutations."""
+
+    def _close(self) -> None:
+        """Hook called when :meth:`fit` finishes."""
 
     def _expand(self, null: np.ndarray) -> np.ndarray:
         """Insert the pooled dimensions back into a reduced null so it
@@ -319,7 +363,7 @@ class Permutation:
 
         proj = QP.transpose(0, 2, 1) @ r  # (batch, rank, n_targets)
         ss = r2[None, :] - np.sum(proj**2, axis=1)
-        varcopes = group["c_xtx_c"] * ss / group["dof"]
+        varcopes = hat_adjustment(group["c_xtx_c"] * ss / group["dof"], self.hat)
         with np.errstate(divide="ignore", invalid="ignore"):
             return copes / np.sqrt(varcopes)
 
@@ -341,7 +385,8 @@ class Permutation:
         n_targets = y.shape[1]
         self._resolve_pooled_dims(target_dims)
 
-        glm_result = self.glm.fit(y.reshape((-1, *target_dims)))
+        glm_result = self.glm.fit(y.reshape((-1, *target_dims)), hat=self.hat)
+        self._before_permutations(glm_result)
 
         groups = [
             (self._prepare_group(X, y[:, targets], rows), targets)
@@ -358,7 +403,8 @@ class Permutation:
         observed = np.empty((1, n_targets))
         for group, targets in groups:
             observed[:, targets] = self._null_batch(group, identity)
-        observed = self._apply_tail(observed.reshape((1, *target_dims)))
+        self._observed = observed.reshape(target_dims)
+        observed = self._transform_observed(self._observed)[None]
 
         all_complete = len(groups) == 1 and len(groups[0][0]["rows"]) == X.shape[0]
         perms, exact = self._permutations(allow_exact_shuffle=all_complete)
@@ -389,21 +435,25 @@ class Permutation:
                 _MAX_BATCH_ELEMENTS // (n_features * n_targets * X.shape[0]), 1, n_perm
             )
         )
+        if self._max_batch_size is not None:
+            batch_size = min(batch_size, self._max_batch_size)
 
         counts = np.zeros(target_dims)
         bar = progress(total=n_perm, desc="Permutations")
-        for start in range(0, n_perm, batch_size):
-            batch = perms[start : start + batch_size]
-            stat = np.empty((len(batch), n_targets))
-            for group, targets in groups:
-                stat[:, targets] = self._null_batch(group, batch)
-            stat = self._apply_tail(stat.reshape((len(batch), *target_dims)))
-            reduced = self._reduce(stat)
-            if keep_null:
-                null[start : start + len(batch)] = reduced
-            counts += np.sum(self._expand(reduced) >= observed, axis=0)
-            bar.update(len(batch))
-        bar.close()
+        try:
+            for start in range(0, n_perm, batch_size):
+                batch = perms[start : start + batch_size]
+                stat = np.empty((len(batch), n_targets))
+                for group, targets in groups:
+                    stat[:, targets] = self._null_batch(group, batch)
+                reduced = self._reduce(stat.reshape((len(batch), *target_dims)))
+                if keep_null:
+                    null[start : start + len(batch)] = reduced
+                counts += np.sum(self._expand(reduced) >= observed, axis=0)
+                bar.update(len(batch))
+        finally:
+            bar.close()
+            self._close()
 
         # Under an exact test the identity permutation is in the null and
         # equals the observed statistic, so no +1 is needed
@@ -488,6 +538,9 @@ class MaxStatPermutation(Permutation):
         after the samples). Default is every target dimension, so the
         correction is across all targets. Dimensions that are not pooled get
         their own null distribution.
+    hat : float, optional
+        'Hat' variance adjustment, see
+        :func:`~osl_dynamics.stats.glm.hat_adjustment`.
     n_jobs : int, optional
         Not used by this class.
 
@@ -509,6 +562,7 @@ class MaxStatPermutation(Permutation):
         tail: int = 0,
         metric: str = "tstats",
         pooled_dims: Optional[Sequence[int]] = None,
+        hat: float = 0.0,
         n_jobs: int = 1,
     ) -> None:
         super().__init__(
@@ -518,6 +572,7 @@ class MaxStatPermutation(Permutation):
             perm_type=perm_type,
             tail=tail,
             metric=metric,
+            hat=hat,
             n_jobs=n_jobs,
         )
         self._requested_pooled_dims = pooled_dims
@@ -538,3 +593,197 @@ class MaxStatPermutation(Permutation):
                     f"data with {n_dims} target dimension(s)."
                 )
         self.pooled_dims = dims
+
+
+def _reduce_maps(
+    maps: np.ndarray,
+    structure: ClusterStructure,
+    tail: int,
+    threshold: Optional[float],
+    tfce_params: Optional[dict],
+) -> np.ndarray:
+    """Maximum cluster statistic (or TFCE value) of each map in a batch."""
+    if tfce_params is not None:
+        return np.array([max_tfce(m, structure, tail, **tfce_params) for m in maps])
+    return np.array([max_cluster_stat(m, threshold, structure, tail) for m in maps])
+
+
+class ClusterPermutation(Permutation):
+    """Cluster-based permutation test [1]_ or threshold-free cluster
+    enhancement (TFCE) [2]_.
+
+    Clusters are connected sets of targets whose t-statistic exceeds the
+    cluster-forming threshold. The null distribution is the largest cluster
+    statistic (the sum of the t-statistics in a cluster) found in each
+    permutation, so the family-wise error rate is controlled across the
+    whole map. A cluster's p-value says how often a cluster at least as
+    large arises by chance anywhere in the map; it does not establish the
+    effect at every target in the cluster, nor the cluster's exact extent.
+
+    With :code:`tfce`, the t-statistics are enhanced over all thresholds
+    instead and every target gets its own p-value.
+
+    Parameters
+    ----------
+    design : Design
+        The design (regressors and contrasts).
+    contrast_indx : int, optional
+        Index of the contrast to test.
+    n_perm : int, optional
+        Number of permutations.
+    perm_type : str, optional
+        :code:`'sign_flip'` or :code:`'row_shuffle'`. Chosen from the
+        feature and contrast types if :code:`None`.
+    tail : int, optional
+        :code:`0` for two-tailed (positive and negative clusters are formed
+        separately), :code:`1` for positive, :code:`-1` for negative effects.
+    cluster_dims : int or sequence of int, optional
+        Target dimensions along which clusters can extend (0 is the first
+        dimension after the samples). Clusters never span two indices of any
+        other dimension, e.g. two states, but the maximum is taken over them.
+    adjacency : dict, optional
+        Adjacency matrices for cluster dimensions that are not lattices,
+        :code:`{dim: matrix}`. See
+        :class:`~osl_dynamics.stats.cluster.ClusterStructure`.
+    cluster_forming_threshold : float, optional
+        Threshold on the t-statistic that forms clusters. Default is the
+        critical t-value at p=0.05 (two-tailed: 0.025 in each tail) for the
+        degrees of freedom of the data. Ignored with :code:`tfce`.
+    tfce : bool or dict, optional
+        Use threshold-free cluster enhancement. A dict passes options to
+        :func:`~osl_dynamics.stats.cluster.tfce` (:code:`start`,
+        :code:`step`, :code:`E`, :code:`H`).
+    hat : float, optional
+        'Hat' variance adjustment, see
+        :func:`~osl_dynamics.stats.glm.hat_adjustment`.
+    n_jobs : int, optional
+        Number of processes used to find clusters in the permuted maps.
+
+    References
+    ----------
+    .. [1] Maris, E. & Oostenveld, R. (2007). Nonparametric statistical
+           testing of EEG- and MEG-data. Journal of Neuroscience Methods,
+           164(1), 177-190.
+    .. [2] Smith, S. M. & Nichols, T. E. (2009). Threshold-free cluster
+           enhancement. NeuroImage, 44(1), 83-98.
+    """
+
+    _max_batch_size = 50
+
+    def __init__(
+        self,
+        design: Design,
+        contrast_indx: int = 0,
+        n_perm: int = 1000,
+        perm_type: Optional[str] = None,
+        tail: int = 0,
+        cluster_dims: Union[int, Sequence[int]] = 0,
+        adjacency: Adjacency = None,
+        cluster_forming_threshold: Optional[float] = None,
+        tfce: Union[bool, dict] = False,
+        hat: float = 0.0,
+        n_jobs: int = 1,
+    ) -> None:
+        super().__init__(
+            design,
+            contrast_indx=contrast_indx,
+            n_perm=n_perm,
+            perm_type=perm_type,
+            tail=tail,
+            metric="tstats",
+            hat=hat,
+            n_jobs=n_jobs,
+        )
+        self.cluster_dims = cluster_dims
+        self.adjacency = adjacency
+        if tfce is False or tfce is None:
+            self.tfce_params = None
+            self.correction = "cluster"
+        else:
+            self.tfce_params = {} if tfce is True else dict(tfce)
+            self.correction = "tfce"
+        if cluster_forming_threshold is not None and cluster_forming_threshold <= 0:
+            raise ValueError("cluster_forming_threshold must be positive.")
+        self._requested_threshold = cluster_forming_threshold
+        self.cluster_forming_threshold = cluster_forming_threshold
+        self.structure = None
+        self._executor = None
+
+    def _resolve_pooled_dims(self, target_dims: Tuple[int, ...]) -> None:
+        self.pooled_dims = tuple(range(len(target_dims)))
+        self.structure = ClusterStructure(
+            target_dims, self.cluster_dims, self.adjacency
+        )
+
+    def _before_permutations(self, glm_result) -> None:
+        if self.tfce_params is not None:
+            return
+        if self._requested_threshold is None:
+            dof = np.nanmin(glm_result.dof)
+            alpha = 0.025 if self.tail == 0 else 0.05
+            self.cluster_forming_threshold = float(scipy_stats.t.ppf(1 - alpha, dof))
+            _logger.info(
+                "Using the critical t-value at p=0.05 as the cluster-forming "
+                f"threshold: {self.cluster_forming_threshold:.3f} (dof={dof:.0f})"
+            )
+
+    def _transform_observed(self, stat: np.ndarray) -> np.ndarray:
+        if self.tfce_params is not None:
+            self._clusters, self._cluster_stats = None, None
+            return np.abs(tfce(stat, self.structure, self.tail, **self.tfce_params))
+        stat_map, self._clusters, self._cluster_stats = cluster_stat_map(
+            stat, self.cluster_forming_threshold, self.structure, self.tail
+        )
+        return stat_map
+
+    def _reduce(self, stat: np.ndarray) -> np.ndarray:
+        args = (
+            self.structure,
+            self.tail,
+            self.cluster_forming_threshold,
+            self.tfce_params,
+        )
+        if self.n_jobs == 1 or len(stat) < 2:
+            return _reduce_maps(stat, *args)
+        if self._executor is None:
+            from concurrent.futures import ProcessPoolExecutor
+
+            self._executor = ProcessPoolExecutor(max_workers=self.n_jobs)
+        chunks = np.array_split(stat, min(self.n_jobs, len(stat)))
+        futures = [self._executor.submit(_reduce_maps, c, *args) for c in chunks]
+        return np.concatenate([f.result() for f in futures])
+
+    def _close(self) -> None:
+        if self._executor is not None:
+            self._executor.shutdown()
+            self._executor = None
+
+    def fit(self, y) -> TestResult:
+        """Fit the GLM and run the permutations.
+
+        Parameters
+        ----------
+        y : np.ndarray or list
+            Data. Shape is (n_samples, \\*target_dims).
+
+        Returns
+        -------
+        result : TestResult
+            For :code:`correction='cluster'`, :code:`result.clusters` holds
+            a mask for each cluster, :code:`result.cluster_stats` their
+            statistics and :code:`result.cluster_pvalues` their p-values;
+            :code:`result.pvalues` gives every target the p-value of its
+            cluster (1 outside clusters). For TFCE :code:`result.pvalues` are
+            per-target p-values.
+        """
+        result = super().fit(y)
+        result.cluster_forming_threshold = self.cluster_forming_threshold
+        if self._clusters is not None:
+            result.clusters = self._clusters
+            result.cluster_stats = self._cluster_stats
+            result.cluster_pvalues = np.array(
+                [result.pvalues[mask].flat[0] for mask in self._clusters]
+            )
+            n_sig = int(np.sum(result.cluster_pvalues < 0.05))
+            _logger.info(f"Found {len(self._clusters)} cluster(s), {n_sig} with p<0.05")
+        return result

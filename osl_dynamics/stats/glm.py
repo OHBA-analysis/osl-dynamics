@@ -93,8 +93,45 @@ def _check_enough_samples(n_complete: int, n_features: int) -> None:
         )
 
 
+def hat_adjustment(varcopes: np.ndarray, hat: float) -> np.ndarray:
+    """'Hat' variance adjustment [1]_.
+
+    Adds a fraction of the largest variance across targets to every target's
+    variance, which stops targets with implausibly small variances producing
+    very large t-statistics.
+
+    Parameters
+    ----------
+    varcopes : np.ndarray
+        Variances. Shape is (..., n_targets).
+    hat : float
+        Fraction of the maximum variance to add, e.g. :code:`1e-3`.
+        :code:`0` leaves the variances unchanged.
+
+    Returns
+    -------
+    varcopes : np.ndarray
+        Adjusted variances.
+
+    References
+    ----------
+    .. [1] Ridgway, G. R. et al. (2012). The problem of low variance voxels
+           in statistical parametric mapping; a new hat avoids a 'haircut'.
+           NeuroImage, 59(3), 2131-2141.
+    """
+    if hat < 0:
+        raise ValueError(f"hat must be non-negative, got {hat}.")
+    if hat == 0:
+        return varcopes
+    return varcopes + hat * np.nanmax(varcopes, axis=-1, keepdims=True)
+
+
 def fit_ols(
-    X: np.ndarray, y: np.ndarray, contrasts: np.ndarray, warn: bool = True
+    X: np.ndarray,
+    y: np.ndarray,
+    contrasts: np.ndarray,
+    warn: bool = True,
+    hat: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Fit a GLM with ordinary least squares.
 
@@ -109,6 +146,8 @@ def fit_ols(
         Contrast matrix. Shape is (n_contrasts, n_features).
     warn : bool, optional
         Log a warning when there are missing values.
+    hat : float, optional
+        'Hat' variance adjustment, see :func:`hat_adjustment`.
 
     Returns
     -------
@@ -160,6 +199,7 @@ def fit_ols(
         varcopes[:, targets] = c_xtx_c[:, None] * s2[None, :]
         dof[targets] = dof_r
 
+    varcopes = hat_adjustment(varcopes, hat)
     return betas, copes, varcopes, dof
 
 
@@ -196,7 +236,7 @@ class GLM:
     def n_contrasts(self) -> int:
         return self.contrasts.shape[0]
 
-    def fit(self, y, warn: bool = True) -> GLMResult:
+    def fit(self, y, warn: bool = True, hat: float = 0.0) -> GLMResult:
         """Fit the model.
 
         Parameters
@@ -205,6 +245,8 @@ class GLM:
             Data. Shape is (n_samples, \\*target_dims).
         warn : bool, optional
             Log a warning when there are missing values.
+        hat : float, optional
+            'Hat' variance adjustment, see :func:`hat_adjustment`.
 
         Returns
         -------
@@ -212,7 +254,9 @@ class GLM:
             Betas, copes, varcopes and degrees of freedom.
         """
         y, target_dims = validate_y(y, self.n_samples)
-        betas, copes, varcopes, dof = fit_ols(self.X, y, self.contrasts, warn=warn)
+        betas, copes, varcopes, dof = fit_ols(
+            self.X, y, self.contrasts, warn=warn, hat=hat
+        )
         return GLMResult(
             design=self.design,
             betas=betas.reshape((self.n_features, *target_dims)),
