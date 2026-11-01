@@ -4,7 +4,7 @@
 
 import numpy as np
 
-from osl_dynamics.analysis import statistics
+from osl_dynamics import stats
 from osl_dynamics.utils import plotting
 
 # Generate some random data
@@ -23,7 +23,7 @@ pre = 9
 epochs -= np.mean(epochs[:, :pre], axis=1, keepdims=True)
 
 # Get time points with a p-value < 0.05
-pvalues = statistics.evoked_response_max_stat_perm(data=epochs, n_perm=100)
+pvalues = stats.evoked_response(data=epochs, n_perm=100).pvalues
 
 # Time axis and average over subjects
 t = np.arange(n_samples) - pre

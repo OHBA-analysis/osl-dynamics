@@ -2280,8 +2280,10 @@ def plot_summary_stats_group_diff(
         Name of the summary statistic.
     summary_stats : np.ndarray
         Summary statistics. Shape is (n_sessions, n_states).
-    pvalues : np.ndarray
+    pvalues : np.ndarray or osl_dynamics.stats.results.TestResult
         p-values for each summary statistic difference. Shape is (n_states,).
+        A :class:`~osl_dynamics.stats.results.TestResult` can be passed
+        instead, in which case its p-values are used.
     assignments : np.ndarray
         Array of 1s and 2s indicating group assignment. Shape is (n_sessions,).
     fig_kwargs : dict, optional
@@ -2309,6 +2311,9 @@ def plot_summary_stats_group_diff(
             )
         if isinstance(ax, np.ndarray):
             raise ValueError("Only pass one axis.")
+
+    # A TestResult can be passed instead of an array of p-values
+    pvalues = getattr(pvalues, "pvalues", pvalues)
 
     # Create a pandas DataFrame to hold the summary stats
     ss_dict = {name: [], "State": [], "Group": []}
@@ -2387,9 +2392,11 @@ def plot_evoked_response(
         Time axis. Shape must be (n_samples,).
     epochs : np.ndarray
         Evoked responses. Shape must be (n_samples, n_channels).
-    pvalues : np.ndarray
+    pvalues : np.ndarray or osl_dynamics.stats.results.TestResult
         p-value for each evoked response. This can be calculated with
-        :func:`osl_dynamics.analysis.statistics.evoked_response_max_stat_perm`.
+        :func:`osl_dynamics.stats.evoked_response`.
+        A :class:`~osl_dynamics.stats.results.TestResult` can be passed
+        instead, in which case its p-values are used.
     significance_level : float, optional
         Value to threshold the p-values with to consider significant.
         By default :code:`pvalues < 0.05` are significant.
@@ -2447,6 +2454,9 @@ def plot_evoked_response(
         fig_kwargs = {}
     default_fig_kwargs = {"figsize": (7, 4)}
     fig_kwargs = override_dict_defaults(default_fig_kwargs, fig_kwargs)
+
+    # A TestResult can be passed instead of an array of p-values
+    pvalues = getattr(pvalues, "pvalues", pvalues)
 
     # Get significant time points for each channel
     significant = pvalues < significance_level
@@ -2616,7 +2626,7 @@ def plot_design_matrix(
 
     Parameters
     ----------
-    design : osl_dynamics.glm.base.Design
+    design : osl_dynamics.stats.design.Design
         Design object.
     show_contrasts : bool, optional
         If :code:`True`, display the contrast matrix below the design matrix.

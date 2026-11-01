@@ -27,16 +27,13 @@ network_response[:, 80:100, 1] += 2
 #%%
 # Statistical significance testing
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# osl-dynamics has the :func:`analysis.statistics.evoked_response_max_stat_perm <osl_dynamics.analysis.statistics.evoked_response_max_stat_perm>` function for doing GLM permutation stats testing see if a value is significantly different from zero. This function uses the maximum test statistic to control for multiple comparisons across the time points and networks.
+# osl-dynamics has the :func:`stats.evoked_response <osl_dynamics.stats.inference.evoked_response>` function for doing GLM permutation stats testing see if a value is significantly different from zero. By default, this function uses the maximum test statistic to control for multiple comparisons across the time points and networks.
 
-from osl_dynamics.analysis import statistics
+from osl_dynamics import stats
 
-pvalues = statistics.evoked_response_max_stat_perm(
-    network_response,
-    n_perm=1000,
-    n_jobs=4,
-)
-print(pvalues.shape)
+result = stats.evoked_response(network_response, n_perm=1000)
+print(result)
+print(result.pvalues.shape)
 
 #%%
 # Let's plot the group average network response with the significant time points highlighted.
@@ -48,7 +45,7 @@ group_network_response = np.mean(network_response, axis=0)
 fig, ax = plotting.plot_evoked_response(
     t,
     group_network_response,
-    pvalues,
+    result,
     x_label="Sample",
     y_label="Network Activation",
 )

@@ -12,7 +12,8 @@ import numpy as np
 import pandas as pd
 
 from osl_dynamics.data import Data
-from osl_dynamics.analysis import static, power, connectivity, statistics
+from osl_dynamics import stats
+from osl_dynamics.analysis import static, power, connectivity
 
 def vec2mat(vec):
     n = int((1 + np.sqrt(1 + 8 * vec.shape[-1])) / 2)
@@ -130,9 +131,9 @@ for i, a in enumerate(age):
         assignments[i] += 1
 
 # Compare power maps for young vs old
-pow_diff, pvalues = statistics.group_diff_max_stat_perm(
-    pow_map, assignments, n_perm=1000, n_jobs=4
-)  # pow_diff is group 1 (old) minus group 2 (young)
+result = stats.group_diff(pow_map, assignments, n_perm=1000)
+pow_diff = result.copes  # pow_diff is group 1 (old) minus group 2 (young)
+pvalues = result.pvalues
 
 # Plot significant power map differences
 power.save(
@@ -155,9 +156,9 @@ power.save(
 
 # Compare AEC networks for young vs old
 aec = mat2vec(aec)
-aec_diffs, pvalues = statistics.group_diff_max_stat_perm(
-    aec, assignments, n_perm=1000, n_jobs=4
-)  # aec_diffs is group 1 (old) minus group 2 (young)
+result = stats.group_diff(aec, assignments, n_perm=1000)
+aec_diffs = result.copes  # aec_diffs is group 1 (old) minus group 2 (young)
+pvalues = result.pvalues
 aec_diffs[pvalues > 0.05] = 0
 
 aec_diffs = vec2mat(aec_diffs)

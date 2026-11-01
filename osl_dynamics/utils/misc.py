@@ -512,7 +512,9 @@ def load(filename: str, **kwargs) -> Union[np.ndarray, list]:
 def set_random_seed(seed: int, op_determinism: bool = False) -> None:
     """Set all random seeds.
 
-    This includes Python's random module, NumPy and TensorFlow.
+    This includes Python's random module, NumPy and TensorFlow (if it is
+    installed). Permutation tests in :mod:`osl_dynamics.stats` use NumPy's
+    global random state, so this makes them reproducible.
 
     Parameters
     ----------
@@ -523,9 +525,17 @@ def set_random_seed(seed: int, op_determinism: bool = False) -> None:
         If True, TensorFlow operations will be deterministic, generally at the cost of
         lower performance. Note that the model may run slower if enabled.
     """
-    import tensorflow as tf  # avoids slow imports
+    import random
 
     _logger.info(f"Setting random seed to {seed}")
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    try:
+        import tensorflow as tf  # avoids slow imports
+    except ImportError:
+        return
 
     tf.keras.utils.set_random_seed(seed)
     if op_determinism:

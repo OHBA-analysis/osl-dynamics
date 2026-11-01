@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 
 from osl_dynamics import run_pipeline
-from osl_dynamics.analysis import statistics
+from osl_dynamics import stats
 from osl_dynamics.utils import plotting
 
 
@@ -51,12 +51,11 @@ def compare_summary_stats(data, output_dir, n_perm, n_jobs):
     sum_stats = np.swapaxes([alp_mean, alp_std], 0, 1)
 
     # Do statistical significance testing
-    _, p = statistics.group_diff_max_stat_perm(
+    p = stats.group_diff(
         data=sum_stats,
         assignments=assignments,
         n_perm=n_perm,
-        n_jobs=n_jobs,
-    )
+    ).pvalues
 
     print("Number of significant difference in alp_mean:", np.sum(p[0] < 0.05))
     print("Number of significant difference in alp_std:", np.sum(p[1] < 0.05))

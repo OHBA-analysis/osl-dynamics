@@ -22,7 +22,7 @@ import numpy as np
 from glob import glob
 
 from osl_dynamics import run_pipeline
-from osl_dynamics.analysis import statistics
+from osl_dynamics import stats
 from osl_dynamics.data import Data
 from osl_dynamics.inference import modes
 from osl_dynamics.utils import plotting
@@ -96,9 +96,9 @@ def plot_evoked_response(data, output_dir, n_perm, metric, significance_level):
 
     # Epoch and do stats
     t, epochs = epoch_state_time_course(stc)
-    pvalues = statistics.evoked_response_max_stat_perm(
+    pvalues = stats.evoked_response(
         epochs, n_perm=n_perm, metric=metric
-    )
+    ).pvalues
 
     # Plot epoched state time courses with significant time points highlighted
     plotting.plot_evoked_response(

@@ -4,7 +4,7 @@
 
 import numpy as np
 
-from osl_dynamics.analysis import statistics
+from osl_dynamics import stats
 
 n_subjects_group1 = 24
 n_subjects_group2 = 8
@@ -27,7 +27,7 @@ assignments = np.ones(n_subjects)
 assignments[-n_subjects_group2:] += 1
 
 # Get the p-value for the difference between the features for each group
-_, pvalues = statistics.group_diff_max_stat_perm(group_data, assignments, n_perm=100)
+pvalues = stats.group_diff(group_data, assignments, n_perm=100).pvalues
 significant = pvalues < 0.05
 
 print("significant features are:", np.squeeze(np.argwhere(significant)))
