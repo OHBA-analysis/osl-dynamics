@@ -5,5 +5,6 @@ sphinx-gallery
 sphinx-autoapi
 sphinx-sitemap
 pydata-sphinx-theme
+myst-parser
 
 -e .[tf]

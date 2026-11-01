@@ -28,6 +28,7 @@ dist/*
 sdist/*
 doc/tutorials_build/*
 doc/sg_execution_times.rst
+doc/parcellations/
 cover/*
 MANIFEST
 

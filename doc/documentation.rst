@@ -48,7 +48,7 @@ Parcellations
 -------------
 
 The parcellations, masks and surfaces osl-dynamics uses are downloaded from
-`osl-files <https://github.com/OHBA-analysis/osl-files>`_. See `the parcellations page <https://github.com/OHBA-analysis/osl-files/tree/main/docs/parcellations>`_
+`osl-files <https://github.com/OHBA-analysis/osl-files>`_. See :doc:`the parcellations page <parcellations/index>`
 for the full list, with labels, MNI coordinates and pictures for each one.
 
 Tutorials

@@ -10,8 +10,12 @@
 
 import inspect
 import os
+import re
 import shutil
+import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 from sphinx_gallery.sorting import FileNameSortKey
 
@@ -19,6 +23,63 @@ from sphinx_gallery.sorting import FileNameSortKey
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# -- Parcellation pages --------------------------------------------------------
+
+OSL_FILES_URL = "https://github.com/OHBA-analysis/osl-files"
+
+
+def fetch_parcellation_docs():
+    """Copy the parcellation pages from osl-files into doc/parcellations.
+
+    The pages are written and kept in osl-files, this copy is not committed.
+    Parcellations without a picture are left out. A failed download stops the
+    build, so that Read the Docs keeps serving the last good version.
+    """
+    destination = Path(__file__).parent / "parcellations"
+
+    with tempfile.TemporaryDirectory() as clone:
+        subprocess.run(
+            [
+                "git", "clone", "--quiet", "--depth", "1", "--filter=blob:none",
+                "--sparse", OSL_FILES_URL, clone,
+            ],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", clone, "sparse-checkout", "set", "docs/parcellations"],
+            check=True,
+        )
+        shutil.rmtree(destination, ignore_errors=True)
+        shutil.copytree(Path(clone) / "docs" / "parcellations", destination)
+
+    (destination / "README.md").rename(destination / "index.md")
+
+    skipped = []
+    for page in destination.glob("*.md"):
+        if page.stem != "index" and not page.with_suffix(".png").exists():
+            page.unlink()
+            skipped.append(page.stem)
+
+    for page in destination.glob("*.md"):
+        text = page.read_text()
+
+        # Links out of docs/parcellations only resolve inside osl-files
+        text = text.replace("](../../", f"]({OSL_FILES_URL}/tree/main/")
+
+        if page.stem == "index":
+            # Remove the entries for the skipped pages and any heading left
+            # without entries
+            for stem in skipped:
+                text = re.sub(rf"^- \[.*\]\({stem}\.md\)\n", "", text, flags=re.M)
+            text = re.sub(r"^### .*\n+(?=#)", "", text, flags=re.M)
+            text = f"(parcellations)=\n\n{text}"
+
+        # The pages are linked to, rather than listed in a toctree
+        page.write_text(f"---\norphan: true\n---\n\n{text}")
+
+
+fetch_parcellation_docs()
 
 # -- General configuration -----------------------------------------------------
 
@@ -36,6 +97,7 @@ extensions = [
     "sphinx_gallery.gen_gallery",
     "autoapi.extension",
     "sphinx_sitemap",
+    "myst_parser",
 ]
 
 autodoc_typehints = "description"
@@ -59,7 +121,7 @@ sphinx_gallery_conf = {
 }
 
 # The suffix of source filenames.
-source_suffix = ".rst"
+source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 
 # The master toctree document.
 master_doc = "index"
@@ -102,6 +164,7 @@ html_sidebars = {
     "getting_started": [],
     "documentation": [],
     "tutorials_build/*": [],
+    "parcellations/*": [],
     "faq": [],
 }
 

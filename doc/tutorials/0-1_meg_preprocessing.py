@@ -354,7 +354,7 @@ Output is written to ``derivatives/``.
 # Step 6: Parcellation
 # ^^^^^^^^^^^^^^^^^^^^
 #
-# We reduce the source space to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis. See `the parcellations page <https://github.com/OHBA-analysis/osl-files/tree/main/docs/parcellations>`_ for the full list of available parcellations.
+# We reduce the source space to a smaller number of parcel time courses using a brain atlas. This makes the data more manageable for downstream analysis. See the :ref:`parcellations page <parcellations>` for the full list of available parcellations.
 #
 # ``parcellate_lcmv`` assigns each dipole of the forward model to parcels using its MNI coordinate and calculates each parcel time course from the sensor data with the beamformer weights. Bad segments are automatically excluded.
 #
