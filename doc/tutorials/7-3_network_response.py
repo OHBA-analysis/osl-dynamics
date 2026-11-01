@@ -24,8 +24,8 @@ network_response = gaussian_filter1d(network_response, sigma=3, axis=1)
 network_response /= network_response.std()
 
 # Network 1 responds from 0.12 to 0.32 s, network 2 from 0.32 to 0.4 s
-network_response[:, 80:130, 0] += 1.0 * np.hanning(50)
-network_response[:, 130:150, 1] += 1.2 * np.hanning(20)
+network_response[:, 80:130, 0] += 1.5 * np.hanning(50)
+network_response[:, 130:150, 1] += 1.8 * np.hanning(20)
 
 # Baseline correct using the pre-stimulus period
 network_response -= network_response[:, t < 0].mean(axis=1, keepdims=True)
@@ -117,7 +117,7 @@ for name, res in [("Max statistic", result_max), ("Cluster", result_cluster), ("
     print(f"{name:14s} network 1: {sig[:, 0].sum():3d} samples, network 2: {sig[:, 1].sum():3d} samples")
 
 #%%
-# The cluster-based test and TFCE recover more of the extended response in network 1. The maximum statistic is better suited to focal, strong effects and to targets without a natural neighbourhood (parcels, states).
+# The cluster-based test recovers the most of the extended response in network 1, and TFCE more than the maximum statistic. For the brief response in network 2 the three are closer. The maximum statistic is better suited to focal, strong effects and to targets without a natural neighbourhood (parcels, states).
 #
 # Interpreting the clusters
 # ^^^^^^^^^^^^^^^^^^^^^^^^^

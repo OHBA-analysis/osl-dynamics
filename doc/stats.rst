@@ -113,6 +113,7 @@ Implementation notes
 - Sign-flip tests need the noise to be symmetric about zero, which holds for baseline-corrected responses and paired differences. Row-shuffle tests make no distributional assumption.
 - Targets with missing values are fitted with the subjects that have a value for them (per-target complete-case analysis), with a warning.
 - Permutations use NumPy's global random state; :func:`osl_dynamics.utils.set_random_seed` makes them reproducible.
+- Cluster-based tests can find clusters in the permuted maps in parallel with :code:`n_jobs`, which only pays off for large maps or TFCE. As for any multiprocessing in Python, a script that does this must keep its code under :code:`if __name__ == "__main__":`.
 - Random field theory (as in SPM) is not provided: it needs a smooth Gaussian field on a lattice, which parcels, states and connections are not. The permutation tests control the FWER without these assumptions.
 
 Also see the :doc:`FAQ <faq>` and the `example scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/statistics>`_.

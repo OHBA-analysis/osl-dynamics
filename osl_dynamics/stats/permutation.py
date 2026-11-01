@@ -49,7 +49,7 @@ class Permutation:
 
     Each target gets its own null distribution, so the p-values are not
     corrected for multiple comparisons. Use :class:`MaxStatPermutation` for
-    family-wise error control, or apply :func:`osl_dynamics.stats.fdr`
+    family-wise error control, or apply :func:`osl_dynamics.stats.correction.fdr`
     to the p-values.
 
     Parameters
@@ -323,13 +323,19 @@ class Permutation:
             "shuffle_local": np.where(np.isin(rows, self._rows_to_shuffle()))[0],
         }
 
-    def _null_batch(self, group: dict, perms: np.ndarray) -> np.ndarray:
-        """Null statistics of one group of targets for a batch of permutations.
+    def _null_batch(
+        self, group: dict, perms: np.ndarray
+    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """Null copes and varcopes of one group of targets for a batch of
+        permutations.
 
         Returns
         -------
-        stat : np.ndarray
+        copes : np.ndarray
             Shape is (batch_size, n_targets_in_group).
+        varcopes : np.ndarray
+            Shape is (batch_size, n_targets_in_group), before any hat
+            adjustment. :code:`None` if :code:`metric='copes'`.
         """
         w, Q, r, r2 = group["w"], group["Q"], group["r"], group["r2"]
         n_r = len(w)
@@ -359,11 +365,30 @@ class Permutation:
 
         copes = W @ r  # (batch, n_targets)
         if self.metric == "copes":
-            return copes
+            return copes, None
 
         proj = QP.transpose(0, 2, 1) @ r  # (batch, rank, n_targets)
         ss = r2[None, :] - np.sum(proj**2, axis=1)
-        varcopes = hat_adjustment(group["c_xtx_c"] * ss / group["dof"], self.hat)
+        return copes, group["c_xtx_c"] * ss / group["dof"]
+
+    def _statistic(self, groups: list, perms: np.ndarray, n_targets: int) -> np.ndarray:
+        """Statistic of every target for a batch of permutations.
+
+        Returns
+        -------
+        stat : np.ndarray
+            Shape is (batch_size, n_targets).
+        """
+        copes = np.empty((perms.shape[0], n_targets))
+        varcopes = np.empty((perms.shape[0], n_targets))
+        for group, targets in groups:
+            copes[:, targets], v = self._null_batch(group, perms)
+            if v is not None:
+                varcopes[:, targets] = v
+        if self.metric == "copes":
+            return copes
+        # The hat adjustment uses the maximum variance over all targets
+        varcopes = hat_adjustment(varcopes, self.hat)
         with np.errstate(divide="ignore", invalid="ignore"):
             return copes / np.sqrt(varcopes)
 
@@ -400,9 +425,7 @@ class Permutation:
             identity = np.ones((1, X.shape[0]), dtype=int)
         else:
             identity = np.arange(X.shape[0])[None]
-        observed = np.empty((1, n_targets))
-        for group, targets in groups:
-            observed[:, targets] = self._null_batch(group, identity)
+        observed = self._statistic(groups, identity, n_targets)
         self._observed = observed.reshape(target_dims)
         observed = self._transform_observed(self._observed)[None]
 
@@ -443,9 +466,7 @@ class Permutation:
         try:
             for start in range(0, n_perm, batch_size):
                 batch = perms[start : start + batch_size]
-                stat = np.empty((len(batch), n_targets))
-                for group, targets in groups:
-                    stat[:, targets] = self._null_batch(group, batch)
+                stat = self._statistic(groups, batch, n_targets)
                 reduced = self._reduce(stat.reshape((len(batch), *target_dims)))
                 if keep_null:
                     null[start : start + len(batch)] = reduced
@@ -462,7 +483,7 @@ class Permutation:
 
         # A target with an undefined statistic (e.g. zero variance) has no
         # meaningful p-value
-        undefined = ~np.isfinite(observed[0])
+        undefined = ~np.isfinite(self._observed)
         if undefined.any():
             _logger.warning(
                 f"{undefined.sum()} target(s) have an undefined statistic (e.g. "
@@ -657,7 +678,10 @@ class ClusterPermutation(Permutation):
         'Hat' variance adjustment, see
         :func:`~osl_dynamics.stats.glm.hat_adjustment`.
     n_jobs : int, optional
-        Number of processes used to find clusters in the permuted maps.
+        Number of processes used to find clusters in the permuted maps. This
+        only pays off for large maps or TFCE. A script that uses more than
+        one process must keep its code under
+        :code:`if __name__ == "__main__":`.
 
     References
     ----------
@@ -730,7 +754,9 @@ class ClusterPermutation(Permutation):
     def _transform_observed(self, stat: np.ndarray) -> np.ndarray:
         if self.tfce_params is not None:
             self._clusters, self._cluster_stats = None, None
-            return np.abs(tfce(stat, self.structure, self.tail, **self.tfce_params))
+            self._tfce_map = tfce(stat, self.structure, self.tail, **self.tfce_params)
+            return np.abs(self._tfce_map)
+        self._tfce_map = None
         stat_map, self._clusters, self._cluster_stats = cluster_stat_map(
             stat, self.cluster_forming_threshold, self.structure, self.tail
         )
@@ -778,6 +804,7 @@ class ClusterPermutation(Permutation):
         """
         result = super().fit(y)
         result.cluster_forming_threshold = self.cluster_forming_threshold
+        result.tfce_map = self._tfce_map
         if self._clusters is not None:
             result.clusters = self._clusters
             result.cluster_stats = self._cluster_stats

@@ -2394,7 +2394,7 @@ def plot_evoked_response(
         Evoked responses. Shape must be (n_samples, n_channels).
     pvalues : np.ndarray or osl_dynamics.stats.results.TestResult
         p-value for each evoked response. This can be calculated with
-        :func:`osl_dynamics.stats.evoked_response`.
+        :func:`osl_dynamics.stats.inference.evoked_response`.
         A :class:`~osl_dynamics.stats.results.TestResult` can be passed
         instead, in which case its p-values are used.
     significance_level : float, optional

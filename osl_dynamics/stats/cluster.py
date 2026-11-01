@@ -11,7 +11,6 @@ Target dimensions are of two kinds:
   is still taken over them.
 """
 
-import math
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -82,6 +81,8 @@ class ClusterStructure:
         self.target_dims = tuple(int(d) for d in target_dims)
         n_dims = len(self.target_dims)
 
+        if cluster_dims is None:
+            raise ValueError("cluster_dims must be given (e.g. 0 for time).")
         dims = np.atleast_1d(cluster_dims).astype(int)
         dims = tuple(
             sorted(
@@ -205,7 +206,7 @@ def find_clusters(
         Sum of the statistic in each cluster (signed). Shape is
         (n_clusters,). Cluster :code:`i` has label :code:`i + 1`.
     """
-    stat = np.nan_to_num(stat, nan=0.0)
+    stat = np.nan_to_num(stat, nan=0.0, posinf=0.0, neginf=0.0)
     labels = np.zeros(stat.shape, dtype=np.int32)
     cluster_stats = []
     signs = {1: (1,), -1: (-1,), 0: (1, -1)}[tail]
@@ -296,7 +297,7 @@ def tfce(
     .. [1] Smith, S. M. & Nichols, T. E. (2009). Threshold-free cluster
            enhancement. NeuroImage, 44(1), 83-98.
     """
-    stat = np.nan_to_num(stat, nan=0.0)
+    stat = np.nan_to_num(stat, nan=0.0, posinf=0.0, neginf=0.0)
     enhanced = np.zeros(stat.shape)
     signs = {1: (1,), -1: (-1,), 0: (1, -1)}[tail]
     for sign in signs:

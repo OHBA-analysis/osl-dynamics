@@ -2,7 +2,7 @@
 
 import logging
 import pickle
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -163,8 +163,9 @@ class TestResult:
         t-statistics. Shape is (\\*target_dims).
     pvalues : np.ndarray
         P-values after the multiple comparisons correction. Shape is
-        (\\*target_dims). For cluster-based corrections every point holds the
-        p-value of the cluster it belongs to (1 if it is in no cluster).
+        (\\*target_dims). For :code:`correction='cluster'` every point holds
+        the p-value of the cluster it belongs to (1 if it is in no cluster);
+        for :code:`'tfce'` every point has its own p-value.
     correction : str or None
         Multiple comparisons correction that was applied.
     tail : int
@@ -199,6 +200,9 @@ class TestResult:
         P-value of each cluster.
     cluster_forming_threshold : float, optional
         Threshold used to form clusters.
+    tfce_map : np.ndarray, optional
+        Observed TFCE-enhanced statistic map for :code:`correction='tfce'`.
+        Shape is (\\*target_dims).
     """
 
     contrast: str
@@ -220,6 +224,7 @@ class TestResult:
     cluster_stats: Optional[np.ndarray] = None
     cluster_pvalues: Optional[np.ndarray] = None
     cluster_forming_threshold: Optional[float] = None
+    tfce_map: Optional[np.ndarray] = field(default=None, repr=False)
 
     @property
     def target_dims(self) -> Tuple[int, ...]:
@@ -257,7 +262,11 @@ class TestResult:
             "tail": self.tail,
             "parametric": self.parametric,
             "n_significant (p<0.05)": int(np.sum(self.pvalues < 0.05)),
-            "min_pvalue": float(np.nanmin(self.pvalues)),
+            "min_pvalue": (
+                float(np.nanmin(self.pvalues))
+                if np.any(np.isfinite(self.pvalues))
+                else np.nan
+            ),
         }
         if not self.parametric:
             summary.update(
@@ -344,19 +353,29 @@ class TestResult:
         if create_fig:
             fig, ax = plt.subplots(figsize=(6, 4))
 
-        observed = self.tstats if self.metric == "tstats" else self.copes
-        if self.tail == 0:
-            observed = np.abs(observed)
-        elif self.tail == -1:
-            observed = -observed
+        if self.correction == "cluster":
+            stats = np.abs(self.cluster_stats) if self.cluster_stats is not None else []
+            observed_max = np.max(stats) if len(stats) else 0.0
+            label = "cluster statistic"
+        elif self.correction == "tfce":
+            observed_max = np.nanmax(np.abs(self.tfce_map))
+            label = "TFCE"
+        else:
+            observed = self.tstats if self.metric == "tstats" else self.copes
+            if self.tail == 0:
+                observed = np.abs(observed)
+            elif self.tail == -1:
+                observed = -observed
+            observed_max = np.nanmax(observed)
+            label = "|{}|" if self.tail == 0 else "{}"
+            label = label.format("t" if self.metric == "tstats" else "cope")
         null = self.null.reshape(-1)
         ax.hist(null[np.isfinite(null)], bins=n_bins, color="tab:grey")
-        ax.axvline(np.nanmax(observed), color="tab:red", label="observed max")
+        ax.axvline(observed_max, color="tab:red", label="observed max")
         ax.axvline(
             np.nanpercentile(null, 95), color="black", ls="--", label="95th percentile"
         )
-        label = "|{}|" if self.tail == 0 else "{}"
-        ax.set_xlabel(label.format("t" if self.metric == "tstats" else "cope"))
+        ax.set_xlabel(label)
         ax.set_ylabel("Count")
         ax.set_title(f"Null distribution: {self.contrast}")
         ax.legend()

@@ -68,6 +68,9 @@ _COMMON_PARAMETERS = """
         samples), e.g. time or frequency. Neighbouring indices are adjacent
         unless an :code:`adjacency` is given for that dimension. Clusters
         never span two indices of other dimensions (e.g. two states).
+        Required for these corrections, except in
+        :func:`~osl_dynamics.stats.inference.evoked_response` where it
+        defaults to time (dimension 0).
     adjacency : dict, optional
         For :code:`'cluster'` and :code:`'tfce'`: adjacency matrices for
         cluster dimensions that are not lattices, :code:`{dim: matrix}`
@@ -89,7 +92,9 @@ _COMMON_PARAMETERS = """
         permutation tests (:code:`False`).
     n_jobs : int, optional
         Number of processes used to find clusters in the permuted maps for
-        :code:`'cluster'` and :code:`'tfce'`. Not used otherwise.
+        :code:`'cluster'` and :code:`'tfce'`, which only pays off for large
+        maps or TFCE. Not used otherwise. A script that uses more than one
+        process must keep its code under :code:`if __name__ == "__main__":`.
 
     Returns
     -------
@@ -143,6 +148,16 @@ def _run(
                 f"cluster_dims must be given for correction='{correction}': the "
                 "target dimension(s) along which clusters can extend, e.g. time."
             )
+        if pooled_dims is not None:
+            _logger.warning(
+                f"pooled_dims is ignored with correction='{correction}': the "
+                "maximum is always taken over the whole map."
+            )
+        if metric != "tstats":
+            _logger.warning(
+                f"metric='{metric}' is ignored with correction='{correction}': "
+                "clusters are always formed from t-statistics."
+            )
         perm = ClusterPermutation(
             design,
             contrast_indx=contrast_indx,
@@ -178,12 +193,15 @@ def _run(
     result = perm.fit(data)
     n_targets = result.pvalues.size
     smallest_p = 1 / (result.n_perm + (0 if result.exact else 1))
-    if correction is not None and smallest_p > 0.05 / n_targets:
+    # Bonferroni/Holm need the smallest p-value below alpha / n_targets to
+    # reject anything; Benjamini-Hochberg needs it below alpha at least
+    needed = {"bonferroni": 0.05 / n_targets, "holm": 0.05 / n_targets, "fdr": 0.05}
+    if correction is not None and smallest_p > needed[correction]:
         _logger.warning(
             f"The smallest attainable p-value with {result.n_perm} permutations is "
             f"{smallest_p:.2g}, but {correction} needs p-values below "
-            f"{0.05 / n_targets:.2g} across {n_targets} targets to reject "
-            "anything at alpha=0.05. Increase n_perm."
+            f"{needed[correction]:.2g} to reject anything at alpha=0.05 across "
+            f"{n_targets} targets. Increase n_perm."
         )
     result.pvalues = correct(result.pvalues_uncorrected, correction)
     result.correction = correction
@@ -219,12 +237,18 @@ def evoked_response(
     target, with sign-flip permutations. The data should be baseline
     corrected so that zero is the null. For cluster-based corrections,
     clusters are formed along time (the first target dimension) by default.
+    With the default :code:`correction='max_stat'`, :code:`metric` defaults
+    to :code:`'copes'` (the mean response, which has the same units at every
+    target) rather than :code:`'tstats'`.
 
     Parameters
     ----------
     data : np.ndarray
         Baseline-corrected responses. Shape is (n_samples, \\*target_dims),
         e.g. (n_subjects, n_time, n_networks).
+    metric : str, optional
+        :code:`'copes'` for :code:`'max_stat'` and :code:`'tstats'` otherwise
+        if :code:`None`.
     """
     data = np.asarray(data, dtype=float)
     if metric is None:

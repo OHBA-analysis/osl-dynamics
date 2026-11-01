@@ -85,6 +85,12 @@ fetch_parcellation_docs()
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
+intersphinx_mapping = {
+    "mne": ("https://mne.tools/stable", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy", None),
+}
+
 extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",

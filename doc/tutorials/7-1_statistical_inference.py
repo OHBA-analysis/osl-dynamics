@@ -181,7 +181,7 @@ print("Parametric p  =", round(result.pvalues[t_index, state], 3))
 # Two practical points:
 #
 # - The p-value from :math:`N` random permutations is :math:`(1 + b) / (N + 1)`, where :math:`b` is the number of permuted statistics at least as extreme as the observed one. It can never be zero: the smallest p-value is :math:`1 / (N + 1)`, so use at least 1000 permutations to resolve p = 0.001.
-# - With few samples (up to about 10 subjects for a sign-flip test), every possible permutation is enumerated and the test is **exact**; :code:`result.exact` tells you when this happened.
+# - With few samples (up to 9 subjects for a sign-flip test with the default 1000 permutations), every possible permutation is enumerated and the test is **exact**; :code:`result.exact` tells you when this happened.
 #
 # Permutations use NumPy's global random state, so :func:`osl_dynamics.utils.set_random_seed` makes them reproducible.
 #
