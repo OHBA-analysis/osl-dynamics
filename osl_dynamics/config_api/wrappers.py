@@ -2144,7 +2144,6 @@ def compare_groups_hmm_summary_stats(
     separate_tests: bool = False,
     covariates: Optional[str] = None,
     n_perm: int = 1000,
-    n_jobs: int = 1,
     sampling_frequency: Optional[float] = None,
 ) -> None:
     """Compare HMM summary statistics between two groups.
@@ -2183,8 +2182,6 @@ def compare_groups_hmm_summary_stats(
             covariates = {"age": [...], "sex": [...]}
     n_perm : int, optional
         Number of permutations.
-    n_jobs : int, optional
-        Not used. Kept so that existing config files still run.
     sampling_frequency : float, optional
         Sampling frequency in Hz. If :code:`None`, we use
         :code:`data.sampling_frequency`.
