@@ -139,8 +139,20 @@ class Permutation:
             return np.where(np.any(self.glm.X[:, indices] != 0, axis=1))[0]
         return np.arange(self.glm.n_samples)
 
-    def _permutations(self) -> Tuple[np.ndarray, bool]:
+    def _permutations(
+        self, allow_exact_shuffle: bool = True
+    ) -> Tuple[np.ndarray, bool]:
         """Draw the permutations.
+
+        Parameters
+        ----------
+        allow_exact_shuffle : bool, optional
+            Whether row shuffles may be enumerated exhaustively. This must be
+            :code:`False` when any target has missing values: the
+            permutations induced on the complete rows of such a target do not
+            visit every assignment equally often, so the test would not be
+            exact. Sign flips are unaffected because every sign vector of the
+            complete rows is induced equally often.
 
         Returns
         -------
@@ -168,7 +180,7 @@ class Permutation:
         # the row it moves to.
         indices = self.design.contrast_feature_indices(self.contrast_indx)
         no_continuous = "continuous" not in self.design.feature_types
-        if len(indices) == 2 and no_continuous:
+        if allow_exact_shuffle and len(indices) == 2 and no_continuous:
             in_first = self.glm.X[rows, indices[0]] != 0
             n_first = int(in_first.sum())
             n_total = math.comb(n_rows, n_first)
@@ -183,7 +195,7 @@ class Permutation:
                     perms[i, second_rows] = rest
                 return perms, True
 
-        if math.factorial(n_rows) <= self.n_perm:
+        if allow_exact_shuffle and math.factorial(n_rows) <= self.n_perm:
             perms = np.tile(identity, (math.factorial(n_rows), 1))
             for i, p in enumerate(itertools.permutations(rows)):
                 perms[i, rows] = p
@@ -249,9 +261,11 @@ class Permutation:
         else:
             r = y
 
-        # Orthonormal basis of the full design, for the residual sum of squares
-        Q, _ = np.linalg.qr(X_r)
-        Q = Q[:, : np.linalg.matrix_rank(X_r)]
+        # Orthonormal basis of the column space of the full design (valid for
+        # rank-deficient designs too), for the residual sum of squares
+        U, singular_values, _ = np.linalg.svd(X_r, full_matrices=False)
+        tol = singular_values.max() * max(X_r.shape) * np.finfo(float).eps
+        Q = U[:, singular_values > tol]
 
         c_pinv = self.contrast @ pinv  # cope = c_pinv @ y*
         return {
@@ -303,7 +317,7 @@ class Permutation:
         if self.metric == "copes":
             return copes
 
-        proj = np.einsum("bnk,nt->bkt", QP, r)
+        proj = QP.transpose(0, 2, 1) @ r  # (batch, rank, n_targets)
         ss = r2[None, :] - np.sum(proj**2, axis=1)
         varcopes = group["c_xtx_c"] * ss / group["dof"]
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -328,15 +342,26 @@ class Permutation:
         self._resolve_pooled_dims(target_dims)
 
         glm_result = self.glm.fit(y.reshape((-1, *target_dims)))
-        observed = getattr(glm_result, self.metric)[self.contrast_indx]
-        observed = self._apply_tail(observed)[None]  # (1, *target_dims)
 
         groups = [
             (self._prepare_group(X, y[:, targets], rows), targets)
             for rows, targets in complete_case_groups(X, y, warn=False)
         ]
 
-        perms, exact = self._permutations()
+        # The observed statistic is computed through the same code as the
+        # null (with the identity permutation) so that comparisons between
+        # the two are not affected by floating point differences
+        if self.perm_type == "sign_flip":
+            identity = np.ones((1, X.shape[0]), dtype=int)
+        else:
+            identity = np.arange(X.shape[0])[None]
+        observed = np.empty((1, n_targets))
+        for group, targets in groups:
+            observed[:, targets] = self._null_batch(group, identity)
+        observed = self._apply_tail(observed.reshape((1, *target_dims)))
+
+        all_complete = len(groups) == 1 and len(groups[0][0]["rows"]) == X.shape[0]
+        perms, exact = self._permutations(allow_exact_shuffle=all_complete)
         n_perm = perms.shape[0]
         if exact:
             _logger.info(
@@ -384,6 +409,16 @@ class Permutation:
         # equals the observed statistic, so no +1 is needed
         offset = 0 if exact else 1
         pvalues = (counts + offset) / (n_perm + offset)
+
+        # A target with an undefined statistic (e.g. zero variance) has no
+        # meaningful p-value
+        undefined = ~np.isfinite(observed[0])
+        if undefined.any():
+            _logger.warning(
+                f"{undefined.sum()} target(s) have an undefined statistic (e.g. "
+                "zero variance). Their p-values are set to NaN."
+            )
+            pvalues[undefined] = np.nan
         if not exact and np.any(counts == 0):
             _logger.info(
                 f"The smallest attainable p-value with {n_perm} permutations "

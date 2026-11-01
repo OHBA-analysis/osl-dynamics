@@ -125,11 +125,12 @@ def _run(
     )
     result = perm.fit(data)
     n_targets = result.pvalues.size
-    if correction is not None and 1 / (result.n_perm + 1) > 0.05 / n_targets:
+    smallest_p = 1 / (result.n_perm + (0 if result.exact else 1))
+    if correction is not None and smallest_p > 0.05 / n_targets:
         _logger.warning(
             f"The smallest attainable p-value with {result.n_perm} permutations is "
-            f"{1 / (result.n_perm + 1):.2g}, but {correction} needs p-values "
-            f"below {0.05 / n_targets:.2g} across {n_targets} targets to reject "
+            f"{smallest_p:.2g}, but {correction} needs p-values below "
+            f"{0.05 / n_targets:.2g} across {n_targets} targets to reject "
             "anything at alpha=0.05. Increase n_perm."
         )
     result.pvalues = correct(result.pvalues_uncorrected, correction)
