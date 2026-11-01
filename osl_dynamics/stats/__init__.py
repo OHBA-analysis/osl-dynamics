@@ -25,8 +25,14 @@ Modules
 
 Tutorials
 ---------
-- :doc:`Group Contrast </tutorials_build/7-1_group_contrast>`
-- :doc:`Network Response </tutorials_build/7-2_group_network_response>`
+- :doc:`Statistical Inference </tutorials_build/7-1_statistical_inference>`
+- :doc:`Group Contrast </tutorials_build/7-2_group_contrast>`
+- :doc:`Network Response </tutorials_build/7-3_network_response>`
+- :doc:`Custom Designs </tutorials_build/7-4_custom_designs>`
+
+Documentation
+-------------
+- :doc:`Statistical Significance Testing </stats>`
 
 Python example scripts
 ----------------------

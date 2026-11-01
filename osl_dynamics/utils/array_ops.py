@@ -476,3 +476,62 @@ def list_stds(list_of_lists: List[list]) -> np.ndarray:
         Numpy array with the standard deviation of each list.
     """
     return apply_to_lists(list_of_lists, func=np.std)
+
+
+def mat2vec(mat: np.ndarray) -> np.ndarray:
+    """Upper triangle of symmetric matrices as vectors.
+
+    Useful for statistical testing of connectivity matrices, which should
+    only test each connection once.
+
+    Parameters
+    ----------
+    mat : np.ndarray
+        Symmetric matrices. Shape is (..., n, n).
+
+    Returns
+    -------
+    vec : np.ndarray
+        Upper triangle (excluding the diagonal), in row-major order.
+        Shape is (..., n * (n - 1) / 2).
+
+    See Also
+    --------
+    vec2mat : The inverse operation.
+    """
+    mat = np.asarray(mat)
+    if mat.ndim < 2 or mat.shape[-1] != mat.shape[-2]:
+        raise ValueError(f"mat must have shape (..., n, n), got {mat.shape}.")
+    i, j = np.triu_indices(mat.shape[-1], k=1)
+    return mat[..., i, j]
+
+
+def vec2mat(vec: np.ndarray, fill_value: float = 0.0) -> np.ndarray:
+    """Symmetric matrices from their upper triangles.
+
+    Parameters
+    ----------
+    vec : np.ndarray
+        Upper triangles as returned by :func:`mat2vec`.
+        Shape is (..., n * (n - 1) / 2).
+    fill_value : float, optional
+        Value for the diagonal.
+
+    Returns
+    -------
+    mat : np.ndarray
+        Symmetric matrices. Shape is (..., n, n).
+    """
+    vec = np.asarray(vec)
+    n_values = vec.shape[-1]
+    n = int(round((1 + np.sqrt(1 + 8 * n_values)) / 2))
+    if n * (n - 1) // 2 != n_values:
+        raise ValueError(
+            f"The last dimension of vec ({n_values}) is not n * (n - 1) / 2 for "
+            "any integer n."
+        )
+    i, j = np.triu_indices(n, k=1)
+    mat = np.full((*vec.shape[:-1], n, n), fill_value, dtype=vec.dtype)
+    mat[..., i, j] = vec
+    mat[..., j, i] = vec
+    return mat

@@ -13,7 +13,7 @@ You can use osl-dynamics to:
 - **Characterise brain states/modes** with summary statistics (fractional occupancy, lifetimes, intervals, switching rates), state-specific power maps, and functional connectivity.
 - **Estimate spectra** using multitaper and regression-based methods, or wavelet transforms.
 - **Detect oscillatory bursts**.
-- **Test for statistical significance** using GLM permutation testing.
+- **Test for statistical significance** with GLM permutation tests: maximum statistic, cluster-based and TFCE corrections, with covariates.
 - **Preprocess and source reconstruct M/EEG data**: preprocessing, coregistration, beamforming and parcellation.
 - **Simulate time series data** from HMMs, sinusoidal oscillators and autoregressive models.
 

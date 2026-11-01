@@ -12,7 +12,7 @@ osl-dynamics is a Python toolbox for studying dynamic brain networks from neuroi
 - **Generative models** for inferring dynamic brain networks, e.g. the Hidden Markov Model (HMM) and Dynamic Network Modes (DyNeMo).
 - **Post-hoc analysis tools**: spectral analysis, summary statistics, and network visualization.
 - **Static analysis**: time-averaged power and connectivity analysis.
-- **Statistical testing**: GLM-based permutation testing for group comparisons.
+- **Statistical testing**: GLM permutation tests for group comparisons, network responses and regressions, with maximum statistic, cluster-based and TFCE corrections for multiple comparisons.
 - **Simulation tools**: for generating synthetic time series data.
 
 M/EEG Processing

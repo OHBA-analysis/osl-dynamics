@@ -310,6 +310,49 @@ How does the regression spectrum calculation work?
 
 See the 'Spectral Analysis' section of the :doc:`DyNeMo model description <models/dynemo>`.
 
+Statistical Significance Testing
+--------------------------------
+
+Which correction for multiple comparisons should I use?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use the default maximum statistic (``correction="max_stat"``) for targets without a natural neighbourhood: states, parcels, connections and summary statistics. Use a cluster-based test (``"cluster"``) or TFCE (``"tfce"``) for effects that are extended along time or frequency, such as network responses and spectra. Use FDR (``"fdr"``) when you test very many targets (e.g. a connectivity matrix) and a small fraction of false positives is acceptable. See the :doc:`statistics page <stats>` for a table and the :doc:`Statistical Inference tutorial <tutorials_build/7-1_statistical_inference>` for a comparison on the same data.
+
+How many permutations do I need?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The p-value from :math:`N` random permutations is :math:`(1 + b) / (N + 1)`, where :math:`b` is the number of permuted statistics at least as extreme as the observed one, so the smallest p-value you can get is :math:`1 / (N + 1)`. Use at least 1000 permutations to report p < 0.01 and 10,000 for p < 0.001. The tests are fast (a few seconds for 1000 permutations on typical data), so there is little reason to use fewer. With few subjects every permutation is enumerated and the test is exact; ``result.exact`` tells you when this happened.
+
+Why is my smallest p-value 0.001 (or 1 / (n_perm + 1))?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Because that is the resolution of a permutation test with ``n_perm`` permutations, see above. A permutation p-value can never be zero. Increase ``n_perm`` if you need smaller p-values.
+
+What does a significant cluster mean?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+That the data are not exchangeable under the null hypothesis, i.e. there is an effect somewhere, and the cluster points to where it is likely to be. It does not establish that the effect is present at every time point (or parcel) in the cluster, or that it starts and ends where the cluster does: the extent of a cluster depends on the signal-to-noise ratio, the number of subjects and the cluster-forming threshold. Report "a significant response, most pronounced between 100 and 300 ms", not "a significant response from 100 to 300 ms". See `Sassenhagen & Draschkow (2019) <https://doi.org/10.1111/psyp.13335>`_.
+
+Should I test copes or t-statistics?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``metric`` argument chooses the statistic whose maximum is taken across targets. T-statistics are the default and the right choice when the targets have different units or variances (e.g. fractional occupancies and lifetimes together). Copes (the raw effect, e.g. the mean response) are the default for :func:`~osl_dynamics.stats.inference.evoked_response`, where every target has the same units and the t-statistic can be unstable where the variance is near zero. The ``hat`` argument is another remedy for unstable t-statistics. Cluster-based tests always use t-statistics.
+
+How do I account for age, sex or other confounds?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pass them as ``covariates={"age": age, "sex": sex}`` to any test. They are added to the GLM as nuisance regressors and regressed out; the permutations use the Freedman-Lane scheme so that the test remains valid with covariates. To test the effect of a covariate itself use :func:`~osl_dynamics.stats.inference.regression`.
+
+My summary statistics contain NaNs. What happens?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A mean lifetime or interval is undefined for a state a subject never visits. Each target is fitted with the subjects that have a value for it, so the subject is only dropped from that state's test, and a warning reports how many subjects were dropped. Targets whose statistic is undefined (e.g. zero variance) get a NaN p-value.
+
+How do I make the permutations reproducible?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Call :func:`osl_dynamics.utils.set_random_seed` at the top of your script. The permutations are drawn from NumPy's global random state.
+
 Other
 -----
 

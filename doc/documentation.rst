@@ -51,6 +51,14 @@ The parcellations, masks and surfaces osl-dynamics uses are downloaded from
 `osl-files <https://github.com/OHBA-analysis/osl-files>`_. See :doc:`the parcellations page <parcellations/index>`
 for the full list, with labels, MNI coordinates and pictures for each one.
 
+Statistical Significance Testing
+--------------------------------
+
+The :doc:`statistics page <stats>` summarises which test and which correction for multiple
+comparisons to use for each kind of osl-dynamics output. The :doc:`Statistical Inference tutorial
+<tutorials_build/7-1_statistical_inference>` explains the methods (GLM permutation tests, maximum
+statistic, cluster-based permutations, TFCE, FDR) with figures.
+
 Tutorials
 ---------
 
@@ -106,10 +114,12 @@ Also see `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM
 - :doc:`tutorials_build/6-1_epoching_alpha`.
 - `Dynamic Network Analysis of Electrophysiological Task Data <https://github.com/OHBA-analysis/Gohil2024_NetworkAnalysisOfTaskData>`_.
 
-**Group-level analysis tutorials**:
+**Statistical significance testing tutorials**:
 
-- :doc:`tutorials_build/7-1_group_contrast`.
-- :doc:`tutorials_build/7-2_group_network_response`.
+- :doc:`tutorials_build/7-1_statistical_inference`.
+- :doc:`tutorials_build/7-2_group_contrast`.
+- :doc:`tutorials_build/7-3_network_response`.
+- :doc:`tutorials_build/7-4_custom_designs`.
 
 Examples Directory
 ------------------
