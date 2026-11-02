@@ -315,10 +315,6 @@ fig.tight_layout()
 #
 # The same caveat applies, less strongly, to TFCE: its per-target p-values are still driven by neighbouring targets.
 #
-# Why no random field theory?
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# SPM corrects for multiple comparisons with random field theory (RFT), a parametric theory of the maximum of a smooth Gaussian field. It needs the targets to form a lattice whose smoothness can be estimated from the residuals. The targets in osl-dynamics (parcels, states, connections) are not a lattice, and the time and frequency axes are short and often not smooth, so the assumptions do not hold. The permutation tests above control the FWER without them.
-#
 # Reporting
 # ^^^^^^^^^
 # A results sentence should state the test, the design, the correction, the number of permutations, the tail and what was controlled for. For example:
