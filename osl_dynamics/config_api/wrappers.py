@@ -27,7 +27,6 @@ from osl_dynamics.utils.misc import (
     load,
     override_dict_defaults,
     save,
-    warn_mask_file_unused,
 )
 
 _logger = logging.getLogger("osl-dynamics")
@@ -746,7 +745,6 @@ def plot_power_maps_from_covariances(
     output_dir: str,
     parcellation_file: Optional[str] = None,
     power_save_kwargs: Optional[dict] = None,
-    mask_file: Optional[str] = None,
 ) -> None:
     """Plot power maps calculated directly from the inferred covariances.
 
@@ -779,11 +777,7 @@ def plot_power_maps_from_covariances(
             {'filename': '<inf_params_dir>/covs_.png',
              'parcellation_file': data.parcellation_file,
              'plot_kwargs': {'symmetric_cbar': True}}
-    mask_file : str, optional
-        Deprecated and ignored: brain maps are plotted on the voxel grid of
-        the parcellation file. Will be removed in v3.8.0.
     """
-    warn_mask_file_unused(mask_file)
     # Validation
     power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
 
@@ -1174,7 +1168,6 @@ def plot_group_ae_networks(
     aec_abs: bool = True,
     power_save_kwargs: Optional[dict] = None,
     conn_save_kwargs: Optional[dict] = None,
-    mask_file: Optional[str] = None,
 ) -> None:
     """Plot group-level amplitude envelope networks.
 
@@ -1212,11 +1205,7 @@ def plot_group_ae_networks(
              'filename': '<output_dir>/networks/aec_.png',
              'threshold': 0.97,
              'plot_kwargs': {'display_mode': 'xz', 'annotate': False}}
-    mask_file : str, optional
-        Deprecated and ignored: brain maps are plotted on the voxel grid of
-        the parcellation file. Will be removed in v3.8.0.
     """
-    warn_mask_file_unused(mask_file)
     power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
 
@@ -1283,7 +1272,6 @@ def plot_group_tde_hmm_networks(
     percentile: float = 97,
     power_save_kwargs: Optional[dict] = None,
     conn_save_kwargs: Optional[dict] = None,
-    mask_file: Optional[str] = None,
 ) -> None:
     """Plot group-level TDE-HMM networks for a specified frequency band.
 
@@ -1329,11 +1317,7 @@ def plot_group_tde_hmm_networks(
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'display_mode': "xz", 'annotate': False}}
-    mask_file : str, optional
-        Deprecated and ignored: brain maps are plotted on the voxel grid of
-        the parcellation file. Will be removed in v3.8.0.
     """
-    warn_mask_file_unused(mask_file)
     power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
 
@@ -1444,7 +1428,6 @@ def plot_group_nnmf_tde_hmm_networks(
     percentile: float = 97,
     power_save_kwargs: Optional[dict] = None,
     conn_save_kwargs: Optional[dict] = None,
-    mask_file: Optional[str] = None,
 ) -> None:
     """Plot group-level TDE-HMM networks using a NNMF component to integrate the spectra.
 
@@ -1494,11 +1477,7 @@ def plot_group_nnmf_tde_hmm_networks(
              'component': component,
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'display_mode': "xz", 'annotate': False}}
-    mask_file : str, optional
-        Deprecated and ignored: brain maps are plotted on the voxel grid of
-        the parcellation file. Will be removed in v3.8.0.
     """
-    warn_mask_file_unused(mask_file)
     power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
 
@@ -1624,7 +1603,6 @@ def plot_group_tde_dynemo_networks(
     percentile: float = 97,
     power_save_kwargs: Optional[dict] = None,
     conn_save_kwargs: Optional[dict] = None,
-    mask_file: Optional[str] = None,
 ) -> None:
     """Plot group-level TDE-DyNeMo networks for a specified frequency band.
 
@@ -1671,11 +1649,7 @@ def plot_group_tde_dynemo_networks(
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'edge_cmap': 'Reds'}}
-    mask_file : str, optional
-        Deprecated and ignored: brain maps are plotted on the voxel grid of
-        the parcellation file. Will be removed in v3.8.0.
     """
-    warn_mask_file_unused(mask_file)
     power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
 
