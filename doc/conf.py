@@ -172,6 +172,8 @@ html_theme_options = {
     "show_nav_level": 1,
     "header_links_before_dropdown": 6,
     "logo": {"text": "OSL Dynamics"},
+    # The User Guide landing page has no sections, so no right-hand page TOC
+    "secondary_sidebar_items": {"**": ["page-toc"], "documentation": []},
 }
 
 # Remove the left "Section Navigation" sidebar on pages that are a section by
