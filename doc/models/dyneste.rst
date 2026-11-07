@@ -71,4 +71,4 @@ See the :doc:`HMM post-hoc analysis documentation <hmm>` for details on these an
 References
 ----------
 
-#. S Cho, R Huang, C Gohil, O Parker Jones, M W Woolrich, Modelling Discrete States and Long-Term Dynamics in Functional Brain Networks. `bioRxiv, 2025 <https://www.biorxiv.org/content/10.1101/2025.09.25.678554>`_.
+#. S Cho, R Huang, C Gohil, O Parker Jones, M W Woolrich, Modelling Discrete States and Long-Term Dynamics in Functional Brain Networks. `Imaging Neuroscience, 2026 <https://doi.org/10.1162/IMAG.a.1237>`_.

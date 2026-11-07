@@ -1,7 +1,7 @@
 """Example script for applying hierarchical clustering to match state time courses
 from different runs.
 
-The method is described here: https://www.biorxiv.org/content/10.1101/2023.01.18.524539v2
+The method is described here: https://doi.org/10.1162/netn_a_00331
 """
 
 import pickle

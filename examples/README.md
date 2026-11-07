@@ -14,4 +14,4 @@ This directory contains:
 - `static`: scripts for static network analysis.
 - `statistics`: scripts for statistical significance testing with GLM permutation tests (group differences, network responses, cluster-based tests, regressions).
 - `tinda`: scripts for using [TINDA](https://www.nature.com/articles/s41593-025-02052-8).
-- `toolbox_paper`: scripts for reproducing the results in the [eLife paper](https://elifesciences.org/reviewed-preprints/91949).
+- `toolbox_paper`: scripts for reproducing the results in the [eLife paper](https://elifesciences.org/articles/91949).

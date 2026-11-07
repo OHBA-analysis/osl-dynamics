@@ -97,6 +97,6 @@ References
 ----------
 
 #. Long-short term memory. `Wikipedia <https://en.wikipedia.org/wiki/Long_short-term_memory>`_.
-#. C Gohil, et al., Mixtures of large-scale dynamic functional brain network modes. `Neuroimage, 2022 <https://www.sciencedirect.com/science/article/pii/S1053811922007108>`_.
+#. C Gohil, et al., Mixtures of large-scale dynamic functional brain network modes. `Neuroimage, 2022 <https://doi.org/10.1016/j.neuroimage.2022.119595>`_.
 #. D Kingma and M Welling, Auto-Encoding Variational Bayes. `arxiv:1312.6114, 2013 <https://arxiv.org/abs/1312.6114>`_.
-#. A Quinn, et al. The GLM-Spectrum: A multilevel framework for spectrum analysis with covariate and confound modelling. `bioRxiv, 2022 <https://www.biorxiv.org/content/10.1101/2022.11.14.516449v1>`_.
+#. A Quinn, et al., The GLM-spectrum: A multilevel framework for spectrum analysis with covariate and confound modelling. `Imaging Neuroscience, 2024 <https://doi.org/10.1162/imag_a_00082>`_.

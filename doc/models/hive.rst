@@ -53,4 +53,4 @@ After fitting HIVE, you can perform the same post-hoc analyses as with the `HMM 
 References
 ----------
 
-#. R Huang, C Gohil, M W Woolrich, Modelling variability in functional brain networks using embeddings. `bioRxiv, 2024 <https://www.biorxiv.org/content/10.1101/2024.01.29.577718>`_.
+#. R Huang, C Gohil, M W Woolrich, Modelling variability in functional brain networks using embeddings. `Imaging Neuroscience, 2026 <https://doi.org/10.1162/IMAG.a.1188>`_.

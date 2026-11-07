@@ -48,4 +48,4 @@ These can be analysed separately to study the independent dynamics of power and 
 References
 ----------
 
-#. R Huang, C Gohil, M W Woolrich, Evidence for Transient, Uncoupled Power and Functional Connectivity Dynamics. `Human Brain Mapping, 2025 <https://pubmed.ncbi.nlm.nih.gov/40035183/>`_.
+#. R Huang, C Gohil, M W Woolrich, Evidence for Transient, Uncoupled Power and Functional Connectivity Dynamics. `Human Brain Mapping, 2025 <https://doi.org/10.1002/hbm.70179>`_.
