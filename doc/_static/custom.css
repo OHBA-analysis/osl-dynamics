@@ -26,19 +26,21 @@ section.home-page > h1 {
   grid-column: 1;
   grid-row: 1;
   align-self: center;
+  margin-bottom: 2rem;
 }
 .institution-logos {
   grid-column: 2;
   grid-row: 1;
   display: flex;
-  gap: 1rem;
+  gap: 1.25rem;
   align-items: center;
+  margin-bottom: 2rem;
 }
 section.home-page > .institution-logos {
   grid-column: 2;
 }
 .institution-logos img {
-  height: 80px;
+  height: 110px;
   width: auto;
 }
 
@@ -52,10 +54,13 @@ section.home-page > .institution-logos {
     grid-column: 1 / -1;
     grid-row: auto;
   }
-  .institution-logos {
+  section.home-page > h1 {
     margin-bottom: 1rem;
   }
+  .institution-logos {
+    margin-bottom: 1.5rem;
+  }
   .institution-logos img {
-    height: 50px;
+    height: 65px;
   }
 }
