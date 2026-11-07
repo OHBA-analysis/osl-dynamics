@@ -18,7 +18,7 @@ osl-dynamics is a Python toolbox for studying dynamic brain networks from neuroi
 M/EEG Processing
 -----------------
 
-If you are starting from raw M/EEG data, osl-dynamics includes a full processing pipeline covering preprocessing, surface extraction, coregistration, source reconstruction (LCMV beamformer), and parcellation. See the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>` for a step-by-step walkthrough, or the `batch processing scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for running multiple sessions in parallel.
+If you are starting from raw M/EEG data, osl-dynamics includes a full processing pipeline covering preprocessing, surface extraction, coregistration, source reconstruction (LCMV beamformer), and parcellation. The :doc:`M/EEG Processing <meeg>` page describes the steps and the software behind them. See the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>` for a step-by-step walkthrough, or the `batch processing scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for running multiple sessions in parallel.
 
 A Typical Workflow
 ------------------

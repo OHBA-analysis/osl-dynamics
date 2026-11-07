@@ -2,13 +2,13 @@
 Group Contrast
 ==============
 
-In this tutorial we test for differences between two groups of subjects with :func:`stats.group_diff <osl_dynamics.stats.inference.group_diff>`. This covers the most common group-level questions in osl-dynamics:
+In this tutorial we test for differences between groups of subjects with :func:`stats.group_diff <osl_dynamics.stats.inference.group_diff>`. This covers the most common group-level questions in osl-dynamics:
 
 1. Do the HMM summary statistics differ between groups?
 2. Do the state power maps differ between groups?
 3. Do the connectivity networks differ between groups?
 
-We also cover nuisance covariates, missing values and controlling the family-wise error rate per state. See the :doc:`Statistical Inference tutorial <7-1_statistical_inference>` for the background.
+We also cover nuisance covariates, missing values, controlling the family-wise error rate per state and more than two groups. See the :doc:`Statistical Inference tutorial <7-1_statistical_inference>` for the background.
 """
 
 #%%
@@ -131,16 +131,23 @@ print("Significant connections:", np.argwhere(np.triu(conn_diff) != 0).tolist())
 #
 # More than two groups
 # ^^^^^^^^^^^^^^^^^^^^
-# When :code:`assignments` has more than two labels, pass the two to compare as :code:`groups`. Every group is still modelled, so the residual variance is estimated from all subjects, but only the subjects in the two compared groups are shuffled.
+# When :code:`assignments` has more than two labels and no :code:`groups` are given, :func:`stats.group_diff <osl_dynamics.stats.inference.group_diff>` tests whether *any* group differs from the others with an **F-test**: the GLM form of a one-way ANOVA, with row-shuffle permutations of all the subjects. An F-statistic has no direction, so the test is always two-tailed and :code:`result.copes` holds the differences between consecutive groups rather than a single effect; :code:`result.stats` gives the F-statistics.
 
 assignments_3 = assignments.copy()
 assignments_3[-5:] = 3
 
-result = stats.group_diff(power_maps, assignments_3, groups=(1, 2), n_perm=1000)
-print(result.contrast)
+result = stats.group_diff(power_maps, assignments_3, n_perm=1000)
+print(result)
+print("Numerator degrees of freedom:", result.f_dof)
 
 #%%
-# Other contrasts (e.g. patients versus the mean of two control groups) can be specified with a custom design, see the :doc:`Custom Designs tutorial <7-4_custom_designs>`.
+# A significant F-test says that the groups are not all the same, not which ones differ. Follow it up with pairwise tests by passing the two labels to compare as :code:`groups`. Every group is still modelled, so the residual variance is estimated from all subjects, but only the subjects in the two compared groups are shuffled.
+
+result_12 = stats.group_diff(power_maps, assignments_3, groups=(1, 2), n_perm=1000)
+print(result_12.contrast)
+
+#%%
+# Each pairwise test controls the FWER across the targets on its own. If you report all the pairs, correct for their number as well (e.g. Bonferroni over the three pairs) or restrict yourself to the pairs you had a hypothesis about. Other contrasts (e.g. patients versus the mean of two control groups) can be specified with a custom design, see the :doc:`Custom Designs tutorial <7-4_custom_designs>`.
 #
 # Reporting
 # ^^^^^^^^^

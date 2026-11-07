@@ -11,7 +11,8 @@ Modules
   :func:`evoked_response`, :func:`paired_diff`, :func:`group_diff` and
   :func:`regression`.
 - :py:mod:`~osl_dynamics.stats.design` — :class:`DesignConfig` and
-  :class:`Design` for specifying regressors and contrasts.
+  :class:`Design` for specifying regressors and contrasts (t-contrasts and
+  F-contrasts).
 - :py:mod:`~osl_dynamics.stats.glm` — :class:`GLM` fitting.
 - :py:mod:`~osl_dynamics.stats.permutation` — :class:`MaxStatPermutation`
   and :class:`ClusterPermutation` (family-wise error control) and

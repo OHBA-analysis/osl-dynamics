@@ -2655,8 +2655,16 @@ def plot_design_matrix(
     if vm == 0:
         vm = 1
 
-    if show_contrasts and len(design.contrasts) > 0:
-        C = design.build_contrast_array()
+    if show_contrasts and (design.n_contrasts + design.n_f_contrasts) > 0:
+        # t-contrasts, then one row per row of each F-contrast
+        C = [design.build_contrast_array()]
+        contrast_names = list(design.contrast_names)
+        for f_contrast in design.f_contrasts:
+            C.append(f_contrast.matrix)
+            contrast_names += [f"{f_contrast.name} (F)"] + [""] * (
+                f_contrast.n_rows - 1
+            )
+        C = np.concatenate(C, axis=0)
         create_fig = ax is None
         if create_fig:
             fig, axes = plt.subplots(
@@ -2704,7 +2712,7 @@ def plot_design_matrix(
         ax_contrast.set_xticks(range(n_features))
         ax_contrast.set_xticklabels(feature_names, rotation=45, ha="right")
         ax_contrast.set_yticks(range(len(C)))
-        ax_contrast.set_yticklabels(design.contrast_names)
+        ax_contrast.set_yticklabels(contrast_names)
         ax_contrast.set_title("Contrasts")
 
         # Annotate contrast weights

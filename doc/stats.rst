@@ -12,7 +12,7 @@ Start with the :doc:`Statistical Inference tutorial <tutorials_build/7-1_statist
 Which function?
 ---------------
 
-All tests take an array with the subjects (or sessions) as the first dimension and any number of target dimensions, and return a :class:`~osl_dynamics.stats.results.TestResult` with the effect (:code:`copes`), t-statistics, corrected p-values and a :code:`significant()` mask of the same shape as the targets.
+All tests take an array with the subjects (or sessions) as the first dimension and any number of target dimensions, and return a :class:`~osl_dynamics.stats.results.TestResult` with the effect (:code:`copes`), the test statistic (:code:`stats`: t, or F for three or more groups), corrected p-values and a :code:`significant()` mask of the same shape as the targets.
 
 .. list-table::
    :header-rows: 1
@@ -30,10 +30,13 @@ All tests take an array with the subjects (or sessions) as the first dimension a
    * - Do two groups differ?
      - :func:`~osl_dynamics.stats.inference.group_diff`
      - Row shuffle (between subject)
+   * - Do three or more groups differ at all? (one-way ANOVA)
+     - :func:`~osl_dynamics.stats.inference.group_diff` with all the labels (an F-test); then :code:`groups=(a, b)` for pairwise follow-ups
+     - Row shuffle (between subject)
    * - Does a quantity change with age, score, etc.?
      - :func:`~osl_dynamics.stats.inference.regression`
      - Row shuffle (between subject)
-   * - Something else (more groups, custom contrasts)
+   * - Something else (custom contrasts, F-contrasts over several t-contrasts)
      - :class:`~osl_dynamics.stats.design.DesignConfig` with :class:`~osl_dynamics.stats.permutation.MaxStatPermutation`, :class:`~osl_dynamics.stats.permutation.ClusterPermutation` or :class:`~osl_dynamics.stats.glm.GLM`
      - Chosen from the design
 
@@ -111,5 +114,6 @@ Implementation notes
 - Sign-flip tests need the noise to be symmetric about zero, which holds for baseline-corrected responses and paired differences. Row-shuffle tests make no distributional assumption.
 - Targets with missing values are fitted with the subjects that have a value for them (per-target complete-case analysis), with a warning.
 - Permutations use NumPy's global random state; :func:`osl_dynamics.utils.set_random_seed` makes them reproducible.
+- F-tests are one-sided by construction (the F-statistic has no direction); their :code:`tail` is always 0, and :code:`result.copes` holds the copes of the rows of the F-contrast.
 
 Also see the :doc:`FAQ <faq>` and the `example scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/statistics>`_.

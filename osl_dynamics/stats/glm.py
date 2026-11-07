@@ -1,7 +1,7 @@
 """Fitting a General Linear Model (GLM) with ordinary least squares."""
 
 import logging
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 
@@ -126,13 +126,54 @@ def hat_adjustment(varcopes: np.ndarray, hat: float) -> np.ndarray:
     return varcopes + hat * np.nanmax(varcopes, axis=-1, keepdims=True)
 
 
+def f_whitening(c_pinv: np.ndarray, name: str = "") -> np.ndarray:
+    """Whitening matrix for the rows of an F-contrast.
+
+    For an F-contrast :math:`C` the copes :math:`C \\hat\\beta` have
+    covariance :math:`\\sigma^2 M` with :math:`M = C (X^T X)^+ C^T`. The
+    whitening matrix :math:`L` satisfies :math:`L M L^T = I`, so that the
+    F-statistic is :math:`\\| L C \\hat\\beta \\|^2 / (q \\hat\\sigma^2)`
+    where :math:`q` is the rank of :math:`M` (the numerator degrees of
+    freedom).
+
+    Parameters
+    ----------
+    c_pinv : np.ndarray
+        :math:`C X^+`, the F-contrast times the pseudo-inverse of the design
+        matrix. Shape is (n_rows, n_samples).
+    name : str, optional
+        Contrast name, for messages.
+
+    Returns
+    -------
+    L : np.ndarray
+        Whitening matrix. Shape is (q, n_rows).
+    """
+    M = c_pinv @ c_pinv.T
+    eigenvalues, V = np.linalg.eigh(M)
+    tol = max(eigenvalues.max(), 0) * M.shape[0] * np.finfo(float).eps
+    keep = eigenvalues > tol
+    if not keep.any():
+        raise ValueError(f"F-contrast {name} is not estimable with this design.")
+    if keep.sum() < M.shape[0]:
+        _logger.warning(
+            f"F-contrast {name} has {M.shape[0]} rows but only {keep.sum()} are "
+            "estimable with this design (the numerator degrees of freedom are "
+            f"{keep.sum()})."
+        )
+    return (V[:, keep] / np.sqrt(eigenvalues[keep])).T
+
+
 def fit_ols(
     X: np.ndarray,
     y: np.ndarray,
     contrasts: np.ndarray,
     warn: bool = True,
     hat: float = 0.0,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    f_contrasts: Optional[List[np.ndarray]] = None,
+) -> Tuple[
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, list, np.ndarray
+]:
     """Fit a GLM with ordinary least squares.
 
     Parameters
@@ -143,11 +184,15 @@ def fit_ols(
         Data. Shape is (n_samples, n_targets). Targets with missing values
         are fitted with their complete samples.
     contrasts : np.ndarray
-        Contrast matrix. Shape is (n_contrasts, n_features).
+        t-contrast matrix. Shape is (n_contrasts, n_features).
     warn : bool, optional
         Log a warning when there are missing values.
     hat : float, optional
-        'Hat' variance adjustment, see :func:`hat_adjustment`.
+        'Hat' variance adjustment, see :func:`hat_adjustment`. For
+        F-statistics the adjustment is applied to the denominator (the
+        residual variance times the numerator degrees of freedom).
+    f_contrasts : list of np.ndarray, optional
+        F-contrast matrices. Shape of each is (n_rows, n_features).
 
     Returns
     -------
@@ -159,25 +204,42 @@ def fit_ols(
         Variance of the copes. Shape is (n_contrasts, n_targets).
     dof : np.ndarray
         Degrees of freedom of each target. Shape is (n_targets,).
+    fstats : np.ndarray
+        F-statistics. Shape is (n_f_contrasts, n_targets).
+    f_copes : list of np.ndarray
+        Copes of the rows of each F-contrast. Shape of each is
+        (n_rows, n_targets).
+    f_dof : np.ndarray
+        Numerator degrees of freedom of each F-contrast. Shape is
+        (n_f_contrasts,).
     """
     X = np.asarray(X, dtype=float)
     y = np.asarray(y, dtype=float)
     contrasts = np.asarray(contrasts, dtype=float)
+    f_contrasts = [np.asarray(c, dtype=float) for c in (f_contrasts or [])]
     if X.ndim != 2 or y.ndim != 2 or contrasts.ndim != 2:
         raise ValueError("X, y and contrasts must be 2D.")
     if X.shape[0] != y.shape[0]:
         raise ValueError("X and y must have the same number of samples.")
     if X.shape[1] != contrasts.shape[1]:
         raise ValueError("X and contrasts must have the same number of features.")
+    for c in f_contrasts:
+        if c.ndim != 2 or c.shape[1] != X.shape[1]:
+            raise ValueError("F-contrasts must be 2D with n_features columns.")
 
     n_samples, n_features = X.shape
     n_targets = y.shape[1]
     n_contrasts = contrasts.shape[0]
+    n_f_contrasts = len(f_contrasts)
 
     betas = np.empty((n_features, n_targets))
     copes = np.empty((n_contrasts, n_targets))
     varcopes = np.empty((n_contrasts, n_targets))
     dof = np.empty(n_targets)
+    f_num = np.empty((n_f_contrasts, n_targets))
+    f_den = np.empty((n_f_contrasts, n_targets))
+    f_copes = [np.empty((c.shape[0], n_targets)) for c in f_contrasts]
+    f_dof = np.zeros(n_f_contrasts, dtype=int)
 
     for rows, targets in complete_case_groups(X, y, warn=warn):
         X_r = X[rows]
@@ -199,8 +261,19 @@ def fit_ols(
         varcopes[:, targets] = c_xtx_c[:, None] * s2[None, :]
         dof[targets] = dof_r
 
+        for i, C in enumerate(f_contrasts):
+            L = f_whitening(C @ pinv, name=str(i))
+            cb = C @ b
+            f_copes[i][:, targets] = cb
+            f_num[i, targets] = np.sum((L @ cb) ** 2, axis=0)
+            f_den[i, targets] = L.shape[0] * s2
+            f_dof[i] = L.shape[0]
+
     varcopes = hat_adjustment(varcopes, hat)
-    return betas, copes, varcopes, dof
+    f_den = hat_adjustment(f_den, hat)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        fstats = f_num / f_den
+    return betas, copes, varcopes, dof, fstats, f_copes, f_dof
 
 
 class GLM:
@@ -217,12 +290,14 @@ class GLM:
     >>> result = glm.fit(data)  # data has shape (n_samples, *target_dims)
     >>> result.copes.shape      # (n_contrasts, *target_dims)
     >>> result.test(contrast_indx=0, correction="fdr").significant()
+    >>> result.ftest(0).pvalues  # if the design has an F-contrast
     """
 
     def __init__(self, design: Design) -> None:
         self.design = design
         self.X = design.build_X()
         self.contrasts = design.build_contrast_array()
+        self.f_contrasts = design.build_f_contrast_arrays()
 
     @property
     def n_samples(self) -> int:
@@ -235,6 +310,10 @@ class GLM:
     @property
     def n_contrasts(self) -> int:
         return self.contrasts.shape[0]
+
+    @property
+    def n_f_contrasts(self) -> int:
+        return len(self.f_contrasts)
 
     def fit(self, y, warn: bool = True, hat: float = 0.0) -> GLMResult:
         """Fit the model.
@@ -251,11 +330,12 @@ class GLM:
         Returns
         -------
         result : GLMResult
-            Betas, copes, varcopes and degrees of freedom.
+            Betas, copes, varcopes, degrees of freedom and, if the design
+            has F-contrasts, F-statistics.
         """
         y, target_dims = validate_y(y, self.n_samples)
-        betas, copes, varcopes, dof = fit_ols(
-            self.X, y, self.contrasts, warn=warn, hat=hat
+        betas, copes, varcopes, dof, fstats, f_copes, f_dof = fit_ols(
+            self.X, y, self.contrasts, warn=warn, hat=hat, f_contrasts=self.f_contrasts
         )
         return GLMResult(
             design=self.design,
@@ -263,4 +343,7 @@ class GLM:
             copes=copes.reshape((self.n_contrasts, *target_dims)),
             varcopes=varcopes.reshape((self.n_contrasts, *target_dims)),
             dof=dof.reshape(target_dims),
+            fstats=fstats.reshape((self.n_f_contrasts, *target_dims)),
+            f_copes=[c.reshape((c.shape[0], *target_dims)) for c in f_copes],
+            f_dof=f_dof,
         )

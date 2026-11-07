@@ -57,7 +57,8 @@ _COMMON_PARAMETERS = """
         :code:`'copes'`. Cluster-based corrections always use t-statistics.
     tail : int, optional
         :code:`0` for a two-tailed test, :code:`1` to test for a positive
-        effect, :code:`-1` for a negative effect.
+        effect, :code:`-1` for a negative effect. An F-test (three or more
+        groups) has no direction and requires :code:`0`.
     pooled_dims : int or sequence of int, optional
         For :code:`correction='max_stat'`, the target dimensions to take the
         maximum over (0 is the first dimension after the samples). Default is
@@ -101,7 +102,8 @@ _COMMON_PARAMETERS = """
     result : osl_dynamics.stats.results.TestResult
         :code:`result.copes` is the effect, :code:`result.pvalues` the
         corrected p-values and :code:`result.significant()` a boolean mask,
-        each with shape (\\*target_dims).
+        each with shape (\\*target_dims). :code:`result.stats` is the test
+        statistic (t, or F for three or more groups).
 """
 
 
@@ -129,7 +131,18 @@ def _run(
     parametric: bool,
     n_jobs: int,
     contrast_indx: int = 0,
+    statistic: str = "t",
 ) -> TestResult:
+    if statistic == "F":
+        if tail != 0:
+            raise ValueError(
+                "An F-test (three or more groups) has no direction, tail must "
+                "be 0. Pass groups=(a, b) to test a directed difference between "
+                "two of the groups."
+            )
+        if metric != "tstats":
+            raise ValueError("metric='copes' is not available for an F-test.")
+
     if correction == "max_stat":
         perm = MaxStatPermutation(
             design,
@@ -139,6 +152,7 @@ def _run(
             metric=metric,
             pooled_dims=pooled_dims,
             hat=hat,
+            statistic=statistic,
         )
         return perm.fit(data)
 
@@ -169,6 +183,7 @@ def _run(
             tfce=correction == "tfce",
             hat=hat,
             n_jobs=n_jobs,
+            statistic=statistic,
         )
         return perm.fit(data)
 
@@ -180,6 +195,8 @@ def _run(
 
     if parametric:
         glm_result = GLM(design).fit(data, hat=hat)
+        if statistic == "F":
+            return glm_result.ftest(contrast_indx, correction=correction)
         return glm_result.test(contrast_indx, correction=correction, tail=tail)
 
     perm = Permutation(
@@ -189,6 +206,7 @@ def _run(
         tail=tail,
         metric=metric,
         hat=hat,
+        statistic=statistic,
     )
     result = perm.fit(data)
     n_targets = result.pvalues.size
@@ -335,11 +353,15 @@ def group_diff(
     parametric: bool = True,
     n_jobs: int = 1,
 ) -> TestResult:
-    """Test for a difference between two groups.
+    """Test for a difference between groups.
 
-    Each unique value in :code:`assignments` is modelled as a group and the
-    two groups in :code:`groups` are compared, with row-shuffle permutations
-    of the samples in those two groups.
+    Each unique value in :code:`assignments` is modelled as a group. With two
+    groups (or :code:`groups`), the difference between them is tested with a
+    t-contrast and row-shuffle permutations of the samples in those two
+    groups. With three or more groups and no :code:`groups`, an F-test asks
+    whether any group differs from the others (a one-way ANOVA with
+    permutations); significant targets can then be followed up with
+    pairwise tests by passing :code:`groups`.
 
     Parameters
     ----------
@@ -348,28 +370,27 @@ def group_diff(
     assignments : np.ndarray
         Group label of each sample. Shape is (n_samples,).
     groups : tuple, optional
-        The two labels to compare, :code:`(group1, group2)`. The effect
-        returned is :code:`group1 - group2`. Required when there are more
-        than two labels. Defaults to the two labels in sorted order.
+        Two labels to compare, :code:`(group1, group2)`. The effect returned
+        is :code:`group1 - group2`. Default is to compare the two labels when
+        there are two, and to test for any difference between the groups
+        (F-test) when there are more. For the F-test :code:`result.copes`
+        holds the differences between consecutive groups (in sorted order),
+        :code:`result.stats` the F-statistics, and :code:`tail` must be 0.
     """
     data = np.asarray(data, dtype=float)
     assignments = np.asarray(assignments)
-    unique_groups = np.unique(assignments)
+    unique_groups = list(np.unique(assignments))
     if len(unique_groups) < 2:
         raise ValueError("assignments must have at least two unique values.")
 
-    if groups is None:
-        if len(unique_groups) != 2:
-            raise ValueError(
-                "groups must be specified when assignments has more than two "
-                f"unique values, got {unique_groups}."
-            )
+    if groups is None and len(unique_groups) == 2:
         groups = tuple(unique_groups)
-    if len(groups) != 2 or groups[0] == groups[1]:
-        raise ValueError(f"groups must be two different labels, got {groups}.")
-    for group in groups:
-        if group not in unique_groups:
-            raise ValueError(f"group {group} not found in assignments.")
+    if groups is not None:
+        if len(groups) != 2 or groups[0] == groups[1]:
+            raise ValueError(f"groups must be two different labels, got {groups}.")
+        for group in groups:
+            if group not in unique_groups:
+                raise ValueError(f"group {group} not found in assignments.")
 
     features = [
         {
@@ -379,11 +400,33 @@ def group_diff(
         }
         for group in unique_groups
     ] + _covariate_features(covariates)
-    contrast = [0] * len(features)
-    contrast[list(unique_groups).index(groups[0])] = 1
-    contrast[list(unique_groups).index(groups[1])] = -1
-    contrasts = [{"name": f"Group_{groups[0]}-Group_{groups[1]}", "values": contrast}]
-    design = DesignConfig(features=features, contrasts=contrasts).create_design()
+
+    if groups is not None:
+        contrast = [0] * len(features)
+        contrast[unique_groups.index(groups[0])] = 1
+        contrast[unique_groups.index(groups[1])] = -1
+        contrasts = [
+            {"name": f"Group_{groups[0]}-Group_{groups[1]}", "values": contrast}
+        ]
+        design = DesignConfig(features=features, contrasts=contrasts).create_design()
+        statistic = "t"
+    else:
+        _logger.info(
+            f"Testing for any difference between the {len(unique_groups)} groups "
+            "with an F-test. Pass groups=(a, b) to compare two of them."
+        )
+        rows = []
+        for a, b in zip(unique_groups[:-1], unique_groups[1:]):
+            row = [0] * len(features)
+            row[unique_groups.index(a)] = 1
+            row[unique_groups.index(b)] = -1
+            rows.append(row)
+        f_contrasts = [{"name": "AnyGroupDifference", "values": rows}]
+        design = DesignConfig(
+            features=features, f_contrasts=f_contrasts
+        ).create_design()
+        statistic = "F"
+
     return _run(
         design,
         data,
@@ -398,6 +441,7 @@ def group_diff(
         hat,
         parametric,
         n_jobs,
+        statistic=statistic,
     )
 
 

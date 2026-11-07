@@ -169,7 +169,7 @@ html_extra_path = ["llms.txt"]
 
 html_theme_options = {
     "github_url": "https://github.com/OHBA-analysis/osl-dynamics",
-    "show_nav_level": 2,
+    "show_nav_level": 1,
     "header_links_before_dropdown": 6,
     "logo": {"text": "OSL Dynamics"},
 }

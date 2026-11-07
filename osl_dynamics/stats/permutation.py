@@ -30,7 +30,13 @@ from osl_dynamics.stats.cluster import (
     tfce,
 )
 from osl_dynamics.stats.design import Design
-from osl_dynamics.stats.glm import GLM, complete_case_groups, hat_adjustment, validate_y
+from osl_dynamics.stats.glm import (
+    GLM,
+    complete_case_groups,
+    f_whitening,
+    hat_adjustment,
+    validate_y,
+)
 from osl_dynamics.stats.results import TestResult
 from osl_dynamics.utils.progress import progress
 
@@ -42,6 +48,40 @@ PERM_TYPES = ("sign_flip", "row_shuffle")
 # null statistics in batches, and the largest null distribution to keep
 _MAX_BATCH_ELEMENTS = 2**24
 _MAX_NULL_ELEMENTS = 2**24
+
+# Relative tolerance when counting null statistics at least as large as the
+# observed one. Permutations that are equivalent to the observed data (e.g.
+# swapping two subjects of the same group) give the same statistic up to
+# floating point noise and must be counted as ties.
+_TIE_RTOL = 1e-8
+
+
+def _group_assignments(rows_by_group: list):
+    """Enumerate every assignment of the rows to groups of the given sizes.
+
+    Yields one tuple per assignment with the rows assigned to each group.
+    """
+    rows = np.concatenate(rows_by_group)
+    sizes = [len(g) for g in rows_by_group]
+
+    def recurse(remaining, sizes):
+        if len(sizes) == 1:
+            yield (tuple(remaining),)
+            return
+        for chosen in itertools.combinations(remaining, sizes[0]):
+            chosen_set = set(chosen)
+            rest = [r for r in remaining if r not in chosen_set]
+            for tail in recurse(rest, sizes[1:]):
+                yield (chosen,) + tail
+
+    yield from recurse(list(rows), sizes)
+
+
+def _n_group_assignments(sizes: Sequence[int]) -> int:
+    n = math.factorial(sum(sizes))
+    for size in sizes:
+        n //= math.factorial(size)
+    return n
 
 
 class Permutation:
@@ -78,6 +118,12 @@ class Permutation:
         (none).
     n_jobs : int, optional
         Number of parallel jobs. Only used by cluster-based corrections.
+    statistic : str, optional
+        :code:`'t'` to test the t-contrast :code:`contrast_indx` of the
+        design, or :code:`'F'` to test its F-contrast :code:`contrast_indx`
+        (e.g. any difference between three or more groups). An F-test has no
+        direction, so :code:`tail` must be 0 and :code:`metric` must be
+        :code:`'tstats'` (the statistic is F).
     """
 
     correction: Optional[str] = None
@@ -95,17 +141,30 @@ class Permutation:
         metric: str = "tstats",
         hat: float = 0.0,
         n_jobs: int = 1,
+        statistic: str = "t",
     ) -> None:
         self.design = design
         self.glm = GLM(design)
 
-        if not 0 <= contrast_indx < design.n_contrasts:
+        if statistic not in ("t", "F"):
+            raise ValueError(f"statistic must be 't' or 'F', got {statistic}.")
+        self.statistic = statistic
+        contrasts = design.contrasts if statistic == "t" else design.f_contrasts
+        if not 0 <= contrast_indx < len(contrasts):
             raise ValueError(
-                f"contrast_indx must be between 0 and {design.n_contrasts - 1}."
+                f"contrast_indx must be between 0 and {len(contrasts) - 1} "
+                f"(the design has {len(contrasts)} {statistic}-contrasts)."
             )
         self.contrast_indx = contrast_indx
-        self.contrast_name = design.contrast_names[contrast_indx]
-        self.contrast = self.glm.contrasts[contrast_indx]
+        self._contrast = contrasts[contrast_indx]
+        self.contrast_name = self._contrast.name
+        self.contrast = self._contrast.matrix  # (n_rows, n_features)
+
+        if statistic == "F":
+            if tail != 0:
+                raise ValueError("An F-test has no direction, tail must be 0.")
+            if metric != "tstats":
+                raise ValueError("metric='copes' is not available for an F-test.")
 
         if n_perm < 1:
             raise ValueError("n_perm must be at least 1.")
@@ -136,7 +195,7 @@ class Permutation:
                 raise ValueError(f"perm_type must be one of {PERM_TYPES}.")
             return perm_type
 
-        indices = self.design.contrast_feature_indices(self.contrast_indx)
+        indices = self._contrast.feature_indices
         feature_types = set(np.array(self.design.feature_types)[indices])
         if len(feature_types) > 1:
             raise ValueError(
@@ -144,7 +203,7 @@ class Permutation:
                 f"mixes feature types {sorted(feature_types)}. Pass perm_type."
             )
         feature_type = feature_types.pop()
-        contrast_type = self.design.contrast_types[self.contrast_indx]
+        contrast_type = self._contrast.contrast_type
 
         if feature_type == "constant":
             return "sign_flip"
@@ -155,11 +214,28 @@ class Permutation:
     def _rows_to_shuffle(self) -> np.ndarray:
         """Rows that are shuffled: only those in the groups being compared
         when the contrast is between categorical features."""
-        indices = self.design.contrast_feature_indices(self.contrast_indx)
+        indices = self._contrast.feature_indices
         feature_types = np.array(self.design.feature_types)[indices]
         if np.all(feature_types == "categorical"):
             return np.where(np.any(self.glm.X[:, indices] != 0, axis=1))[0]
         return np.arange(self.glm.n_samples)
+
+    def _rows_by_group(self, rows: np.ndarray) -> Optional[list]:
+        """Split the shuffled rows by the categorical feature they belong to,
+        or :code:`None` if the contrast is not between categorical features
+        with each row in exactly one of them, or the nuisance regressors
+        are not constant over the rows."""
+        indices = self._contrast.feature_indices
+        X = self.glm.X
+        if not np.all(np.array(self.design.feature_types)[indices] == "categorical"):
+            return None
+        membership = X[rows][:, indices] != 0
+        if not np.all(membership.sum(axis=1) == 1):
+            return None
+        nuisance = X[rows][:, self._contrast.nuisance_indices]
+        if nuisance.size and not np.all(nuisance == nuisance[0], axis=0).all():
+            return None
+        return [rows[membership[:, j]] for j in range(len(indices))]
 
     def _permutations(
         self, allow_exact_shuffle: bool = True
@@ -196,25 +272,22 @@ class Permutation:
         n_rows = len(rows)
         identity = np.arange(n)
 
-        # Exhaustive enumeration of two-group assignments. This is only
-        # exact when there are no continuous regressors, because under
-        # Freedman-Lane a shuffled residual inherits the covariate values of
+        # Exhaustive enumeration of the assignments of the shuffled rows to
+        # the groups (categorical features) in the contrast. Rearranging
+        # rows within a group does not change the statistic, so this visits
+        # every distinct statistic once. It is only exact when the nuisance
+        # regressors are constant over the shuffled rows, because under
+        # Freedman-Lane a shuffled residual inherits the nuisance values of
         # the row it moves to.
-        indices = self.design.contrast_feature_indices(self.contrast_indx)
-        no_continuous = "continuous" not in self.design.feature_types
-        if allow_exact_shuffle and len(indices) == 2 and no_continuous:
-            in_first = self.glm.X[rows, indices[0]] != 0
-            n_first = int(in_first.sum())
-            n_total = math.comb(n_rows, n_first)
+        rows_by_group = self._rows_by_group(rows)
+        if allow_exact_shuffle and rows_by_group is not None:
+            sizes = [len(g) for g in rows_by_group]
+            n_total = _n_group_assignments(sizes)
             if n_total <= self.n_perm:
                 perms = np.tile(identity, (n_total, 1))
-                first_rows = rows[in_first]
-                second_rows = rows[~in_first]
-                for i, chosen in enumerate(itertools.combinations(rows, n_first)):
-                    chosen = np.array(chosen)
-                    rest = np.setdiff1d(rows, chosen)
-                    perms[i, first_rows] = chosen
-                    perms[i, second_rows] = rest
+                for i, assignment in enumerate(_group_assignments(rows_by_group)):
+                    for group_rows, chosen in zip(rows_by_group, assignment):
+                        perms[i, group_rows] = chosen
                 return perms, True
 
         if allow_exact_shuffle and math.factorial(n_rows) <= self.n_perm:
@@ -298,7 +371,7 @@ class Permutation:
         dof = X_r.shape[0] - np.linalg.matrix_rank(X_r)
 
         # Residuals of the data after fitting the nuisance regressors
-        nuisance = self.design.nuisance_feature_indices(self.contrast_indx)
+        nuisance = self._contrast.nuisance_indices
         if len(nuisance) > 0:
             Z = X_r[:, nuisance]
             r = y - Z @ (np.linalg.pinv(Z) @ y)
@@ -311,12 +384,21 @@ class Permutation:
         tol = singular_values.max() * max(X_r.shape) * np.finfo(float).eps
         Q = U[:, singular_values > tol]
 
-        c_pinv = self.contrast @ pinv  # cope = c_pinv @ y*
+        # copes = w @ y*. For a t-contrast w has one row and the variance of
+        # the cope is c_xtx_c * sigma^2. For an F-contrast the rows are
+        # whitened so that F = sum(copes^2) / (q * sigma^2) with q rows.
+        c_pinv = self.contrast @ pinv
+        if self.statistic == "t":
+            w = c_pinv
+            scale = float(c_pinv[0] @ c_pinv[0])
+        else:
+            w = f_whitening(c_pinv, name=self.contrast_name) @ c_pinv
+            scale = float(w.shape[0])
         return {
             "rows": rows,
             "dof": dof,
-            "w": c_pinv,
-            "c_xtx_c": float(c_pinv @ c_pinv),
+            "w": w,
+            "scale": scale,
             "Q": Q,
             "r": r,
             "r2": np.sum(r**2, axis=0),
@@ -326,24 +408,27 @@ class Permutation:
     def _null_batch(
         self, group: dict, perms: np.ndarray
     ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
-        """Null copes and varcopes of one group of targets for a batch of
-        permutations.
+        """Null numerators and denominators of one group of targets for a
+        batch of permutations.
 
         Returns
         -------
-        copes : np.ndarray
-            Shape is (batch_size, n_targets_in_group).
-        varcopes : np.ndarray
-            Shape is (batch_size, n_targets_in_group), before any hat
-            adjustment. :code:`None` if :code:`metric='copes'`.
+        numerator : np.ndarray
+            Copes for a t-contrast, sum of squared whitened copes for an
+            F-contrast. Shape is (batch_size, n_targets_in_group).
+        denominator : np.ndarray
+            Variance of the copes for a t-contrast, numerator degrees of
+            freedom times the residual variance for an F-contrast, before
+            any hat adjustment. Shape is (batch_size, n_targets_in_group).
+            :code:`None` if :code:`metric='copes'`.
         """
         w, Q, r, r2 = group["w"], group["Q"], group["r"], group["r2"]
-        n_r = len(w)
+        n_rows, n_r = w.shape
         batch_size = perms.shape[0]
 
         if self.perm_type == "sign_flip":
             S = perms[:, group["rows"]]  # (batch, n_r)
-            W = S * w[None, :]
+            W = S[:, None, :] * w[None, :, :]  # (batch, n_rows, n_r)
             QP = S[:, :, None] * Q[None, :, :]
         else:
             # Induce a permutation of the complete rows from the global one:
@@ -356,20 +441,25 @@ class Permutation:
                 ranks = np.argsort(np.argsort(values, axis=1), axis=1)
                 I[:, local] = local[ranks]
             # y*_i = r_{I[i]}, so cope = sum_i w_i r_{I[i]} = W @ r with
-            # W[b, I[b, i]] = w[i]; similarly for the projection onto Q
+            # W[b, :, I[b, i]] = w[:, i]; similarly for the projection onto Q
             b = np.arange(batch_size)[:, None]
-            W = np.zeros((batch_size, n_r))
-            W[b, I] = w[None, :]
+            WT = np.zeros((batch_size, n_r, n_rows))
+            WT[b, I] = w.T[None, :, :]
+            W = WT.transpose(0, 2, 1)
             QP = np.zeros((batch_size, n_r, Q.shape[1]))
             QP[b, I] = Q[None, :, :]
 
-        copes = W @ r  # (batch, n_targets)
-        if self.metric == "copes":
-            return copes, None
+        copes = W @ r  # (batch, n_rows, n_targets)
+        if self.statistic == "t":
+            numerator = copes[:, 0]
+            if self.metric == "copes":
+                return numerator, None
+        else:
+            numerator = np.sum(copes**2, axis=1)
 
         proj = QP.transpose(0, 2, 1) @ r  # (batch, rank, n_targets)
         ss = r2[None, :] - np.sum(proj**2, axis=1)
-        return copes, group["c_xtx_c"] * ss / group["dof"]
+        return numerator, group["scale"] * ss / group["dof"]
 
     def _statistic(self, groups: list, perms: np.ndarray, n_targets: int) -> np.ndarray:
         """Statistic of every target for a batch of permutations.
@@ -379,18 +469,20 @@ class Permutation:
         stat : np.ndarray
             Shape is (batch_size, n_targets).
         """
-        copes = np.empty((perms.shape[0], n_targets))
-        varcopes = np.empty((perms.shape[0], n_targets))
+        numerator = np.empty((perms.shape[0], n_targets))
+        denominator = np.empty((perms.shape[0], n_targets))
         for group, targets in groups:
-            copes[:, targets], v = self._null_batch(group, perms)
-            if v is not None:
-                varcopes[:, targets] = v
+            numerator[:, targets], d = self._null_batch(group, perms)
+            if d is not None:
+                denominator[:, targets] = d
         if self.metric == "copes":
-            return copes
+            return numerator
         # The hat adjustment uses the maximum variance over all targets
-        varcopes = hat_adjustment(varcopes, self.hat)
+        denominator = hat_adjustment(denominator, self.hat)
         with np.errstate(divide="ignore", invalid="ignore"):
-            return copes / np.sqrt(varcopes)
+            if self.statistic == "F":
+                return numerator / denominator
+            return numerator / np.sqrt(denominator)
 
     def fit(self, y) -> TestResult:
         """Fit the GLM and run the permutations.
@@ -432,16 +524,13 @@ class Permutation:
         all_complete = len(groups) == 1 and len(groups[0][0]["rows"]) == X.shape[0]
         perms, exact = self._permutations(allow_exact_shuffle=all_complete)
         n_perm = perms.shape[0]
+        label = f"{self.statistic}-contrast '{self.contrast_name}'"
         if exact:
             _logger.info(
-                f"Enumerating all {n_perm} permutations of contrast "
-                f"'{self.contrast_name}' (exact test)"
+                f"Enumerating all {n_perm} permutations of {label} (exact test)"
             )
         else:
-            _logger.info(
-                f"Running {n_perm} {self.perm_type} permutations of contrast "
-                f"'{self.contrast_name}'"
-            )
+            _logger.info(f"Running {n_perm} {self.perm_type} permutations of {label}")
 
         nonpooled_dims = tuple(
             d for d in range(len(target_dims)) if d not in self.pooled_dims
@@ -461,6 +550,9 @@ class Permutation:
         if self._max_batch_size is not None:
             batch_size = min(batch_size, self._max_batch_size)
 
+        # Null statistics within floating point noise of the observed one
+        # count as at least as large (ties)
+        threshold = observed - _TIE_RTOL * np.abs(observed)
         counts = np.zeros(target_dims)
         bar = progress(total=n_perm, desc="Permutations")
         try:
@@ -470,7 +562,7 @@ class Permutation:
                 reduced = self._reduce(stat.reshape((len(batch), *target_dims)))
                 if keep_null:
                     null[start : start + len(batch)] = reduced
-                counts += np.sum(self._expand(reduced) >= observed, axis=0)
+                counts += np.sum(self._expand(reduced) >= threshold, axis=0)
                 bar.update(len(batch))
         finally:
             bar.close()
@@ -496,10 +588,20 @@ class Permutation:
                 f"is {1 / (n_perm + 1):.2g}. Increase n_perm for smaller p-values."
             )
 
+        if self.statistic == "t":
+            copes = glm_result.copes[self.contrast_indx]
+            tstats = glm_result.tstats[self.contrast_indx]
+            fstats, f_dof = None, None
+        else:
+            copes = glm_result.f_copes[self.contrast_indx]
+            tstats = None
+            fstats = glm_result.fstats[self.contrast_indx]
+            f_dof = int(glm_result.f_dof[self.contrast_indx])
+
         return TestResult(
             contrast=self.contrast_name,
-            copes=glm_result.copes[self.contrast_indx],
-            tstats=glm_result.tstats[self.contrast_indx],
+            copes=copes,
+            tstats=tstats,
             pvalues=pvalues,
             pvalues_uncorrected=pvalues if self.correction is None else None,
             correction=self.correction,
@@ -512,6 +614,9 @@ class Permutation:
             pooled_dims=self.pooled_dims if self.correction else None,
             null=null,
             glm=glm_result,
+            statistic=self.statistic,
+            fstats=fstats,
+            f_dof=f_dof,
         )
 
     def summary(self) -> dict:
@@ -520,6 +625,7 @@ class Permutation:
         summary.update(
             {
                 "contrast": self.contrast_name,
+                "statistic": self.statistic,
                 "n_perm": self.n_perm,
                 "perm_type": self.perm_type,
                 "tail": self.tail,
@@ -564,6 +670,8 @@ class MaxStatPermutation(Permutation):
         :func:`~osl_dynamics.stats.glm.hat_adjustment`.
     n_jobs : int, optional
         Not used by this class.
+    statistic : str, optional
+        :code:`'t'` (default) or :code:`'F'`, see :class:`Permutation`.
 
     References
     ----------
@@ -585,6 +693,7 @@ class MaxStatPermutation(Permutation):
         pooled_dims: Optional[Sequence[int]] = None,
         hat: float = 0.0,
         n_jobs: int = 1,
+        statistic: str = "t",
     ) -> None:
         super().__init__(
             design,
@@ -595,6 +704,7 @@ class MaxStatPermutation(Permutation):
             metric=metric,
             hat=hat,
             n_jobs=n_jobs,
+            statistic=statistic,
         )
         self._requested_pooled_dims = pooled_dims
 
@@ -669,7 +779,8 @@ class ClusterPermutation(Permutation):
     cluster_forming_threshold : float, optional
         Threshold on the t-statistic that forms clusters. Default is the
         critical t-value at p=0.05 (two-tailed: 0.025 in each tail) for the
-        degrees of freedom of the data. Ignored with :code:`tfce`.
+        degrees of freedom of the data, or the critical F-value at p=0.05
+        for an F-test. Ignored with :code:`tfce`.
     tfce : bool or dict, optional
         Use threshold-free cluster enhancement. A dict passes options to
         :func:`~osl_dynamics.stats.cluster.tfce` (:code:`start`,
@@ -682,6 +793,9 @@ class ClusterPermutation(Permutation):
         only pays off for large maps or TFCE. A script that uses more than
         one process must keep its code under
         :code:`if __name__ == "__main__":`.
+    statistic : str, optional
+        :code:`'t'` (default) or :code:`'F'`, see :class:`Permutation`.
+        Clusters of an F-test are formed from the F-statistics.
 
     References
     ----------
@@ -707,6 +821,7 @@ class ClusterPermutation(Permutation):
         tfce: Union[bool, dict] = False,
         hat: float = 0.0,
         n_jobs: int = 1,
+        statistic: str = "t",
     ) -> None:
         super().__init__(
             design,
@@ -717,6 +832,7 @@ class ClusterPermutation(Permutation):
             metric="tstats",
             hat=hat,
             n_jobs=n_jobs,
+            statistic=statistic,
         )
         self.cluster_dims = cluster_dims
         self.adjacency = adjacency
@@ -744,6 +860,17 @@ class ClusterPermutation(Permutation):
             return
         if self._requested_threshold is None:
             dof = np.nanmin(glm_result.dof)
+            if self.statistic == "F":
+                f_dof = int(glm_result.f_dof[self.contrast_indx])
+                self.cluster_forming_threshold = float(
+                    scipy_stats.f.ppf(0.95, f_dof, dof)
+                )
+                _logger.info(
+                    "Using the critical F-value at p=0.05 as the cluster-forming "
+                    f"threshold: {self.cluster_forming_threshold:.3f} "
+                    f"(dof={f_dof}, {dof:.0f})"
+                )
+                return
             alpha = 0.025 if self.tail == 0 else 0.05
             self.cluster_forming_threshold = float(scipy_stats.t.ppf(1 - alpha, dof))
             _logger.info(

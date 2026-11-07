@@ -72,6 +72,22 @@ print(result)
 #%%
 # For a differential contrast between categorical regressors, only the subjects in the groups with a non-zero weight are shuffled. Here that is everyone; when comparing two of three groups it is the subjects in those two.
 #
+# F-contrasts
+# ^^^^^^^^^^^
+# A t-contrast tests one difference in one direction. An **F-contrast** tests several t-contrasts jointly: is *any* of them non-zero? This is the GLM form of an ANOVA, and it is how :func:`stats.group_diff <osl_dynamics.stats.inference.group_diff>` handles three or more groups. Here we ask whether the three groups differ at all, controlling for age and sex. The two t-contrasts already in the design span every difference between the three groups, so the F-contrast can be built from them (any set of linearly independent rows spanning the same differences gives the same F-statistic):
+
+design.add_f_contrast(
+    "Any group difference",
+    contrasts=["Patients - Controls", "Patients A - Patients B"],
+)
+
+result = stats.MaxStatPermutation(design, contrast_indx=0, n_perm=1000, statistic="F").fit(fo)
+print(result)
+print("F-statistics:", np.round(result.stats, 2))
+
+#%%
+# :code:`statistic="F"` makes :code:`contrast_indx` refer to the F-contrasts of the design. An F-test has no direction, so :code:`tail` must be 0 and the permutation statistic is always F. :code:`result.copes` holds the copes of each row of the F-contrast. An F-contrast can also be given directly as a matrix, one t-contrast per row, with :code:`values=[[-1, 0.5, 0.5, 0, 0], [0, 1, -1, 0, 0]]` or in :class:`~osl_dynamics.stats.design.DesignConfig` with :code:`f_contrasts=[{"name": ..., "values": ...}]`. The parametric version is :code:`stats.GLM(design).fit(fo).ftest(0)`.
+#
 # Parametric tests
 # ^^^^^^^^^^^^^^^^
 # :class:`~osl_dynamics.stats.glm.GLM` fits the design and returns every regression coefficient, cope and varcope. Its :meth:`~osl_dynamics.stats.results.GLMResult.test` method gives parametric p-values from the t-distribution with an optional Bonferroni, Holm or FDR correction. Use this when the data are approximately Gaussian or you have too few subjects for permutations to be informative.

@@ -43,6 +43,29 @@ def parametric_pvalues(
     raise ValueError(f"tail must be -1, 0 or 1, got {tail}.")
 
 
+def parametric_fpvalues(
+    fstats: np.ndarray, f_dof: np.ndarray, dof: np.ndarray
+) -> np.ndarray:
+    """P-values from the F distribution.
+
+    Parameters
+    ----------
+    fstats : np.ndarray
+        F-statistics.
+    f_dof : np.ndarray
+        Numerator degrees of freedom, broadcastable to :code:`fstats`.
+    dof : np.ndarray
+        Denominator (residual) degrees of freedom, broadcastable to
+        :code:`fstats`.
+
+    Returns
+    -------
+    pvalues : np.ndarray
+        P-values. Same shape as :code:`fstats`.
+    """
+    return scipy_stats.f.sf(fstats, f_dof, dof)
+
+
 def _tstats(copes: np.ndarray, varcopes: np.ndarray) -> np.ndarray:
     with np.errstate(divide="ignore", invalid="ignore"):
         return copes / np.sqrt(varcopes)
@@ -65,6 +88,15 @@ class GLMResult:
     dof : np.ndarray
         Degrees of freedom of each target (they differ between targets only
         when there are missing values). Shape is (\\*target_dims).
+    fstats : np.ndarray, optional
+        F-statistics of the F-contrasts. Shape is
+        (n_f_contrasts, \\*target_dims).
+    f_copes : list of np.ndarray, optional
+        Copes of the rows of each F-contrast. Shape of each is
+        (n_rows, \\*target_dims).
+    f_dof : np.ndarray, optional
+        Numerator degrees of freedom of each F-contrast. Shape is
+        (n_f_contrasts,).
     """
 
     design: Design
@@ -72,6 +104,9 @@ class GLMResult:
     copes: np.ndarray
     varcopes: np.ndarray
     dof: np.ndarray
+    fstats: Optional[np.ndarray] = None
+    f_copes: Optional[List[np.ndarray]] = field(default=None, repr=False)
+    f_dof: Optional[np.ndarray] = None
 
     @property
     def tstats(self) -> np.ndarray:
@@ -80,11 +115,15 @@ class GLMResult:
 
     @property
     def target_dims(self) -> Tuple[int, ...]:
-        return tuple(self.copes.shape[1:])
+        return tuple(self.dof.shape)
 
     @property
     def contrast_names(self) -> List[str]:
         return self.design.contrast_names
+
+    @property
+    def f_contrast_names(self) -> List[str]:
+        return self.design.f_contrast_names
 
     def pvalues(self, tail: int = 0) -> np.ndarray:
         """Uncorrected parametric p-values for every contrast.
@@ -101,6 +140,19 @@ class GLMResult:
             Shape is (n_contrasts, \\*target_dims).
         """
         return parametric_pvalues(self.tstats, self.dof[None], tail)
+
+    def fpvalues(self) -> np.ndarray:
+        """Uncorrected parametric p-values for every F-contrast.
+
+        Returns
+        -------
+        pvalues : np.ndarray
+            Shape is (n_f_contrasts, \\*target_dims).
+        """
+        if self.fstats is None or len(self.fstats) == 0:
+            raise ValueError("The design has no F-contrasts.")
+        f_dof = self.f_dof.reshape((-1,) + (1,) * len(self.target_dims))
+        return parametric_fpvalues(self.fstats, f_dof, self.dof[None])
 
     def test(
         self,
@@ -140,6 +192,45 @@ class GLMResult:
             glm=self,
         )
 
+    def ftest(
+        self,
+        contrast_indx: int = 0,
+        correction: Optional[str] = None,
+    ) -> "TestResult":
+        """Parametric test of an F-contrast.
+
+        Parameters
+        ----------
+        contrast_indx : int, optional
+            Which F-contrast to test.
+        correction : str, optional
+            :code:`'bonferroni'`, :code:`'holm'`, :code:`'fdr'` or
+            :code:`None` for uncorrected p-values.
+
+        Returns
+        -------
+        result : TestResult
+            Test result with parametric p-values. :code:`result.copes` holds
+            the copes of the rows of the F-contrast and
+            :code:`result.fstats` the F-statistics.
+        """
+        uncorrected = self.fpvalues()[contrast_indx]
+        return TestResult(
+            contrast=self.f_contrast_names[contrast_indx],
+            copes=self.f_copes[contrast_indx],
+            tstats=None,
+            pvalues=correct(uncorrected, correction),
+            pvalues_uncorrected=uncorrected,
+            correction=correction,
+            tail=0,
+            metric="tstats",
+            parametric=True,
+            glm=self,
+            statistic="F",
+            fstats=self.fstats[contrast_indx],
+            f_dof=int(self.f_dof[contrast_indx]),
+        )
+
     def summary(self) -> Dict:
         """Summary of the fit."""
         summary = self.design.summary()
@@ -158,9 +249,11 @@ class TestResult:
         Name of the contrast tested.
     copes : np.ndarray
         Contrast parameter estimate (e.g. the group difference or mean
-        response). Shape is (\\*target_dims).
+        response). Shape is (\\*target_dims). For an F-test, the copes of
+        the rows of the F-contrast, shape (n_rows, \\*target_dims).
     tstats : np.ndarray
-        t-statistics. Shape is (\\*target_dims).
+        t-statistics. Shape is (\\*target_dims). :code:`None` for an F-test,
+        see :code:`fstats`.
     pvalues : np.ndarray
         P-values after the multiple comparisons correction. Shape is
         (\\*target_dims). For :code:`correction='cluster'` every point holds
@@ -203,6 +296,12 @@ class TestResult:
     tfce_map : np.ndarray, optional
         Observed TFCE-enhanced statistic map for :code:`correction='tfce'`.
         Shape is (\\*target_dims).
+    statistic : str
+        :code:`'t'` for a t-contrast or :code:`'F'` for an F-contrast.
+    fstats : np.ndarray, optional
+        F-statistics for an F-test. Shape is (\\*target_dims).
+    f_dof : int, optional
+        Numerator degrees of freedom of the F-test.
     """
 
     contrast: str
@@ -225,10 +324,19 @@ class TestResult:
     cluster_pvalues: Optional[np.ndarray] = None
     cluster_forming_threshold: Optional[float] = None
     tfce_map: Optional[np.ndarray] = field(default=None, repr=False)
+    statistic: str = "t"
+    fstats: Optional[np.ndarray] = None
+    f_dof: Optional[int] = None
 
     @property
     def target_dims(self) -> Tuple[int, ...]:
         return tuple(self.pvalues.shape)
+
+    @property
+    def stats(self) -> np.ndarray:
+        """The test statistic: :code:`tstats` or :code:`fstats`. Shape is
+        (\\*target_dims)."""
+        return self.fstats if self.statistic == "F" else self.tstats
 
     @property
     def dof(self) -> np.ndarray:
@@ -257,6 +365,7 @@ class TestResult:
         """Summary of the test."""
         summary = {
             "contrast": self.contrast,
+            "statistic": self.statistic,
             "target_dims": self.target_dims,
             "correction": self.correction,
             "tail": self.tail,
@@ -360,6 +469,9 @@ class TestResult:
         elif self.correction == "tfce":
             observed_max = np.nanmax(np.abs(self.tfce_map))
             label = "TFCE"
+        elif self.statistic == "F":
+            observed_max = np.nanmax(self.fstats)
+            label = "F"
         else:
             observed = self.tstats if self.metric == "tstats" else self.copes
             if self.tail == 0:

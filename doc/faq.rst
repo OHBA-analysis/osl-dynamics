@@ -4,15 +4,10 @@ Frequently Asked Questions (FAQ)
 .. contents::
    :local:
 
-If you have a question that's not listed above, please open an issue on the `GitHub <https://github.com/OHBA-analysis/osl-dynamics/issues>`_.
+If you have a question that's not listed below, please open an issue on the `GitHub <https://github.com/OHBA-analysis/osl-dynamics/issues>`_.
 
 Installation
 ------------
-
-How do I install osl-dynamics?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The recommended installation of the latest version via pip is described :doc:`here <install>`.
 
 Do I need a GPU?
 ~~~~~~~~~~~~~~~~
@@ -337,6 +332,11 @@ Should I test copes or t-statistics?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The ``metric`` argument chooses the statistic whose maximum is taken across targets. T-statistics are the default and the right choice when the targets have different units or variances (e.g. fractional occupancies and lifetimes together). Copes (the raw effect, e.g. the mean response) are the default for :func:`~osl_dynamics.stats.inference.evoked_response`, where every target has the same units and the t-statistic can be unstable where the variance is near zero. The ``hat`` argument is another remedy for unstable t-statistics. Cluster-based tests always use t-statistics.
+
+How do I compare more than two groups?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Pass all the group labels to :func:`~osl_dynamics.stats.inference.group_diff`. With three or more labels it runs an F-test (the GLM form of a one-way ANOVA, with permutations) for any difference between the groups. A significant F-test does not say which groups differ, so follow it with pairwise tests, ``groups=(1, 2)`` and so on, and correct for the number of pairs you report. For other questions, e.g. patients versus the mean of two control groups, write the contrast yourself with :class:`~osl_dynamics.stats.design.DesignConfig`, see the :doc:`Custom Designs tutorial <tutorials_build/7-4_custom_designs>`.
 
 How do I account for age, sex or other confounds?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
