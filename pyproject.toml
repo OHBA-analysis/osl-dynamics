@@ -96,8 +96,9 @@ tf-cuda = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/OHBA-analysis/osl-dynamics"
+"Homepage" = "https://osl-dynamics.readthedocs.io"
 "Documentation" = "https://osl-dynamics.readthedocs.io/en/latest/"
+"Source" = "https://github.com/OHBA-analysis/osl-dynamics"
 
 [project.scripts]
 osl-dynamics = "osl_dynamics.config_api.pipeline:osl_dynamics_cli"
