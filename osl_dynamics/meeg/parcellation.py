@@ -209,7 +209,7 @@ def parcellate(
     voxel_coords: np.ndarray,
     parcellation_file: str,
     method: str = "pca",
-    orthogonalisation: str | None = None,
+    orthogonalization: str | None = None,
 ) -> np.ndarray:
     """Parcellate data.
 
@@ -238,8 +238,8 @@ def parcellate(
                      average.
         'centroid' - Use the time course of the voxel nearest to each parcel
                      centroid.
-    orthogonalisation : str, optional
-        Method for orthogonalising the data. Can be None or 'symmetric'.
+    orthogonalization : str, optional
+        Method for orthogonalizing the data. Can be None or 'symmetric'.
 
     Returns
     -------
@@ -250,8 +250,8 @@ def parcellate(
     print("Parcellating data")
     print("-----------------")
 
-    if orthogonalisation not in [None, "symmetric"]:
-        raise ValueError("orthogonalisation must be None or 'symmetric'.")
+    if orthogonalization not in [None, "symmetric"]:
+        raise ValueError("orthogonalization must be None or 'symmetric'.")
 
     if method not in ["pca", "centroid"]:
         raise ValueError("method must be 'pca' or 'centroid'.")
@@ -275,8 +275,8 @@ def parcellate(
             voxel_data, parcellation, parcellation_file, voxel_coords
         )
 
-    # Orthogonalisation
-    if orthogonalisation == "symmetric":
+    # Orthogonalization
+    if orthogonalization == "symmetric":
         parcel_data = symmetric_orthogonalization(parcel_data, maintain_magnitudes=True)
 
     return parcel_data
@@ -285,7 +285,7 @@ def parcellate(
 def parcellate_lcmv(
     session: Session,
     parcellation_file: str,
-    orthogonalisation: str | None = None,
+    orthogonalization: str | None = None,
     data: str | mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | None = "omit",
 ) -> np.ndarray:
@@ -306,8 +306,8 @@ def parcellate_lcmv(
     parcellation_file : str
         Path to parcellation file (in MNI space). The weights must be
         non-negative.
-    orthogonalisation : str, optional
-        Method for orthogonalising the data. Can be None or 'symmetric'.
+    orthogonalization : str, optional
+        Method for orthogonalizing the data. Can be None or 'symmetric'.
     data : str | mne.io.Raw | mne.Epochs, optional
         The data to calculate parcel time courses for, or the path to a fif
         file containing it. If None, session.preproc_file is used.
@@ -324,8 +324,8 @@ def parcellate_lcmv(
     print("Parcellating data")
     print("-----------------")
 
-    if orthogonalisation not in [None, "symmetric"]:
-        raise ValueError("orthogonalisation must be None or 'symmetric'.")
+    if orthogonalization not in [None, "symmetric"]:
+        raise ValueError("orthogonalization must be None or 'symmetric'.")
 
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
@@ -375,8 +375,8 @@ def parcellate_lcmv(
     if epochs_shape is not None:
         parcel_data = parcel_data.reshape(-1, *epochs_shape)
 
-    # Orthogonalisation
-    if orthogonalisation == "symmetric":
+    # Orthogonalization
+    if orthogonalization == "symmetric":
         parcel_data = symmetric_orthogonalization(parcel_data, maintain_magnitudes=True)
 
     return parcel_data
@@ -847,7 +847,7 @@ def symmetric_orthogonalization(
     Frobenius norm, and are calculated from a singular value decomposition.
 
     :func:`parcellate` and :func:`parcellate_lcmv` apply this with
-    :code:`orthogonalisation="symmetric"`.
+    :code:`orthogonalization="symmetric"`.
 
     Parameters
     ----------

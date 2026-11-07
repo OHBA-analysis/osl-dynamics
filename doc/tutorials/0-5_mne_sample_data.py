@@ -239,10 +239,10 @@ Prerequisites
 # carries the stimulus channels over to the parcellated data, so we can epoch
 # it later.
 #
-# Note, we use ``orthogonalisation=None`` here (rather than ``"symmetric"``,
+# Note, we use ``orthogonalization=None`` here (rather than ``"symmetric"``,
 # the usual choice — see the
 # :doc:`MEG preprocessing tutorial </tutorials_build/0-1_meg_preprocessing>`).
-# Symmetric orthogonalisation removes all zero-lag correlations between
+# Symmetric orthogonalization removes all zero-lag correlations between
 # parcels — which is exactly the correlated bilateral signal we want to study
 # below. Leakage correction should not be used when analysing zero-lag
 # correlated task responses.
@@ -252,7 +252,7 @@ Prerequisites
 #     parcel_data = parcellation.parcellate_lcmv(
 #         session,
 #         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
-#         orthogonalisation=None,
+#         orthogonalization=None,
 #     )
 #     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
 #
@@ -313,7 +313,7 @@ Prerequisites
 #     parcel_data = parcellation.parcellate_lcmv(
 #         session,
 #         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
-#         orthogonalisation=None,
+#         orthogonalization=None,
 #     )
 #     bilateral_parc_fif = str(output_dir / "osl" / id / "lcmv-bilateral-parc-raw.fif")
 #     parcellation.save_as_fif(
@@ -472,8 +472,8 @@ Prerequisites
 #   ``use_bilateral_pairs=True``.
 # - The pairing tolerance ``bilateral_tol`` defaults to half the dipole grid
 #   spacing, which is usually what you want.
-# - Use ``orthogonalisation=None`` when analysing zero-lag correlated
-#   responses — symmetric orthogonalisation would remove them.
+# - Use ``orthogonalization=None`` when analyzing zero-lag correlated
+#   responses — symmetric orthogonalization would remove them.
 # - Check the dipole pairing QC plot (``bilateral_dipoles.png``).
 # - Use ``source_recon.virtual_electrodes`` to get the time course at a
 #   specific MNI coordinate.

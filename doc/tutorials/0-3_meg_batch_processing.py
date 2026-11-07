@@ -387,7 +387,7 @@ The output of this script is written to ``derivatives/``.
 #         parcel_data = parcellation.parcellate_lcmv(
 #             session_files,
 #             parcellation_file=parcellation_file,
-#             orthogonalisation="symmetric",
+#             orthogonalization="symmetric",
 #         )
 #
 #         parc_fif = str(output_dir / "osl" / session["id"] / "lcmv-parc-raw.fif")

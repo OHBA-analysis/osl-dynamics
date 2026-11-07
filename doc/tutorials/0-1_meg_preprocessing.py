@@ -359,14 +359,14 @@ Output is written to ``derivatives/``.
 # ``parcellate_lcmv`` assigns each dipole of the forward model to parcels using its MNI coordinate and calculates each parcel time course from the sensor data with the beamformer weights. Bad segments are automatically excluded.
 #
 # - The time course of each parcel is the first principal component of the dipoles in the parcel (weighted by the parcellation).
-# - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels.
+# - ``orthogonalization="symmetric"`` — Apply symmetric orthogonalization to reduce spatial leakage between parcels.
 #
 # .. code-block:: python
 #
 #     parcel_data = parcellation.parcellate_lcmv(
 #         session,
 #         parcellation_file,
-#         orthogonalisation="symmetric",
+#         orthogonalization="symmetric",
 #     )
 #     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
 
