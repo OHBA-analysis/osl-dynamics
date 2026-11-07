@@ -104,7 +104,7 @@ fig, ax = plotting.plot_violin(kurt_norm_alpha.T, x_label="Mode", y_label="Kurt.
 #%%
 # Binarizing the mixing coefficient time course
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# If we convert the mixing coefficients into a binary time course for each mode (i.e. something similar to the HMM state time courses) we can calculate the usual summary statistics we did for the HMM states (fractional occupancies, lifetimes, intervals). See the :doc:`HMM Summary Statistics tutorial <tutorials_build/4-3_hmm_summary_stats>` for further details.
+# If we convert the mixing coefficients into a binary time course for each mode (i.e. something similar to the HMM state time courses) we can calculate the usual summary statistics we did for the HMM states (fractional occupancies, lifetimes, intervals). See the :doc:`HMM Summary Statistics tutorial <../tutorials_build/4-3_hmm_summary_stats>` for further details.
 #
 # We have a couple options for binarizing the mixing coefficient time course:
 #
@@ -209,4 +209,4 @@ print(np.mean(fo, axis=0), 2)
 #%%
 # We can see the GMM thresholds identify more mode activations, which are reflected in the higher fractional occupancies.
 #
-# With a mode activation time course we can do the same analysis we did for the HMM state time courses. See the :doc:`HMM Summary Statistics tutorial <tutorials_build/4-3_hmm_summary_stats>` for more details.
+# With a mode activation time course we can do the same analysis we did for the HMM state time courses. See the :doc:`HMM Summary Statistics tutorial <../tutorials_build/4-3_hmm_summary_stats>` for more details.

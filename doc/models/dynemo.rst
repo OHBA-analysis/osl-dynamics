@@ -1,12 +1,10 @@
-:orphan:
-
 Dynamic Network Modes (DyNeMo)
 ==============================
 
 Introduction
 ------------
 
-DyNeMo overcomes two limitations of the `HMM <hmm.html>`_:
+DyNeMo overcomes two limitations of the :doc:`HMM <hmm>`:
 
 - The **Markovian assumption**: DyNeMo uses a recurrent neural network (LSTM [1]) to model long-range temporal dependencies in the latent variable.
 - The **mutual exclusivity of states**: DyNeMo models the data using a linear mixture of '**modes**'.
@@ -55,7 +53,7 @@ The generative model of DyNeMo is shown below.
 Inference
 ---------
 
-Similar to the `HMM <hmm.html>`_, we perform variational Bayes on the latent variables, i.e. the logits :math:`\theta_{1:T}`, and learn point estimates for the observation model parameters, i.e. the mode means :math:`\mu_j` and covariances :math:`D_j`.
+Similar to the :doc:`HMM <hmm>`, we perform variational Bayes on the latent variables, i.e. the logits :math:`\theta_{1:T}`, and learn point estimates for the observation model parameters, i.e. the mode means :math:`\mu_j` and covariances :math:`D_j`.
 
 Amortized Variational Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -82,7 +80,7 @@ In the post-hoc analysis of a DyNeMo fit, we are interested in interpreting the 
 Summary Statistics
 ^^^^^^^^^^^^^^^^^^
 
-We can calculate the usual statistics we study with the `HMM <hmm.html>`_ by binarizing the mixing coefficient time course. The :doc:`DyNeMo Mixing Coefficients Analysis tutorial <../tutorials_build/5-3_dynemo_mixing_coefs>` discusses how to do this.
+We can calculate the usual statistics we study with the :doc:`HMM <hmm>` by binarizing the mixing coefficient time course. The :doc:`DyNeMo Mixing Coefficients Analysis tutorial <../tutorials_build/5-3_dynemo_mixing_coefs>` discusses how to do this.
 
 Alternatively, we can use the statistics calculated from the mixing coefficient time series, like the mean, standard deviation or kurtosis. Normally, we calculate these quantities on the reweighted mixing coefficients (to account for the magnitude of the mode covariances).
 

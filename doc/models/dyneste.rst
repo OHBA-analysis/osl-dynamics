@@ -1,12 +1,10 @@
-:orphan:
-
 Dynamic Network States (DyNeSte)
 ================================
 
 Introduction
 ------------
 
-DyNeSte combines elements of both the `HMM <hmm.html>`_ and `DyNeMo <dynemo.html>`_ to address their inherent trade-offs [1]. The HMM infers categorical brain network states that provide good interpretability but does not model long-range temporal structure due to its Markovian constraint. DyNeMo uses recurrent neural networks to model long-range temporal dependencies, but at the expense of interpretability (due to its mixture description of states).
+DyNeSte combines elements of both the :doc:`HMM <hmm>` and :doc:`DyNeMo <dynemo>` to address their inherent trade-offs [1]. The HMM infers categorical brain network states that provide good interpretability but does not model long-range temporal structure due to its Markovian constraint. DyNeMo uses recurrent neural networks to model long-range temporal dependencies, but at the expense of interpretability (due to its mixture description of states).
 
 DyNeSte addresses this by combining:
 
@@ -64,7 +62,7 @@ As with DyNeMo, **KL annealing** can be used to stabilize training — the KL te
 Post-hoc Analysis
 -----------------
 
-Because DyNeSte infers discrete states, the post-hoc analysis is the same as for the `HMM <hmm.html>`_. You can directly calculate summary statistics (fractional occupancy, mean lifetime, mean interval, switching rate) and use the multitaper approach for spectral analysis.
+Because DyNeSte infers discrete states, the post-hoc analysis is the same as for the :doc:`HMM <hmm>`. You can directly calculate summary statistics (fractional occupancy, mean lifetime, mean interval, switching rate) and use the multitaper approach for spectral analysis.
 
 See the :doc:`HMM post-hoc analysis documentation <hmm>` for details on these analyses.
 

@@ -10,7 +10,8 @@ If you use osl-dynamics, please cite: Gohil, C., Huang, R., Roberts, E., van Es,
 
 - [Installation](https://osl-dynamics.readthedocs.io/en/latest/install.html): conda environment files for Linux, Mac and HPC clusters.
 - [Getting started](https://osl-dynamics.readthedocs.io/en/latest/getting_started.html): a minimal pipeline for training an HMM on M/EEG data.
-- [Tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.html): step by step walkthroughs covering data loading and preparation, time-delay embedding, HMM and DyNeMo training, selecting a run, spectral estimation, power maps, connectivity and statistical testing.
+- [User guide](https://osl-dynamics.readthedocs.io/en/latest/documentation.html): the models (HMM, DyNeMo, DyNeSte, M-DyNeMo, HIVE), statistical significance testing and the parcellations.
+- [Tutorials](https://osl-dynamics.readthedocs.io/en/latest/tutorials.html): step by step walkthroughs covering data loading and preparation, time-delay embedding, HMM and DyNeMo training, selecting a run, spectral estimation, power maps, connectivity and statistical testing.
 - [FAQ](https://osl-dynamics.readthedocs.io/en/latest/faq.html): guidance on preprocessing, time-delay embedding, choosing parameters, choosing between runs and interpreting results.
 - [Statistical significance testing](https://osl-dynamics.readthedocs.io/en/latest/stats.html): which test and which correction for multiple comparisons (maximum statistic, cluster-based, TFCE, FDR) to use for each kind of output; the `osl_dynamics.stats` subpackage implements GLM permutation tests with covariates.
 - [API reference](https://osl-dynamics.readthedocs.io/en/latest/autoapi/index.html): documentation for every module, class and function.

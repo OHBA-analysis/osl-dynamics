@@ -73,10 +73,14 @@ def fetch_parcellation_docs():
             for stem in skipped:
                 text = re.sub(rf"^- \[.*\]\({stem}\.md\)\n", "", text, flags=re.M)
             text = re.sub(r"^### .*\n+(?=#)", "", text, flags=re.M)
-            text = f"(parcellations)=\n\n{text}"
+            # The index is in the User Guide toctree, a hidden toctree makes
+            # the individual pages part of the section (for the sidebar)
+            text = (
+                f"(parcellations)=\n\n{text}\n\n"
+                "```{toctree}\n:hidden:\n:glob:\n\n*\n```\n"
+            )
 
-        # The pages are linked to, rather than listed in a toctree
-        page.write_text(f"---\norphan: true\n---\n\n{text}")
+        page.write_text(text)
 
 
 fetch_parcellation_docs()
@@ -132,6 +136,11 @@ source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
 # The master toctree document.
 master_doc = "index"
 
+# Autoapi templates are not source documents. The tutorial pages are listed in
+# tutorials.rst, so the gallery index sphinx-gallery generates is not built
+# (a page in two toctrees would be placed under the wrong section).
+exclude_patterns = ["_templates", "tutorials_build/index.rst"]
+
 # General information about the project.
 project = "osl-dynamics"
 copyright = "2020, OHBA Methods Group, University of Oxford"
@@ -161,16 +170,16 @@ html_extra_path = ["llms.txt"]
 html_theme_options = {
     "github_url": "https://github.com/OHBA-analysis/osl-dynamics",
     "show_nav_level": 2,
+    "header_links_before_dropdown": 6,
     "logo": {"text": "OSL Dynamics"},
 }
 
-# Remove "Section Navigation"
+# Remove the left "Section Navigation" sidebar on pages that are a section by
+# themselves. The User Guide, Tutorials and API Reference sections keep it.
 html_sidebars = {
+    "index": [],
     "install": [],
     "getting_started": [],
-    "documentation": [],
-    "tutorials_build/*": [],
-    "parcellations/*": [],
     "faq": [],
 }
 

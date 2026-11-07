@@ -1,5 +1,3 @@
-:orphan:
-
 Hidden Markov Model (HMM)
 =========================
 

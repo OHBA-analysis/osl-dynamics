@@ -451,7 +451,7 @@ Output is written to ``derivatives/``.
 #
 # - **Canonical HMM analysis** — See `here <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ for notebooks applying a canonical HMM to the parcellated data.
 # - **Batch processing** — See the `batch scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for processing many sessions in parallel.
-# - **Analysis** — See the :doc:`documentation <../documentation>` for further tutorials for static and dynamic network analysis.
+# - **Analysis** — See the :doc:`tutorials <../tutorials>` page for further tutorials for static and dynamic network analysis.
 #
 # Notes on CTF and OPM data
 # *************************

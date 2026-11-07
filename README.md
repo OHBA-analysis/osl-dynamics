@@ -57,7 +57,7 @@ model.fit(data)
 alpha = model.get_alpha(data)
 ```
 
-See the [tutorials](https://osl-dynamics.readthedocs.io/en/latest/documentation.html) for complete walkthroughs and the [examples directory](https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples) for full analysis pipelines.
+See the [tutorials](https://osl-dynamics.readthedocs.io/en/latest/tutorials.html) for complete walkthroughs and the [examples directory](https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples) for full analysis pipelines.
 
 ## Installation
 

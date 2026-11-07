@@ -191,7 +191,7 @@ How do I choose what hyperparameters to use?
 Unfortunately, many modern machine learning models come with hyperparameters (parameters that are not part of the generative model) which need to be pre-specified. The best approach is to try and few combinations and do the following:
 
 - Make sure any conclusions are robust to the choice of hyperparameters.
-- Use the variational free energy (see the model descriptions in the :doc:`docs <documentation>`) to compare models. Preferably, the variational free energy would be calculated on a hold out validation dataset, which is not used for training.
+- Use the variational free energy (see the :doc:`model descriptions <models/index>`) to compare models. Preferably, the variational free energy would be calculated on a hold out validation dataset, which is not used for training.
 
 The :mod:`config API <osl_dynamics.config_api>` has wrapper functions for training an :func:`HMM <osl_dynamics.config_api.wrappers.train_hmm>` or :func:`DyNeMo <osl_dynamics.config_api.wrappers.train_dynemo>`, which pre-specify hyperparameters that have worked well in the past. These might be a good place to start.
 
@@ -241,7 +241,7 @@ As explained in 'I have trained a model with the same hyperparameters on the sam
 Can I do static analysis with this package?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Yes! See the tutorials :doc:`here <documentation>`.
+Yes! See the :doc:`static analysis tutorials <tutorials>`.
 
 Can I use this package with task data?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -112,7 +112,7 @@ The YAML config specifies a pipeline of functions to run. Each top-level key (e.
 What Next?
 ----------
 
-- **Tutorials**: Work through the :doc:`tutorials <documentation>` for detailed examples covering data loading, model training, and post-hoc analysis.
+- **Tutorials**: Work through the :doc:`tutorials <tutorials>` for detailed examples covering data loading, model training, and post-hoc analysis.
 - **API reference**: Browse the :doc:`API docs <autoapi/index>` for detailed information on all classes and functions.
 - **Examples**: See the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ for more analysis scripts.
 - **Workshops**: Check out materials from past `OSL workshops <https://github.com/OHBA-analysis/osl-workshop-2025-dynamics>`_.

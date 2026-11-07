@@ -1,130 +1,21 @@
-Documentation
-=============
+User Guide
+==========
 
-Welcome to the osl-dynamics documentation!
+The user guide describes the methods implemented in osl-dynamics: the generative models for dynamic brain networks, the tools for statistical significance testing and the parcellations used to define brain regions.
 
-New users can start with the :doc:`Getting Started <getting_started>` guide for a quick introduction and then work through the tutorials below. The :doc:`FAQ <faq>` covers common questions about data preparation, model training, and post-hoc analysis.
+New users should start with the :doc:`Getting Started <getting_started>` guide and then work through the :doc:`tutorials <tutorials>`, which show the methods applied to real data. The :doc:`FAQ <faq>` covers common questions about data preparation, model training and post-hoc analysis, and the :doc:`API reference <autoapi/index>` documents every class and function.
 
-API Reference
--------------
+.. toctree::
+   :maxdepth: 2
 
-The :doc:`API reference <autoapi/index>` provides documentation for all classes, methods, and functions in osl-dynamics.
-
-Models
-------
-
-.. list-table::
-   :header-rows: 1
-   :widths: 15 20 20 20
-
-   * - Model
-     - State type
-     - Temporal model
-     - Best for
-   * - :doc:`HMM <models/hmm>`
-     - Discrete (mutually exclusive)
-     - Markovian (transition probability matrix)
-     - Resting-state analysis; interpretable summary stats
-   * - :doc:`DyNeMo <models/dynemo>`
-     - Continuous (linear mixture of modes)
-     - Non-Markovian (RNN)
-     - Task data; overlapping network activity
-   * - :doc:`DyNeSte <models/dyneste>`
-     - Discrete (mutually exclusive)
-     - Non-Markovian (RNN)
-     - Discrete states with long-range dynamics
-   * - :doc:`M-DyNeMo <models/mdynemo>`
-     - Continuous (linear mixture; separate for power and FC)
-     - Non-Markovian (RNN)
-     - Separate power and connectivity dynamics
-   * - :doc:`HIVE <models/hive>`
-     - Discrete (mutually exclusive)
-     - Markovian (transition probability matrix)
-     - Modelling inter-session variability (e.g. subjects, scanners, sites)
-
-Also see the :doc:`FAQ <faq>` for guidance on choosing a model and hyperparameters.
-
-Parcellations
--------------
-
-The parcellations, masks and surfaces osl-dynamics uses are downloaded from
-`osl-files <https://github.com/OHBA-analysis/osl-files>`_. See :doc:`the parcellations page <parcellations/index>`
-for the full list, with labels, MNI coordinates and pictures for each one.
-
-Statistical Significance Testing
---------------------------------
-
-The :doc:`statistics page <stats>` summarises which test and which correction for multiple
-comparisons to use for each kind of osl-dynamics output. The :doc:`Statistical Inference tutorial
-<tutorials_build/7-1_statistical_inference>` explains the methods (GLM permutation tests, maximum
-statistic, cluster-based permutations, TFCE, FDR) with figures.
-
-Tutorials
----------
-
-The following tutorials illustrate basic usage and analysis that can be done with osl-dynamics.
-
-**M/EEG processing tutorials**:
-
-- :doc:`tutorials_build/0-1_meg_preprocessing`.
-- :doc:`tutorials_build/0-2_sign_flipping`.
-- :doc:`tutorials_build/0-3_meg_batch_processing`.
-- :doc:`tutorials_build/0-4_eeg_batch_processing`.
-- :doc:`tutorials_build/0-5_mne_sample_data`.
-
-Also see `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ for start-to-end tutorials with Elekta, CTF, OPM and EEG data.
-
-**Data tutorials**:
-
-- :doc:`tutorials_build/1-1_data_loading`.
-- :doc:`tutorials_build/1-2_data_prepare_meg`.
-- :doc:`tutorials_build/1-3_data_prepare_fmri`.
-- :doc:`tutorials_build/1-4_data_time_delay_embedding`.
-
-**Static (time-averaged) modelling tutorials for MEG**:
-
-- :doc:`tutorials_build/2-1_static_spectra_analysis`.
-- :doc:`tutorials_build/2-2_static_power_analysis`.
-- :doc:`tutorials_build/2-3_static_aec_analysis`.
-
-**Dynamic modelling tutorials**:
-
-- :doc:`tutorials_build/3-1_sliding_window_analysis`.
-- :doc:`tutorials_build/3-2_hmm_training`.
-- :doc:`tutorials_build/3-3_dynemo_training`.
-- :doc:`tutorials_build/3-4_dynemo_selecting_a_run`.
-- :doc:`tutorials_build/3-5_hmm_dynemo_get_inf_params`.
-
-**HMM post-hoc analysis tutorials**:
-
-- :doc:`tutorials_build/4-1_hmm_multitaper_spectra`.
-- :doc:`tutorials_build/4-2_hmm_plotting_meg_networks`.
-- :doc:`tutorials_build/4-3_hmm_summary_stats`.
-- :doc:`tutorials_build/4-4_hmm_fmri_dual_estimation`.
-- :doc:`tutorials_build/4-5_hmm_plotting_fmri_networks`.
-
-**DyNeMo post-hoc analysis tutorials**:
-
-- :doc:`tutorials_build/5-1_dynemo_regression_spectra`.
-- :doc:`tutorials_build/5-2_dynemo_plotting_networks`.
-- :doc:`tutorials_build/5-3_dynemo_mixing_coefs`.
-
-**Task analysis tutorials**:
-
-- :doc:`tutorials_build/6-1_epoching_alpha`.
-- `Dynamic Network Analysis of Electrophysiological Task Data <https://github.com/OHBA-analysis/Gohil2024_NetworkAnalysisOfTaskData>`_.
-
-**Statistical significance testing tutorials**:
-
-- :doc:`tutorials_build/7-1_statistical_inference`.
-- :doc:`tutorials_build/7-2_group_contrast`.
-- :doc:`tutorials_build/7-3_network_response`.
-- :doc:`tutorials_build/7-4_custom_designs`.
+   Models <models/index>
+   Statistical Significance Testing <stats>
+   Parcellations <parcellations/index>
 
 Examples Directory
 ------------------
 
-More examples scripts can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repository.
+Full analysis scripts, including the scripts used to produce the results in the `osl-dynamics paper <https://elifesciences.org/articles/91949>`_, can be found in the `examples directory <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples>`_ of the repository.
 
 Workshops
 ---------
