@@ -91,7 +91,7 @@ model.summary()
 
 if not use_pre_trained_model:
 
-    # Initialisation
+    # Initialization
     model.random_subset_initialization(training_data, n_init=3, n_epochs=1, take=0.25)
 
     # Train the model
@@ -221,7 +221,7 @@ coh_map = analysis.connectivity.gmm_threshold(
     n_sigma=2,
     filename=f"{maps_dir}/gmm_coh_.png",
     plot_kwargs={
-        "x_label": "Standardised Relative Coherence",
+        "x_label": "Standardized Relative Coherence",
         "y_label": "Probability",
     },
 )

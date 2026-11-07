@@ -1,4 +1,4 @@
-# Parallelised Pipeline for Elekta MEG
+# Parallelized Pipeline for Elekta MEG
 
 This directory contains Python scripts that run the M/EEG processing pipeline on multiple sessions in parallel using `multiprocessing`.
 
@@ -30,7 +30,7 @@ Run the scripts **in order**. Each script processes all sessions in parallel.
 | `2_surfaces.py` | Surface Extraction | Extract inner skull, outer skull and scalp surfaces from structural MRI using FSL BET, and register the MRI to MNI space (FLIRT, then FNIRT) |
 | `3_coreg.py` | Coregistration | Coregister MEG to MRI using Polhemus headshape points |
 | `4_source_recon.py` | Forward Model and Source Reconstruction | Compute forward model (8 mm dipole grid) and LCMV beamformer weights |
-| `5_parc.py` | Parcellation | Parcellate with the beamformer filters, apply symmetric orthogonalisation |
+| `5_parc.py` | Parcellation | Parcellate with the beamformer filters, apply symmetric orthogonalization |
 
 ## Usage
 

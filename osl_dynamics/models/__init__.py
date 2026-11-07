@@ -7,7 +7,7 @@ and a ``Model`` class.
 Code structure
 --------------
 
-The code is organised into three layers:
+The code is organized into three layers:
 
 **1. Base layer** (``mod_base.py``)
 
@@ -16,7 +16,7 @@ The code is organised into three layers:
   modes/states, etc.).
 - :py:class:`~osl_dynamics.models.mod_base.ModelBase` — Abstract base class
   that wraps a Keras model. Provides the training loop (``fit``),
-  initialisation, checkpointing, and attribute delegation to the underlying
+  initialization, checkpointing, and attribute delegation to the underlying
   Keras model. Subclasses must implement ``build_model()``.
 
 **2. Inference layer** (``inf_mod_base.py``)
@@ -33,7 +33,7 @@ Two parallel branches extend ``ModelBase`` for different inference paradigms:
 
 - **Markov state inference** — For models with discrete hidden states
   (state sequence inferred by the Baum-Welch algorithm). Adds transition
-  probability learning and state initialisation.
+  probability learning and state initialization.
 
   - :py:class:`~osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelConfig`
   - :py:class:`~osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelBase`

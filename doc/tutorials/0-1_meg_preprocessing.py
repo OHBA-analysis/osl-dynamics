@@ -37,6 +37,8 @@ In this tutorial, we will use data from the `Wakeman-Henson dataset <https://www
 Output is written to ``derivatives/``.
 """
 
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/0-1_meg_preprocessing.png"
+
 #%%
 # Download the dataset
 # ^^^^^^^^^^^^^^^^^^^^
@@ -177,7 +179,7 @@ Output is written to ``derivatives/``.
 #
 #     raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(raw, picks="meg")
 #
-# **Option B: MEGNet automatic labelling** — Uses ``mne-icalabel`` (included
+# **Option B: MEGNet automatic labeling** — Uses ``mne-icalabel`` (included
 # in the osl-dynamics conda environments) to classify components with a
 # pre-trained deep learning model. Note, MEGNet was trained on ``'mag'``
 # sensor topographies but we'll pass ``'meg'`` to include both magnetometers
@@ -265,7 +267,7 @@ Output is written to ``derivatives/``.
 # Extract fiducials and headshape
 # *******************************
 #
-# The Polhemus digitisation points are stored inside the FIF file. We extract them to text files that RHINO uses for coregistration.
+# The Polhemus digitization points are stored inside the FIF file. We extract them to text files that RHINO uses for coregistration.
 #
 # .. code-block:: python
 #
@@ -359,14 +361,14 @@ Output is written to ``derivatives/``.
 # ``parcellate_lcmv`` assigns each dipole of the forward model to parcels using its MNI coordinate and calculates each parcel time course from the sensor data with the beamformer weights. Bad segments are automatically excluded.
 #
 # - The time course of each parcel is the first principal component of the dipoles in the parcel (weighted by the parcellation).
-# - ``orthogonalisation="symmetric"`` — Apply symmetric orthogonalisation to reduce spatial leakage between parcels.
+# - ``orthogonalization="symmetric"`` — Apply symmetric orthogonalization to reduce spatial leakage between parcels.
 #
 # .. code-block:: python
 #
 #     parcel_data = parcellation.parcellate_lcmv(
 #         session,
 #         parcellation_file,
-#         orthogonalisation="symmetric",
+#         orthogonalization="symmetric",
 #     )
 #     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
 

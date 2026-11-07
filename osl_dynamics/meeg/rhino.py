@@ -59,7 +59,7 @@ def scale_surfaces_to_headshape(
 
     Computes an affine transform that scales an existing set of surfaces
     (from ``extract_surfaces`` or the bundled MNI152 surfaces) to match
-    the headshape digitisation points in a FIF file. The scaled MRI and
+    the headshape digitization points in a FIF file. The scaled MRI and
     surfaces are written to ``outdir``.
 
     This is useful when no individual structural MRI is available (e.g.,
@@ -70,7 +70,7 @@ def scale_surfaces_to_headshape(
     1. Aligns the headshape to the template scalp surface using fiducials
        and ICP.
     2. Computes an affine transform (with anisotropic scaling) from
-       nearest-neighbour correspondences between the aligned surfaces.
+       nearest-neighbor correspondences between the aligned surfaces.
     3. Applies the transform to the MRI and surfaces.
 
     Parameters
@@ -86,7 +86,7 @@ def scale_surfaces_to_headshape(
         Output directory for the scaled MRI and surfaces. Pass this
         as ``surfaces_dir`` when creating ``Session``.
     n_init : int, optional
-        Number of random initialisations for ICP alignment.
+        Number of random initializations for ICP alignment.
 
     Returns
     -------
@@ -157,7 +157,7 @@ def scale_surfaces_to_headshape(
     # --------------
     # ICP refinement
     # --------------
-    print(f"Running ICP with {n_init} initialisations")
+    print(f"Running ICP with {n_init} initializations")
 
     headshape_mri_mm = _xform_points(head2mri_xform, headshape_mm)
     xform_icp, _, _ = _rhino_icp(scalp_mm, headshape_mri_mm, n_init=n_init)
@@ -288,23 +288,27 @@ def extract_surfaces(
     MRI file has a valid sform.
 
     In more detail:
-    1) Transform MRI to be aligned with the MNI axes so that BET works well
-    2) Use bet to skull strip MRI so that flirt works well
-    3) Use flirt to register skull stripped MRI to MNI space
-    4) Use BET/BETSURF to get:
-       a) The scalp surface (excluding nose), this gives the MRI-derived
+
+    1. Transform MRI to be aligned with the MNI axes so that BET works well
+    2. Use bet to skull strip MRI so that flirt works well
+    3. Use flirt to register skull stripped MRI to MNI space
+    4. Use BET/BETSURF to get:
+
+       a. The scalp surface (excluding nose), this gives the MRI-derived
           headshape points in native MRI space, which can be used in the
           headshape points registration later.
-       b) The scalp surface (outer skin), inner skull and brain surface, these
-          can be used for forward modelling later. Note that  due to the unusual
+       b. The scalp surface (outer skin), inner skull and brain surface, these
+          can be used for forward modeling later. Note that  due to the unusual
           naming conventions used by BET:
+
           - bet_inskull_mesh_file is actually the brain surface
           - bet_outskull_mesh_file is actually the inner skull surface
           - bet_outskin_mesh_file is the outer skin/scalp surface
-    5) Add nose to scalp surface (optional)
-    6) Output the transform from MRI space to MNI
-    7) Output surfaces in MRI space
-    8) Use FNIRT to nonlinearly register the MRI to MNI space (optional)
+
+    5. Add nose to scalp surface (optional)
+    6. Output the transform from MRI space to MNI
+    7. Output surfaces in MRI space
+    8. Use FNIRT to nonlinearly register the MRI to MNI space (optional)
 
     Parameters
     ----------
@@ -335,7 +339,7 @@ def extract_surfaces(
         surface includes non-brain tissue.
     nonlinear_registration : bool, optional
         Should we nonlinearly register the MRI to MNI space with FSL's FNIRT
-        (initialised with the FLIRT affine registration)? The registration
+        (initialized with the FLIRT affine registration)? The registration
         is used to transform MNI coordinates into the subject's MRI space,
         e.g. to place the dipoles of the MNI grid in rhino.forward_model and
         in source_recon.virtual_electrodes. A nonlinear registration follows
@@ -475,7 +479,7 @@ def extract_surfaces(
         # origin is a long way from the head, e.g. the subject was lying low
         # in the scanner. Move the head into the FOV and try again.
         print("Head is outside the MNI FOV, centring it...")
-        flirt_mri2mniaxes_xform = _centre_head_in_fov(
+        flirt_mri2mniaxes_xform = _center_head_in_fov(
             surfaces.mri_file, surfaces.std_brain_file, flirt_mri2mniaxes_xform
         )
         img_latest_density = _apply_mri2mniaxes_xform()
@@ -571,7 +575,7 @@ def extract_surfaces(
     #    headshape points in native MRI space, which can be used in the
     #    headshape points registration later.
     # b) The scalp surface (outer skin), inner skull and brain surface, these
-    #    can be used for forward modelling later. Note that due to the unusual
+    #    can be used for forward modeling later. Note that due to the unusual
     #    naming conventions used by BET:
     #    - bet_inskull_mesh_file is actually the brain surface
     #    - bet_outskull_mesh_file is actually the inner skull surface
@@ -673,7 +677,7 @@ def extract_surfaces(
         vol = nib.load(f"{flirt_mri_mni_bigfov_file}.nii.gz")
         vol_data = vol.get_fdata()
 
-        # Normalise vol data
+        # Normalize vol data
         vol_data = vol_data / np.max(vol_data.flatten())
 
         # Estimate observation model params of 2 class GMM with diagonal
@@ -903,14 +907,14 @@ def plot_surfaces(outdir: str, include_nose: bool = True) -> None:
     # Surfaces to plot. Note the names BET gives the files: inskull is the
     # brain surface and outskull is the inner skull
     scalp = "outskin_plus_nose" if include_nose else "outskin"
-    colours = {
+    colors = {
         "Brain": ("inskull", "#FFD400"),
         "Inner skull": ("outskull", "#00C8FF"),
         "Scalp": (scalp, "#FF4FD8"),
     }
 
     # Check surfaces exist
-    for name, _ in colours.values():
+    for name, _ in colors.values():
         file = Path(getattr(surfaces, f"bet_{name}_mesh_file"))
         if not file.exists():
             raise ValueError(f"{file} does not exist")
@@ -927,19 +931,19 @@ def plot_surfaces(outdir: str, include_nose: bool = True) -> None:
             draw_cross=False,
             colorbar=False,
         )
-        for name, colour in colours.values():
+        for name, color in colors.values():
             display.add_overlay(
                 getattr(surfaces, f"bet_{name}_mesh_file"),
-                cmap=ListedColormap([colour]),
+                cmap=ListedColormap([color]),
                 threshold=0.5,
             )
     display.frame_axes.legend(
         handles=[
-            Line2D([], [], color=colour, label=label)
-            for label, (_, colour) in colours.items()
+            Line2D([], [], color=color, label=label)
+            for label, (_, color) in colors.items()
         ],
         loc="lower center",
-        ncol=len(colours),
+        ncol=len(colors),
         frameon=False,
         labelcolor="white",
     )
@@ -961,7 +965,7 @@ def extract_fiducials_and_headshape_from_fif(
     mm).
 
     Should only be used with MNE-derived .fif files that have the expected
-    digitised points held in info['dig'] of fif_file.
+    digitized points held in info['dig'] of fif_file.
 
     Parameters
     ----------
@@ -973,7 +977,7 @@ def extract_fiducials_and_headshape_from_fif(
         Should we include HPI locations as headshape points?
     include_extra_as_headshape : bool, optional
         Should we include the extra locations as headshape points?
-        These are the unnamed points digitised over the scalp.
+        These are the unnamed points digitized over the scalp.
     """
     print()
     print("Extracting fiducials/headshape points from fif info")
@@ -1064,8 +1068,8 @@ def extract_fiducials_and_headshape_from_pos(session: Session) -> None:
     """Saves fiducials/headshape from a pos file.
 
     Two layouts are supported. Either the headshape points are the first rows
-    (the header gives how many) and the fiducials are labelled ``nasion``,
-    ``left`` and ``right``, or the headshape points are labelled ``EXTRA`` and
+    (the header gives how many) and the fiducials are labeled ``nasion``,
+    ``left`` and ``right``, or the headshape points are labeled ``EXTRA`` and
     the fiducials ``nasion``, ``lpa`` and ``rpa``. Labels are case-insensitive.
 
     Parameters
@@ -1261,12 +1265,12 @@ def remove_stray_headshape_points(
 
     # Project everything into the fiducial coordinate system
     def _project(pts: np.ndarray) -> np.ndarray:
-        centred = pts - origin[:, np.newaxis]
+        centered = pts - origin[:, np.newaxis]
         return np.array(
             [
-                ax_lr @ centred,
-                ax_ant @ centred,
-                ax_sup @ centred,
+                ax_lr @ centered,
+                ax_ant @ centered,
+                ax_sup @ centered,
             ]
         )
 
@@ -1370,7 +1374,7 @@ def save_coregistration_files(session: Session) -> None:
 
     # ------------------------------------------------------------------------
     # Create sMRI-derived freesurfer meshes in native/mri space in mm, for use
-    # by forward modelling
+    # by forward modeling
     # ------------------------------------------------------------------------
 
     nativeindex_scalednative_t = np.copy(xform_nativeindex2scalednative)
@@ -1419,31 +1423,28 @@ def coregister_head_and_mri(
     registered to the MRI-derived scalp surface in native MRI space.
 
     In more detail:
-    1)  Map location of fiducials in MNI standard space brain to native MRI
-        space. These are then used as the location of the MRI-derived fiducials
-        in native MRI space.
 
-    2a) We have polhemus-derived fiducials in HEAD space and MRI-derived fiducials
-        in native MRI space. Use these to estimate the affine xform from native
-        MRI space to HEAD space.
+    1. Map location of fiducials in MNI standard space brain to native MRI
+       space. These are then used as the location of the MRI-derived fiducials
+       in native MRI space.
+    2. We have polhemus-derived fiducials in HEAD space and MRI-derived
+       fiducials in native MRI space. Use these to estimate the affine xform
+       from native MRI space to HEAD space.
 
-    2b) We can also optionally learn the best scaling to add to this affine
-        xform, such that the MRI-derived fiducials are scaled in size to better
-        match the polhemus-derived fiducials. This assumes that we trust the size
-        (e.g. in mm) of the polhemus-derived fiducials, but not the size of
-        MRI-derived fiducials. E.g. this might be the case if we do not trust
-        the size (e.g. in mm) of the MRI, or if we are using a template MRI
-        that would has not come from this subject.
-
-    3)  If a scaling is learnt in step 2, we apply it to MRI, and to anything
-        derived from MRI.
-
-    4)  Transform MRI-derived headshape points into HEAD space.
-
-    5)  We have the polhemus-derived headshape points in HEAD space and the
-        MRI-derived headshape (scalp surface) in native MRI space.  Use these
-        to estimate the affine xform from native MRI space using the ICP
-        algorithm initilaised using the xform estimate in step 2.
+       We can also optionally learn the best scaling to add to this affine
+       xform, such that the MRI-derived fiducials are scaled in size to better
+       match the polhemus-derived fiducials. This assumes that we trust the size
+       (e.g. in mm) of the polhemus-derived fiducials, but not the size of
+       MRI-derived fiducials. E.g. this might be the case if we do not trust
+       the size (e.g. in mm) of the MRI, or if we are using a template MRI
+       that would has not come from this subject.
+    3. If a scaling is learnt in step 2, we apply it to MRI, and to anything
+       derived from MRI.
+    4. Transform MRI-derived headshape points into HEAD space.
+    5. We have the polhemus-derived headshape points in HEAD space and the
+       MRI-derived headshape (scalp surface) in native MRI space.  Use these
+       to estimate the affine xform from native MRI space using the ICP
+       algorithm initialized using the xform estimate in step 2.
 
     Parameters
     ----------
@@ -1468,7 +1469,7 @@ def coregister_head_and_mri(
         where nasion, rpa, lpa are 3D coordinates.
         Defaults to [[1, 85, -41], [83, -20, -65], [-83, -20, -65]].
     n_init : int, optional
-        Number of initialisations for the ICP algorithm that performs coregistration.
+        Number of initializations for the ICP algorithm that performs coregistration.
     plot_type : str, optional
         Type of coregistration plot to save. Options are "png", "html" or None.
         "png" saves static PNG images (requires a display/render window).
@@ -1690,13 +1691,13 @@ def coregister_head_and_mri(
     # 5) We have the polhemus-derived headshape points in HEAD space and
     #    the MRI-derived headshape (scalp surface) in native MRI space. We
     #    use these to estimate the affine xform from native MRI space using
-    #    the ICP algorithm initilaised using the xform estimate in step 2.
+    #    the ICP algorithm initialized using the xform estimate in step 2.
     # ----------------------------------------------------------------------
 
     if use_headshape:
         print("Running ICP...")
 
-        # Run ICP with multiple initialisations to refine registration of
+        # Run ICP with multiple initializations to refine registration of
         # MRI-derived headshape points to polhemus derived headshape points,
         # with both in HEAD space
 
@@ -1762,7 +1763,7 @@ def coregister_head_and_mri(
 
     # ------------------------------------------------------------------------
     # Create MRI-derived freesurfer meshes in native/mri space in mm, for use
-    # by forward modelling
+    # by forward modeling
     # ------------------------------------------------------------------------
 
     nativeindex_scalednative_t = np.copy(xform_nativeindex2scalednative)
@@ -1807,7 +1808,7 @@ def coreg_error(session: Session, include_nose: bool = False) -> np.ndarray:
     """Distance from each headshape point to the scalp after coregistration.
 
     The quantitative companion to :func:`plot_coregistration`: how far the
-    digitised head points land from the MRI-derived scalp once the head has
+    digitized head points land from the MRI-derived scalp once the head has
     been coregistered to the MRI. Use this when you want the individual points,
     e.g. to find which electrodes are displaced; :func:`coreg_rms` is the usual
     single number summary.
@@ -1816,7 +1817,7 @@ def coreg_error(session: Session, include_nose: bool = False) -> np.ndarray:
     ``use_headshape=True`` the ICP fits the headshape points to this surface,
     so they are a goodness-of-fit residual. With ``use_headshape=False`` the
     fit is driven by the fiducials alone, so they are an independent check on
-    the digitised positions.
+    the digitized positions.
 
     Parameters
     ----------
@@ -1850,11 +1851,11 @@ def coreg_error(session: Session, include_nose: bool = False) -> np.ndarray:
     vertices, _ = nib.freesurfer.read_geometry(outskin_surf_file)
     dist, index = KDTree(vertices).query(headshape_mri)
 
-    # Sign each distance by whether the point sits further from the centre of
+    # Sign each distance by whether the point sits further from the center of
     # the scalp than the scalp surface does
-    centre = vertices.mean(axis=0)
-    outside = np.linalg.norm(headshape_mri - centre, axis=1) > np.linalg.norm(
-        vertices[index] - centre, axis=1
+    center = vertices.mean(axis=0)
+    outside = np.linalg.norm(headshape_mri - center, axis=1) > np.linalg.norm(
+        vertices[index] - center, axis=1
     )
     return np.where(outside, dist, -dist)
 
@@ -1970,8 +1971,8 @@ def plot_coregistration(
     head_scaledmri_t = read_trans(head_scaledmri_t_file)
     dev_head_t, _ = _get_trans(info["dev_head_t"], "meg", "head")
 
-    # Change xform from metres to mm.
-    # Note that MNE xform in fif.info assume metres, whereas we want it in mm.
+    # Change xform from meters to mm.
+    # Note that MNE xform in fif.info assume meters, whereas we want it in mm.
     # To change units for an xform, just need to change the translation part
     # and leave the rotation alone.
     dev_head_t["trans"][0:3, -1] = dev_head_t["trans"][0:3, -1] * 1000
@@ -2061,7 +2062,7 @@ def plot_coregistration(
                         or "Initial simplex is flat" in str(exc)
                     )
                     if is_qhull:
-                        # Create a tiny 3-point triangle in metres (so later transforms work)
+                        # Create a tiny 3-point triangle in meters (so later transforms work)
                         tiny = 0.001  # 1 mm
                         rrs = np.array(
                             [[0.0, 0.0, 0.0], [tiny, 0.0, 0.0], [-tiny, 0.0, 0.0]]
@@ -2072,7 +2073,7 @@ def plot_coregistration(
                         # Unexpected exception - re-raise
                         raise
 
-                # apply coil transform to get coil shape in device coords (metres)
+                # apply coil transform to get coil shape in device coords (meters)
                 rrs = apply_trans(coil_trans, rrs)
                 meg_rrs.append(rrs)
                 meg_tris.append(tris + offset)
@@ -2250,8 +2251,8 @@ def plot_coregistration(
                 backface_culling=False,
             )
 
-        # Centre the camera on everything plotted (the origin of the
-        # coordinate frame is not the centre of the head)
+        # Center the camera on everything plotted (the origin of the
+        # coordinate frame is not the center of the head)
         bounds = np.reshape(renderer.figure.plotter.bounds, (3, 2))
         focalpoint = tuple(bounds.mean(axis=1))
 
@@ -2346,7 +2347,7 @@ def repair_bem_surfaces(session: Session, max_iter: int = 50) -> None:
     model at all. This only matters for the multi-layer models, i.e. EEG - a
     single layer model uses one surface, so nothing can intersect.
 
-    Each offending vertex is replaced by the mean of its neighbours in the
+    Each offending vertex is replaced by the mean of its neighbors in the
     mesh, repeated until the surfaces nest. The vertices that are already
     inside are left untouched, so the repair is local to the spikes: it is
     fixing a defect in the segmentation, not reshaping the head.
@@ -2389,7 +2390,7 @@ def repair_bem_surfaces(session: Session, max_iter: int = 50) -> None:
 
         # The test mne.make_bem_model applies: a point is inside a closed
         # surface if the solid angle it subtends is 4*pi. Scale invariant, so
-        # it doesn't matter that these surfaces are in mm rather than metres.
+        # it doesn't matter that these surfaces are in mm rather than meters.
         outer_surf = {"rr": outer_verts, "tris": outer_tris}
 
         def _outside(points):
@@ -2399,13 +2400,13 @@ def repair_bem_surfaces(session: Session, max_iter: int = 50) -> None:
         if not stray.any():
             continue
 
-        # Neighbours of each vertex in the mesh
-        neighbours = [[] for _ in range(len(verts))]
+        # Neighbors of each vertex in the mesh
+        neighbors = [[] for _ in range(len(verts))]
         for a, b, c in tris:
-            neighbours[a] += [b, c]
-            neighbours[b] += [a, c]
-            neighbours[c] += [a, b]
-        neighbours = [np.unique(n) for n in neighbours]
+            neighbors[a] += [b, c]
+            neighbors[b] += [a, c]
+            neighbors[c] += [a, b]
+        neighbors = [np.unique(n) for n in neighbors]
 
         original = verts.copy()
         n_stray = int(stray.sum())
@@ -2414,7 +2415,7 @@ def repair_bem_surfaces(session: Session, max_iter: int = 50) -> None:
             if not len(indices):
                 break
             for index in indices:
-                verts[index] = verts[neighbours[index]].mean(axis=0)
+                verts[index] = verts[neighbors[index]].mean(axis=0)
             stray = _outside(verts)
 
         if stray.any():
@@ -2451,6 +2452,7 @@ def forward_model(
         Files of the session.
     model : string, optional
         Options are:
+
         - 'Single Layer' to use single layer (brain/cortex).
           Recommended for MEG.
         - 'Triple Layer' to three layers (scalp, inner skull, brain/cortex).
@@ -2612,7 +2614,7 @@ def _write_bem_surfaces(session: Session) -> None:
 
     # -------------------------------------------------------------------
     # Move the surfaces to where MNE expects to find them for the forward
-    # modelling, see make_bem_model in mne/bem.py
+    # modeling, see make_bem_model in mne/bem.py
     # -------------------------------------------------------------------
 
     # Note that the coreg surf files are in scaled MRI space
@@ -2678,7 +2680,7 @@ def _setup_mni_grid_source_space(
     print(f"MNI grid: {len(coords_mni)} voxels")
     src = _mni_source_space(session, coords_mni)
     if exclude > 0:
-        # Exclude points close to the centre of mass of the inner skull
+        # Exclude points close to the center of mass of the inner skull
         surf = mne.surface.read_surface(
             f"{session.bem_dir}/inner_skull.surf", return_dict=True
         )[-1]
@@ -2702,7 +2704,7 @@ def _mni_source_space(session: Session, coords_mni: np.ndarray) -> mne.SourceSpa
     Returns
     -------
     src : mne.SourceSpaces
-        Source space in scaled MRI space (in metres), which is what
+        Source space in scaled MRI space (in meters), which is what
         _make_fwd_solution expects.
     """
     coords_mri = _mni_to_scaledmri(session, coords_mni)
@@ -2774,7 +2776,7 @@ def _nonlinear_registration(surfaces: SurfaceFilenames) -> None:
     """
     print("Running FNIRT...")
 
-    # FLIRT affine from MRI to MNI to initialise FNIRT with
+    # FLIRT affine from MRI to MNI to initialize FNIRT with
     mri2mni_flirt_xform = np.linalg.inv(np.loadtxt(surfaces.mni2mri_flirt_xform_file))
 
     # Command: fnirt --in=<mri_file> --aff=<mri2mni_flirt_xform> \
@@ -3040,11 +3042,11 @@ def _read_head_model(session: Session) -> tuple[mne.Info, Transform]:
     info : mne.Info
         Sensor info saved by the coregistration.
     head_mri_t : mne.transforms.Transform
-        Transform from head to (scaled) MRI coordinates, in metres.
+        Transform from head to (scaled) MRI coordinates, in meters.
     """
     info = mne.io.read_info(session.coreg.info_fif_file)
     head_mri_t = read_trans(session.coreg.head_scaledmri_t_file)
-    # RHINO does everything in mm, so need to convert it to metres which is
+    # RHINO does everything in mm, so need to convert it to meters which is
     # what MNE expects. To change units on an xform, just need to change the
     # translation part and leave the rotation alone
     head_mri_t["trans"][0:3, -1] = head_mri_t["trans"][0:3, -1] / 1000
@@ -3071,7 +3073,7 @@ def _make_fwd_solution(
     info : mne.Info
         Sensor info.
     head_mri_t : mne.transforms.Transform
-        Transform from head to MRI coordinates, in metres (see
+        Transform from head to MRI coordinates, in meters (see
         :func:`_read_head_model`).
     src : instance of SourceSpaces
         Volumetric source space in MRI coordinates.
@@ -3097,19 +3099,19 @@ def _make_fwd_solution(
 
     Notes
     -----
-    Forward modelling is done in head space.
+    Forward modeling is done in head space.
 
     The coords of points to reconstruct to can be found in the output here:
 
     >>> fwd['src'][0]['rr'][fwd['src'][0]['vertno']]
 
-    where they are in head space in metres.
+    where they are in head space in meters.
 
     The same coords of points to reconstruct to can be found in the input here:
 
     >>> src[0]['rr'][src[0]['vertno']]
 
-    where they are in native MRI space in metres.
+    where they are in native MRI space in meters.
     """
     # src should be in MRI space. Let's just check that is the case
     if src[0]["coord_frame"] != FIFF.FIFFV_COORD_MRI:
@@ -3228,14 +3230,14 @@ def _get_flirt_xform_between_axes(from_nii: str, target_nii: str) -> np.ndarray:
     return target2targetflirtcoords @ fromflirtcoords2from
 
 
-def _centre_head_in_fov(
+def _center_head_in_fov(
     from_nii: str, target_nii: str, flirt_xform: np.ndarray
 ) -> np.ndarray:
     """
     Translates a flirt xform so that the head in from_nii lands inside the FOV
     of target_nii.
 
-    The head is centred left-right and front-back and its top is put just below
+    The head is centered left-right and front-back and its top is put just below
     the top of the FOV, which is where the head is in the MNI template.
 
     flirt_xform must put from_nii on the same axes as target_nii, with the last
@@ -3262,10 +3264,10 @@ def _centre_head_in_fov(
     top = np.percentile(coords[:, 2], 99)
     head = coords[coords[:, 2] > top - 120]
 
-    centred_xform = flirt_xform.copy()
-    centred_xform[:2, 3] += fov[:2] / 2 - head[:, :2].mean(axis=0)
-    centred_xform[2, 3] += fov[2] - 15 - top
-    return centred_xform
+    centered_xform = flirt_xform.copy()
+    centered_xform[:2, 3] += fov[:2] / 2 - head[:, :2].mean(axis=0)
+    centered_xform[2, 3] += fov[2] - 15 - top
+    return centered_xform
 
 
 def _get_mne_xform_from_flirt_xform(
@@ -3483,7 +3485,7 @@ def _rhino_icp(
     polhemus_headshape_head: np.ndarray,
     n_init: int = 10,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    """Runs Iterative Closest Point (ICP) with multiple initialisations.
+    """Runs Iterative Closest Point (ICP) with multiple initializations.
 
     Parameters
     ----------
@@ -3492,7 +3494,7 @@ def _rhino_icp(
     polhemus_headshape_polhemus : numpy.ndarray
         [3 x N] locations of the headshape points from polhemus in HEAD space.
     n_init : int
-        Number of random initialisations to perform.
+        Number of random initializations to perform.
 
     Returns
     -------
@@ -3651,7 +3653,7 @@ def _create_freesurfer_meshes_from_bet_surfaces(
 ) -> None:
     """
     Create sMRI-derived freesurfer surfaces in native/mri space in mm,
-    for use by forward modelling
+    for use by forward modeling
     """
     _create_freesurfer_mesh_from_bet_surface(
         infile=session.bet_inskull_mesh_vtk_file,

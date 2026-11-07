@@ -18,7 +18,7 @@ Modules
   wrappers for osl-dynamics models.
 - :py:mod:`~osl_dynamics.utils.topoplots` — Sensor-space topographic plots.
 - :py:mod:`~osl_dynamics.utils.workbench` — HCP Workbench integration for
-  cortical surface visualisation.
+  cortical surface visualization.
 """
 
 import importlib

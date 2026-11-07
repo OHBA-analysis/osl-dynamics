@@ -46,7 +46,7 @@ np.save(f"{output_dir}/psd.npy", psd)
 np.save(f"{output_dir}/coh.npy", coh)
 np.save(f"{output_dir}/w.npy", w)
 
-# Calculate non-negative matrix factorisation on the stacked coherences
+# Calculate non-negative matrix factorization on the stacked coherences
 nnmf = spectral.decompose_spectra(coh, n_components=2)
 np.save(f"{output_dir}/nnmf_2.npy", nnmf)
 

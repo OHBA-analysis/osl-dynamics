@@ -58,7 +58,7 @@ def linear_regression(
     new_shape = [X.shape[1]] + list(original_shape[1:])
     y = y.reshape(original_shape[0], -1)
 
-    # Normalise the regressors
+    # Normalize the regressors
     if normalize:
         X -= np.mean(X, axis=0)
         X /= np.std(X, axis=0)
@@ -137,13 +137,13 @@ def fit_gaussian_mixture(
         Number of standard deviations of the 'off' component the mean of the
         'on' component must be for the fit to be considered to have two
         components.
-    label_order: str, optional
+    label_order : str, optional
         How do we order the inferred classes?
     sklearn_kwargs : dict, optional
         Dictionary of keyword arguments to pass to
         `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable\
         /modules/generated/sklearn.mixture.GaussianMixture.html>`_.
-    return_statistics: bool, optional
+    return_statistics : bool, optional
         Should we return statistics of the Gaussian mixture components?
     show_plot : bool, optional
         Should we show the GMM fit to the distribution of :code:`X`.
@@ -187,7 +187,7 @@ def fit_gaussian_mixture(
         X_ = special.logit(X)
         X_[np.isinf(X_[:, 0]), :] = np.mean(X_[~np.isinf(X_[:, 0]), 0])
 
-    # Standardise the data
+    # Standardize the data
     if standardize:
         std = np.std(X_, axis=0)
         if std == 0:
@@ -247,7 +247,7 @@ def fit_gaussian_mixture(
         a *= gm.weights_[order]
 
         # Find the index of the data point closest to the desired p-value
-        # This defines the threshold in the standardised/logit transformed space
+        # This defines the threshold in the standardized/logit transformed space
         x_threshold = x[np.argmin(np.abs(a[:, 0] - p_value / X_.shape[0]))]
         index = np.argmin(np.abs(X_[:, 0] - x_threshold))
 
@@ -265,7 +265,7 @@ def fit_gaussian_mixture(
         on_prob_higher[X_[:, 0] < means[0]] = False
         index = np.argmax(on_prob_higher)
 
-    # Get the threshold in the standardised/logit transform and original space
+    # Get the threshold in the standardized/logit transform and original space
     threshold_ = X_[index, 0]
     threshold = X[index, 0]
 

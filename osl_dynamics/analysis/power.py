@@ -279,7 +279,7 @@ def save(
         Spectral component to save.
     subtract_mean : bool, optional
         Should we subtract the mean power across modes?
-    mean_weights: np.ndarray, optional
+    mean_weights : np.ndarray, optional
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     plot_kwargs : dict, optional
@@ -466,7 +466,7 @@ def multi_save(
         List of session indices to be plot power maps for.
     subtract_mean : bool, optional
         Should we subtract the mean power across modes?
-    mean_weights: np.ndarray, optional
+    mean_weights : np.ndarray, optional
         Numpy array with weightings for each mode to use to calculate the mean.
         Default is equal weighting.
     plot_kwargs : dict, optional
@@ -648,7 +648,7 @@ def independent_components_to_surface_maps(
         Path to cifti file or cifti object containing the spatial maps
         obtained from group ICA. Should be in (n_ica_components, n_voxels)
         format.
-    ic_values: np.ndarray
+    ic_values : np.ndarray
         Independent component values.
         Should be in (n_maps, n_ica_components) format.
     output_file : str, optional

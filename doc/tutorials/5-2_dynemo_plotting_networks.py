@@ -11,6 +11,8 @@ In this tutorial we will plot networks from a DyNeMo model trained on source rec
 5. Coherence maps
 """
 
+# sphinx_gallery_thumbnail_number = 7
+
 #%%
 # Download post-hoc spectra
 # ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -97,15 +99,15 @@ print(mean_p.shape)
 fig, ax = power.save(
     mean_p,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
-    subtract_mean=True,  # just for visualisation
+    subtract_mean=True,  # just for visualization
 )
 
 #%%
-# We can see recognisable functional networks, which gives us confidence in the DyNeMo fit. We also see the networks are more localised than typical HMM states.
+# We can see recognisable functional networks, which gives us confidence in the DyNeMo fit. We also see the networks are more localized than typical HMM states.
 #
 # Coherence networks
 # ^^^^^^^^^^^^^^^^^^
-# Next, let's visualise the coherence networks. First, we need to calculate the networks from the coherence spectra.
+# Next, let's visualize the coherence networks. First, we need to calculate the networks from the coherence spectra.
 
 print(coh.shape)
 
@@ -127,7 +129,7 @@ mean_c = np.average(c, axis=0, weights=w)
 thres_mean_c = connectivity.threshold(mean_c, percentile=97, subtract_mean=True)
 
 #%%
-# Now we can visualise the networks.
+# Now we can visualize the networks.
 
 connectivity.save(
     thres_mean_c,
@@ -147,5 +149,5 @@ mean_c_map = connectivity.mean_connections(mean_c)
 fig, ax = power.save(
     mean_c_map,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
-    subtract_mean=True,  # just for visualisation
+    subtract_mean=True,  # just for visualization
 )

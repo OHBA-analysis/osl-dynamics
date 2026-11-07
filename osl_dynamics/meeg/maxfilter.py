@@ -233,7 +233,7 @@ def _output_name(input_file: str, outdir: str, *labels: str) -> str:
     Multiple processing labels are joined with ``+`` and inserted into
     the ``proc-`` entity before the ``_meg`` suffix.
 
-    For non-BIDS inputs (no recognised data-type suffix), the ``proc-``
+    For non-BIDS inputs (no recognized data-type suffix), the ``proc-``
     entity is appended at the end of the basename instead.
 
     Examples
@@ -412,7 +412,7 @@ def _run_single(
         Path to output FIF file.
     options : dict
         Maxfilter options.  Must contain ``"maxpath"`` and ``"dryrun"``.
-        See :func:`_build_command` for the full set of recognised keys.
+        See :func:`_build_command` for the full set of recognized keys.
 
     Returns
     -------

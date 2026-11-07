@@ -5,6 +5,8 @@ DyNeMo: Regression Spectra
 In this tutorial we calculate subject and mode-specific spectra using a trained DyNeMo model and **source space** data. Here, we should **not** use the prepared (e.g. TDE-PCA) data.
 """
 
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/5-1_dynemo_regression_spectra.png"
+
 #%%
 # Download source data
 # ^^^^^^^^^^^^^^^^^^^^

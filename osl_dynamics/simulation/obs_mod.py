@@ -156,7 +156,7 @@ class MVN:
         """
         n_samples = state_time_course.shape[0]
 
-        # Initialise array to hold data
+        # Initialize array to hold data
         data = np.zeros((n_samples, self.n_channels))
 
         # Loop through all unique combinations of modes
@@ -200,7 +200,7 @@ class MVN:
             Instantaneous covariances.
             Shape is (n_samples, n_channels, n_channels).
         """
-        # Initialise an array to hold the data
+        # Initialize an array to hold the data
         n_samples = state_time_course.shape[0]
         inst_covs = np.empty([n_samples, self.n_channels, self.n_channels])
 
@@ -283,7 +283,7 @@ class MDyn_MVN(MVN):
         # Number of samples to simulate
         n_samples = state_time_courses.shape[0]
 
-        # Initialise array to hold data
+        # Initialize array to hold data
         data = np.zeros([n_samples, self.n_channels])
 
         # Loop through all unique combinations of states
@@ -342,7 +342,7 @@ class MDyn_MVN(MVN):
         # Number of samples to simulate
         n_samples = state_time_courses.shape[0]
 
-        # Initialise an array to hold data
+        # Initialize an array to hold data
         inst_covs = np.empty([n_samples, self.n_channels, self.n_channels])
 
         # Loop through all unique combinations of states
@@ -731,7 +731,7 @@ class MSess_MVN(MVN):
         data : np.ndarray
             Simulated data. Shape is (n_samples, n_channels).
         """
-        # Initialise array to hold data
+        # Initialize array to hold data
         n_samples = mode_time_course.shape[0]
         data = np.zeros((n_samples, self.n_channels))
 
@@ -776,7 +776,7 @@ class MSess_MVN(MVN):
             Instantaneous covariances for an session.
             Shape is (n_samples, n_channels, n_channels).
         """
-        # Initialise array to hold data
+        # Initialize array to hold data
         n_samples = mode_time_course.shape[0]
         inst_covs = np.zeros([n_samples, self.n_channels, self.n_channels])
 
@@ -1106,7 +1106,7 @@ class TDECovs:
     n_embeddings : int, optional
         Number of time-delay embeddings.
     rho : float, optional
-        Regularisation parameter for inverting the covariance.
+        Regularization parameter for inverting the covariance.
     """
 
     def __init__(
@@ -1178,7 +1178,7 @@ class TDECovs:
             data[t] = x_1
             x_2 = np.concatenate([x_2[n_channels:], x_1[:, np.newaxis]], axis=0)
 
-        # Standardise
+        # Standardize
         data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 
         return data

@@ -1124,12 +1124,12 @@ def _compute_beamformer(
         else:
             # MWW
             #
-            # Compute orientation based on pre-normalised power
+            # Compute orientation based on pre-normalized power
             #
             # See eq 5 in Brookes et al, Optimising experimental design for
-            # MEG beamformer imaging, Neuroimage 2008. This optimises the
-            # orientation by maximising the power BEFORE any weight
-            # normalisation is performed
+            # MEG beamformer imaging, Neuroimage 2008. This optimizes the
+            # orientation by maximizing the power BEFORE any weight
+            # normalization is performed
             ori_pick = _sym_inv_sm(bf_denom, reduce_rank, inversion, sk)
 
         assert ori_pick.shape == (n_sources, n_orient, n_orient)
@@ -1503,7 +1503,7 @@ def _get_gridstep(coords: np.ndarray) -> int:
 
     Returns
     -------
-    gridstep: int
+    gridstep : int
         Spatial resolution of dipole grid in mm.
     """
     dists = np.linalg.norm(coords - coords[0], axis=-1)
@@ -1733,7 +1733,7 @@ def _plot_bilateral_pairs(
             src_coords_mni[single_dipoles, j],
             s=26,
             facecolors="none",
-            edgecolors="grey",
+            edgecolors="gray",
             linewidths=0.7,
             zorder=4,
         )
@@ -1744,7 +1744,7 @@ def _plot_bilateral_pairs(
 
     # Dummy handles for the legend
     handles = [
-        plt.Line2D([], [], ls="", marker="o", ms=5, mfc="none", mec="grey"),
+        plt.Line2D([], [], ls="", marker="o", ms=5, mfc="none", mec="gray"),
         plt.Line2D([], [], ls="", marker="o", ms=4, c="tab:blue"),
         plt.Line2D([], [], marker="o", ms=2, c="tab:red"),
     ]

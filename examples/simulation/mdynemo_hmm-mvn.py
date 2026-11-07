@@ -60,7 +60,7 @@ config.pca_components = training_data.pca_components
 model = Model(config)
 model.summary()
 
-# Set regularisers
+# Set regularizers
 model.set_regularizers(training_data)
 
 print("Training model")

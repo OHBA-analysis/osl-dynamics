@@ -19,7 +19,7 @@ sessions = [
 ]
 
 parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
-orthogonalisation = "symmetric"
+orthogonalization = "symmetric"
 use_mni152 = False
 # ----------------------------------------------------------------------------
 
@@ -45,7 +45,7 @@ def process_session(session):
     parcel_data = parcellation.parcellate_lcmv(
         session_files,
         parcellation_file=parcellation_file,
-        orthogonalisation=orthogonalisation,
+        orthogonalization=orthogonalization,
     )
 
     parc_fif = str(output_dir / "osl" / session["id"] / "lcmv-parc-raw.fif")

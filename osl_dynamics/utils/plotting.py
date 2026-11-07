@@ -166,7 +166,7 @@ def get_colors(n: int, colormap: str = "magma") -> List[Tuple[float, ...]]:
 
     Returns
     -------
-    colors: list of tuple of float
+    colors : list of tuple of float
         Colors in RGBA format.
 
     Note
@@ -1039,7 +1039,7 @@ def plot_separate_time_series(
     time_series : np.ndarray
         Time series to be plotted. Should be (n_samples, n_lines). Each line is
         its own subplot.
-    sampling_frequency: float, optional
+    sampling_frequency : float, optional
         Sampling frequency of the input data, enabling us to label the x-axis.
     n_samples : int, optional
         Number of samples to be shown on the x-axis.
@@ -1236,22 +1236,22 @@ def plot_matrices(
 
     Parameters
     ----------
-    matrix: list of np.ndarray
+    matrix : list of np.ndarray
         The matrices to plot.
-    group_color_scale: bool, optional
+    group_color_scale : bool, optional
         If True, all matrices will have the same colormap scale, where we use
         the minimum and maximum across all matrices as the scale.
-    titles: list of str, optional
+    titles : list of str, optional
         Titles to give to each matrix axis.
-    main_title: str, optional
+    main_title : str, optional
         Main title to be placed at the top of the plot.
-    cmap: str or matplotlib.colors.ListedColormap, optional
+    cmap : str or matplotlib.colors.ListedColormap, optional
         Matplotlib colormap.
-    nan_color: str, optional
+    nan_color : str, optional
         Matplotlib color to use for :code:`NaN` values.
-    log_norm: bool, optional
+    log_norm : bool, optional
         Should we show the elements on a log scale?
-    filename: str, optional
+    filename : str, optional
         Output filename.
 
     Returns
@@ -1716,11 +1716,11 @@ def plot_brain_surface(
         fig.suptitle(title, fontsize=30, y=0.97)
 
         if colorbar:
-            # Positioning and size of the colour bar
+            # Positioning and size of the color bar
             # [left, bottom, width, height]
             cbar_ax = fig.add_axes([0.25, 0.2, 0.5, 0.05])
 
-            # Colour bar
+            # Color bar
             sm = plt.cm.ScalarMappable(
                 cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax)
             )
@@ -1739,11 +1739,11 @@ def plot_brain_surface(
         fig.suptitle(title, fontsize=22, y=0.98)
 
         if colorbar:
-            # Positioning and size of the colour bar
+            # Positioning and size of the color bar
             # [left, bottom, width, height]
             cbar_ax = fig.add_axes([0.3, 0.1, 0.4, 0.04])
 
-            # Colour bar
+            # Color bar
             sm = plt.cm.ScalarMappable(
                 cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax)
             )
@@ -1784,7 +1784,7 @@ def plot_alpha(
     ----------
     alpha : np.ndarray
         A collection of alphas passed as separate arguments.
-    n_samples: int, optional
+    n_samples : int, optional
         Number of time points to be plotted.
     cmap : str or matplotlib.colors.ListedColormap, optional
         Matplotlib colormap.
@@ -1890,7 +1890,7 @@ def plot_alpha(
     # Fix layout
     plt.tight_layout()
 
-    # Add a colour bar
+    # Add a color bar
     norm = matplotlib.colors.BoundaryNorm(
         boundaries=range(n_modes + 1), ncolors=n_modes
     )
@@ -1928,7 +1928,7 @@ def plot_state_lifetimes(
     Parameters
     ----------
     state_time_course : np.ndarray
-        Mode time course to analyse.
+        Mode time course to analyze.
     bins : int, optional
         Number of bins for the histograms.
     density : bool, optional
@@ -2111,7 +2111,7 @@ def plot_psd_topo(
         parcellation = Parcellation(parcellation_file)
         roi_centers = parcellation.roi_centers()
 
-        # Re-order to use colour to indicate anterior->posterior location
+        # Re-order to use color to indicate anterior->posterior location
         order = np.argsort(roi_centers[:, 1])
         roi_centers = roi_centers[order]
         psd = np.copy(psd)[order]
@@ -2617,7 +2617,7 @@ def plot_design_matrix(
     """Plot a GLM design matrix.
 
     Displays the design matrix as a heatmap with feature names as column
-    labels and a diverging colormap centred at zero.
+    labels and a diverging colormap centered at zero.
 
     Parameters
     ----------

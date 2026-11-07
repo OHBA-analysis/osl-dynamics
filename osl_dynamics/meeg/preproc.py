@@ -193,8 +193,10 @@ def detect_bad_channels(
     separately (in no particular order).
 
     Note that with CTF data, mne.pick_types will return:
-        ~274 axial grads (as magnetometers) if picks='mag', ref_meg=False
-        ~28 reference axial grads if picks='grad'.
+
+    - ~274 axial grads (as magnetometers) if picks='mag', ref_meg=False
+    - ~28 reference axial grads if picks='grad'.
+
     Thus, it is recommended to use picks='mag' in combination with ref_mag=False,
     and picks='grad' separately (in no particular order).
     """
@@ -313,7 +315,7 @@ def detect_flat_segments(
         data = raw.get_data(picks=chs, start=start, stop=stop)
         same[start : stop - 1] = np.all(np.diff(data, axis=1) == 0, axis=0)
 
-    # Flat stretches: a run of equal neighbours from i to j covers samples
+    # Flat stretches: a run of equal neighbors from i to j covers samples
     # i to j + 1. Keep the long enough ones and pad them
     edges = np.diff(np.r_[0, same.astype(int), 0])
     starts = np.where(edges == 1)[0]
@@ -356,7 +358,7 @@ def _gesd(
     p_out: float = 0.1,
     outlier_side: int = 0,
 ) -> np.ndarray:
-    """Generalised-ESD (Rosner) test for outliers.
+    """Generalized-ESD (Rosner) test for outliers.
 
     Parameters
     ----------
@@ -499,10 +501,10 @@ def ica_label(
         Number of ICA components. Should not exceed the data rank.
         For MaxFiltered Elekta data (rank ~60), 20 is a safe default.
     method : str, optional
-        Labelling method: ``"megnet"`` for MEG or ``"iclabel"`` for EEG.
+        Labeling method: ``"megnet"`` for MEG or ``"iclabel"`` for EEG.
     threshold : float, optional
         Probability threshold (0–1) for excluding a component. Components
-        labelled as artefact with probability above this threshold are
+        labeled as artefact with probability above this threshold are
         removed.
     random_state : int, optional
         Random seed for ICA reproducibility.
@@ -519,6 +521,7 @@ def ica_label(
     ic_labels : dict
         Dictionary with keys ``"labels"`` (list of str) and
         ``"y_pred_proba"`` (array of float).
+
     Notes
     -----
     For EEG data, use ``picks="eeg"`` and ``method="iclabel"``::
@@ -557,7 +560,7 @@ def ica_label(
     print(f"Fitted in {ica.n_iter_}/{ica.max_iter} iterations.")
 
     # Label components
-    print("Labelling components...")
+    print("Labeling components...")
     ic_labels = label_components(raw_fit, ica, method=method)
 
     labels = ic_labels["labels"]
@@ -654,6 +657,7 @@ def ica_ecg_eog_correlation(
         Dictionary with keys ``"labels"`` (list of str) and
         ``"y_pred_proba"`` (array of float), compatible with
         :func:`plot_ica_components`.
+
     Notes
     -----
     For EEG data, use ``picks="eeg"``. Note that synthetic ECG detection
@@ -870,25 +874,25 @@ def decimate_headshape_points(
     raw : mne.io.Raw
         MNE Raw object.
     decimate_amount : float, optional
-        Bin width in metres to decimate.
+        Bin width in meters to decimate.
     include_facial_info : bool, optional
         Should we keep facial headshape points?
     remove_zlim : float, optional
-        Remove headshape points below this z-value (in metres).
+        Remove headshape points below this z-value (in meters).
     angle : float, optional
         How much should we rotate the headshape points?
     method : str, optional
         What method should we use for decimation?
     face_Z : list, optional
-        Keep headshape points within these z-values (in metres).
+        Keep headshape points within these z-values (in meters).
     face_Y : list, optional
-        Keep headshape points within these y-values (in metres).
+        Keep headshape points within these y-values (in meters).
     face_X : list, optional
-        Keep headshape points within these x-values (in metres).
+        Keep headshape points within these x-values (in meters).
     decimate_facial_info : bool, optional
         Should we decimate facial headshape points?
     decimate_facial_info_amount : float, optional
-        Bin width in metres to decimate.
+        Bin width in meters to decimate.
 
     Returns
     -------

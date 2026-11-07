@@ -64,7 +64,7 @@ def render(
         Default is :code:`True`.
     image_name : str, optional
         Filename of image to save.
-    input_is_cifti: bool
+    input_is_cifti : bool
         Whether the input file is a CIFTI file.
     """
     img = pathlib.Path(img)
@@ -147,7 +147,7 @@ def render(
         )
 
     if gui:
-        visualise(
+        visualize(
             cifti_left=cifti_left,
             cifti_right=cifti_right,
             inflation=inflation,
@@ -172,7 +172,7 @@ def create_scene(
     temp_scene.write_text(scene)
 
 
-def visualise(
+def visualize(
     cifti_left: pathlib.Path,
     cifti_right: pathlib.Path,
     inflation: int = 0,

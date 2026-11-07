@@ -12,6 +12,8 @@ In this tutorial we will plot networks from an HMM trained on source reconstruct
 6. Coherence vs Power
 """
 
+# sphinx_gallery_thumbnail_number = 17
+
 #%%
 # Download post-hoc spectra
 # ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -52,7 +54,7 @@ print(psd.shape)
 #%%
 # From the shape of each array we can see `f` is a 1D numpy array which contains the frequency axis of the spectra and `psd` is a (subjects, states, channels, frequencies) array.
 #
-# To help us visualise this we can average over the subjects and channels. This gives us a (states, frequencies) array.
+# To help us visualize this we can average over the subjects and channels. This gives us a (states, frequencies) array.
 
 from osl_dynamics.utils import plotting
 
@@ -110,7 +112,7 @@ fig, ax = power.save(
 #%%
 # Coherence networks
 # ^^^^^^^^^^^^^^^^^^
-# Next, let's visualise the coherence networks. First, we need to calculate the networks from the coherence spectra.
+# Next, let's visualize the coherence networks. First, we need to calculate the networks from the coherence spectra.
 
 print(coh.shape)
 
@@ -150,7 +152,7 @@ thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True
 print(thres_mean_c.shape)
 
 #%%
-# Now let's visualise the thresholded networks.
+# Now let's visualize the thresholded networks.
 
 connectivity.save(
     thres_mean_c,
@@ -233,7 +235,7 @@ c = connectivity.mean_coherence_from_spectra(f, coh, wb_comp)
 print(c.shape)
 
 #%%
-# Now we want to summarise the power and coherence for each state. We could do this by:
+# Now we want to summarize the power and coherence for each state. We could do this by:
 #
 # - Averaging over subjects to get the power/coherence for each parcel.
 # - Averaging over parcels to get the power/coherence for each subject.

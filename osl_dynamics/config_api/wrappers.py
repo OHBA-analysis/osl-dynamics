@@ -141,7 +141,7 @@ def train_hmm(
     model = hmm.Model(config)
     model.summary()
 
-    # Initialisation
+    # Initialization
     default_init_kwargs = {"n_init": 5, "n_epochs": 2}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
@@ -279,10 +279,10 @@ def train_dynemo(
     model = dynemo.Model(config)
     model.summary()
 
-    # Set regularisers
+    # Set regularizers
     model.set_regularizers(data)
 
-    # Initialisation
+    # Initialization
     default_init_kwargs = {"n_init": 5, "n_epochs": 2, "take": 1}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
@@ -379,7 +379,7 @@ def train_mdynemo(
         Keyword arguments to pass to the :code:`Model.fit`.
     corrs_init_kwargs : dict, optional
         Keyword arguments to pass to the mode correlations
-        initialisation. Defaults to::
+        initialization. Defaults to::
 
             {
                 'window_length': data.sampling_frequency * 2,
@@ -428,8 +428,8 @@ def train_mdynemo(
     config = mdynemo.Config(**config_kwargs)
     config.pca_components = data.pca_components
 
-    # KMeans to initialise corrs
-    _logger.info("Initialising corrs")
+    # KMeans to initialize corrs
+    _logger.info("Initializing corrs")
     default_corrs_init_kwargs = {
         "window_length": data.sampling_frequency * 2,
         "step_size": data.sampling_frequency // 25,
@@ -467,7 +467,7 @@ def train_mdynemo(
     model = mdynemo.Model(config)
     model.summary()
 
-    # Initialisation
+    # Initialization
     default_init_kwargs = {"n_init": 5, "n_epochs": 5, "take": 1}
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
@@ -614,19 +614,19 @@ def train_hive(
     init_kwargs = override_dict_defaults(default_init_kwargs, init_kwargs)
     _logger.info(f"Using init_kwargs: {init_kwargs}")
 
-    # Initialise and train HIVE
+    # Initialize and train HIVE
     _logger.info(f"Using config_kwargs: {config_kwargs}")
     config = hive.Config(**config_kwargs)
     model = hive.Model(config)
     model.summary()
 
-    # Set regularisers
+    # Set regularizers
     model.set_regularizers(data)
 
     # Set deviation initializer
     model.set_dev_parameters_initializer(data)
 
-    # Initialise HIVE
+    # Initialize HIVE
     _logger.info(f"Using init_kwargs: {init_kwargs}")
     init_history = model.initialization(data, **init_kwargs)
 
@@ -1835,7 +1835,7 @@ def plot_alpha(
     if normalize:
         from osl_dynamics.inference import modes
 
-        # Calculate normalised alphas
+        # Calculate normalized alphas
         covs = load(f"{inf_params_dir}/covs.npy")
         norm_alp = modes.reweight_alphas(alp, covs)
 
@@ -1881,7 +1881,7 @@ def calc_gmm_alpha(data, output_dir: str, kwargs: Optional[dict] = None) -> None
         raise ValueError(f"{alp_file} missing.")
     alp = load(alp_file)
 
-    # Binarise using a two-component GMM
+    # Binarize using a two-component GMM
     from osl_dynamics.inference import modes
 
     _logger.info(f"Using kwargs: {kwargs}")
@@ -1926,7 +1926,7 @@ def plot_hmm_network_summary_stats(
     output_dir : str
         Path to output directory.
     use_gmm_alpha : bool, optional
-        Should we use alphas binarised using a Gaussian mixture model?
+        Should we use alphas binarized using a Gaussian mixture model?
         This function assumes :code:`calc_gmm_alpha` has been called and the
         file :code:`<output_dir>/inf_params/gmm_alp.pkl` exists.
     sampling_frequency : float, optional
@@ -1951,7 +1951,7 @@ def plot_hmm_network_summary_stats(
     from osl_dynamics.inference import modes
 
     if use_gmm_alpha:
-        # Use alphas that were binarised using a GMM
+        # Use alphas that were binarized using a GMM
         gmm_alp_file = f"{inf_params_dir}/gmm_alp.pkl"
         if Path(gmm_alp_file).exists():
             stc = load(gmm_alp_file)
@@ -2025,8 +2025,8 @@ def plot_dynemo_network_summary_stats(data, output_dir: str) -> None:
     This function will plot the distribution over sessions for the following
     summary statistics:
 
-    - Mean (renormalised) mixing coefficients.
-    - Standard deviation of (renormalised) mixing coefficients.
+    - Mean (renormalized) mixing coefficients.
+    - Standard deviation of (renormalized) mixing coefficients.
 
     This function expects a model has been trained and the following directories
     to exist:
@@ -2068,7 +2068,7 @@ def plot_dynemo_network_summary_stats(data, output_dir: str) -> None:
 
     config, _ = ModelBase.load_config(model_dir)
 
-    # Renormalise (only if we are learning covariances)
+    # Renormalize (only if we are learning covariances)
     from osl_dynamics.inference import modes
 
     if config["learn_covariances"]:

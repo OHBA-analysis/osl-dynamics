@@ -33,7 +33,7 @@ where :math:`\theta^{\mathrm{mod}}_t` are logits predicted by the Model RNN give
 Inference
 ---------
 
-DyNeSte uses **amortised variational inference** to learn the model parameters. An **inference RNN** takes the observed data as input and predicts the posterior distribution over states at each time point:
+DyNeSte uses **amortized variational inference** to learn the model parameters. An **inference RNN** takes the observed data as input and predicts the posterior distribution over states at each time point:
 
 .. math::
     q(s_t) = \mathrm{Cat}(\mathrm{softmax}(\theta^{\mathrm{inf}}_t)),

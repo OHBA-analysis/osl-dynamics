@@ -1,0 +1,103 @@
+/* Introductory paragraph on the home page */
+.lead {
+  font-size: 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Cards on the home page */
+.sd-card .sd-card-title {
+  font-weight: 600;
+}
+.sd-card .sd-card-title svg {
+  margin-right: 0.3rem;
+}
+
+/* Home page title with the institution logos on its right */
+section.home-page {
+  display: grid;
+  /* minmax(0, ...) so long content can't push the page wider than the screen */
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 2rem;
+}
+section.home-page > * {
+  grid-column: 1 / -1;
+}
+section.home-page > h1 {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+  margin-bottom: 2rem;
+}
+.institution-logos {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  gap: 1.25rem;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+section.home-page > .institution-logos {
+  grid-column: 2;
+}
+.institution-logos img {
+  height: 110px;
+  width: auto;
+}
+
+/* On narrow screens the logos go below the title */
+@media (max-width: 720px) {
+  section.home-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  section.home-page > h1,
+  section.home-page > .institution-logos {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+  section.home-page > h1 {
+    margin-bottom: 1rem;
+  }
+  .institution-logos {
+    margin-bottom: 1.5rem;
+  }
+  .institution-logos img {
+    height: 65px;
+  }
+}
+
+/* Keep the text the same width on every page: without a right-hand
+   "On this page" panel the theme would let it grow to 60em */
+.bd-main .bd-content .bd-article-container {
+  max-width: 48em;
+}
+
+/* The home page has no sidebars, so it can be wider */
+.bd-main .bd-content .bd-article-container:has(section.home-page) {
+  max-width: 72em;
+}
+
+/* Left sidebar collapsed on page load (see sidebar-state.js): the same look
+   as the theme's collapsed sidebar, without the animation */
+@media (min-width: 960px) {
+  html.osld-sidebar-collapsed .bd-sidebar-primary {
+    --pst-sidebar-primary-width: 4rem;
+    overflow: hidden;
+  }
+  html.osld-sidebar-collapsed .bd-sidebar-primary .sidebar-primary-item:not(.pst-sidebar-collapse) {
+    opacity: 0;
+    visibility: hidden;
+  }
+  html.osld-sidebar-collapsed #pst-collapse-sidebar-button .pst-collapse-sidebar-label {
+    height: 0;
+    opacity: 0;
+    visibility: hidden;
+    width: 0;
+  }
+  html.osld-sidebar-collapsed #pst-collapse-sidebar-button .pst-icon {
+    transform: translateX(0.25em) rotate(180deg);
+  }
+}
+html.osld-sidebar-collapsed .bd-sidebar-primary,
+html.osld-sidebar-collapsed .bd-sidebar-primary * {
+  transition: none !important;
+}

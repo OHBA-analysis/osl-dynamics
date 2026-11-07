@@ -634,7 +634,7 @@ def regression_spectra(
     if window_length % n_sub_windows != 0:
         raise ValueError("window_length must be divisible by n_sub_windows.")
 
-    # Standardise before calculating the spectrogram
+    # Standardize before calculating the spectrogram
     if standardize:
         data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
 
@@ -844,7 +844,7 @@ def coherence_spectra(cpsd: np.ndarray, keepdims: bool = False) -> np.ndarray:
     cpsd : np.ndarray
         Cross power spectra.
         Shape is (..., n_channels, n_channels, n_freq).
-    keepdims: bool, optional
+    keepdims : bool, optional
         Should we squeeze any axis of length 1?
 
     Returns
@@ -890,7 +890,7 @@ def partial_coherence_spectra(cpsd: np.ndarray, keepdims: bool = False) -> np.nd
     cpsd : np.ndarray
         Cross power spectra.
         Shape is (..., n_channels, n_channels, n_freq).
-    keepdims: bool, optional
+    keepdims : bool, optional
         Should we squeeze any axis of length 1?
 
     Returns
@@ -946,7 +946,7 @@ def partial_directed_coherence_spectra(
         spectra.
     tol : float, optional
         Tolerance for the Wilson factorization of the cross spectra.
-    keepdims: bool, optional
+    keepdims : bool, optional
         Should we squeeze any axis of length 1?
 
     Returns
@@ -1093,7 +1093,7 @@ def decompose_spectra(
     # and only keep the upper triangle
     coherences = coherences[:, :, i, j].reshape(-1, n_freq)
 
-    # Perform non-negative matrix factorisation
+    # Perform non-negative matrix factorization
     _, components, _ = non_negative_factorization(
         coherences,
         n_components=n_components,
@@ -1265,7 +1265,7 @@ def autocorr_to_spectra(
     psd = psd[..., min_arg : max_arg + 1]
     psd = abs(psd)
 
-    # Normalise the power spectra
+    # Normalize the power spectra
     psd /= nfft**2
 
     # Coherences for each mode
@@ -1548,7 +1548,7 @@ def _welch(
     # Indices for the upper triangle of a channels by channels matrix
     m, n = np.triu_indices(n_channels)
 
-    # Standardise before calculating spectra
+    # Standardize before calculating spectra
     if standardize:
         data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 
@@ -1895,7 +1895,7 @@ def _multitaper(
     # Indices for the upper triangle of a channels by channels matrix
     m, n = np.triu_indices(n_channels)
 
-    # Standardise before calculating spectra
+    # Standardize before calculating spectra
     if standardize:
         data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 

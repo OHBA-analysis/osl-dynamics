@@ -163,7 +163,7 @@ def _worker(
     return id, status, elapsed, message
 
 
-def _summarise(results: list[tuple[str, str, float, str]]) -> None:
+def _summarize(results: list[tuple[str, str, float, str]]) -> None:
     """Print a summary of a run."""
     counts = Counter(status for _, status, _, _ in results)
     print(
@@ -225,7 +225,7 @@ def run(
         If provided, generate a QC report after processing.
     maxtasksperchild : int, optional
         Number of items a worker processes before it is replaced by a fresh
-        one. Some steps (e.g. rhino coregistration and forward modelling) leak
+        one. Some steps (e.g. rhino coregistration and forward modeling) leak
         on the order of tens of MB per item, which over a large dataset is
         enough to exhaust memory in a long-lived worker. Recycling caps that at
         :code:`maxtasksperchild` times the per-item leak. Pass :code:`None` to
@@ -239,7 +239,7 @@ def run(
 
     # Limit BLAS/LAPACK threads to 1 per worker to avoid over-subscription.
     # We set these before spawning workers so each child process picks them
-    # up before NumPy/SciPy initialise their threading backends.
+    # up before NumPy/SciPy initialize their threading backends.
     old_env = {var: os.environ.get(var) for var in _THREAD_LIMIT_VARS}
     for var in _THREAD_LIMIT_VARS:
         os.environ[var] = "1"
@@ -260,7 +260,7 @@ def run(
         else:
             os.environ[var] = val
 
-    _summarise(results)
+    _summarize(results)
 
     if qc_dir is not None:
         report.generate_report(

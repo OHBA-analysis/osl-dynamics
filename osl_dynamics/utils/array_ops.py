@@ -91,8 +91,8 @@ def cov2corr(cov: np.ndarray) -> np.ndarray:
 
     # Extract batches of standard deviations
     std = np.sqrt(np.diagonal(cov, axis1=-2, axis2=-1))
-    normalisation = np.expand_dims(std, -1) @ np.expand_dims(std, -2)
-    return cov / normalisation
+    normalization = np.expand_dims(std, -1) @ np.expand_dims(std, -2)
+    return cov / normalization
 
 
 def cov2std(cov: np.ndarray) -> np.ndarray:

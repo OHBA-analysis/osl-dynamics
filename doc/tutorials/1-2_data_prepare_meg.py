@@ -10,6 +10,8 @@ In this tutorial we will go through common ways to prepare M/EEG data. This tuto
 4. Saving and Loading Prepared Data
 """
 
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/1-2_data_prepare_meg.png"
+
 #%%
 # Download the dataset
 # ^^^^^^^^^^^^^^^^^^^^
@@ -81,7 +83,7 @@ print(pca_components.shape)
 #%%
 # Amplitude envelope
 # ******************
-# Another approach for preparing data is to calculate the amplitude envelope. Here, we obtain a time series that characterises the amplitude of oscilations.
+# Another approach for preparing data is to calculate the amplitude envelope. Here, we obtain a time series that characterizes the amplitude of oscilations.
 #
 # To prepare amplitude envelope data, we perform a few steps. It's common to first filter a frequency range of interest before calculating the amplitude envelope. Calculating a moving average has also been found to help smooth the data. Finally, standardization is always recommended for models in osl-dynamics.
 
@@ -98,7 +100,7 @@ data.prepare(methods)
 print(data)
 
 #%%
-# When we apply a moving average we lose a few time points from each end of the time series for each subject. We lose `n_window // 2` time points, for `n_window=5` we lose 2 time points from the start and end. This totals to 4 time points lost for each subject. We can see this looking at the `n_samples` attribute of the Data object, where we have lost 4 time points for each subject, totalling to 8 time points. 
+# When we apply a moving average we lose a few time points from each end of the time series for each subject. We lose `n_window // 2` time points, for `n_window=5` we lose 2 time points from the start and end. This totals to 4 time points lost for each subject. We can see this looking at the `n_samples` attribute of the Data object, where we have lost 4 time points for each subject, totaling to 8 time points. 
 #
 # Accessing the prepared and raw data
 # ***********************************

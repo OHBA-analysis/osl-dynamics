@@ -2,7 +2,7 @@
 Sliding Window Analysis
 =======================
 
-In this tutorial we will use a sliding window technique, which is a common approach for studying network dynamics, to analyse source space MEG data. fMRI data can easily be substituted.
+In this tutorial we will use a sliding window technique, which is a common approach for studying network dynamics, to analyze source space MEG data. fMRI data can easily be substituted.
 
 This tutorial covers:
 
@@ -147,7 +147,7 @@ print(centroids.shape)
 #%%
 # We see the first dimension is the number of clusters and the second dimension is the length of the input vectors, which is what we expect.
 #
-# Now, we just need to put the vectors back into ROIs by ROIs form and then we can visualise them as networks.
+# Now, we just need to put the vectors back into ROIs by ROIs form and then we can visualize them as networks.
 
 n_clusters = centroids.shape[0]
 n_channels = data.n_channels

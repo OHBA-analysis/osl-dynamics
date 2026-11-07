@@ -43,10 +43,10 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     learn_log_rates : bool
         Should we make :code:`log_rate` for each state trainable?
     initial_log_rates : np.ndarray
-        Initialisation for state :code:`log_rates`.
+        Initialization for state :code:`log_rates`.
 
     initial_trans_prob : np.ndarray
-        Initialisation for the transition probability matrix.
+        Initialization for the transition probability matrix.
     learn_trans_prob : bool
         Should we make the transition probability matrix trainable?
     trans_prob_prior : np.ndarray

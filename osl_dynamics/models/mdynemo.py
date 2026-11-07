@@ -2,7 +2,7 @@
 
 See the :doc:`model description </models/mdynemo>` for more details.
 
-See Also
+Examples
 --------
 `Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main\
 /examples/simulation/mdynemo_hmm-mvn.py>`_ for training M-DyNeMo on simulated
@@ -104,11 +104,11 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_corrs : bool
         Should we make the correlation for each mode trainable?
     initial_means : np.ndarray
-        Initialisation for the mode means.
+        Initialization for the mode means.
     initial_stds : np.ndarray
-        Initialisation for mode standard deviations.
+        Initialization for mode standard deviations.
     initial_corrs : np.ndarray
-        Initialisation for mode correlation matrices.
+        Initialization for mode correlation matrices.
     stds_epsilon : float
         Error added to mode stds for numerical stability.
     corrs_epsilon : float
@@ -679,7 +679,7 @@ class Model(VariationalInferenceModelBase):
             0, 1, [n_samples + 1, self.config.n_corr_modes]
         ).astype(np.float32)
 
-        # Initialise sequence of underlying logits theta
+        # Initialize sequence of underlying logits theta
         power_theta = np.zeros(
             [self.config.sequence_length, self.config.n_modes],
             dtype=np.float32,

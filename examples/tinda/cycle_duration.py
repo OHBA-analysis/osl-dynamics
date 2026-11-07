@@ -35,7 +35,7 @@ os.makedirs(hmm_dir, exist_ok=True)
 # ------------ Functions -------------#
 
 def get_best_state_sequence(W: int = 16):
-    """Best cycle sequence based on group-optimalised sequence. 
+    """Best cycle sequence based on group-optimalized sequence. 
     The FO and FO timecourses (wdata) are also reordered 
     according to this sequence."""
     # load state time course and tinda output

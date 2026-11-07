@@ -1210,7 +1210,7 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
             log_smoothing_distribution = log_likelihood + log_prediction_distribution
             predictive_log_likelihood = logsumexp(log_smoothing_distribution, axis=-1)
 
-            # Normalise the log smoothing distribution
+            # Normalize the log smoothing distribution
             log_smoothing_distribution -= np.expand_dims(
                 predictive_log_likelihood,
                 axis=-1,

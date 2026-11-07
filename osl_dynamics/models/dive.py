@@ -109,9 +109,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances : bool
         Should we make the covariance matrix for each mode trainable?
     initial_means : np.ndarray
-        Initialisation for mean vectors.
+        Initialization for mean vectors.
     initial_covariances : np.ndarray
-        Initialisation for mode covariances.
+        Initialization for mode covariances.
     covariances_epsilon : float
         Error added to mode covariances for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
@@ -190,7 +190,7 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     dev_regularizer_factor : float
         Regularizer factor for the MLP for deviations.
     initial_dev : dict
-        Initialisation for dev posterior parameters.
+        Initialization for dev posterior parameters.
 
     session_labels : List[SessionLabels]
         List of session labels.

@@ -69,9 +69,9 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     learn_covariances : bool
         Should we make the group covariance matrix for each state trainable?
     initial_means : np.ndarray
-        Initialisation for group level state means.
+        Initialization for group level state means.
     initial_covariances : np.ndarray
-        Initialisation for group level state covariances.
+        Initialization for group level state covariances.
     covariances_epsilon : float
         Error added to state covariances for numerical stability.
     means_regularizer : tf.keras.regularizers.Regularizer
@@ -105,10 +105,10 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     dev_regularizer_factor : float
         Regularizer factor for the MLP for deviations.
     initial_dev : dict
-        Initialisation for dev posterior parameters.
+        Initialization for dev posterior parameters.
 
     initial_trans_prob : np.ndarray
-        Initialisation for transition probability matrix.
+        Initialization for transition probability matrix.
     learn_trans_prob : bool
         Should we make the transition probability matrix trainable?
     trans_prob_prior : np.ndarray

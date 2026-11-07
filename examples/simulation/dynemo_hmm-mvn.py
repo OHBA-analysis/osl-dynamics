@@ -103,7 +103,7 @@ np.save(f"{inf_params_dir}/covs.npy", covs)
 
 #%% Calculate summary statistics
 
-# Statistics summarising the mixing coefficients
+# Statistics summarizing the mixing coefficients
 alp_mean = np.array([np.mean(a, axis=0) for a in alp])
 alp_std = np.array([np.std(a, axis=0) for a in alp])
 alp_corr = np.array([np.corrcoef(a, rowvar=False) for a in alp])

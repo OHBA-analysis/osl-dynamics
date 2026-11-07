@@ -187,7 +187,7 @@ class HMM_MAR(Simulation):
             n_states=self.n_states,
         )
 
-        # Initialise base class
+        # Initialize base class
         super().__init__(n_samples=n_samples)
 
         # Simulate data
@@ -281,7 +281,7 @@ class HMM_MVN(Simulation):
             n_states=self.n_states,
         )
 
-        # Initialise base class
+        # Initialize base class
         super().__init__(n_samples=n_samples)
 
         # Simulate data
@@ -402,7 +402,7 @@ class MDyn_HMM_MVN(Simulation):
             n_states=self.n_states,
         )
 
-        # Initialise base class
+        # Initialize base class
         super().__init__(n_samples=n_samples)
 
         # Simulate state time courses
@@ -495,7 +495,7 @@ class HMM_Poi(Simulation):
             n_states=self.n_states,
         )
 
-        # Initialise base class
+        # Initialize base class
         super().__init__(n_samples=n_samples)
 
         # Simulate data
@@ -579,7 +579,7 @@ class HMM_Dirichlet(Simulation):
             n_states=self.n_states,
         )
 
-        # Initialise base class
+        # Initialize base class
         super().__init__(n_samples=n_samples)
 
         # Simulate data
@@ -729,7 +729,7 @@ class MSess_HMM_MVN(Simulation):
         else:
             session_stay_prob = [stay_prob] * self.n_sessions
 
-        # Initialise base class
+        # Initialize base class
         super().__init__(n_samples=n_samples)
 
         # Simulate state time courses for all sessions
@@ -831,13 +831,13 @@ class HierarchicalHMM_MVN(Simulation):
         The list of :code:`stay_prob` values for the bottom level HMMs.
         Used when the correspondining entry in :code:`bottom_level_trans_prob`
         is a :code:`str`.
-    top_level_hmm_type: str, optional
+    top_level_hmm_type : str, optional
         The type of HMM to use at the top level, either :code:`'hmm'` or
         :code:`'hsmm'`.
-    top_level_gamma_shape: float, optional
+    top_level_gamma_shape : float, optional
         The shape parameter for the Gamma distribution used by
         the top level hmm when :code:`top_level_hmm_type='hsmm'`.
-    top_level_gamma_scale: float, optional
+    top_level_gamma_scale : float, optional
         The scale parameter for the Gamma distribution used by
         the top level hmm when :code:`top_level_hmm_type='hsmm'`.
     """
@@ -908,7 +908,7 @@ class HierarchicalHMM_MVN(Simulation):
             for i in range(self.n_bottom_level_hmms)
         ]
 
-        # Initialise base class
+        # Initialize base class
         super().__init__(n_samples=n_samples)
 
         # Simulate data
@@ -1129,7 +1129,7 @@ class HMM_TDECovs:
     stay_prob : float, optional
         HMM state stay probability.
     rho : float, optional
-        Regularisation parameter for inverting the covariance.
+        Regularization parameter for inverting the covariance.
     """
 
     def __init__(

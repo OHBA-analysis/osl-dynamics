@@ -62,7 +62,7 @@ fig, ax = plotting.plot_evoked_response(
 #%%
 # Cluster-based permutation test
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# A response is extended in time, which the maximum statistic ignores. :code:`correction="cluster"` thresholds the t-statistics, groups neighbouring supra-threshold time points into clusters (within each network: clusters never span two networks) and tests the summed t-statistic of each cluster against the largest cluster found in each permutation.
+# A response is extended in time, which the maximum statistic ignores. :code:`correction="cluster"` thresholds the t-statistics, groups neighboring supra-threshold time points into clusters (within each network: clusters never span two networks) and tests the summed t-statistic of each cluster against the largest cluster found in each permutation.
 
 result_cluster = stats.evoked_response(network_response, n_perm=1000, correction="cluster")
 print(result_cluster)
@@ -125,7 +125,7 @@ for name, res in [("Max statistic", result_max), ("Cluster", result_cluster), ("
 #
 # Comparing conditions
 # ^^^^^^^^^^^^^^^^^^^^
-# Often each subject has a response per condition and the question is whether the responses differ between conditions. For two conditions, pass the difference between the subject-specific responses to :func:`stats.paired_diff <osl_dynamics.stats.inference.paired_diff>`. For any number of conditions, :func:`stats.condition_diff <osl_dynamics.stats.inference.condition_diff>` takes a `(subjects, conditions, time, networks)` array and fits a within-subject GLM: an indicator per condition plus an indicator per subject, so that the differences between subjects are modelled rather than left in the noise. The permutations shuffle the conditions within each subject (the subjects are **exchangeability blocks**). With three or more conditions it runs an F-test for any difference; :code:`conditions=(a, b)` tests a pair.
+# Often each subject has a response per condition and the question is whether the responses differ between conditions. For two conditions, pass the difference between the subject-specific responses to :func:`stats.paired_diff <osl_dynamics.stats.inference.paired_diff>`. For any number of conditions, :func:`stats.condition_diff <osl_dynamics.stats.inference.condition_diff>` takes a `(subjects, conditions, time, networks)` array and fits a within-subject GLM: an indicator per condition plus an indicator per subject, so that the differences between subjects are modeled rather than left in the noise. The permutations shuffle the conditions within each subject (the subjects are **exchangeability blocks**). With three or more conditions it runs an F-test for any difference; :code:`conditions=(a, b)` tests a pair.
 #
 # Here we simulate three conditions where the response of network 1 is larger in condition 2, and the subjects differ in their overall response amplitude:
 

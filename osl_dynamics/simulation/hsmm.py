@@ -204,7 +204,7 @@ class HSMM_MVN(Simulation):
             n_states=self.n_states,
         )
 
-        # Initialise base class
+        # Initialize base class
         super().__init__(n_samples=n_samples)
 
         # Simulate data
@@ -325,7 +325,7 @@ class MixedHSMM_MVN(Simulation):
             n_states=self.n_states + self.n_mixed_states,
         )
 
-        # Initialise base class
+        # Initialize base class
         super().__init__(n_samples=n_samples)
 
         # Simulate data

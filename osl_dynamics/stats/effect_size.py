@@ -119,7 +119,7 @@ def _strata(design: Design, contrast) -> list:
 def _estimates(X, y, contrast_matrix, f_contrast, statistic, d_scale):
     """Cope and Cohen's d (t) or cope and partial eta squared (F) from one
     fit. :code:`d_scale` multiplies the residual standard deviation to give
-    the standardiser of d."""
+    the standardizer of d."""
     if statistic == "t":
         betas, copes, varcopes, dof, *_ = fit_ols(X, y, contrast_matrix, warn=False)
         residuals = y - X @ betas
@@ -194,7 +194,7 @@ def effect_size(
 
     y, target_dims = validate_y(data, X.shape[0])
 
-    # Within blocks (e.g. subjects) d is standardised by the standard
+    # Within blocks (e.g. subjects) d is standardized by the standard
     # deviation of the within-block contrast score (Cohen's d_z), which is
     # the residual standard deviation times the norm of the contrast; this
     # makes a paired difference agree with a one-sample test of the

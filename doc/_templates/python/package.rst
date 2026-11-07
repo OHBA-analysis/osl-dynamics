@@ -9,7 +9,7 @@
    :hidden:
 
       {% for submodule in visible_submodules %}
-   {{ submodule.include_path }}
+   {{ submodule.short_name }} <{{ submodule.include_path }}>
       {% endfor %}
 
    {% endif %}

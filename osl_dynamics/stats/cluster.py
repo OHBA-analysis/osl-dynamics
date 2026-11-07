@@ -3,9 +3,9 @@
 Clusters are connected sets of targets whose statistic exceeds a threshold.
 Target dimensions are of two kinds:
 
-- **Cluster dimensions** are connected: neighbouring indices along a
+- **Cluster dimensions** are connected: neighboring indices along a
   lattice (e.g. consecutive time points or frequencies), or a user-supplied
-  adjacency (e.g. neighbouring parcels).
+  adjacency (e.g. neighboring parcels).
 - All other dimensions are unconnected: a cluster never spans two indices
   of such a dimension (e.g. two states), but the maximum cluster statistic
   is still taken over them.
@@ -122,13 +122,13 @@ class ClusterStructure:
             self._graph = self._build_graph()
         else:
             # Pure lattice: scipy.ndimage.label with a structure that only
-            # connects neighbours along the cluster dimensions
+            # connects neighbors along the cluster dimensions
             structure = np.zeros((3,) * n_dims, dtype=bool)
-            centre = (1,) * n_dims
-            structure[centre] = True
+            center = (1,) * n_dims
+            structure[center] = True
             for d in self.cluster_dims:
                 for offset in (0, 2):
-                    index = list(centre)
+                    index = list(center)
                     index[d] = offset
                     structure[tuple(index)] = True
             self._structure = structure

@@ -25,7 +25,7 @@ As in DyNeMo, each set of mixing coefficients has a recurrent neural network as 
 Inference
 ---------
 
-M-DyNeMo uses the same **amortised variational inference** approach as DyNeMo. An inference RNN takes the observed data and predicts posterior distributions for both sets of logits (power and FC). The cost function is the variational free energy, with **KL annealing** used to stabilize training.
+M-DyNeMo uses the same **amortized variational inference** approach as DyNeMo. An inference RNN takes the observed data and predicts posterior distributions for both sets of logits (power and FC). The cost function is the variational free energy, with **KL annealing** used to stabilize training.
 
 The number of power modes (``n_modes``) and FC modes (``n_corr_modes``) can be set independently, allowing for different numbers of power and connectivity patterns.
 
@@ -37,7 +37,7 @@ After fitting M-DyNeMo, you obtain two sets of mixing coefficients:
 - **Alpha** (:math:`\alpha_{jt}`): mixing coefficients for power modes.
 - **Beta** (:math:`\beta_{jt}`): mixing coefficients for FC modes.
 
-Each can be analysed with the summary statistics and spectral analysis used for :doc:`DyNeMo <dynemo>`.
+Each can be analyzed with the summary statistics and spectral analysis used for :doc:`DyNeMo <dynemo>`.
 
 References
 ----------

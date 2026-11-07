@@ -97,7 +97,7 @@ print(aec.shape)
 #%%
 # We can see it is a subject by ROIs by ROIs array. It contains all pairwise connections between ROIs.
 #
-# Visualising networks
+# Visualizing networks
 # ^^^^^^^^^^^^^^^^^^^^
 # A common approach for plotting a network is as a matrix. We can do this with the :func:`plotting.plot_matrices <osl_dynamics.utils.plotting.plot_matrices>` function in osl-dynamics.
 
@@ -107,7 +107,7 @@ from osl_dynamics.utils import plotting
 fig, ax = plotting.plot_matrices(aec[:3], titles=[f"Subject {i+1}" for i in range(3)])
 
 #%%
-# The diagonal is full of ones and is a lot larger then the off-diagonal values. This means our colour scale doesn't show the off-diagonal structure very well. We can zero the diagonal to improve this.
+# The diagonal is full of ones and is a lot larger then the off-diagonal values. This means our color scale doesn't show the off-diagonal structure very well. We can zero the diagonal to improve this.
 
 import numpy as np
 
@@ -121,7 +121,7 @@ fig, ax = plotting.plot_matrices(mat[:3], titles=[f"Subject {i+1}" for i in rang
 #%%
 # We can now see the off-diagonal structure a bit better. We also see there is a lot of variability between subjects.
 #
-# Another way we can visualise the network is a glass brain plot. We can do this using the :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>` function in osl-dynamics. This function is a wrapper for the nilearn function `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_. Let's use :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>` to plot the first subject's AEC network.
+# Another way we can visualize the network is a glass brain plot. We can do this using the :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>` function in osl-dynamics. This function is a wrapper for the nilearn function `plot_connectome <https://nilearn.github.io/stable/modules/generated/nilearn.plotting.plot_connectome.html>`_. Let's use :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>` to plot the first subject's AEC network.
 
 from osl_dynamics.analysis import connectivity
 

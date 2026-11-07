@@ -116,7 +116,7 @@ print(p.shape)
 #
 # Plot power maps
 # ^^^^^^^^^^^^^^^
-# We can use :func:`power.save <osl_dynamics.analysis.power.save>` to visualise the power maps. Let's plot the group average.
+# We can use :func:`power.save <osl_dynamics.analysis.power.save>` to visualize the power maps. Let's plot the group average.
 
 group_p = np.mean(p, axis=0)
 

@@ -32,7 +32,7 @@ The pages in this section describe each model: the generative model, how it is t
    * - :doc:`HIVE <hive>`
      - Discrete (mutually exclusive)
      - Markovian (transition probability matrix)
-     - Modelling inter-session variability (e.g. subjects, scanners, sites)
+     - Modeling inter-session variability (e.g. subjects, scanners, sites)
 
 The :doc:`FAQ <../faq>` has guidance on choosing a model and its hyperparameters. The :doc:`HMM Training <../tutorials_build/3-2_hmm_training>` and :doc:`DyNeMo Training <../tutorials_build/3-3_dynemo_training>` tutorials show the models applied to real data.
 

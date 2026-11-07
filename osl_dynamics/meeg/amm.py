@@ -193,14 +193,14 @@ def _spheroid_fit(positions_m: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]
     Parameters
     ----------
     positions_m : ndarray, shape (n, 3)
-        Sensor positions in metres (MNE convention).
+        Sensor positions in meters (MNE convention).
 
     Returns
     -------
     center : ndarray, shape (3,)
-        Spheroid centre in metres.
+        Spheroid center in meters.
     radii : ndarray, shape (3,)
-        Semi-axis lengths in metres.
+        Semi-axis lengths in meters.
     longest_axis : int
         Index (0, 1, or 2) of the longest axis.
     """
@@ -212,7 +212,7 @@ def _spheroid_fit(positions_m: np.ndarray) -> tuple[np.ndarray, np.ndarray, int]
 
     center, radii = _spheroid_fit_axis(positions, longest_axis)
 
-    # Convert back to metres
+    # Convert back to meters
     return center / 1000.0, radii / 1000.0, longest_axis
 
 
@@ -231,7 +231,7 @@ def _spheroid_fit_axis(X: np.ndarray, ax: int) -> tuple[np.ndarray, np.ndarray]:
     Returns
     -------
     o : ndarray, shape (3,)
-        Centre in mm.
+        Center in mm.
     r : ndarray, shape (3,)
         Radii in mm.
     """
@@ -321,16 +321,16 @@ def _shrink_spheroid(
     Parameters
     ----------
     positions_m : ndarray, shape (n, 3)
-        Sensor positions in metres.
+        Sensor positions in meters.
     center_m : ndarray, shape (3,)
-        Spheroid centre in metres.
+        Spheroid center in meters.
     radii_m : ndarray, shape (3,)
-        Initial semi-axis lengths in metres.
+        Initial semi-axis lengths in meters.
 
     Returns
     -------
     radii_m : ndarray, shape (3,)
-        Shrunk radii in metres.
+        Shrunk radii in meters.
     """
     # Work in mm
     v = (positions_m - center_m) * 1000.0
@@ -395,15 +395,15 @@ def _cartesian_to_prolate(
     Parameters
     ----------
     positions_m : ndarray, shape (n, 3)
-        Sensor positions in metres.
+        Sensor positions in meters.
     orientations : ndarray, shape (n, 3)
         Sensor orientations (unit vectors).
     center_m : ndarray, shape (3,)
-        Spheroid centre in metres.
+        Spheroid center in meters.
     a_m : float
-        Semi-major axis length in metres.
+        Semi-major axis length in meters.
     b_m : float
-        Semi-minor axis length in metres.
+        Semi-minor axis length in meters.
     longest_axis : int
         Index of the longest axis (0, 1, or 2).
 
@@ -814,17 +814,17 @@ def _compute_harmonic_basis(
     Parameters
     ----------
     positions_m : ndarray, shape (n, 3)
-        Sensor positions in metres.
+        Sensor positions in meters.
     orientations : ndarray, shape (n, 3)
         Sensor orientations.
     a_m : float
-        Semi-major axis in metres.
+        Semi-major axis in meters.
     b_m : float
-        Semi-minor axis in metres.
+        Semi-minor axis in meters.
     L : int
         Harmonic order.
     center_m : ndarray, shape (3,)
-        Spheroid centre in metres.
+        Spheroid center in meters.
     longest_axis : int
         Index of the longest axis.
     radial_func : callable
@@ -895,17 +895,17 @@ def _compute_internal_harmonics(
     Parameters
     ----------
     positions_m : ndarray, shape (n, 3)
-        Sensor positions in metres.
+        Sensor positions in meters.
     orientations : ndarray, shape (n, 3)
         Sensor orientations.
     a_m : float
-        Semi-major axis in metres.
+        Semi-major axis in meters.
     b_m : float
-        Semi-minor axis in metres.
+        Semi-minor axis in meters.
     L : int
         Harmonic order.
     center_m : ndarray, shape (3,)
-        Spheroid centre in metres.
+        Spheroid center in meters.
     longest_axis : int
         Index of the longest axis.
 
@@ -941,17 +941,17 @@ def _compute_external_harmonics(
     Parameters
     ----------
     positions_m : ndarray, shape (n, 3)
-        Sensor positions in metres.
+        Sensor positions in meters.
     orientations : ndarray, shape (n, 3)
         Sensor orientations.
     a_m : float
-        Semi-major axis in metres.
+        Semi-major axis in meters.
     b_m : float
-        Semi-minor axis in metres.
+        Semi-minor axis in meters.
     L : int
         Harmonic order.
     center_m : ndarray, shape (3,)
-        Spheroid centre in metres.
+        Spheroid center in meters.
     longest_axis : int
         Index of the longest axis.
 
@@ -1032,7 +1032,7 @@ def apply_amm(
 
     for i, pick in enumerate(meg_picks):
         loc = raw.info["chs"][pick]["loc"]
-        positions[i] = loc[:3]  # position in metres
+        positions[i] = loc[:3]  # position in meters
         orientations[i] = loc[9:12]  # orientation (ez unit vector)
 
     # Check we have valid positions
@@ -1046,11 +1046,11 @@ def apply_amm(
 
     # Fit spheroid
     center, radii, longest_axis = _spheroid_fit(positions)
-    print(f"  Spheroid centre: {center * 1000} mm")
+    print(f"  Spheroid center: {center * 1000} mm")
     print(f"  Spheroid radii: {radii * 1000} mm")
     print(f"  Longest axis: {longest_axis} " f"({'XYZ'[longest_axis]})")
 
-    # Centre positions
+    # Center positions
     positions_centered = positions - center
 
     # Shrink spheroid until all sensors are outside

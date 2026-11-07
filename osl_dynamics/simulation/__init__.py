@@ -12,7 +12,7 @@ State models
 - :py:class:`HSMM` — Hidden Semi-Markov Model. Like HMM but state lifetimes
   follow a Gamma distribution rather than a geometric distribution.
 - :py:class:`MixedSine` — Sinusoidal soft mixtures. Generates smooth,
-  overlapping mode time courses using softmax-normalised sinusoids.
+  overlapping mode time courses using softmax-normalized sinusoids.
 
 Observation models
 ------------------

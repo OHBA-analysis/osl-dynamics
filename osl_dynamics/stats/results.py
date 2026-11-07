@@ -559,7 +559,7 @@ class TestResult:
             label = "|{}|" if self.tail == 0 else "{}"
             label = label.format("t" if self.metric == "tstats" else "cope")
         null = self.null.reshape(-1)
-        ax.hist(null[np.isfinite(null)], bins=n_bins, color="tab:grey")
+        ax.hist(null[np.isfinite(null)], bins=n_bins, color="tab:gray")
         ax.axvline(observed_max, color="tab:red", label="observed max")
         ax.axvline(
             np.nanpercentile(null, 95), color="black", ls="--", label="95th percentile"

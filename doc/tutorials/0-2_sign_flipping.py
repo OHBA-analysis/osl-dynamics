@@ -20,7 +20,7 @@ matches a common template, and flip the parcels accordingly. This tutorial
 covers:
 
 1. Simulating parcellated data.
-2. Visualising the sign ambiguity across sessions.
+2. Visualizing the sign ambiguity across sessions.
 3. Aligning the signs to a fixed template covariance.
 4. Using the median session as a template instead.
 5. Sign flipping arrays and fif files inside a processing pipeline.
@@ -66,7 +66,7 @@ data = Data(arrays)
 print(data)
 
 #%%
-# Visualising the sign ambiguity
+# Visualizing the sign ambiguity
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # The sign ambiguity shows up in the covariance. We compare sessions using the
 # covariance of the *time-delay embedded* data (adding time-lagged copies of

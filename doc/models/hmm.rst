@@ -28,7 +28,7 @@ where :math:`m_k` and :math:`C_k` are state means and covariances and :math:`k` 
 
 :math:`p(s_t | s_{t-1})` is the temporal model for the hidden state. Because the probability of the next state only depends on the current state (known as the **Markovian constraint**), this conditional probability distribution can be represented as a matrix.
 
-The generative model is shown graphically below. The hidden states are the grey nodes and the observed data are white nodes. Arrows connect variables that are conditionally dependent.
+The generative model is shown graphically below. The hidden states are the gray nodes and the observed data are white nodes. Arrows connect variables that are conditionally dependent.
 
 .. image:: images/hmm-generative-model.jpeg
     :class: no-scaled-link
@@ -60,7 +60,7 @@ The process of inference is also known as 'training the model' or 'fitting a mod
 HMM in osl-dynamics
 -------------------
 
-This package contains a Python implementation of the HMM. In this implementation we perform Bayesian inference on the hidden states, :math:`s_t`, but learn point estimates (i.e. not Bayesian) for all the other parameters, this includes the transition probability matrix and state means and covariances. Given the transition probability matrix, state means and covariances are global parameters (the same for all time points), modelling their uncertainty is less valuable, whereas the uncertainty in the hidden state may be different at different time points.
+This package contains a Python implementation of the HMM. In this implementation we perform Bayesian inference on the hidden states, :math:`s_t`, but learn point estimates (i.e. not Bayesian) for all the other parameters, this includes the transition probability matrix and state means and covariances. Given the transition probability matrix, state means and covariances are global parameters (the same for all time points), modeling their uncertainty is less valuable, whereas the uncertainty in the hidden state may be different at different time points.
 
 A derivation of the cost function used to train the HMM in osl-dynamics is :download:`here <images/hmm-cost-function.pdf>`. Note, we use different symbols in this derivation compared to the previous section.
 
@@ -77,7 +77,7 @@ A set of canonical HMM networks trained on a large MEG dataset are available in 
 Post-hoc Analysis
 -----------------
 
-Two analyses interpret the hidden states: statistics that summarise the state time course, and spectral properties re-estimated from the training data given the state time course.
+Two analyses interpret the hidden states: statistics that summarize the state time course, and spectral properties re-estimated from the training data given the state time course.
 
 Summary Statistics
 ^^^^^^^^^^^^^^^^^^
@@ -120,9 +120,9 @@ References
 
 #. D Vidaurre, et al., Discovering dynamic brain networks from big data in rest and task. `Neuroimage, 2018 <https://www.sciencedirect.com/science/article/pii/S1053811917305487>`_.
 #. A Baker, et al., Fast transient networks in spontaneous human brain activity. `Elife, 2014 <https://elifesciences.org/articles/01867>`_.
-#. D Vidaurre, et al., Brain Network Dynamics are Hierarchically Organised in Time. `PNAS, 2017 <https://www.pnas.org/doi/10.1073/pnas.1705120114>`_. 
+#. D Vidaurre, et al., Brain Network Dynamics are Hierarchically Organized in Time. `PNAS, 2017 <https://www.pnas.org/doi/10.1073/pnas.1705120114>`_. 
 #. D Vidaurre, et al., Spontaneous cortical activity transiently organises into frequency specific phase-coupling networks. `Nat. Commun. 2018 <https://www.nature.com/articles/s41467-018-05316-z>`_.
 #. J Van Schependom, et al., Increased brain atrophy and lesion load is associated with stronger lower alpha MEG power in multiple sclerosis patients. `Neuroimage: Clinical, 2021 <https://doi.org/10.1016/j.nicl.2021.102632>`_.
 #. T Sitnikova, et al., Short timescale abnormalities in the states of spontaneous synchrony in the functional neural networks in Alzheimer's disease. `Neuroimage: Clinical, 2018 <https://www.sciencedirect.com/science/article/pii/S2213158218301748>`_.
-#. A Quinn, et al., Task-evoked dynamic network analysis through hidden markov modelling. `Frontiers in Neuroscience, 2018 <https://www.frontiersin.org/articles/10.3389/fnins.2018.00603/full>`_.
+#. A Quinn, et al., Task-evoked dynamic network analysis through hidden markov modeling. `Frontiers in Neuroscience, 2018 <https://www.frontiersin.org/articles/10.3389/fnins.2018.00603/full>`_.
 #. C Higgins, et al., Replay bursts in humans coincide with activation of the default mode and parietal alpha networks. `Neuron, 2021 <https://www.sciencedirect.com/science/article/pii/S0896627320309661>`_.

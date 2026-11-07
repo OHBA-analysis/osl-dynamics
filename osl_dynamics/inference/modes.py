@@ -129,7 +129,7 @@ def gmm_time_courses(
     gmm_tcs = []
     gmm_metrics = []
     for sub in progress(range(n_sessions), desc="Fitting GMMs"):
-        # Initialise an array to hold the gmm thresholded time course
+        # Initialize an array to hold the gmm thresholded time course
         gmm_tc = np.empty(alpha[sub].shape, dtype=int)
         gmm_metric = []
 
@@ -159,7 +159,7 @@ def gmm_time_courses(
         gmm_tcs.append(gmm_tc)
         gmm_metrics.append(gmm_metric)
 
-    # Visualise session-specific time courses in one plot per mode
+    # Visualize session-specific time courses in one plot per mode
     avg_threshold = [
         np.mean([gmm_metrics[s][m]["threshold"] for s in range(n_sessions)])
         for m in range(n_modes)
@@ -243,7 +243,7 @@ def _match_to_first(items: Tuple, similarity: Callable) -> List[np.ndarray]:
     -------
     orders : list of np.ndarray
         Order for each item (always unchanged for the first item). Found with
-        the Hungarian algorithm, maximising the total similarity.
+        the Hungarian algorithm, maximizing the total similarity.
     """
     orders = [np.arange(len(items[0]))]
     for item in items[1:]:
@@ -429,12 +429,12 @@ def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
 
     Parameters
     ----------
-    state_time_course: np.ndarray
+    state_time_course : np.ndarray
         State time course. Shape must be (n_samples, n_states).
 
     Returns
     -------
-    reduced_state_time_course: np.ndarray
+    reduced_state_time_course : np.ndarray
         Reduced state time course. Shape is (n_samples, n_reduced_states).
     """
     return state_time_course[:, ~np.all(state_time_course == 0, axis=0)]
@@ -657,8 +657,8 @@ def average_runs(
         This is a dictionary with keys :code:`'correlation'`,
         :code:`'dissimiarity'`, :code:`'ids'` and :code:`'linkage'`.
 
-    See Also
-    --------
+    References
+    ----------
     S. Alonso and D. Vidaurre, "Towards stability of dynamic FC estimates in
     neuroimaging and electrophysiology: solutions and limits" `Network
     Neuroscience (2023) <https://doi.org/10.1162/netn_a_00331>`_.
@@ -948,7 +948,7 @@ def select_run(
     threshold: Optional[float] = None,
     return_info: bool = False,
 ) -> Union[int, Tuple[int, Dict]]:
-    """Select the run to analyse: the most typical run of the most common
+    """Select the run to analyze: the most typical run of the most common
     solution.
 
     When a model is trained multiple times, a common choice is the run with

@@ -23,8 +23,8 @@ Input Data
 
 The LEMON dataset contains resting-state EEG recordings from ~200
 subjects. Each subject also has a structural MRI (MP2RAGE) and an
-EEG localizer file (``.mat``) containing digitised electrode positions
-and fiducials. The data is organised as::
+EEG localizer file (``.mat``) containing digitized electrode positions
+and fiducials. The data is organized as::
 
     lemon/
     ├── sub-*/
@@ -35,6 +35,8 @@ and fiducials. The data is organised as::
 
 The output of this script is written to ``derivatives/``.
 """
+
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/0-4_eeg_batch_processing.png"
 
 #%%
 # Step 0: Find File Paths
@@ -99,7 +101,7 @@ The output of this script is written to ``derivatives/``.
 #
 # - Data is loaded from BrainVision (``.vhdr``) format.
 # - A channel montage is set from the localizer ``.mat`` file, which
-#   contains digitised electrode positions and fiducials.
+#   contains digitized electrode positions and fiducials.
 # - A synthetic HEOG channel is created from F7 - F8.
 # - The first 15 seconds are cropped (equipment settling time).
 # - Bad channels are detected, interpolated, and an average reference
@@ -446,7 +448,7 @@ The output of this script is written to ``derivatives/``.
 #         parcel_data = parcellation.parcellate_lcmv(
 #             session_files,
 #             parcellation_file=parcellation_file,
-#             orthogonalisation="symmetric",
+#             orthogonalization="symmetric",
 #         )
 #
 #         parc_fif = str(output_dir / "osl" / session["id"] / "lcmv-parc-raw.fif")

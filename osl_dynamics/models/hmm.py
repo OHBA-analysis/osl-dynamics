@@ -2,8 +2,8 @@
 
 See the :doc:`documentation </models/hmm>` for a description of this model.
 
-See Also
---------
+References
+----------
 - D. Vidaurre, et al., "Spectrally resolved fast transient brain states in
   electrophysiological data". `Neuroimage 126, 81-95 (2016)
   <https://www.sciencedirect.com/science/article/pii/S1053811915010691>`_.
@@ -64,9 +64,9 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
     learn_covariances : bool
         Should we make the covariance matrix for each state trainable?
     initial_means : np.ndarray
-        Initialisation for mean vectors.
+        Initialization for mean vectors.
     initial_covariances : np.ndarray
-        Initialisation for state covariances.
+        Initialization for state covariances.
         If :code:`diagonal_covariances=True` and full matrices are passed,
         the diagonal is extracted.
     covariances_epsilon : float
@@ -79,7 +79,7 @@ class Config(BaseModelConfig, MarkovStateInferenceModelConfig):
         Regularizer for covariance matrices.
 
     initial_trans_prob : np.ndarray
-        Initialisation for the transition probability matrix.
+        Initialization for the transition probability matrix.
     learn_trans_prob : bool
         Should we make the transition probability matrix trainable?
     trans_prob_prior : np.ndarray

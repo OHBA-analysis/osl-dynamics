@@ -24,7 +24,7 @@ Input Data
 The Cam-CAN dataset contains resting-state (``rest``), sensorimotor
 (``smt``) and passive stimulation (``passive``) MEG recordings from
 ~650 subjects. The raw data has already been MaxFiltered. Each subject
-also has a structural MRI. The data is organised as::
+also has a structural MRI. The data is organized as::
 
     cc700/
     ├── meg/
@@ -38,6 +38,8 @@ also has a structural MRI. The data is organised as::
 
 The output of this script is written to ``derivatives/``.
 """
+
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/0-3_meg_batch_processing.png"
 
 #%%
 # Step 0: Find File Paths
@@ -387,7 +389,7 @@ The output of this script is written to ``derivatives/``.
 #         parcel_data = parcellation.parcellate_lcmv(
 #             session_files,
 #             parcellation_file=parcellation_file,
-#             orthogonalisation="symmetric",
+#             orthogonalization="symmetric",
 #         )
 #
 #         parc_fif = str(output_dir / "osl" / session["id"] / "lcmv-parc-raw.fif")

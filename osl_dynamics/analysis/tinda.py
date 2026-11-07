@@ -6,7 +6,7 @@ intended to use it on an HMM state time course to ask questions like what is
 the density of state :math:`j` in the first and second part of the interval
 between visits to state :math:`i`.
 
-See Also
+Examples
 --------
 `Example scripts <https://github.com/OHBA-analysis/osl-dynamics/blob/main\
 /examples/tinda>`_ for applying TINDA.
@@ -653,10 +653,10 @@ def circle_angles(order: List[int]) -> np.ndarray:
     return angleplot
 
 
-def optimise_sequence(
+def optimize_sequence(
     fo_density: np.ndarray, metric_to_use: int = 0, n_perms: int = 10**6
 ) -> np.ndarray:
-    """Optimise the sequence to maximal circularity.
+    """Optimize the sequence to maximal circularity.
 
     This function reads in the mean pattern of differential fractional
     occupancy and computes the optimal display for a sequential circular plot
@@ -668,7 +668,7 @@ def optimise_sequence(
         Time-in-state densities array of shape (n_interval_states,
         n_density_states, 2, n_sessions).
     metric_to_use : int, optional
-        Metric to use for optimisation:
+        Metric to use for optimization:
 
         - :code:`0`: mean FO asymmetry.
         - :code:`1`: proportional FO asymmetry (i.e. asymmetry as a proportion
@@ -694,7 +694,7 @@ def optimise_sequence(
     # Make sure there are no nans (without modifying the input array):
     fo_density = np.where(np.isnan(fo_density), 0, fo_density)
 
-    # Compute different metrics to optimise
+    # Compute different metrics to optimize
     metrics = []
     metrics.append(np.mean(fo_density[:, :, 0, :] - fo_density[:, :, 1, :], axis=2))
     temp = (fo_density[:, :, 0, :] - fo_density[:, :, 1, :]) / np.mean(
@@ -809,7 +809,7 @@ def compute_cycle_strength(
     # positive rotational momentum should indicate clockwise cycle
     cycle_strength = -cycle_strength
 
-    if relative:  # normalise by the theoretical maximum
+    if relative:  # normalize by the theoretical maximum
         cycle_strength = cycle_strength / np.abs(
             compute_cycle_strength(
                 angleplot,

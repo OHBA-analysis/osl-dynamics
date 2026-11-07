@@ -52,6 +52,8 @@ Prerequisites
 - `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_.
 """
 
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/0-5_mne_sample_data.png"
+
 #%%
 # Download the dataset
 # ^^^^^^^^^^^^^^^^^^^^
@@ -169,7 +171,7 @@ Prerequisites
 # ^^^^^^^^^^^^^^^^^^^^^^
 #
 # Coregistration aligns the MEG sensor coordinate system ("head" space) to the
-# MRI coordinate system using the digitised fiducials and headshape points
+# MRI coordinate system using the digitized fiducials and headshape points
 # stored in the FIF file. First we create a ``Session`` to
 # keep track of all the pipeline output files.
 #
@@ -239,12 +241,12 @@ Prerequisites
 # carries the stimulus channels over to the parcellated data, so we can epoch
 # it later.
 #
-# Note, we use ``orthogonalisation=None`` here (rather than ``"symmetric"``,
+# Note, we use ``orthogonalization=None`` here (rather than ``"symmetric"``,
 # the usual choice — see the
 # :doc:`MEG preprocessing tutorial </tutorials_build/0-1_meg_preprocessing>`).
-# Symmetric orthogonalisation removes all zero-lag correlations between
+# Symmetric orthogonalization removes all zero-lag correlations between
 # parcels — which is exactly the correlated bilateral signal we want to study
-# below. Leakage correction should not be used when analysing zero-lag
+# below. Leakage correction should not be used when analyzing zero-lag
 # correlated task responses.
 #
 # .. code-block:: python
@@ -252,7 +254,7 @@ Prerequisites
 #     parcel_data = parcellation.parcellate_lcmv(
 #         session,
 #         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
-#         orthogonalisation=None,
+#         orthogonalization=None,
 #     )
 #     print(f"Parcel data shape: {parcel_data.shape} (parcels x time)")
 #
@@ -292,7 +294,7 @@ Prerequisites
 #   mirror images. ``bilateral_tol`` is the mean absolute difference between
 #   the x, y and z coordinates of the mirrored dipoles and defaults to half
 #   the grid spacing (here: 8 mm grid, so 4 mm), so a dipole whose mirror
-#   image is outside the brain can be paired with a neighbouring dipole.
+#   image is outside the brain can be paired with a neighboring dipole.
 # - Dipoles within ``bilateral_tol_midline`` of the midline, and dipoles with
 #   no match, are beamformed as usual (defaults to ``bilateral_tol``).
 # - Joint weights are computed for each pair by concatenating the two lead
@@ -313,7 +315,7 @@ Prerequisites
 #     parcel_data = parcellation.parcellate_lcmv(
 #         session,
 #         parcellation_file="atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz",
-#         orthogonalisation=None,
+#         orthogonalization=None,
 #     )
 #     bilateral_parc_fif = str(output_dir / "osl" / id / "lcmv-bilateral-parc-raw.fif")
 #     parcellation.save_as_fif(
@@ -326,7 +328,7 @@ Prerequisites
 #%%
 # The beamformer prints how many pairs were found. To check the pairing, we
 # plot it (saved to ``session.src_dir/bilateral_dipoles.png``). Paired dipoles
-# are red and joined by a line, blue dots are midline dipoles, grey circles
+# are red and joined by a line, blue dots are midline dipoles, gray circles
 # are unpaired dipoles.
 #
 # .. code-block:: python
@@ -427,7 +429,7 @@ Prerequisites
 # Virtual Electrodes
 # ^^^^^^^^^^^^^^^^^^
 #
-# Parcel time courses summarise large regions. To look at the activity at a
+# Parcel time courses summarize large regions. To look at the activity at a
 # specific location we can compute a 'virtual electrode': the beamformer
 # weights for a dipole at the exact MNI coordinate (rather than taking the
 # nearest dipole of the 8 mm grid). The weights are computed with the same
@@ -472,8 +474,8 @@ Prerequisites
 #   ``use_bilateral_pairs=True``.
 # - The pairing tolerance ``bilateral_tol`` defaults to half the dipole grid
 #   spacing, which is usually what you want.
-# - Use ``orthogonalisation=None`` when analysing zero-lag correlated
-#   responses — symmetric orthogonalisation would remove them.
+# - Use ``orthogonalization=None`` when analyzing zero-lag correlated
+#   responses — symmetric orthogonalization would remove them.
 # - Check the dipole pairing QC plot (``bilateral_dipoles.png``).
 # - Use ``source_recon.virtual_electrodes`` to get the time course at a
 #   specific MNI coordinate.

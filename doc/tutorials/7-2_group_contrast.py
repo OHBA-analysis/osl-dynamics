@@ -11,6 +11,8 @@ In this tutorial we test for differences between groups of subjects with :func:`
 We also cover nuisance covariates, missing values, controlling the family-wise error rate per state and more than two groups. See the :doc:`Statistical Inference tutorial <7-1_statistical_inference>` for the background.
 """
 
+# sphinx_gallery_thumbnail_number = 3
+
 #%%
 # Subject-specific features
 # ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -141,7 +143,7 @@ print(result)
 print("Numerator degrees of freedom:", result.f_dof)
 
 #%%
-# A significant F-test says that the groups are not all the same, not which ones differ. Follow it up with pairwise tests by passing the two labels to compare as :code:`groups`. Every group is still modelled, so the residual variance is estimated from all subjects, but only the subjects in the two compared groups are shuffled.
+# A significant F-test says that the groups are not all the same, not which ones differ. Follow it up with pairwise tests by passing the two labels to compare as :code:`groups`. Every group is still modeled, so the residual variance is estimated from all subjects, but only the subjects in the two compared groups are shuffled.
 
 result_12 = stats.group_diff(power_maps, assignments_3, groups=(1, 2), n_perm=1000)
 print(result_12.contrast)
@@ -164,4 +166,4 @@ for parcel in range(5):
 #%%
 # Reporting
 # ^^^^^^^^^
-# :code:`print(result)` summarises the test. For example, the analysis above would be reported as: "Power maps were compared between groups with a GLM permutation test (1000 row-shuffle permutations, two-tailed) with age and sex as covariates, using the maximum t-statistic across states and parcels to control the family-wise error rate at 5%. Group 1 had higher power in state 2 (Cohen's d = 1.1 to 1.6 in the significant parcels, 95% bootstrap confidence intervals in Table 1)."
+# :code:`print(result)` summarizes the test. For example, the analysis above would be reported as: "Power maps were compared between groups with a GLM permutation test (1000 row-shuffle permutations, two-tailed) with age and sex as covariates, using the maximum t-statistic across states and parcels to control the family-wise error rate at 5%. Group 1 had higher power in state 2 (Cohen's d = 1.1 to 1.6 in the significant parcels, 95% bootstrap confidence intervals in Table 1)."
