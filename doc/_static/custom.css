@@ -64,3 +64,9 @@ section.home-page > .institution-logos {
     height: 65px;
   }
 }
+
+/* Keep the text the same width on every page: without a right-hand
+   "On this page" panel the theme would let it grow to 60em */
+.bd-main .bd-content .bd-article-container {
+  max-width: 48em;
+}
