@@ -71,6 +71,11 @@ section.home-page > .institution-logos {
   max-width: 48em;
 }
 
+/* The home page has no sidebars, so it can be wider */
+.bd-main .bd-content .bd-article-container:has(section.home-page) {
+  max-width: 72em;
+}
+
 /* Left sidebar collapsed on page load (see sidebar-state.js): the same look
    as the theme's collapsed sidebar, without the animation */
 @media (min-width: 960px) {
