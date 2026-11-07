@@ -12,6 +12,8 @@ In this tutorial we calculate summary statistics for dynamics:
 - Switching rate, which is the average number of state activations.
 """
 
+# sphinx_gallery_thumbnail_number = 3
+
 #%%
 # Download inferred parameters
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
