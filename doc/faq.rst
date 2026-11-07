@@ -31,7 +31,7 @@ How do I optimally preprocess my data for training an HMM or DyNeMo?
 
 For electrophysiological data we have found preprocessing the sensor-level data by downsampling to 250 Hz and bandpass filtering 1-45 Hz works well. Additionally, we do some bad segment detection based on the variance of non-overlapping windows. Following this, we use a volumetric linearly constrained minimum variance (LCMV) beamformer to estimate source space data. Usually the beamformed (voxel) data is parcellated to ~50 regions of interest and an orthogonalisation technique is used to correct for spatial leakage. Additionally, the sign of parcel time courses is adjusted to align different subjects. All of these steps can be done directly within osl-dynamics, see the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>` for a step-by-step walkthrough and the `batch processing scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for processing multiple sessions in parallel. Alternatively, the `osl-ephys <https://github.com/OHBA-analysis/osl-ephys>`_ package can also be used for these steps.
 
-The OSL workshop had a session on dynamic network modelling. The OSF project hosting workshop materials (`here <https://osf.io/zxb6c/>`_) has jupyter notebooks with recommended preprocessing and source reconstruction for fitting the HMM/DyNeMo.
+The OSL workshop had a session on dynamic network modeling. The OSF project hosting workshop materials (`here <https://osf.io/zxb6c/>`_) has jupyter notebooks with recommended preprocessing and source reconstruction for fitting the HMM/DyNeMo.
 
 Can I use a structural parcellation (e.g. the AAL or Desikan-Killiany atlas)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -72,7 +72,7 @@ Time-Delay Embedding (TDE) involves adding extra channels containing time-lagged
 - For each channel you shift the time series by a fixed amount (forwards or backwards) and add it as an extra channel to the time series data.
 - You do this for a pre-specified number of lags. **Typically, we use lags of -7,-6,...,6,7** (equivalent to :code:`n_embeddings=15`). This results in an extra 14 channels being added for each original channel. E.g. if you originally had 10 channels and added ±7 lags, you would end up with a time series with 150 channels.
 
-The purpose of TDE is to encode spectral (frequency-specific) information in the covariance matrix of the data. The covariance matrix of the TDE data has additional off-diagonal elements which corresponds to the auto-correlation function (this characterises the spectral properties of the original data). TDE is useful when we want to model transient spectral properties in the data.
+The purpose of TDE is to encode spectral (frequency-specific) information in the covariance matrix of the data. The covariance matrix of the TDE data has additional off-diagonal elements which corresponds to the auto-correlation function (this characterizes the spectral properties of the original data). TDE is useful when we want to model transient spectral properties in the data.
 
 Usually adding the extra channels results in a very high-dimensional time series, so we typically also apply principal component analysis for dimensionality reduction. **We recommend reducing down to at least twice the number of original channels**.
 
@@ -118,7 +118,7 @@ How do I make training reproducible?
 
 Call ``osl_dynamics.utils.set_random_seed(seed)`` before building the model. This seeds Python, NumPy and TensorFlow, which covers the initialization (random subsets, sampled state time courses), the shuffling of the training data and the model weights. Training on a GPU can still differ slightly between runs because some TensorFlow operations are non-deterministic; pass ``op_determinism=True`` to make them deterministic at the cost of speed.
 
-Modelling
+Modeling
 ---------
 
 What is the Hidden Markov Model (HMM)?
@@ -164,9 +164,9 @@ Both calculating the AE and TDE are referred to as 'data preparation' options. S
 
 The models in osl-dynamics (HMM and DyNeMo) aim to describe dynamics in the first and second order statistics of the data, i.e. the mean vector and covariance matrix respectively. We calculate AE or TDE data to ensure the mean and covariance of the data contains dynamics we're interested in.
 
-For example, if we are interested in modelling transient events of high amplitude, we can calculate the AE of our original data and fit an HMM learning the mean vector for multiple states. This will help the HMM find states that have differences in the mean amplitude.
+For example, if we are interested in modeling transient events of high amplitude, we can calculate the AE of our original data and fit an HMM learning the mean vector for multiple states. This will help the HMM find states that have differences in the mean amplitude.
 
-If we are interested in modelling transient bursts of oscillations (spectral events), we can train on TDE data. Each oscillatory burst will have a unique covariance matrix (oscillations at different frequencies will affect the value of off-diagonal elements in the covariance of TDE data). This will help the HMM find states that have different oscillatory behaviour.
+If we are interested in modeling transient bursts of oscillations (spectral events), we can train on TDE data. Each oscillatory burst will have a unique covariance matrix (oscillations at different frequencies will affect the value of off-diagonal elements in the covariance of TDE data). This will help the HMM find states that have different oscillatory behavior.
 
 Note, when we train on TDE data, because the differences we want to model are reflected in the covariance of the data, we don't need to model the state means (we can just fix them to zero). Whereas, when we train on AE data, the differences we want to model are contained in the mean, so we learn the state means.
 
@@ -209,7 +209,7 @@ An alternative is to choose a run based on the networks the runs found:
 #. Train the model multiple times (e.g. 10-20 runs).
 #. Describe each state/mode by its power map, which can be calculated directly from the state/mode covariances (using :code:`osl_dynamics.analysis.post_hoc.raw_covariances` for time-delay embedded data).
 #. Group the states/modes of all runs into networks with :code:`osl_dynamics.inference.modes.match_runs`. This also tells us how many runs each network is found in, which is a useful measure of how reproducible each network is.
-#. Group runs that found the same set of networks into families with :code:`osl_dynamics.inference.modes.run_families`, and analyse the most typical run (the medoid) of the largest family. If the largest families are equally large, choose the one with the lowest median free energy. :code:`osl_dynamics.inference.modes.select_run` does all of these steps.
+#. Group runs that found the same set of networks into families with :code:`osl_dynamics.inference.modes.run_families`, and analyze the most typical run (the medoid) of the largest family. If the largest families are equally large, choose the one with the lowest median free energy. :code:`osl_dynamics.inference.modes.select_run` does all of these steps.
 
 This selects a run that is representative of the solution the model finds most often. The choice is only as reliable as the family sizes, so train enough runs (e.g. 20) for the most common solution to stand out. It can be used with the HMM and DyNeMo. See :doc:`DyNeMo: Selecting a Run <tutorials_build/3-4_dynemo_selecting_a_run>` for an example.
 
@@ -274,7 +274,7 @@ The loss function we use for DyNeMo is the variational free energy:
 .. math::
     \mathcal{F} = -LL + \eta KL
 
-where :math:`\eta` is the 'KL annealing factor'. This is a scalar that starts off at zero and increases to one as training progresses. At the start of training we suppress the KL term of the loss function (by setting :math:`\eta` to zero), which allows us to find the model that maximises the likelihood (via minimising the negative log-likelihood term, :math:`-LL`). Then we slowly turn on the KL term by increasing :math:`\eta`, this adds more of the KL term to the loss function which gives the apparent rise. This process is known as **KL annealing**. We typically use KL annealing for the first half of training (set using the :code:`n_kl_annealing_epochs` hyperparameter). After :code:`n_kl_annealing_epochs` of training have occurred then the model is using the full loss function (with :math:`\eta=1`). If we are using early stopping we should make sure we're only considering epochs after :code:`n_kl_annealing_epochs`.
+where :math:`\eta` is the 'KL annealing factor'. This is a scalar that starts off at zero and increases to one as training progresses. At the start of training we suppress the KL term of the loss function (by setting :math:`\eta` to zero), which allows us to find the model that maximizes the likelihood (via minimizing the negative log-likelihood term, :math:`-LL`). Then we slowly turn on the KL term by increasing :math:`\eta`, this adds more of the KL term to the loss function which gives the apparent rise. This process is known as **KL annealing**. We typically use KL annealing for the first half of training (set using the :code:`n_kl_annealing_epochs` hyperparameter). After :code:`n_kl_annealing_epochs` of training have occurred then the model is using the full loss function (with :math:`\eta=1`). If we are using early stopping we should make sure we're only considering epochs after :code:`n_kl_annealing_epochs`.
 
 Post-Hoc Analysis
 -----------------

@@ -67,7 +67,7 @@ _COMMON_PARAMETERS = """
     cluster_dims : int or sequence of int, optional
         For :code:`'cluster'` and :code:`'tfce'`: target dimensions along
         which clusters can extend (0 is the first dimension after the
-        samples), e.g. time or frequency. Neighbouring indices are adjacent
+        samples), e.g. time or frequency. Neighboring indices are adjacent
         unless an :code:`adjacency` is given for that dimension. Clusters
         never span two indices of other dimensions (e.g. two states).
         Required for these corrections, except in
@@ -366,7 +366,7 @@ def group_diff(
 ) -> TestResult:
     """Test for a difference between groups.
 
-    Each unique value in :code:`assignments` is modelled as a group. With two
+    Each unique value in :code:`assignments` is modeled as a group. With two
     groups (or :code:`groups`), the difference between them is tested with a
     t-contrast and row-shuffle permutations of the samples in those two
     groups. With three or more groups and no :code:`groups`, an F-test asks

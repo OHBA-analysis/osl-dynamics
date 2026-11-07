@@ -786,7 +786,7 @@ def partial_covariances(
 
     - :math:`Y_i` is (n_samples, 1) the data amplitude/envelope/power/absolute
       time course at channel :math:`i`.
-    - :math:`X` is (n_samples, n_states) matrix of the variance normalised
+    - :math:`X` is (n_samples, n_states) matrix of the variance normalized
       state/mode time courses.
     - :math:`\beta_i` is an (n_states, 1) vector of multiple regression
       parameters for channel :math:`i`.
@@ -828,7 +828,7 @@ def partial_covariances(
 
     pcovs = []
     for X, a in zip(data, alpha):
-        # Variance normalise state/mode time courses
+        # Variance normalize state/mode time courses
         a_normed = a / np.std(a, axis=0, keepdims=True)
 
         # Do multiple regression of alpha onto data

@@ -169,7 +169,7 @@ Prerequisites
 # ^^^^^^^^^^^^^^^^^^^^^^
 #
 # Coregistration aligns the MEG sensor coordinate system ("head" space) to the
-# MRI coordinate system using the digitised fiducials and headshape points
+# MRI coordinate system using the digitized fiducials and headshape points
 # stored in the FIF file. First we create a ``Session`` to
 # keep track of all the pipeline output files.
 #
@@ -244,7 +244,7 @@ Prerequisites
 # :doc:`MEG preprocessing tutorial </tutorials_build/0-1_meg_preprocessing>`).
 # Symmetric orthogonalisation removes all zero-lag correlations between
 # parcels — which is exactly the correlated bilateral signal we want to study
-# below. Leakage correction should not be used when analysing zero-lag
+# below. Leakage correction should not be used when analyzing zero-lag
 # correlated task responses.
 #
 # .. code-block:: python
@@ -292,7 +292,7 @@ Prerequisites
 #   mirror images. ``bilateral_tol`` is the mean absolute difference between
 #   the x, y and z coordinates of the mirrored dipoles and defaults to half
 #   the grid spacing (here: 8 mm grid, so 4 mm), so a dipole whose mirror
-#   image is outside the brain can be paired with a neighbouring dipole.
+#   image is outside the brain can be paired with a neighboring dipole.
 # - Dipoles within ``bilateral_tol_midline`` of the midline, and dipoles with
 #   no match, are beamformed as usual (defaults to ``bilateral_tol``).
 # - Joint weights are computed for each pair by concatenating the two lead
@@ -427,7 +427,7 @@ Prerequisites
 # Virtual Electrodes
 # ^^^^^^^^^^^^^^^^^^
 #
-# Parcel time courses summarise large regions. To look at the activity at a
+# Parcel time courses summarize large regions. To look at the activity at a
 # specific location we can compute a 'virtual electrode': the beamformer
 # weights for a dipole at the exact MNI coordinate (rather than taking the
 # nearest dipole of the 8 mm grid). The weights are computed with the same
@@ -472,7 +472,7 @@ Prerequisites
 #   ``use_bilateral_pairs=True``.
 # - The pairing tolerance ``bilateral_tol`` defaults to half the dipole grid
 #   spacing, which is usually what you want.
-# - Use ``orthogonalisation=None`` when analysing zero-lag correlated
+# - Use ``orthogonalisation=None`` when analyzing zero-lag correlated
 #   responses — symmetric orthogonalisation would remove them.
 # - Check the dipole pairing QC plot (``bilateral_dipoles.png``).
 # - Use ``source_recon.virtual_electrodes`` to get the time course at a

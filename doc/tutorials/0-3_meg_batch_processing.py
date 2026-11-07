@@ -24,7 +24,7 @@ Input Data
 The Cam-CAN dataset contains resting-state (``rest``), sensorimotor
 (``smt``) and passive stimulation (``passive``) MEG recordings from
 ~650 subjects. The raw data has already been MaxFiltered. Each subject
-also has a structural MRI. The data is organised as::
+also has a structural MRI. The data is organized as::
 
     cc700/
     ├── meg/

@@ -6,7 +6,7 @@ short time and keeps the best. The multi-start loop
 a candidate is just a function that sets the initial parameters.
 
 A candidate's parameters are set from windows of data. A window is
-summarised by a feature vector (:meth:`InitializationMixin._window_features`)
+summarized by a feature vector (:meth:`InitializationMixin._window_features`)
 and a model knows how to set its parameters from one feature vector per
 state (:meth:`InitializationMixin._set_parameters_from_features`). For
 Gaussian observation models the features are the mean and the covariance.
@@ -20,7 +20,7 @@ The candidate generators are:
 mixture of modes (used by :code:`nfindr_initialization`, for models that
 set :meth:`InitializationMixin._supports_nfindr_initialization`).
 
-Models customise the loop through hooks:
+Models customize the loop through hooks:
 
 - :meth:`InitializationMixin._initialization_context`: settings that only
   apply while initializing (e.g. the number of KL annealing epochs).
@@ -139,7 +139,7 @@ class InitializationMixin:
         return np.argmax(self._sample_state_time_course(n_samples, stay_prob), axis=1)
 
     def _window_features(self, windows: List[np.ndarray]) -> np.ndarray:
-        """Summarise windows of data as feature vectors.
+        """Summarize windows of data as feature vectors.
 
         For Gaussian observation models: the mean (if means are learnt)
         and the upper triangle of the covariance.

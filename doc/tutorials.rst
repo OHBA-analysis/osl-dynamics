@@ -33,7 +33,7 @@ From raw sensor recordings to parcellated source-space time courses: preprocessi
 Data
 ----
 
-Loading data into osl-dynamics and preparing it for modelling: standardisation, time-delay embedding and PCA.
+Loading data into osl-dynamics and preparing it for modeling: standardization, time-delay embedding and PCA.
 
 .. minigallery::
 
@@ -53,7 +53,7 @@ Time-averaged analysis of MEG data: spectra, power maps and amplitude envelope c
    tutorials/2-2_static_power_analysis.py
    tutorials/2-3_static_aec_analysis.py
 
-Dynamic Modelling
+Dynamic Modeling
 -----------------
 
 Inferring dynamic networks: sliding windows, training an HMM or DyNeMo, selecting a run and getting the inferred parameters.
@@ -69,7 +69,7 @@ Inferring dynamic networks: sliding windows, training an HMM or DyNeMo, selectin
 HMM Post-hoc Analysis
 ---------------------
 
-Analysing the states of a trained HMM: spectra, networks, summary statistics and fMRI dual estimation.
+Analyzing the states of a trained HMM: spectra, networks, summary statistics and fMRI dual estimation.
 
 .. minigallery::
 
@@ -82,7 +82,7 @@ Analysing the states of a trained HMM: spectra, networks, summary statistics and
 DyNeMo Post-hoc Analysis
 ------------------------
 
-Analysing the modes of a trained DyNeMo: regression spectra, networks and mixing coefficients.
+Analyzing the modes of a trained DyNeMo: regression spectra, networks and mixing coefficients.
 
 .. minigallery::
 
@@ -119,7 +119,7 @@ Full analysis scripts, including the scripts used to produce the results in the 
 Workshops
 ---------
 
-The `OHBA Methods Group <https://www.psych.ox.ac.uk/research/ohba-analysis-group>`_ organises teaching workshops for analysing M/EEG data using `osl-ephys <https://osl-ephys.readthedocs.io/en/latest/>`_ and osl-dynamics.
+The `OHBA Methods Group <https://www.psych.ox.ac.uk/research/ohba-analysis-group>`_ organizes teaching workshops for analyzing M/EEG data using `osl-ephys <https://osl-ephys.readthedocs.io/en/latest/>`_ and osl-dynamics.
 
 Links to past workshops:
 

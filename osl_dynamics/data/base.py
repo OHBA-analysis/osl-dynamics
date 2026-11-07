@@ -961,14 +961,14 @@ class Data:
             Should we prepare the original 'raw' data that we loaded?
         """
 
-        # Function to apply standardisation to a single array
+        # Function to apply standardization to a single array
         def _apply(array, prepared_data_file):
             array = processing.standardize(array, create_copy=False)
             if self.load_memmaps:
                 array = misc.array_to_memmap(prepared_data_file, array)
             return array
 
-        # Apply standardisation to each array in parallel
+        # Apply standardization to each array in parallel
         arrays = self.raw_data_arrays if use_raw else self.arrays
         args = zip(arrays, self.prepared_data_filenames)
         self.arrays = parallel_map(
@@ -990,7 +990,7 @@ class Data:
         :func:`osl_dynamics.data.processing.whitening_matrix`), so afterwards
         every session has an identity covariance: unit variances and no static
         correlation between channels. This is the per-session counterpart of
-        :code:`standardize`, which only equalises the variances, and differs
+        :code:`standardize`, which only equalizes the variances, and differs
         from :code:`pca(whiten=True)`, which whitens with one covariance
         pooled over all sessions and so leaves each session's own covariance
         structure in place.

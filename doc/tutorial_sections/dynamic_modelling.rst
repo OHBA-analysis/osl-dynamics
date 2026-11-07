@@ -1,4 +1,4 @@
-Dynamic Modelling
+Dynamic Modeling
 =================
 
 Inferring dynamic networks: sliding windows, training an HMM or DyNeMo, selecting a run and getting the inferred parameters.

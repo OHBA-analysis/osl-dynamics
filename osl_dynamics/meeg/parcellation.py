@@ -132,7 +132,7 @@ def parcel_vector_to_nifti(
     """Takes a vector of parcel values and return a NIFTI image.
 
     The image is on the voxel grid of the parcellation file. The value at
-    each voxel is the sum of the parcel values weighted by the (normalised)
+    each voxel is the sum of the parcel values weighted by the (normalized)
     weight of the voxel for each parcel.
 
     Parameters
@@ -172,7 +172,7 @@ def parcel_vector_to_nifti(
     # 2D array of voxel weights for each parcel
     voxel_weights = parc.get_fdata().reshape(-1, n_parcels)
 
-    # Normalise the voxels weights
+    # Normalize the voxels weights
     max_weights = voxel_weights.max(axis=0, keepdims=True)
     voxel_weights /= np.where(max_weights > 0, max_weights, 1)
 
@@ -593,7 +593,7 @@ def _sample_parcellation(parcellation_file: str, coords: np.ndarray) -> np.ndarr
     """Sample a parcellation at a set of coordinates.
 
     Each coordinate is given the parcel weights of the parcellation voxel that
-    contains it (nearest neighbour sampling). The coordinates do not need to be
+    contains it (nearest neighbor sampling). The coordinates do not need to be
     on the same grid as the parcellation.
 
     Parameters
@@ -636,7 +636,7 @@ def _get_parcel_weights(
     ----------
     voxel_cov : callable
         Function that takes an array of voxel indices and returns the
-        (len(inds), len(inds)) covariance (normalised by n_samples) of these
+        (len(inds), len(inds)) covariance (normalized by n_samples) of these
         voxels.
     parcellation_asmatrix : np.ndarray
         (nvoxels x n_parcels) parcel weights for each voxel.
@@ -714,8 +714,8 @@ def _empty_parcels_message(
     """Error message for parcels that do not contain any dipoles."""
     msg = f"{len(empty_parcels)} parcel(s) do not contain any dipoles: {empty_parcels}."
     parcellation = Parcellation(parcellation_file)
-    centres = np.round(parcellation.roi_centers()[empty_parcels]).astype(int)
-    msg += f" MNI coordinates (mm) of the parcel centres: {centres.tolist()}.\n\n"
+    centers = np.round(parcellation.roi_centers()[empty_parcels]).astype(int)
+    msg += f" MNI coordinates (mm) of the parcel centers: {centers.tolist()}.\n\n"
     msg += "This can happen if:\n"
     parcellation_res = float(parcellation.parcellation.header.get_zooms()[0])
     gridstep = source_recon._get_gridstep(voxel_coords / 1000)

@@ -97,9 +97,9 @@ class Config(BaseModelConfig, VariationalInferenceModelConfig):
     learn_covariances : bool
         Should we make the covariance matrix for each mode trainable?
     initial_means : np.ndarray
-        Initialisation for mean vectors.
+        Initialization for mean vectors.
     initial_covariances : np.ndarray
-        Initialisation for mode covariances.
+        Initialization for mode covariances.
         If :code:`diagonal_covariances=True` and full matrices are passed,
         the diagonal is extracted.
     covariances_epsilon : float
@@ -504,7 +504,7 @@ class Model(VariationalInferenceModelBase):
         n_samples : int
             Number of samples to take.
         theta : np.ndarray, optional
-            Normalized logits to initialise the sampling with.
+            Normalized logits to initialize the sampling with.
             Shape must be (sequence_length, n_modes).
 
         Returns

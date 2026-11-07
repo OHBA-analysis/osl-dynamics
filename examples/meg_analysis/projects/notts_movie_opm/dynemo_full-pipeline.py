@@ -169,13 +169,13 @@ D = D[order]
 # Trace of mode covariances
 tr_D = np.trace(D, axis1=1, axis2=2)
 
-# Normalised weighted alpha
+# Normalized weighted alpha
 a_NW = [tr_D[np.newaxis, ...] * alp for alp in a]
 a_NW = [alp_NW / np.sum(alp_NW, axis=1)[..., np.newaxis] for alp_NW in a_NW]
 
 plotting.plot_alpha(a_NW[0], filename=f"{analysis_dir}/a_NW.png")
 
-# Mean normalised weighted alpha
+# Mean normalized weighted alpha
 mean_a_NW = np.mean(np.concatenate(a_NW), axis=0)
 
 print("mean_a_NW:", mean_a_NW)
@@ -267,7 +267,7 @@ coh_map = analysis.connectivity.gmm_threshold(
     n_sigma=2,
     filename=f"{maps_dir}/gmm_coh_.png",
     plot_kwargs={
-        "x_label": "Standardised Relative Coherence",
+        "x_label": "Standardized Relative Coherence",
         "y_label": "Probability",
     },
 )

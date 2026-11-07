@@ -2,7 +2,7 @@
 HMM: Summary Statistics
 =======================
 
-A useful way of characterising the data is to use statistics that summarise the state time course, these are referred to as 'summary statistics'. The state time course captures the dynamics in the training data, therefore, summary statistics characterise the dynamics of the data.
+A useful way of characterizing the data is to use statistics that summarize the state time course, these are referred to as 'summary statistics'. The state time course captures the dynamics in the training data, therefore, summary statistics characterize the dynamics of the data.
 
 In this tutorial we calculate summary statistics for dynamics:
 
@@ -59,7 +59,7 @@ stc = modes.argmax_time_courses(alpha)
 fig, ax = plotting.plot_alpha(stc[0], n_samples=2000)
 
 #%%
-# We can see this time series is completely binarised, only one state is active at each time point.
+# We can see this time series is completely binarized, only one state is active at each time point.
 #
 # Calculate summary statistics
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

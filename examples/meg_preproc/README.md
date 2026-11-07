@@ -1,4 +1,4 @@
-# Parallelised Pipeline for Elekta MEG
+# Parallelized Pipeline for Elekta MEG
 
 This directory contains Python scripts that run the M/EEG processing pipeline on multiple sessions in parallel using `multiprocessing`.
 

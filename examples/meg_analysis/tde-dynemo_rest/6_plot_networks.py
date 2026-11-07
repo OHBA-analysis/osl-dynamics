@@ -57,7 +57,7 @@ p = power.variance_from_spectra(f, gpsd_coefs)
 power.save(
     p,
     parcellation_file=parcellation_file,
-    subtract_mean=True,  # just for visualisation
+    subtract_mean=True,  # just for visualization
     filename=f"{networks_dir}/pow_.png",
 )
 

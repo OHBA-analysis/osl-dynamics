@@ -20,7 +20,7 @@ The practical tutorials that follow show the tests on realistic analyses: :doc:`
 # ^^^^^^^^^^^^^^
 # We simulate a **network response**: the state (or mode) time course of a dynamic network model epoched around a task event and averaged over trials, for each subject. This gives an array with shape `(n_subjects, n_time, n_states)`. After baseline correction, the question is whether the response differs from zero at each time point and state.
 #
-# The noise is smoothed over time so that neighbouring time points are correlated, as they are in real data. A real effect is planted in state 1 (samples 30-60) and a smaller one in state 3 (samples 70-85).
+# The noise is smoothed over time so that neighboring time points are correlated, as they are in real data. A real effect is planted in state 1 (samples 30-60) and a smaller one in state 3 (samples 70-85).
 
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
@@ -77,7 +77,7 @@ fig.tight_layout()
 #
 # The General Linear Model
 # ************************
-# All tests in osl-dynamics are expressed as a General Linear Model (GLM): at every target the data :math:`y` (one value per sample) is modelled as
+# All tests in osl-dynamics are expressed as a General Linear Model (GLM): at every target the data :math:`y` (one value per sample) is modeled as
 #
 # .. math::
 #     y = X \beta + \epsilon,
@@ -196,7 +196,7 @@ print("Parametric p  =", round(result.pvalues[t_index, state], 3))
 #
 # Bonferroni and Holm
 # *******************
-# Bonferroni multiplies every p-value by the number of tests. It controls the FWER but is very conservative when the targets are correlated, as neighbouring time points are. Holm's step-down procedure is a uniformly more powerful version with the same guarantee.
+# Bonferroni multiplies every p-value by the number of tests. It controls the FWER but is very conservative when the targets are correlated, as neighboring time points are. Holm's step-down procedure is a uniformly more powerful version with the same guarantee.
 
 result_bonferroni = stats.evoked_response(data, correction="bonferroni")
 result_holm = stats.evoked_response(data, correction="holm")
@@ -226,14 +226,14 @@ fig, ax = result_max.plot_null()
 #%%
 # Cluster-based permutation test
 # ******************************
-# The maximum statistic treats every target on its own. But real effects in time (or frequency, or space) are extended: they form **clusters** of neighbouring targets. The cluster-based permutation test (`Maris & Oostenveld, 2007 <https://doi.org/10.1016/j.jneumeth.2007.03.024>`_) uses this:
+# The maximum statistic treats every target on its own. But real effects in time (or frequency, or space) are extended: they form **clusters** of neighboring targets. The cluster-based permutation test (`Maris & Oostenveld, 2007 <https://doi.org/10.1016/j.jneumeth.2007.03.024>`_) uses this:
 #
 # 1. Threshold the t-statistics at a **cluster-forming threshold** (by default the critical t at p = 0.05).
-# 2. Group neighbouring supra-threshold targets into clusters and sum their t-statistics to give a **cluster statistic**.
+# 2. Group neighboring supra-threshold targets into clusters and sum their t-statistics to give a **cluster statistic**.
 # 3. In each permutation, do the same and record the largest cluster statistic. This is the null distribution.
 # 4. A cluster's p-value is the fraction of permutations whose largest cluster was at least as big.
 #
-# The neighbours are defined by :code:`cluster_dims`: the target dimensions along which clusters can extend. For a network response that is time (dimension 0 of the targets, the default for :func:`~osl_dynamics.stats.inference.evoked_response`). States are not neighbours of each other, so a cluster never spans two states, but the maximum is still taken over all states and the FWER is controlled across the whole map.
+# The neighbors are defined by :code:`cluster_dims`: the target dimensions along which clusters can extend. For a network response that is time (dimension 0 of the targets, the default for :func:`~osl_dynamics.stats.inference.evoked_response`). States are not neighbors of each other, so a cluster never spans two states, but the maximum is still taken over all states and the FWER is controlled across the whole map.
 
 result_cluster = stats.evoked_response(data, n_perm=500, correction="cluster")
 print(result_cluster)
@@ -313,7 +313,7 @@ fig.tight_layout()
 #
 # Acceptable: "Network 1 showed a significant response (cluster-based permutation test, p = 0.002), most pronounced between 100 and 300 ms." Not acceptable: "Network 1 was significantly active from 100 to 300 ms."
 #
-# The same caveat applies, less strongly, to TFCE: its per-target p-values are still driven by neighbouring targets.
+# The same caveat applies, less strongly, to TFCE: its per-target p-values are still driven by neighboring targets.
 #
 # Reporting
 # ^^^^^^^^^

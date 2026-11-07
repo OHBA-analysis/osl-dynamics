@@ -26,12 +26,12 @@ The temporal model (transition probability matrix) is the same as the standard H
 Inference
 ---------
 
-HIVE infers the hidden states and transition probabilities as the HMM does, and learns the embedding vectors and the deviation MLP jointly during training, with KL annealing to stabilise the deviations. The embedding and deviation-network sizes are set in :class:`osl_dynamics.models.hive.Config`.
+HIVE infers the hidden states and transition probabilities as the HMM does, and learns the embedding vectors and the deviation MLP jointly during training, with KL annealing to stabilize the deviations. The embedding and deviation-network sizes are set in :class:`osl_dynamics.models.hive.Config`.
 
 Post-hoc Analysis
 -----------------
 
-The post-hoc analyses of the :doc:`HMM <hmm>` apply. In addition, the **embedding vectors** can be visualised to see how sessions cluster, correlated with external variables (age, sex, scanner), and the session-specific deviations examined to see how a session differs from the group.
+The post-hoc analyses of the :doc:`HMM <hmm>` apply. In addition, the **embedding vectors** can be visualized to see how sessions cluster, correlated with external variables (age, sex, scanner), and the session-specific deviations examined to see how a session differs from the group.
 
 References
 ----------

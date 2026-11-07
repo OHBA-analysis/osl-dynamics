@@ -56,7 +56,7 @@ The :code:`correction` argument selects the correction for multiple comparisons.
      - Targets without a natural neighbourhood: states, parcels, connections, summary statistics. Accounts for the correlation between targets. :code:`pooled_dims` restricts the family, e.g. to the parcels within each state.
    * - :code:`'cluster'`
      - FWER
-     - Effects extended along time or frequency (network responses, spectra). Clusters are formed along :code:`cluster_dims`; a custom :code:`adjacency` connects e.g. neighbouring parcels. A cluster's p-value does not establish its exact extent or latency.
+     - Effects extended along time or frequency (network responses, spectra). Clusters are formed along :code:`cluster_dims`; a custom :code:`adjacency` connects e.g. neighboring parcels. A cluster's p-value does not establish its exact extent or latency.
    * - :code:`'tfce'`
      - FWER
      - As :code:`'cluster'` without a cluster-forming threshold, with per-target p-values.

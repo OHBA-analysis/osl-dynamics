@@ -5,12 +5,12 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-green)](https://github.com/OHBA-analysis/osl-dynamics/blob/main/LICENSE)
 [![Paper](https://img.shields.io/badge/paper-eLife-orange)](https://elifesciences.org/articles/91949)
 
-osl-dynamics is a Python toolbox for studying brain dynamics using neuroimaging data: MEG, EEG and fMRI. It provides generative models that decompose data into brain networks (often called brain states or modes), including the Hidden Markov Model (HMM) and Dynamic Network Modes (DyNeMo), along with everything needed for a complete analysis: data loading and preparation, spectral estimation, network visualisation and statistical significance testing.
+osl-dynamics is a Python toolbox for studying brain dynamics using neuroimaging data: MEG, EEG and fMRI. It provides generative models that decompose data into brain networks (often called brain states or modes), including the Hidden Markov Model (HMM) and Dynamic Network Modes (DyNeMo), along with everything needed for a complete analysis: data loading and preparation, spectral estimation, network visualization and statistical significance testing.
 
 You can use osl-dynamics to:
 
 - **Infer dynamic functional networks** from resting-state or task M/EEG and fMRI data using the HMM, DyNeMo and related models (M-DyNeMo, HIVE, DIVE, DyNeSTE and more).
-- **Characterise brain states/modes** with summary statistics (fractional occupancy, lifetimes, intervals, switching rates), state-specific power maps, and functional connectivity.
+- **Characterize brain states/modes** with summary statistics (fractional occupancy, lifetimes, intervals, switching rates), state-specific power maps, and functional connectivity.
 - **Estimate spectra** using multitaper and regression-based methods, or wavelet transforms.
 - **Detect oscillatory bursts**.
 - **Test for statistical significance** with GLM permutation tests: maximum statistic, cluster-based and TFCE corrections, with covariates.

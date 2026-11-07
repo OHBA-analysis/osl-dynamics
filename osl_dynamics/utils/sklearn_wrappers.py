@@ -58,7 +58,7 @@ def linear_regression(
     new_shape = [X.shape[1]] + list(original_shape[1:])
     y = y.reshape(original_shape[0], -1)
 
-    # Normalise the regressors
+    # Normalize the regressors
     if normalize:
         X -= np.mean(X, axis=0)
         X /= np.std(X, axis=0)
@@ -187,7 +187,7 @@ def fit_gaussian_mixture(
         X_ = special.logit(X)
         X_[np.isinf(X_[:, 0]), :] = np.mean(X_[~np.isinf(X_[:, 0]), 0])
 
-    # Standardise the data
+    # Standardize the data
     if standardize:
         std = np.std(X_, axis=0)
         if std == 0:
@@ -247,7 +247,7 @@ def fit_gaussian_mixture(
         a *= gm.weights_[order]
 
         # Find the index of the data point closest to the desired p-value
-        # This defines the threshold in the standardised/logit transformed space
+        # This defines the threshold in the standardized/logit transformed space
         x_threshold = x[np.argmin(np.abs(a[:, 0] - p_value / X_.shape[0]))]
         index = np.argmin(np.abs(X_[:, 0] - x_threshold))
 
@@ -265,7 +265,7 @@ def fit_gaussian_mixture(
         on_prob_higher[X_[:, 0] < means[0]] = False
         index = np.argmax(on_prob_higher)
 
-    # Get the threshold in the standardised/logit transform and original space
+    # Get the threshold in the standardized/logit transform and original space
     threshold_ = X_[index, 0]
     threshold = X[index, 0]
 

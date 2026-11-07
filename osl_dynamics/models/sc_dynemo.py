@@ -51,7 +51,7 @@ class Model(DynemoModel):
     This model is a single-channel version of DyNeMo.
     It should only be used for single-channel data which has been time-embedded.
 
-    This model parameterises the covariance matrice for each model assuming a
+    This model parameterizes the covariance matrice for each model assuming a
     stochastic oscillators.
 
     The parameters are the amplitude (:math:`A`), frequency (:math:`f`), and

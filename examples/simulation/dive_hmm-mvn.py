@@ -130,7 +130,7 @@ plotting.plot_scatter(
     ax=axes[0],
 )
 
-# Perform PCA on the embeddings to visualise the embeddings
+# Perform PCA on the embeddings to visualize the embeddings
 plotting.plot_scatter(
     [lda_inf_embeddings[group_mask, 0] for group_mask in group_masks],
     [lda_inf_embeddings[group_mask, 1] for group_mask in group_masks],

@@ -2,7 +2,7 @@
 DyNeMo: Mixing Coefficients
 ===========================
 
-In this tutorial we analyse DyNeMo mixing coefficients. This tutorial covers:
+In this tutorial we analyze DyNeMo mixing coefficients. This tutorial covers:
 
 1. Summarizing the mixing coefficient time course
 2. Binarizing the mixing coefficient time course
@@ -46,7 +46,7 @@ fig, ax = plotting.plot_alpha(alpha[0], n_samples=2000)
 #
 # Normalizing the mixing coefficients
 # ***********************************
-# To account for the difference in mode covariances we can renormalise the mixing coefficients include the 'size' of the mode covariances.
+# To account for the difference in mode covariances we can renormalize the mixing coefficients include the 'size' of the mode covariances.
 
 import numpy as np
 from osl_dynamics.inference import modes
@@ -182,7 +182,7 @@ fo = modes.fractional_occupancies(thres_norm_alpha)
 print(np.mean(fo, axis=0))
 
 #%%
-# We see the fractional occupancy for each subject and state is 0.1, which corresponds to the segments with normalised alpha values in the top 10%. In contrast, the lifetimes are interpretable.
+# We see the fractional occupancy for each subject and state is 0.1, which corresponds to the segments with normalized alpha values in the top 10%. In contrast, the lifetimes are interpretable.
 
 mlt = modes.mean_lifetimes(thres_norm_alpha, sampling_frequency=250)
 

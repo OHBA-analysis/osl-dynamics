@@ -1,7 +1,7 @@
 Data
 ====
 
-Loading data into osl-dynamics and preparing it for modelling: standardisation, time-delay embedding and PCA.
+Loading data into osl-dynamics and preparing it for modeling: standardization, time-delay embedding and PCA.
 
 .. toctree::
    :hidden:

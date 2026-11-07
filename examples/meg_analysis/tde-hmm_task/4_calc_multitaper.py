@@ -67,7 +67,7 @@ np.save(f"{spectra_dir}/psd.npy", psd)
 np.save(f"{spectra_dir}/coh.npy", coh)
 np.save(f"{spectra_dir}/w.npy", w)
 
-#%% Calculate non-negative matrix factorisation (NNMF)
+#%% Calculate non-negative matrix factorization (NNMF)
 
 # We fit 2 'wideband' components
 wb_comp = spectral.decompose_spectra(coh, n_components=2)

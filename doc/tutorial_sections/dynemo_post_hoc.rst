@@ -1,7 +1,7 @@
 DyNeMo Post-hoc Analysis
 ========================
 
-Analysing the modes of a trained DyNeMo: regression spectra, networks and mixing coefficients.
+Analyzing the modes of a trained DyNeMo: regression spectra, networks and mixing coefficients.
 
 .. toctree::
    :hidden:

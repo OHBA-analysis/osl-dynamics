@@ -7,7 +7,7 @@ The high-level functions in :mod:`osl_dynamics.stats` cover the common questions
 1. Testing the effect of a continuous variable such as age.
 2. Specifying your own design matrix and contrasts.
 3. Parametric tests, one-tailed tests and uncorrected permutation p-values.
-4. Cluster-based tests with a custom adjacency (e.g. neighbouring parcels).
+4. Cluster-based tests with a custom adjacency (e.g. neighboring parcels).
 
 See the :doc:`Statistical Inference tutorial <7-1_statistical_inference>` for the background.
 """
@@ -115,7 +115,7 @@ print(result.pvalues.round(3))
 #%%
 # Clusters with a custom adjacency
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Cluster-based tests connect neighbouring indices along :code:`cluster_dims`. For dimensions that are not a lattice, such as parcels or sensors, pass an adjacency matrix: :code:`adjacency={dim: matrix}` where :code:`matrix[i, j]` is non-zero when targets :code:`i` and :code:`j` are neighbours. For sensors, MNE's :func:`mne.channels.find_ch_adjacency` provides one; for parcels it can be built from the parcel centroids.
+# Cluster-based tests connect neighboring indices along :code:`cluster_dims`. For dimensions that are not a lattice, such as parcels or sensors, pass an adjacency matrix: :code:`adjacency={dim: matrix}` where :code:`matrix[i, j]` is non-zero when targets :code:`i` and :code:`j` are neighbors. For sensors, MNE's :func:`mne.channels.find_ch_adjacency` provides one; for parcels it can be built from the parcel centroids.
 #
 # Here we simulate power maps over time for 12 parcels arranged in a ring, so that parcel :code:`i` is adjacent to :code:`i - 1` and :code:`i + 1`, with an effect in parcels 1-3 from sample 20 to 40:
 

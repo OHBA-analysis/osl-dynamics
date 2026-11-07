@@ -1011,7 +1011,7 @@ def save_interactive(
                 fn=Path(filename), i=i, w=len(str(n_modes))
             )
 
-        # The colour bar range is determined by the max value in the matrix
+        # The color bar range is determined by the max value in the matrix
         # we zero the diagonal so it's not included
         np.fill_diagonal(conn_map[i], val=0)
 

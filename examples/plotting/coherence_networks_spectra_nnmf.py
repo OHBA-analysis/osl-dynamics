@@ -43,7 +43,7 @@ conn_map = connectivity.gmm_threshold(
     one_component_percentile=95,
     filename="gmm_conn_.png",
     plot_kwargs={
-        "x_label": "Standardised Relative Coherence",
+        "x_label": "Standardized Relative Coherence",
         "y_label": "Probability",
     },
 )

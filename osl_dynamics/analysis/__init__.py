@@ -1,6 +1,6 @@
 """Post-hoc analysis of inferred state/mode dynamics.
 
-This subpackage provides tools for analysing the output of trained models
+This subpackage provides tools for analyzing the output of trained models
 (HMM states, DyNeMo modes, etc.) and for static (time-averaged) analysis.
 
 Modules

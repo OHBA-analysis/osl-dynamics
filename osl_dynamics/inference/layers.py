@@ -1982,7 +1982,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                 [batch_size, self.sequence_length], dtype=self.compute_dtype
             )
 
-            # Renormalise the log-likelihood for numerical stability
+            # Renormalize the log-likelihood for numerical stability
             max_values = tf.reduce_max(log_B, axis=-1, keepdims=True)
             max_values = tf.minimum(max_values, 0.0)
             log_B -= max_values

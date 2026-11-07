@@ -46,7 +46,7 @@ Each step reads the files written by the steps before it and writes its own at p
      - FSL
      - :func:`~osl_dynamics.meeg.rhino.extract_surfaces`
    * - Coregistration
-     - RHINO aligns the MEG head coordinates to the MRI: the fiducials first, then the digitised headshape points to the scalp surface.
+     - RHINO aligns the MEG head coordinates to the MRI: the fiducials first, then the digitized headshape points to the scalp surface.
      - osl-dynamics
      - :func:`~osl_dynamics.meeg.rhino.coregister_head_and_mri`
    * - Forward model

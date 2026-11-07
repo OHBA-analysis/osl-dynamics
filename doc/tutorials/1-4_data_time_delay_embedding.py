@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 # Simulate data:
 # - Channel 1: 10 Hz sine wave
 # - Channel 2: 20 Hz sine wave
-# - Channel 3: 20 Hz sine wave synchronised with channel 2 but with different amplitude
+# - Channel 3: 20 Hz sine wave synchronized with channel 2 but with different amplitude
 n = 10000
 t = np.arange(n) / 200  # we're using a sampling frequency of 200 Hz
 p = np.random.uniform(0, 2 * np.pi, size=(2,))  # random phases
@@ -47,7 +47,7 @@ plt.matshow(cov)
 plt.colorbar()
 
 #%%
-# The covariance here is a 3x3 matrix because we have 3 channels. The diagonal of this matrix is the variance and reflects the amplitude of each sine wave. The off-diagonal elements reflect the covariance between channels. In this example the covariance between the channels 1 and 2 is close to zero, however there is some covariance between channels 2 and 3 due to the phase synchronisation. Let's see what happens to the covariance matrix when we TDE the data.
+# The covariance here is a 3x3 matrix because we have 3 channels. The diagonal of this matrix is the variance and reflects the amplitude of each sine wave. The off-diagonal elements reflect the covariance between channels. In this example the covariance between the channels 1 and 2 is close to zero, however there is some covariance between channels 2 and 3 due to the phase synchronization. Let's see what happens to the covariance matrix when we TDE the data.
 
 from osl_dynamics.data import Data
 
@@ -187,9 +187,9 @@ ax[2].legend()
 plt.tight_layout()
 
 #%%
-# We can see the covariance of the TDE data, as well as the ACF/PSD has, changed to reflect the frequency of data. The above example shows how TDE leads to covariance matrices that are sensitive to oscillatory frequencies in the original data and how the number of embeddings relates to the frequency resolution that can be modelled.
+# We can see the covariance of the TDE data, as well as the ACF/PSD has, changed to reflect the frequency of data. The above example shows how TDE leads to covariance matrices that are sensitive to oscillatory frequencies in the original data and how the number of embeddings relates to the frequency resolution that can be modeled.
 #
-# In addition to modelling the frequency of oscillations in an individual channel, we can also model phase synchronisation across channels using TDE data. We can see from the above TDE covariance matrix the off-diagonal block for channels 2 and 3 (row 10-20, column 20-30) shows some structure. Let's plot the CCF for each pair of channels.
+# In addition to modeling the frequency of oscillations in an individual channel, we can also model phase synchronization across channels using TDE data. We can see from the above TDE covariance matrix the off-diagonal block for channels 2 and 3 (row 10-20, column 20-30) shows some structure. Let's plot the CCF for each pair of channels.
 
 plt.plot(tau, acf[0,1], label="Channel 1+2")
 plt.plot(tau, acf[1,2], label="Channel 2+3")
@@ -198,7 +198,7 @@ plt.ylabel("CCF (a.u.)")
 plt.legend()
 
 #%%
-# The structure in the CCF for channels 2 and 3 shows the time-lagged versions of these channels are correlated. Such structure arises from phase synchronisation. In contrast, we don't see any structure for the CCF between channels 1 and 2. This is because we simulated random phases for these channels.
+# The structure in the CCF for channels 2 and 3 shows the time-lagged versions of these channels are correlated. Such structure arises from phase synchronization. In contrast, we don't see any structure for the CCF between channels 1 and 2. This is because we simulated random phases for these channels.
 #
 # Let's plot the cross PSD for these channels.
 
@@ -209,7 +209,7 @@ plt.ylabel("Cross PSD (a.u)")
 plt.legend()
 
 #%%
-# We can see the cross PSD indicates the frequencies which show phase synchronisation.
+# We can see the cross PSD indicates the frequencies which show phase synchronization.
 #
 # In the above examples we have shown how the covariance of TDE data can capture the oscillatory properties (power spectra and frequency-specific coupling) of a time series.
 #

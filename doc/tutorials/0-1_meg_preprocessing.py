@@ -177,7 +177,7 @@ Output is written to ``derivatives/``.
 #
 #     raw, ica, ic_labels = preproc.ica_ecg_eog_correlation(raw, picks="meg")
 #
-# **Option B: MEGNet automatic labelling** — Uses ``mne-icalabel`` (included
+# **Option B: MEGNet automatic labeling** — Uses ``mne-icalabel`` (included
 # in the osl-dynamics conda environments) to classify components with a
 # pre-trained deep learning model. Note, MEGNet was trained on ``'mag'``
 # sensor topographies but we'll pass ``'meg'`` to include both magnetometers
@@ -265,7 +265,7 @@ Output is written to ``derivatives/``.
 # Extract fiducials and headshape
 # *******************************
 #
-# The Polhemus digitisation points are stored inside the FIF file. We extract them to text files that RHINO uses for coregistration.
+# The Polhemus digitization points are stored inside the FIF file. We extract them to text files that RHINO uses for coregistration.
 #
 # .. code-block:: python
 #

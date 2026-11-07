@@ -10,7 +10,7 @@ Modules
   and preparing data, and :py:class:`SessionLabels` for associating
   metadata with sessions.
 - :py:mod:`~osl_dynamics.data.processing` — Data preparation methods
-  (standardisation, time-delay embedding, PCA, amplitude envelope) called
+  (standardization, time-delay embedding, PCA, amplitude envelope) called
   via :py:meth:`Data.prepare`.
 - :py:mod:`~osl_dynamics.data.rw` — Low-level read/write functions for
   different file formats.

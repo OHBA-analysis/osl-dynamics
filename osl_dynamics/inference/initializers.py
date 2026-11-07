@@ -17,7 +17,7 @@ class WeightInitializer(Initializer):
     Parameters
     ----------
     initial_value : np.ndarray
-        Value to initialise weights to. Note, the shape is not checked.
+        Value to initialize weights to. Note, the shape is not checked.
     """
 
     def __init__(self, initial_value: np.ndarray) -> None:
@@ -35,7 +35,7 @@ class RandomWeightInitializer(Initializer):
     Parameters
     ----------
     initial_value : np.ndarray
-        Value to initialise weights to. Note, the shape is not checked.
+        Value to initialize weights to. Note, the shape is not checked.
     std : float
         Standard deviation of the noise to add.
     """
@@ -196,7 +196,7 @@ def reinitialize_layer_weights(layer: tf.keras.layers.Layer) -> None:
     function will break.
     """
 
-    # Get the initialisation container
+    # Get the initialization container
     if hasattr(layer, "cell"):
         init_container = layer.cell
     else:

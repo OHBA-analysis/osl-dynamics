@@ -14,7 +14,7 @@ Modules
 - :py:mod:`~osl_dynamics.meeg.session` — :py:class:`~osl_dynamics.meeg.session.Session`,
   the files of a session that the pipeline steps read and write.
 - :py:mod:`~osl_dynamics.meeg.rhino` — Surface extraction, coregistration
-  (RHINO), and forward modelling.
+  (RHINO), and forward modeling.
 - :py:mod:`~osl_dynamics.meeg.source_recon` — Source reconstruction (LCMV
   beamformer).
 - :py:mod:`~osl_dynamics.meeg.parcellation` — Parcellation of voxel data

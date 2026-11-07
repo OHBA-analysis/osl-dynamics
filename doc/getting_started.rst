@@ -27,7 +27,7 @@ Once you have parcellated source-space data (or fMRI data), a typical analysis f
 
 1. **Load data**: Load your parcellated (or sensor) M/EEG or fMRI data (:doc:`Data tutorials <tutorial_sections/data>`).
 2. **Prepare data**: Standardize, and optionally apply time-delay embedding (TDE) and PCA (:doc:`Data tutorials <tutorial_sections/data>`).
-3. **Train a model**: Fit an HMM, DyNeMo, or DyNeSte to infer dynamic brain states/modes (:doc:`Dynamic Modelling tutorials <tutorial_sections/dynamic_modelling>`).
+3. **Train a model**: Fit an HMM, DyNeMo, or DyNeSte to infer dynamic brain states/modes (:doc:`Dynamic Modeling tutorials <tutorial_sections/dynamic_modelling>`).
 4. **Post-hoc analysis**: Estimate state/mode spectra, compute summary statistics, and visualize networks (:doc:`HMM <tutorial_sections/hmm_post_hoc>` and :doc:`DyNeMo <tutorial_sections/dynemo_post_hoc>` post-hoc tutorials).
 5. **Group analysis**: Compare dynamics across groups or conditions using statistical testing (:doc:`Statistical Significance Testing tutorials <tutorial_sections/statistics>`).
 

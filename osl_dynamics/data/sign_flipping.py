@@ -325,7 +325,7 @@ def sign_flip(
         ``(n_parcels,)``.
     corr : float
         Correlation between the flipped covariance and ``template_cov`` (the
-        metric maximised by the flip search).
+        metric maximized by the flip search).
     """
     print()
     print("Sign flipping")

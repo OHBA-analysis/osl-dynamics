@@ -6,7 +6,7 @@ This directory contains Python scripts for preparing EEG data for source reconst
 
 | Script | Description |
 |--------|-------------|
-| `standard_montage_coreg.py` | Fit a standard montage to the MNI152 standard brain by scaling the electrode positions (with `osl_dynamics.meeg.preproc.scale_eeg_positions`). Useful when you don't have digitised electrode positions or a structural MRI. |
+| `standard_montage_coreg.py` | Fit a standard montage to the MNI152 standard brain by scaling the electrode positions (with `osl_dynamics.meeg.preproc.scale_eeg_positions`). Useful when you don't have digitized electrode positions or a structural MRI. |
 
 ## Usage
 

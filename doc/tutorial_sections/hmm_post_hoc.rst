@@ -1,7 +1,7 @@
 HMM Post-hoc Analysis
 =====================
 
-Analysing the states of a trained HMM: spectra, networks, summary statistics and fMRI dual estimation.
+Analyzing the states of a trained HMM: spectra, networks, summary statistics and fMRI dual estimation.
 
 .. toctree::
    :hidden:

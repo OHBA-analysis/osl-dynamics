@@ -2,7 +2,7 @@
 DyNeMo: Selecting a Run
 =======================
 
-Training DyNeMo several times on the same data can give different networks: the modes come out in a different order and, where the data do not constrain the solution well, some networks can be split or combined differently from run to run. A good default is to analyse the run with the lowest variational free energy. This tutorial covers an alternative, which chooses a run based on the networks the runs found, using only the mode covariances:
+Training DyNeMo several times on the same data can give different networks: the modes come out in a different order and, where the data do not constrain the solution well, some networks can be split or combined differently from run to run. A good default is to analyze the run with the lowest variational free energy. This tutorial covers an alternative, which chooses a run based on the networks the runs found, using only the mode covariances:
 
 1. Download the runs
 2. Power maps from the mode covariances
@@ -14,7 +14,7 @@ Training DyNeMo several times on the same data can give different networks: the 
 #%%
 # Download the runs
 # ^^^^^^^^^^^^^^^^^
-# In this tutorial, we'll download the mode covariances of 20 runs of a 6-mode TDE-DyNeMo model from `OSF <https://osf.io/by2tc/>`_. The model was trained on MEG data parcellated with a 38 region parcellation, prepared with 15 time-delay embeddings and 80 PCA components. Each run was trained with the same hyperparameters, the only difference being the random initialisation.
+# In this tutorial, we'll download the mode covariances of 20 runs of a 6-mode TDE-DyNeMo model from `OSF <https://osf.io/by2tc/>`_. The model was trained on MEG data parcellated with a 38 region parcellation, prepared with 15 time-delay embeddings and 80 PCA components. Each run was trained with the same hyperparameters, the only difference being the random initialization.
 
 import os
 
@@ -131,7 +131,7 @@ print(f"runs in its family: {info['families'][info['family']]}")
 print(f"typicality: {np.round(info['typicality'], 3)}")
 
 #%%
-# Let's plot the power maps of the selected run. These are the networks we would analyse. Each title gives the network the mode belongs to and the number of runs that network is found in.
+# Let's plot the power maps of the selected run. These are the networks we would analyze. Each title gives the network the mode belongs to and the number of runs that network is found in.
 
 fig, ax = power.save(
     relative_maps[run],

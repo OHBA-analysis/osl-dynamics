@@ -22,7 +22,7 @@ Modules
 - :py:mod:`~osl_dynamics.files.scanner` — MEG scanner layouts and channel
   name files (CTF-275, Neuromag-306).
 - :py:mod:`~osl_dynamics.files.scene` — HCP Workbench scene files for
-  cortical surface visualisation.
+  cortical surface visualization.
 """
 
 from osl_dynamics.files import (

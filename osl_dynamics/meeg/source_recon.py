@@ -1124,12 +1124,12 @@ def _compute_beamformer(
         else:
             # MWW
             #
-            # Compute orientation based on pre-normalised power
+            # Compute orientation based on pre-normalized power
             #
             # See eq 5 in Brookes et al, Optimising experimental design for
-            # MEG beamformer imaging, Neuroimage 2008. This optimises the
-            # orientation by maximising the power BEFORE any weight
-            # normalisation is performed
+            # MEG beamformer imaging, Neuroimage 2008. This optimizes the
+            # orientation by maximizing the power BEFORE any weight
+            # normalization is performed
             ori_pick = _sym_inv_sm(bf_denom, reduce_rank, inversion, sk)
 
         assert ori_pick.shape == (n_sources, n_orient, n_orient)

@@ -1,6 +1,6 @@
 """Fit a standard EEG montage to the MNI152 standard brain.
 
-If we don't have digitised electrode positions or a structural MRI, we can
+If we don't have digitized electrode positions or a structural MRI, we can
 use a standard montage and a standard brain to source reconstruct EEG data.
 However, the electrodes of a standard montage don't sit on the scalp of the
 standard brain.

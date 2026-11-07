@@ -12,7 +12,7 @@ from glob import glob
 from osl_dynamics.analysis import power, connectivity
 from osl_dynamics.inference import modes
 
-#%% Calculate HMM features summarising dynamics
+#%% Calculate HMM features summarizing dynamics
 
 # Load inferred state probabilities
 alp = pickle.load(open("data/inf_params/alp.pkl", "rb"))

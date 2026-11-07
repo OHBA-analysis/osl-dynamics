@@ -11,14 +11,14 @@ Modules
   layers, etc.).
 - :py:mod:`~osl_dynamics.inference.callbacks` — Training callbacks (KL
   annealing, transition probability updates, EMA).
-- :py:mod:`~osl_dynamics.inference.initializers` — Weight initialisers for
+- :py:mod:`~osl_dynamics.inference.initializers` — Weight initializers for
   observation model parameters.
 - :py:mod:`~osl_dynamics.inference.metrics` — Loss metrics and evaluation
   functions.
 - :py:mod:`~osl_dynamics.inference.modes` — Utilities for manipulating
   inferred mode/state time courses (reordering, matching, correlation).
-- :py:mod:`~osl_dynamics.inference.optimizers` — Custom optimisers.
-- :py:mod:`~osl_dynamics.inference.regularizers` — Regularisers for
+- :py:mod:`~osl_dynamics.inference.optimizers` — Custom optimizers.
+- :py:mod:`~osl_dynamics.inference.regularizers` — Regularizers for
   observation model parameters.
 - :py:mod:`~osl_dynamics.inference.tf_ops` — TensorFlow utility operations.
 """

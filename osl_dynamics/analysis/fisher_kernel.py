@@ -64,10 +64,10 @@ class FisherKernel:
             shuffle=False,
         )
 
-        # Initialise list to hold features for each session
+        # Initialize list to hold features for each session
         features = []
         for i in progress(range(n_sessions), desc="Calculating Fisher features"):
-            # Initialise dictionary for holding gradients
+            # Initialize dictionary for holding gradients
             d_model = dict()
 
             if self.model.config.model_name == "HMM":
@@ -117,7 +117,7 @@ class FisherKernel:
 
         features = np.array(features)  # shape=(n_sessions, n_features)
 
-        # Normalise the features to l2-norm of 1
+        # Normalize the features to l2-norm of 1
         features_l2_norm = np.sqrt(np.sum(np.square(features), axis=-1, keepdims=True))
         features /= features_l2_norm
         return features

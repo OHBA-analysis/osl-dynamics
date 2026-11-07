@@ -1716,11 +1716,11 @@ def plot_brain_surface(
         fig.suptitle(title, fontsize=30, y=0.97)
 
         if colorbar:
-            # Positioning and size of the colour bar
+            # Positioning and size of the color bar
             # [left, bottom, width, height]
             cbar_ax = fig.add_axes([0.25, 0.2, 0.5, 0.05])
 
-            # Colour bar
+            # Color bar
             sm = plt.cm.ScalarMappable(
                 cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax)
             )
@@ -1739,11 +1739,11 @@ def plot_brain_surface(
         fig.suptitle(title, fontsize=22, y=0.98)
 
         if colorbar:
-            # Positioning and size of the colour bar
+            # Positioning and size of the color bar
             # [left, bottom, width, height]
             cbar_ax = fig.add_axes([0.3, 0.1, 0.4, 0.04])
 
-            # Colour bar
+            # Color bar
             sm = plt.cm.ScalarMappable(
                 cmap=cmap, norm=plt.Normalize(vmin=vmin, vmax=vmax)
             )
@@ -1890,7 +1890,7 @@ def plot_alpha(
     # Fix layout
     plt.tight_layout()
 
-    # Add a colour bar
+    # Add a color bar
     norm = matplotlib.colors.BoundaryNorm(
         boundaries=range(n_modes + 1), ncolors=n_modes
     )
@@ -1928,7 +1928,7 @@ def plot_state_lifetimes(
     Parameters
     ----------
     state_time_course : np.ndarray
-        Mode time course to analyse.
+        Mode time course to analyze.
     bins : int, optional
         Number of bins for the histograms.
     density : bool, optional
@@ -2111,7 +2111,7 @@ def plot_psd_topo(
         parcellation = Parcellation(parcellation_file)
         roi_centers = parcellation.roi_centers()
 
-        # Re-order to use colour to indicate anterior->posterior location
+        # Re-order to use color to indicate anterior->posterior location
         order = np.argsort(roi_centers[:, 1])
         roi_centers = roi_centers[order]
         psd = np.copy(psd)[order]
