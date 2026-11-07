@@ -78,7 +78,8 @@ def complete_case_groups(
         dropped = missing.sum(axis=0)
         n_affected = int((dropped > 0).sum())
         _logger.warning(
-            f"{n_affected} of {n_targets} targets have missing values. "
+            f"{n_affected} of {n_targets} targets have missing values (in the data "
+            "or the design). "
             f"Between {dropped[dropped > 0].min()} and {dropped.max()} of "
             f"{n_samples} samples were dropped for these targets."
         )
@@ -126,6 +127,67 @@ def hat_adjustment(varcopes: np.ndarray, hat: float) -> np.ndarray:
     return varcopes + hat * np.nanmax(varcopes, axis=-1, keepdims=True)
 
 
+# Relative tolerances: a contrast row counts as estimable when its component
+# outside the row space of the design is below this fraction of its size, and
+# a residual sum of squares below this fraction of the total sum of squares
+# counts as zero (a constant target)
+_ESTIMABLE_RTOL = 1e-8
+_ZERO_SS_RTOL = 1e-10
+
+
+def estimable_contrast(C: np.ndarray, X: np.ndarray, pinv: np.ndarray) -> np.ndarray:
+    """The estimable part of a contrast for a design.
+
+    A hypothesis :math:`C \\beta = 0` can only be tested for the part of
+    :math:`C` that lies in the row space of :math:`X`. This is the whole of
+    :math:`C` unless the design is rank deficient in a way that involves the
+    contrast, e.g. a group with no data for a target (so its indicator column
+    is all zero for the complete samples of that target): the difference
+    between that group and another is then not estimable, while differences
+    between the remaining groups still are.
+
+    Parameters
+    ----------
+    C : np.ndarray
+        Contrast matrix. Shape is (n_rows, n_features).
+    X : np.ndarray
+        Design matrix. Shape is (n_samples, n_features).
+    pinv : np.ndarray
+        Pseudo-inverse of :code:`X`. Shape is (n_features, n_samples).
+
+    Returns
+    -------
+    C_est : np.ndarray
+        Rows spanning the estimable part of the contrast. Shape is
+        (n_estimable, n_features), with :code:`n_estimable <= n_rows` and
+        possibly zero.
+    """
+    # Component of each row outside the row space of X
+    outside = C - (C @ pinv) @ X
+    scale = np.abs(C).max(axis=1, keepdims=True)
+    if np.all(np.abs(outside) <= _ESTIMABLE_RTOL * scale):
+        return C
+    # Combinations of the rows that have no component outside: the left
+    # null space of `outside`
+    U, s, _ = np.linalg.svd(outside, full_matrices=True)
+    rank = int(np.sum(s > _ESTIMABLE_RTOL * max(s.max(), np.abs(C).max())))
+    A = U[:, rank:]
+    return A.T @ C
+
+
+def _estimable_rows(C: np.ndarray, X: np.ndarray, pinv: np.ndarray) -> np.ndarray:
+    """Which rows of a contrast matrix are estimable (boolean array)."""
+    outside = C - (C @ pinv) @ X
+    scale = np.abs(C).max(axis=1)
+    return np.all(np.abs(outside) <= _ESTIMABLE_RTOL * scale[:, None], axis=1)
+
+
+def _zero_small(ss: np.ndarray, total: np.ndarray) -> np.ndarray:
+    """Set residual sums of squares that are zero up to floating point
+    noise (constant targets) to exactly zero."""
+    return np.where(ss <= _ZERO_SS_RTOL * total, 0.0, ss)
+
+
 def f_whitening(c_pinv: np.ndarray, name: str = "") -> np.ndarray:
     """Whitening matrix for the rows of an F-contrast.
 
@@ -155,12 +217,6 @@ def f_whitening(c_pinv: np.ndarray, name: str = "") -> np.ndarray:
     keep = eigenvalues > tol
     if not keep.any():
         raise ValueError(f"F-contrast {name} is not estimable with this design.")
-    if keep.sum() < M.shape[0]:
-        _logger.warning(
-            f"F-contrast {name} has {M.shape[0]} rows but only {keep.sum()} are "
-            "estimable with this design (the numerator degrees of freedom are "
-            f"{keep.sum()})."
-        )
     return (V[:, keep] / np.sqrt(eigenvalues[keep])).T
 
 
@@ -210,8 +266,16 @@ def fit_ols(
         Copes of the rows of each F-contrast. Shape of each is
         (n_rows, n_targets).
     f_dof : np.ndarray
-        Numerator degrees of freedom of each F-contrast. Shape is
-        (n_f_contrasts,).
+        Numerator degrees of freedom of each F-contrast for each target (the
+        number of estimable rows). Shape is (n_f_contrasts, n_targets).
+
+    Notes
+    -----
+    A contrast that is not estimable for a target (e.g. a group difference
+    when the group has no data for that target) gets NaN statistics; an
+    F-contrast that is partly estimable tests its estimable part with fewer
+    numerator degrees of freedom. Targets with zero residual variance get
+    NaN statistics unless :code:`hat > 0`.
     """
     X = np.asarray(X, dtype=float)
     y = np.asarray(y, dtype=float)
@@ -239,7 +303,8 @@ def fit_ols(
     f_num = np.empty((n_f_contrasts, n_targets))
     f_den = np.empty((n_f_contrasts, n_targets))
     f_copes = [np.empty((c.shape[0], n_targets)) for c in f_contrasts]
-    f_dof = np.zeros(n_f_contrasts, dtype=int)
+    f_dof = np.zeros((n_f_contrasts, n_targets), dtype=int)
+    not_estimable = {}
 
     for rows, targets in complete_case_groups(X, y, warn=warn):
         X_r = X[rows]
@@ -250,7 +315,8 @@ def fit_ols(
         dof_r = X_r.shape[0] - np.linalg.matrix_rank(X_r)
         b = pinv @ y_r
         residuals = y_r - X_r @ b
-        s2 = np.sum(residuals**2, axis=0) / dof_r
+        ss = _zero_small(np.sum(residuals**2, axis=0), np.sum(y_r**2, axis=0))
+        s2 = ss / dof_r
 
         # diag(C (X^T X)^+ C^T) using (X^T X)^+ = pinv pinv^T
         c_pinv = contrasts @ pinv
@@ -261,18 +327,45 @@ def fit_ols(
         varcopes[:, targets] = c_xtx_c[:, None] * s2[None, :]
         dof[targets] = dof_r
 
+        if n_contrasts:
+            estimable = _estimable_rows(contrasts, X_r, pinv)
+            for i in np.where(~estimable)[0]:
+                copes[i, targets] = np.nan
+                varcopes[i, targets] = np.nan
+                not_estimable[f"t-contrast {i}"] = not_estimable.get(
+                    f"t-contrast {i}", 0
+                ) + len(targets)
+
         for i, C in enumerate(f_contrasts):
-            L = f_whitening(C @ pinv, name=str(i))
+            C_est = estimable_contrast(C, X_r, pinv)
             cb = C @ b
+            cb[~_estimable_rows(C, X_r, pinv)] = np.nan
             f_copes[i][:, targets] = cb
-            f_num[i, targets] = np.sum((L @ cb) ** 2, axis=0)
-            f_den[i, targets] = L.shape[0] * s2
-            f_dof[i] = L.shape[0]
+            f_dof[i, targets] = C_est.shape[0]
+            if C_est.shape[0] < C.shape[0]:
+                not_estimable[f"F-contrast {i}"] = not_estimable.get(
+                    f"F-contrast {i}", 0
+                ) + len(targets)
+            if C_est.shape[0] == 0:
+                f_num[i, targets] = np.nan
+                f_den[i, targets] = np.nan
+                continue
+            L = f_whitening(C_est @ pinv, name=str(i))
+            f_num[i, targets] = np.sum((L @ C_est @ b) ** 2, axis=0)
+            f_den[i, targets] = C_est.shape[0] * s2
+
+    if warn:
+        for name, n in not_estimable.items():
+            _logger.warning(
+                f"{name} is not (fully) estimable for {n} of {n_targets} targets, "
+                "e.g. a group has no data for them. Its estimable part is tested, "
+                "with NaN statistics where there is none."
+            )
 
     varcopes = hat_adjustment(varcopes, hat)
     f_den = hat_adjustment(f_den, hat)
     with np.errstate(divide="ignore", invalid="ignore"):
-        fstats = f_num / f_den
+        fstats = np.where(f_den > 0, f_num / f_den, np.nan)
     return betas, copes, varcopes, dof, fstats, f_copes, f_dof
 
 
@@ -289,7 +382,7 @@ class GLM:
     >>> glm = GLM(design)
     >>> result = glm.fit(data)  # data has shape (n_samples, *target_dims)
     >>> result.copes.shape      # (n_contrasts, *target_dims)
-    >>> result.test(contrast_indx=0, correction="fdr").significant()
+    >>> result.test(contrast_index=0, correction="fdr").significant()
     >>> result.ftest(0).pvalues  # if the design has an F-contrast
     """
 
@@ -345,5 +438,5 @@ class GLM:
             dof=dof.reshape(target_dims),
             fstats=fstats.reshape((self.n_f_contrasts, *target_dims)),
             f_copes=[c.reshape((c.shape[0], *target_dims)) for c in f_copes],
-            f_dof=f_dof,
+            f_dof=f_dof.reshape((self.n_f_contrasts, *target_dims)),
         )

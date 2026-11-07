@@ -239,6 +239,8 @@ class Design:
         if (values is None) == (contrasts is None):
             raise ValueError("Pass either values or contrasts, not both.")
         if contrasts is not None:
+            if len(contrasts) == 0:
+                raise ValueError("contrasts must name at least one t-contrast.")
             rows = []
             for contrast in contrasts:
                 if isinstance(contrast, str):
@@ -332,13 +334,13 @@ class Design:
             X[:, cts] = (X[:, cts] - mean) / std
         return X
 
-    def contrast_feature_indices(self, contrast_indx: int) -> np.ndarray:
+    def contrast_feature_indices(self, contrast_index: int) -> np.ndarray:
         """Indices of the features with a non-zero weight in a t-contrast."""
-        return self.contrasts[contrast_indx].feature_indices
+        return self.contrasts[contrast_index].feature_indices
 
-    def nuisance_feature_indices(self, contrast_indx: int) -> np.ndarray:
+    def nuisance_feature_indices(self, contrast_index: int) -> np.ndarray:
         """Indices of the features with a zero weight in a t-contrast."""
-        return self.contrasts[contrast_indx].nuisance_indices
+        return self.contrasts[contrast_index].nuisance_indices
 
     @property
     def n_samples(self) -> int:
@@ -380,8 +382,10 @@ class Design:
 
     @property
     def dof(self) -> int:
-        """Degrees of freedom of the full design (no missing data)."""
+        """Degrees of freedom of the design, for the samples without missing
+        values in the design matrix."""
         X = self.build_X()
+        X = X[~np.isnan(X).any(axis=1)]
         return X.shape[0] - np.linalg.matrix_rank(X)
 
     def summary(self) -> Dict:

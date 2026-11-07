@@ -67,8 +67,9 @@ def parametric_fpvalues(
 
 
 def _tstats(copes: np.ndarray, varcopes: np.ndarray) -> np.ndarray:
+    # A zero variance (constant target) gives an undefined t-statistic
     with np.errstate(divide="ignore", invalid="ignore"):
-        return copes / np.sqrt(varcopes)
+        return np.where(varcopes > 0, copes / np.sqrt(varcopes), np.nan)
 
 
 @dataclass
@@ -95,8 +96,9 @@ class GLMResult:
         Copes of the rows of each F-contrast. Shape of each is
         (n_rows, \\*target_dims).
     f_dof : np.ndarray, optional
-        Numerator degrees of freedom of each F-contrast. Shape is
-        (n_f_contrasts,).
+        Numerator degrees of freedom of each F-contrast at each target (the
+        number of estimable rows, which can be smaller for targets with
+        missing values). Shape is (n_f_contrasts, \\*target_dims).
     """
 
     design: Design
@@ -151,12 +153,12 @@ class GLMResult:
         """
         if self.fstats is None or len(self.fstats) == 0:
             raise ValueError("The design has no F-contrasts.")
-        f_dof = self.f_dof.reshape((-1,) + (1,) * len(self.target_dims))
-        return parametric_fpvalues(self.fstats, f_dof, self.dof[None])
+        with np.errstate(invalid="ignore"):
+            return parametric_fpvalues(self.fstats, self.f_dof, self.dof[None])
 
     def test(
         self,
-        contrast_indx: int = 0,
+        contrast_index: int = 0,
         correction: Optional[str] = None,
         tail: int = 0,
     ) -> "TestResult":
@@ -164,7 +166,7 @@ class GLMResult:
 
         Parameters
         ----------
-        contrast_indx : int, optional
+        contrast_index : int, optional
             Which contrast to test.
         correction : str, optional
             :code:`'bonferroni'`, :code:`'holm'`, :code:`'fdr'` or
@@ -178,11 +180,16 @@ class GLMResult:
         result : TestResult
             Test result with parametric p-values.
         """
-        uncorrected = self.pvalues(tail)[contrast_indx]
+        if not 0 <= contrast_index < len(self.contrast_names):
+            raise ValueError(
+                f"contrast_index must be between 0 and {len(self.contrast_names) - 1} "
+                f"(the design has {len(self.contrast_names)} t-contrasts)."
+            )
+        uncorrected = self.pvalues(tail)[contrast_index]
         return TestResult(
-            contrast=self.contrast_names[contrast_indx],
-            copes=self.copes[contrast_indx],
-            tstats=self.tstats[contrast_indx],
+            contrast=self.contrast_names[contrast_index],
+            copes=self.copes[contrast_index],
+            tstats=self.tstats[contrast_index],
             pvalues=correct(uncorrected, correction),
             pvalues_uncorrected=uncorrected,
             correction=correction,
@@ -194,14 +201,14 @@ class GLMResult:
 
     def ftest(
         self,
-        contrast_indx: int = 0,
+        contrast_index: int = 0,
         correction: Optional[str] = None,
     ) -> "TestResult":
         """Parametric test of an F-contrast.
 
         Parameters
         ----------
-        contrast_indx : int, optional
+        contrast_index : int, optional
             Which F-contrast to test.
         correction : str, optional
             :code:`'bonferroni'`, :code:`'holm'`, :code:`'fdr'` or
@@ -214,21 +221,26 @@ class GLMResult:
             the copes of the rows of the F-contrast and
             :code:`result.fstats` the F-statistics.
         """
-        uncorrected = self.fpvalues()[contrast_indx]
+        if not 0 <= contrast_index < len(self.f_contrast_names):
+            raise ValueError(
+                f"contrast_index must be between 0 and {len(self.f_contrast_names) - 1} "
+                f"(the design has {len(self.f_contrast_names)} F-contrasts)."
+            )
+        uncorrected = self.fpvalues()[contrast_index]
         return TestResult(
-            contrast=self.f_contrast_names[contrast_indx],
-            copes=self.f_copes[contrast_indx],
+            contrast=self.f_contrast_names[contrast_index],
+            copes=self.f_copes[contrast_index],
             tstats=None,
             pvalues=correct(uncorrected, correction),
             pvalues_uncorrected=uncorrected,
             correction=correction,
             tail=0,
-            metric="tstats",
+            metric="fstats",
             parametric=True,
             glm=self,
             statistic="F",
-            fstats=self.fstats[contrast_indx],
-            f_dof=int(self.f_dof[contrast_indx]),
+            fstats=self.fstats[contrast_index],
+            f_dof=self.f_dof[contrast_index],
         )
 
     def summary(self) -> Dict:
@@ -266,8 +278,8 @@ class TestResult:
     glm : GLMResult
         The fitted GLM (all contrasts).
     metric : str
-        Statistic the permutation test was run on, :code:`'tstats'` or
-        :code:`'copes'`.
+        Statistic the permutation test was run on, :code:`'tstats'`,
+        :code:`'copes'` or :code:`'fstats'`.
     parametric : bool
         Whether the p-values come from the t distribution rather than
         permutations.
@@ -300,8 +312,9 @@ class TestResult:
         :code:`'t'` for a t-contrast or :code:`'F'` for an F-contrast.
     fstats : np.ndarray, optional
         F-statistics for an F-test. Shape is (\\*target_dims).
-    f_dof : int, optional
-        Numerator degrees of freedom of the F-test.
+    f_dof : np.ndarray, optional
+        Numerator degrees of freedom of the F-test at each target. Shape is
+        (\\*target_dims).
     """
 
     contrast: str
@@ -326,7 +339,7 @@ class TestResult:
     tfce_map: Optional[np.ndarray] = field(default=None, repr=False)
     statistic: str = "t"
     fstats: Optional[np.ndarray] = None
-    f_dof: Optional[int] = None
+    f_dof: Optional[np.ndarray] = None
 
     @property
     def target_dims(self) -> Tuple[int, ...]:

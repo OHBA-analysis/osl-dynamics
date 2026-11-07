@@ -130,7 +130,7 @@ def _run(
     hat: float,
     parametric: bool,
     n_jobs: int,
-    contrast_indx: int = 0,
+    contrast_index: int = 0,
     statistic: str = "t",
 ) -> TestResult:
     if statistic == "F":
@@ -146,7 +146,7 @@ def _run(
     if correction == "max_stat":
         perm = MaxStatPermutation(
             design,
-            contrast_indx=contrast_indx,
+            contrast_index=contrast_index,
             n_perm=n_perm,
             tail=tail,
             metric=metric,
@@ -174,7 +174,7 @@ def _run(
             )
         perm = ClusterPermutation(
             design,
-            contrast_indx=contrast_indx,
+            contrast_index=contrast_index,
             n_perm=n_perm,
             tail=tail,
             cluster_dims=cluster_dims,
@@ -196,12 +196,12 @@ def _run(
     if parametric:
         glm_result = GLM(design).fit(data, hat=hat)
         if statistic == "F":
-            return glm_result.ftest(contrast_indx, correction=correction)
-        return glm_result.test(contrast_indx, correction=correction, tail=tail)
+            return glm_result.ftest(contrast_index, correction=correction)
+        return glm_result.test(contrast_index, correction=correction, tail=tail)
 
     perm = Permutation(
         design,
-        contrast_indx=contrast_indx,
+        contrast_index=contrast_index,
         n_perm=n_perm,
         tail=tail,
         metric=metric,
@@ -391,6 +391,8 @@ def group_diff(
         for group in groups:
             if group not in unique_groups:
                 raise ValueError(f"group {group} not found in assignments.")
+        # Canonical labels (e.g. the user may pass 1.0 for the label 1)
+        groups = tuple(unique_groups[unique_groups.index(group)] for group in groups)
 
     features = [
         {
@@ -447,10 +449,10 @@ def group_diff(
 
 def regression(
     data: np.ndarray,
-    covariate: np.ndarray,
+    regressor: np.ndarray,
     n_perm: int = 1000,
     covariates: Optional[Dict[str, np.ndarray]] = None,
-    name: str = "Covariate",
+    name: str = "Regressor",
     correction: Optional[str] = "max_stat",
     metric: str = "tstats",
     tail: int = 0,
@@ -472,7 +474,7 @@ def regression(
     ----------
     data : np.ndarray
         Data. Shape is (n_samples, \\*target_dims).
-    covariate : np.ndarray
+    regressor : np.ndarray
         Variable of interest, e.g. age. Shape is (n_samples,).
     name : str, optional
         Name of the variable of interest.
@@ -480,7 +482,7 @@ def regression(
     data = np.asarray(data, dtype=float)
     features = [
         {"name": "Mean", "values": np.ones(data.shape[0]), "feature_type": "constant"},
-        {"name": name, "values": np.asarray(covariate), "feature_type": "continuous"},
+        {"name": name, "values": np.asarray(regressor), "feature_type": "continuous"},
     ] + _covariate_features(covariates)
     contrasts = [{"name": name, "values": [0, 1] + [0] * (len(features) - 2)}]
     design = DesignConfig(features=features, contrasts=contrasts).create_design()

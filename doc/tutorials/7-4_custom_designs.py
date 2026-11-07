@@ -63,9 +63,9 @@ design = stats.DesignConfig(
 fig, axes = design.plot()
 
 #%%
-# A design is tested with one of the permutation classes. :class:`~osl_dynamics.stats.permutation.MaxStatPermutation` uses the maximum statistic over the targets; :class:`~osl_dynamics.stats.permutation.ClusterPermutation` the cluster-based test. :code:`contrast_indx` selects the contrast. The permutation type is chosen from the design (row shuffles for a categorical difference) unless :code:`perm_type` is passed.
+# A design is tested with one of the permutation classes. :class:`~osl_dynamics.stats.permutation.MaxStatPermutation` uses the maximum statistic over the targets; :class:`~osl_dynamics.stats.permutation.ClusterPermutation` the cluster-based test. :code:`contrast_index` selects the contrast. The permutation type is chosen from the design (row shuffles for a categorical difference) unless :code:`perm_type` is passed.
 
-perm = stats.MaxStatPermutation(design, contrast_indx=0, n_perm=1000)
+perm = stats.MaxStatPermutation(design, contrast_index=0, n_perm=1000)
 result = perm.fit(fo)
 print(result)
 
@@ -81,12 +81,12 @@ design.add_f_contrast(
     contrasts=["Patients - Controls", "Patients A - Patients B"],
 )
 
-result = stats.MaxStatPermutation(design, contrast_indx=0, n_perm=1000, statistic="F").fit(fo)
+result = stats.MaxStatPermutation(design, contrast_index=0, n_perm=1000, statistic="F").fit(fo)
 print(result)
 print("F-statistics:", np.round(result.stats, 2))
 
 #%%
-# :code:`statistic="F"` makes :code:`contrast_indx` refer to the F-contrasts of the design. An F-test has no direction, so :code:`tail` must be 0 and the permutation statistic is always F. :code:`result.copes` holds the copes of each row of the F-contrast. An F-contrast can also be given directly as a matrix, one t-contrast per row, with :code:`values=[[-1, 0.5, 0.5, 0, 0], [0, 1, -1, 0, 0]]` or in :class:`~osl_dynamics.stats.design.DesignConfig` with :code:`f_contrasts=[{"name": ..., "values": ...}]`. The parametric version is :code:`stats.GLM(design).fit(fo).ftest(0)`.
+# :code:`statistic="F"` makes :code:`contrast_index` refer to the F-contrasts of the design. An F-test has no direction, so :code:`tail` must be 0 and the permutation statistic is always F. :code:`result.copes` holds the copes of each row of the F-contrast. An F-contrast can also be given directly as a matrix, one t-contrast per row, with :code:`values=[[-1, 0.5, 0.5, 0, 0], [0, 1, -1, 0, 0]]` or in :class:`~osl_dynamics.stats.design.DesignConfig` with :code:`f_contrasts=[{"name": ..., "values": ...}]`. The parametric version is :code:`stats.GLM(design).fit(fo).ftest(0)`.
 #
 # Parametric tests
 # ^^^^^^^^^^^^^^^^
@@ -95,7 +95,7 @@ print("F-statistics:", np.round(result.stats, 2))
 glm_result = stats.GLM(design).fit(fo)
 print(glm_result.betas.shape, glm_result.copes.shape)  # (features, states), (contrasts, states)
 
-result = glm_result.test(contrast_indx=0, correction="fdr")
+result = glm_result.test(contrast_index=0, correction="fdr")
 print(result)
 
 #%%

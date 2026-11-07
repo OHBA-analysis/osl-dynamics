@@ -32,7 +32,9 @@ from osl_dynamics.stats.cluster import (
 from osl_dynamics.stats.design import Design
 from osl_dynamics.stats.glm import (
     GLM,
+    _zero_small,
     complete_case_groups,
+    estimable_contrast,
     f_whitening,
     hat_adjustment,
     validate_y,
@@ -49,10 +51,11 @@ PERM_TYPES = ("sign_flip", "row_shuffle")
 _MAX_BATCH_ELEMENTS = 2**24
 _MAX_NULL_ELEMENTS = 2**24
 
-# Relative tolerance when counting null statistics at least as large as the
-# observed one. Permutations that are equivalent to the observed data (e.g.
-# swapping two subjects of the same group) give the same statistic up to
-# floating point noise and must be counted as ties.
+# Tolerance when counting null statistics at least as large as the observed
+# one, relative to the largest statistic seen. Permutations that are
+# equivalent to the observed data (e.g. swapping two subjects of the same
+# group) give the same statistic up to floating point noise and must be
+# counted as ties.
 _TIE_RTOL = 1e-8
 
 
@@ -96,7 +99,7 @@ class Permutation:
     ----------
     design : Design
         The design (regressors and contrasts).
-    contrast_indx : int, optional
+    contrast_index : int, optional
         Index of the contrast to test.
     n_perm : int, optional
         Number of permutations. If every possible permutation can be
@@ -119,11 +122,12 @@ class Permutation:
     n_jobs : int, optional
         Number of parallel jobs. Only used by cluster-based corrections.
     statistic : str, optional
-        :code:`'t'` to test the t-contrast :code:`contrast_indx` of the
-        design, or :code:`'F'` to test its F-contrast :code:`contrast_indx`
+        :code:`'t'` to test the t-contrast :code:`contrast_index` of the
+        design, or :code:`'F'` to test its F-contrast :code:`contrast_index`
         (e.g. any difference between three or more groups). An F-test has no
         direction, so :code:`tail` must be 0 and :code:`metric` must be
-        :code:`'tstats'` (the statistic is F).
+        :code:`'tstats'` (the statistic is F, reported as
+        :code:`metric='fstats'`).
     """
 
     correction: Optional[str] = None
@@ -134,7 +138,7 @@ class Permutation:
     def __init__(
         self,
         design: Design,
-        contrast_indx: int = 0,
+        contrast_index: int = 0,
         n_perm: int = 1000,
         perm_type: Optional[str] = None,
         tail: int = 0,
@@ -150,21 +154,23 @@ class Permutation:
             raise ValueError(f"statistic must be 't' or 'F', got {statistic}.")
         self.statistic = statistic
         contrasts = design.contrasts if statistic == "t" else design.f_contrasts
-        if not 0 <= contrast_indx < len(contrasts):
+        if not 0 <= contrast_index < len(contrasts):
             raise ValueError(
-                f"contrast_indx must be between 0 and {len(contrasts) - 1} "
+                f"contrast_index must be between 0 and {len(contrasts) - 1} "
                 f"(the design has {len(contrasts)} {statistic}-contrasts)."
             )
-        self.contrast_indx = contrast_indx
-        self._contrast = contrasts[contrast_indx]
+        self.contrast_index = contrast_index
+        self._contrast = contrasts[contrast_index]
         self.contrast_name = self._contrast.name
         self.contrast = self._contrast.matrix  # (n_rows, n_features)
 
         if statistic == "F":
             if tail != 0:
                 raise ValueError("An F-test has no direction, tail must be 0.")
-            if metric != "tstats":
+            if metric == "copes":
                 raise ValueError("metric='copes' is not available for an F-test.")
+        elif metric == "fstats":
+            raise ValueError("metric='fstats' is only available for an F-test.")
 
         if n_perm < 1:
             raise ValueError("n_perm must be at least 1.")
@@ -174,12 +180,17 @@ class Permutation:
             raise ValueError(f"tail must be -1, 0 or 1, got {tail}.")
         self.tail = tail
 
-        if metric not in ("tstats", "copes"):
+        if metric not in ("tstats", "copes", "fstats"):
             raise ValueError(f"metric must be 'tstats' or 'copes', got {metric}.")
-        self.metric = metric
+        self.metric = "fstats" if statistic == "F" else metric
 
         if hat < 0:
             raise ValueError(f"hat must be non-negative, got {hat}.")
+        if hat > 0 and metric == "copes":
+            _logger.warning(
+                "hat is ignored with metric='copes': it adjusts the variance of "
+                "the t-statistic."
+            )
         self.hat = hat
 
         self.n_jobs = n_jobs
@@ -213,10 +224,10 @@ class Permutation:
 
     def _rows_to_shuffle(self) -> np.ndarray:
         """Rows that are shuffled: only those in the groups being compared
-        when the contrast is between categorical features."""
+        when the contrast is between two or more categorical features."""
         indices = self._contrast.feature_indices
         feature_types = np.array(self.design.feature_types)[indices]
-        if np.all(feature_types == "categorical"):
+        if len(indices) > 1 and np.all(feature_types == "categorical"):
             return np.where(np.any(self.glm.X[:, indices] != 0, axis=1))[0]
         return np.arange(self.glm.n_samples)
 
@@ -387,8 +398,14 @@ class Permutation:
         # copes = w @ y*. For a t-contrast w has one row and the variance of
         # the cope is c_xtx_c * sigma^2. For an F-contrast the rows are
         # whitened so that F = sum(copes^2) / (q * sigma^2) with q rows.
-        c_pinv = self.contrast @ pinv
-        if self.statistic == "t":
+        # Only the estimable part of the contrast can be tested (e.g. a group
+        # with no data for these targets); NaN when there is none
+        C_est = estimable_contrast(self.contrast, X_r, pinv)
+        c_pinv = C_est @ pinv
+        if C_est.shape[0] == 0:
+            w = np.full((1, X_r.shape[0]), np.nan)
+            scale = np.nan
+        elif self.statistic == "t":
             w = c_pinv
             scale = float(c_pinv[0] @ c_pinv[0])
         else:
@@ -458,7 +475,7 @@ class Permutation:
             numerator = np.sum(copes**2, axis=1)
 
         proj = QP.transpose(0, 2, 1) @ r  # (batch, rank, n_targets)
-        ss = r2[None, :] - np.sum(proj**2, axis=1)
+        ss = _zero_small(r2[None, :] - np.sum(proj**2, axis=1), r2[None, :])
         return numerator, group["scale"] * ss / group["dof"]
 
     def _statistic(self, groups: list, perms: np.ndarray, n_targets: int) -> np.ndarray:
@@ -477,12 +494,15 @@ class Permutation:
                 denominator[:, targets] = d
         if self.metric == "copes":
             return numerator
-        # The hat adjustment uses the maximum variance over all targets
+        # The hat adjustment uses the maximum variance over all targets. A
+        # zero denominator (constant target) gives an undefined statistic.
         denominator = hat_adjustment(denominator, self.hat)
         with np.errstate(divide="ignore", invalid="ignore"):
             if self.statistic == "F":
-                return numerator / denominator
-            return numerator / np.sqrt(denominator)
+                stat = numerator / denominator
+            else:
+                stat = numerator / np.sqrt(denominator)
+        return np.where(denominator > 0, stat, np.nan)
 
     def fit(self, y) -> TestResult:
         """Fit the GLM and run the permutations.
@@ -552,7 +572,8 @@ class Permutation:
 
         # Null statistics within floating point noise of the observed one
         # count as at least as large (ties)
-        threshold = observed - _TIE_RTOL * np.abs(observed)
+        finite = observed[np.isfinite(observed)]
+        observed_scale = np.abs(finite).max() if finite.size else 0.0
         counts = np.zeros(target_dims)
         bar = progress(total=n_perm, desc="Permutations")
         try:
@@ -562,6 +583,9 @@ class Permutation:
                 reduced = self._reduce(stat.reshape((len(batch), *target_dims)))
                 if keep_null:
                     null[start : start + len(batch)] = reduced
+                finite = reduced[np.isfinite(reduced)]
+                scale = max(observed_scale, np.abs(finite).max() if finite.size else 0)
+                threshold = observed - _TIE_RTOL * scale
                 counts += np.sum(self._expand(reduced) >= threshold, axis=0)
                 bar.update(len(batch))
         finally:
@@ -578,8 +602,9 @@ class Permutation:
         undefined = ~np.isfinite(self._observed)
         if undefined.any():
             _logger.warning(
-                f"{undefined.sum()} target(s) have an undefined statistic (e.g. "
-                "zero variance). Their p-values are set to NaN."
+                f"{undefined.sum()} target(s) have an undefined statistic (zero "
+                "variance, or the contrast is not estimable for them). Their "
+                "p-values are set to NaN."
             )
             pvalues[undefined] = np.nan
         if not exact and np.any(counts == 0):
@@ -589,14 +614,14 @@ class Permutation:
             )
 
         if self.statistic == "t":
-            copes = glm_result.copes[self.contrast_indx]
-            tstats = glm_result.tstats[self.contrast_indx]
+            copes = glm_result.copes[self.contrast_index]
+            tstats = glm_result.tstats[self.contrast_index]
             fstats, f_dof = None, None
         else:
-            copes = glm_result.f_copes[self.contrast_indx]
+            copes = glm_result.f_copes[self.contrast_index]
             tstats = None
-            fstats = glm_result.fstats[self.contrast_indx]
-            f_dof = int(glm_result.f_dof[self.contrast_indx])
+            fstats = glm_result.fstats[self.contrast_index]
+            f_dof = glm_result.f_dof[self.contrast_index]
 
         return TestResult(
             contrast=self.contrast_name,
@@ -647,7 +672,7 @@ class MaxStatPermutation(Permutation):
     ----------
     design : Design
         The design (regressors and contrasts).
-    contrast_indx : int, optional
+    contrast_index : int, optional
         Index of the contrast to test.
     n_perm : int, optional
         Number of permutations.
@@ -685,7 +710,7 @@ class MaxStatPermutation(Permutation):
     def __init__(
         self,
         design: Design,
-        contrast_indx: int = 0,
+        contrast_index: int = 0,
         n_perm: int = 1000,
         perm_type: Optional[str] = None,
         tail: int = 0,
@@ -697,7 +722,7 @@ class MaxStatPermutation(Permutation):
     ) -> None:
         super().__init__(
             design,
-            contrast_indx=contrast_indx,
+            contrast_index=contrast_index,
             n_perm=n_perm,
             perm_type=perm_type,
             tail=tail,
@@ -758,7 +783,7 @@ class ClusterPermutation(Permutation):
     ----------
     design : Design
         The design (regressors and contrasts).
-    contrast_indx : int, optional
+    contrast_index : int, optional
         Index of the contrast to test.
     n_perm : int, optional
         Number of permutations.
@@ -811,7 +836,7 @@ class ClusterPermutation(Permutation):
     def __init__(
         self,
         design: Design,
-        contrast_indx: int = 0,
+        contrast_index: int = 0,
         n_perm: int = 1000,
         perm_type: Optional[str] = None,
         tail: int = 0,
@@ -825,7 +850,7 @@ class ClusterPermutation(Permutation):
     ) -> None:
         super().__init__(
             design,
-            contrast_indx=contrast_indx,
+            contrast_index=contrast_index,
             n_perm=n_perm,
             perm_type=perm_type,
             tail=tail,
@@ -861,7 +886,10 @@ class ClusterPermutation(Permutation):
         if self._requested_threshold is None:
             dof = np.nanmin(glm_result.dof)
             if self.statistic == "F":
-                f_dof = int(glm_result.f_dof[self.contrast_indx])
+                f_dof = glm_result.f_dof[self.contrast_index]
+                if not np.any(f_dof > 0):
+                    raise ValueError("The F-contrast is not estimable for any target.")
+                f_dof = int(f_dof[f_dof > 0].min())
                 self.cluster_forming_threshold = float(
                     scipy_stats.f.ppf(0.95, f_dof, dof)
                 )

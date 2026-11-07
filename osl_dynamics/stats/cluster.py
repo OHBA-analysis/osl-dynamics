@@ -102,7 +102,13 @@ class ClusterStructure:
         adjacency = {} if adjacency is None else dict(adjacency)
         self.adjacency = {}
         for dim, matrix in adjacency.items():
-            dim = int(dim) % n_dims
+            dim = int(dim)
+            if not -n_dims <= dim < n_dims:
+                raise ValueError(
+                    f"adjacency given for dimension {dim}, out of range for data "
+                    f"with {n_dims} target dimension(s)."
+                )
+            dim = dim % n_dims
             if dim not in self.cluster_dims:
                 raise ValueError(
                     f"adjacency given for dimension {dim}, which is not in "
@@ -279,7 +285,9 @@ def tfce(
         :code:`1` enhances positive values, :code:`-1` negative values and
         :code:`0` both (the output is signed).
     start : float, optional
-        First threshold.
+        First threshold. Every threshold contributes :code:`step` to the
+        integral; MNE-Python weights the first one by :code:`start` instead,
+        so the two agree only for :code:`start=0`.
     step : float, optional
         Spacing of the thresholds.
     E : float, optional
@@ -305,7 +313,8 @@ def tfce(
         top = signed.max()
         if not np.isfinite(top) or top <= start:
             continue
-        thresholds = np.arange(start + step, top + step, step)
+        thresholds = np.arange(start, top, step)
+        thresholds = thresholds[thresholds > 0]
         for h in thresholds:
             labels, n = structure.label(signed > h)
             if n == 0:
