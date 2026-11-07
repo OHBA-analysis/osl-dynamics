@@ -660,8 +660,8 @@ def average_runs(
     See Also
     --------
     S. Alonso and D. Vidaurre, "Towards stability of dynamic FC estimates in
-    neuroimaging and electrophysiology: solutions and limits" `bioRxiv (2023): \
-    2023-01 <https://www.biorxiv.org/content/10.1101/2023.01.18.524539v2>`_.
+    neuroimaging and electrophysiology: solutions and limits" `Network
+    Neuroscience (2023) <https://doi.org/10.1162/netn_a_00331>`_.
     """
     if not isinstance(alpha, list):
         raise TypeError(

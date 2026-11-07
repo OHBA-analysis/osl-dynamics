@@ -39,7 +39,7 @@ get_inf_params("tde_hmm_notts_meguk_giles_5_subjects", rename="results/inf_param
 #%%
 # Load the source data
 # ^^^^^^^^^^^^^^^^^^^^
-# We load the data into osl-dynamics using the Data class. See the :doc:`Loading Data tutorial <tutorials_build/data_loading>` for further details.
+# We load the data into osl-dynamics using the Data class. See the :doc:`Loading Data tutorial <../tutorials_build/1-1_data_loading>` for further details.
 
 from osl_dynamics.data import Data
 

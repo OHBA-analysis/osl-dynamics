@@ -2144,7 +2144,6 @@ def compare_groups_hmm_summary_stats(
     separate_tests: bool = False,
     covariates: Optional[str] = None,
     n_perm: int = 1000,
-    n_jobs: int = 1,
     sampling_frequency: Optional[float] = None,
 ) -> None:
     """Compare HMM summary statistics between two groups.
@@ -2183,8 +2182,6 @@ def compare_groups_hmm_summary_stats(
             covariates = {"age": [...], "sex": [...]}
     n_perm : int, optional
         Number of permutations.
-    n_jobs : int, optional
-        Number of jobs for parallel processing.
     sampling_frequency : float, optional
         Sampling frequency in Hz. If :code:`None`, we use
         :code:`data.sampling_frequency`.
@@ -2232,20 +2229,19 @@ def compare_groups_hmm_summary_stats(
         covariates = {}
 
     # Perform statistical significance testing
-    from osl_dynamics.analysis import statistics
+    from osl_dynamics import stats
 
     if separate_tests:
         pvalues = []
         for i in range(4):
             # Calculate a statistical significance test for each
             # summary stat separately
-            _, p = statistics.group_diff_max_stat_perm(
+            p = stats.group_diff(
                 sum_stats[:, i],
                 assignments,
                 n_perm=n_perm,
                 covariates=covariates,
-                n_jobs=n_jobs,
-            )
+            ).pvalues
             pvalues.append(p)
             _logger.info(f"{names[i]}: {np.sum(p <  0.05)} states have p-value<0.05")
             save(f"{group_diff_dir}/{names[i]}_pvalues.npy", p)
@@ -2253,13 +2249,12 @@ def compare_groups_hmm_summary_stats(
     else:
         # Calculate a statistical significance test for all
         # summary stats concatenated
-        _, pvalues = statistics.group_diff_max_stat_perm(
+        pvalues = stats.group_diff(
             sum_stats,
             assignments,
             n_perm=n_perm,
             covariates=covariates,
-            n_jobs=n_jobs,
-        )
+        ).pvalues
         for i in range(4):
             _logger.info(
                 f"{names[i]}: {np.sum(pvalues[i] < 0.05)} states have p-value<0.05"

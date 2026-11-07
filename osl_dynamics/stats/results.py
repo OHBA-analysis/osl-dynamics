@@ -1,0 +1,578 @@
+"""Result objects returned by the statistical tests."""
+
+import logging
+import pickle
+from dataclasses import dataclass, field, replace
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+from scipy import stats as scipy_stats
+
+from osl_dynamics.stats.correction import correct
+from osl_dynamics.stats.design import Design
+
+_logger = logging.getLogger("osl-dynamics")
+
+
+def parametric_pvalues(
+    tstats: np.ndarray, dof: np.ndarray, tail: int = 0
+) -> np.ndarray:
+    """P-values from the Student t distribution.
+
+    Parameters
+    ----------
+    tstats : np.ndarray
+        t-statistics.
+    dof : np.ndarray
+        Degrees of freedom, broadcastable to :code:`tstats`.
+    tail : int, optional
+        :code:`0` for two-tailed, :code:`1` for :code:`t > 0`, :code:`-1`
+        for :code:`t < 0`.
+
+    Returns
+    -------
+    pvalues : np.ndarray
+        P-values. Same shape as :code:`tstats`.
+    """
+    if tail == 0:
+        return 2 * scipy_stats.t.sf(np.abs(tstats), dof)
+    if tail == 1:
+        return scipy_stats.t.sf(tstats, dof)
+    if tail == -1:
+        return scipy_stats.t.cdf(tstats, dof)
+    raise ValueError(f"tail must be -1, 0 or 1, got {tail}.")
+
+
+def parametric_fpvalues(
+    fstats: np.ndarray, f_dof: np.ndarray, dof: np.ndarray
+) -> np.ndarray:
+    """P-values from the F distribution.
+
+    Parameters
+    ----------
+    fstats : np.ndarray
+        F-statistics.
+    f_dof : np.ndarray
+        Numerator degrees of freedom, broadcastable to :code:`fstats`.
+    dof : np.ndarray
+        Denominator (residual) degrees of freedom, broadcastable to
+        :code:`fstats`.
+
+    Returns
+    -------
+    pvalues : np.ndarray
+        P-values. Same shape as :code:`fstats`.
+    """
+    return scipy_stats.f.sf(fstats, f_dof, dof)
+
+
+def _tstats(copes: np.ndarray, varcopes: np.ndarray) -> np.ndarray:
+    # A zero variance (constant target) gives an undefined t-statistic
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return np.where(varcopes > 0, copes / np.sqrt(varcopes), np.nan)
+
+
+@dataclass
+class GLMResult:
+    """A fitted GLM.
+
+    Parameters
+    ----------
+    design : Design
+        The design that was fitted.
+    betas : np.ndarray
+        Regression coefficients. Shape is (n_features, \\*target_dims).
+    copes : np.ndarray
+        Contrast parameter estimates. Shape is (n_contrasts, \\*target_dims).
+    varcopes : np.ndarray
+        Variance of the copes. Shape is (n_contrasts, \\*target_dims).
+    dof : np.ndarray
+        Degrees of freedom of each target (they differ between targets only
+        when there are missing values). Shape is (\\*target_dims).
+    fstats : np.ndarray, optional
+        F-statistics of the F-contrasts. Shape is
+        (n_f_contrasts, \\*target_dims).
+    f_copes : list of np.ndarray, optional
+        Copes of the rows of each F-contrast. Shape of each is
+        (n_rows, \\*target_dims).
+    f_dof : np.ndarray, optional
+        Numerator degrees of freedom of each F-contrast at each target (the
+        number of estimable rows, which can be smaller for targets with
+        missing values). Shape is (n_f_contrasts, \\*target_dims).
+    data : np.ndarray, optional
+        The data that were fitted, kept for bootstrapping effect sizes.
+        Shape is (n_samples, \\*target_dims).
+    """
+
+    design: Design
+    betas: np.ndarray
+    copes: np.ndarray
+    varcopes: np.ndarray
+    dof: np.ndarray
+    fstats: Optional[np.ndarray] = None
+    f_copes: Optional[List[np.ndarray]] = field(default=None, repr=False)
+    f_dof: Optional[np.ndarray] = None
+    data: Optional[np.ndarray] = field(default=None, repr=False)
+
+    @property
+    def tstats(self) -> np.ndarray:
+        """t-statistics. Shape is (n_contrasts, \\*target_dims)."""
+        return _tstats(self.copes, self.varcopes)
+
+    @property
+    def target_dims(self) -> Tuple[int, ...]:
+        return tuple(self.dof.shape)
+
+    @property
+    def contrast_names(self) -> List[str]:
+        return self.design.contrast_names
+
+    @property
+    def f_contrast_names(self) -> List[str]:
+        return self.design.f_contrast_names
+
+    def pvalues(self, tail: int = 0) -> np.ndarray:
+        """Uncorrected parametric p-values for every contrast.
+
+        Parameters
+        ----------
+        tail : int, optional
+            :code:`0` for two-tailed, :code:`1` for :code:`t > 0`,
+            :code:`-1` for :code:`t < 0`.
+
+        Returns
+        -------
+        pvalues : np.ndarray
+            Shape is (n_contrasts, \\*target_dims).
+        """
+        return parametric_pvalues(self.tstats, self.dof[None], tail)
+
+    def fpvalues(self) -> np.ndarray:
+        """Uncorrected parametric p-values for every F-contrast.
+
+        Returns
+        -------
+        pvalues : np.ndarray
+            Shape is (n_f_contrasts, \\*target_dims).
+        """
+        if self.fstats is None or len(self.fstats) == 0:
+            raise ValueError("The design has no F-contrasts.")
+        with np.errstate(invalid="ignore"):
+            return parametric_fpvalues(self.fstats, self.f_dof, self.dof[None])
+
+    def test(
+        self,
+        contrast_index: int = 0,
+        correction: Optional[str] = None,
+        tail: int = 0,
+    ) -> "TestResult":
+        """Parametric test of a contrast.
+
+        Parameters
+        ----------
+        contrast_index : int, optional
+            Which contrast to test.
+        correction : str, optional
+            :code:`'bonferroni'`, :code:`'holm'`, :code:`'fdr'` or
+            :code:`None` for uncorrected p-values.
+        tail : int, optional
+            :code:`0` for two-tailed, :code:`1` for :code:`t > 0`,
+            :code:`-1` for :code:`t < 0`.
+
+        Returns
+        -------
+        result : TestResult
+            Test result with parametric p-values.
+        """
+        if not 0 <= contrast_index < len(self.contrast_names):
+            raise ValueError(
+                f"contrast_index must be between 0 and {len(self.contrast_names) - 1} "
+                f"(the design has {len(self.contrast_names)} t-contrasts)."
+            )
+        uncorrected = self.pvalues(tail)[contrast_index]
+        return TestResult(
+            contrast=self.contrast_names[contrast_index],
+            copes=self.copes[contrast_index],
+            tstats=self.tstats[contrast_index],
+            pvalues=correct(uncorrected, correction),
+            pvalues_uncorrected=uncorrected,
+            correction=correction,
+            tail=tail,
+            metric="tstats",
+            parametric=True,
+            glm=self,
+            contrast_index=contrast_index,
+        )
+
+    def ftest(
+        self,
+        contrast_index: int = 0,
+        correction: Optional[str] = None,
+    ) -> "TestResult":
+        """Parametric test of an F-contrast.
+
+        Parameters
+        ----------
+        contrast_index : int, optional
+            Which F-contrast to test.
+        correction : str, optional
+            :code:`'bonferroni'`, :code:`'holm'`, :code:`'fdr'` or
+            :code:`None` for uncorrected p-values.
+
+        Returns
+        -------
+        result : TestResult
+            Test result with parametric p-values. :code:`result.copes` holds
+            the copes of the rows of the F-contrast and
+            :code:`result.fstats` the F-statistics.
+        """
+        if not 0 <= contrast_index < len(self.f_contrast_names):
+            raise ValueError(
+                f"contrast_index must be between 0 and {len(self.f_contrast_names) - 1} "
+                f"(the design has {len(self.f_contrast_names)} F-contrasts)."
+            )
+        uncorrected = self.fpvalues()[contrast_index]
+        return TestResult(
+            contrast=self.f_contrast_names[contrast_index],
+            copes=self.f_copes[contrast_index],
+            tstats=None,
+            pvalues=correct(uncorrected, correction),
+            pvalues_uncorrected=uncorrected,
+            correction=correction,
+            tail=0,
+            metric="fstats",
+            parametric=True,
+            glm=self,
+            statistic="F",
+            fstats=self.fstats[contrast_index],
+            f_dof=self.f_dof[contrast_index],
+            contrast_index=contrast_index,
+        )
+
+    def summary(self) -> Dict:
+        """Summary of the fit."""
+        summary = self.design.summary()
+        summary["target_dims"] = self.target_dims
+        summary["dof"] = (int(self.dof.min()), int(self.dof.max()))
+        return summary
+
+
+@dataclass
+class TestResult:
+    """Result of a statistical test of one contrast.
+
+    Parameters
+    ----------
+    contrast : str
+        Name of the contrast tested.
+    copes : np.ndarray
+        Contrast parameter estimate (e.g. the group difference or mean
+        response). Shape is (\\*target_dims). For an F-test, the copes of
+        the rows of the F-contrast, shape (n_rows, \\*target_dims).
+    tstats : np.ndarray
+        t-statistics. Shape is (\\*target_dims). :code:`None` for an F-test,
+        see :code:`fstats`.
+    pvalues : np.ndarray
+        P-values after the multiple comparisons correction. Shape is
+        (\\*target_dims). For :code:`correction='cluster'` every point holds
+        the p-value of the cluster it belongs to (1 if it is in no cluster);
+        for :code:`'tfce'` every point has its own p-value.
+    correction : str or None
+        Multiple comparisons correction that was applied.
+    tail : int
+        :code:`0` for two-tailed, :code:`1` or :code:`-1` for one-tailed.
+    glm : GLMResult
+        The fitted GLM (all contrasts).
+    metric : str
+        Statistic the permutation test was run on, :code:`'tstats'`,
+        :code:`'copes'` or :code:`'fstats'`.
+    parametric : bool
+        Whether the p-values come from the t distribution rather than
+        permutations.
+    pvalues_uncorrected : np.ndarray, optional
+        Uncorrected p-values, when they were calculated.
+    n_perm : int, optional
+        Number of permutations used.
+    perm_type : str, optional
+        :code:`'sign_flip'` or :code:`'row_shuffle'`.
+    exact : bool
+        Whether every possible permutation was enumerated.
+    pooled_dims : tuple of int, optional
+        Target dimensions the maximum statistic was taken over.
+    null : np.ndarray, optional
+        Null distribution of the (reduced) statistic. Shape is
+        (n_perm, \\*nonpooled_dims). :code:`None` if it was too large to keep.
+    clusters : list of np.ndarray, optional
+        Boolean masks of the clusters found in the observed data, largest
+        statistic first. Shape of each is (\\*target_dims).
+    cluster_stats : np.ndarray, optional
+        Statistic of each cluster.
+    cluster_pvalues : np.ndarray, optional
+        P-value of each cluster.
+    cluster_forming_threshold : float, optional
+        Threshold used to form clusters.
+    tfce_map : np.ndarray, optional
+        Observed TFCE-enhanced statistic map for :code:`correction='tfce'`.
+        Shape is (\\*target_dims).
+    statistic : str
+        :code:`'t'` for a t-contrast or :code:`'F'` for an F-contrast.
+    fstats : np.ndarray, optional
+        F-statistics for an F-test. Shape is (\\*target_dims).
+    f_dof : np.ndarray, optional
+        Numerator degrees of freedom of the F-test at each target. Shape is
+        (\\*target_dims).
+    contrast_index : int, optional
+        Index of the contrast in the design (among the t-contrasts or the
+        F-contrasts according to :code:`statistic`).
+    blocks : np.ndarray, optional
+        Exchangeability blocks used by the permutations, see
+        :class:`~osl_dynamics.stats.permutation.Permutation`.
+    """
+
+    contrast: str
+    copes: np.ndarray
+    tstats: np.ndarray
+    pvalues: np.ndarray
+    correction: Optional[str]
+    tail: int
+    glm: GLMResult
+    metric: str = "tstats"
+    parametric: bool = False
+    pvalues_uncorrected: Optional[np.ndarray] = None
+    n_perm: Optional[int] = None
+    perm_type: Optional[str] = None
+    exact: bool = False
+    pooled_dims: Optional[Tuple[int, ...]] = None
+    null: Optional[np.ndarray] = field(default=None, repr=False)
+    clusters: Optional[List[np.ndarray]] = field(default=None, repr=False)
+    cluster_stats: Optional[np.ndarray] = None
+    cluster_pvalues: Optional[np.ndarray] = None
+    cluster_forming_threshold: Optional[float] = None
+    tfce_map: Optional[np.ndarray] = field(default=None, repr=False)
+    statistic: str = "t"
+    fstats: Optional[np.ndarray] = None
+    f_dof: Optional[np.ndarray] = None
+    contrast_index: Optional[int] = None
+    blocks: Optional[np.ndarray] = field(default=None, repr=False)
+
+    @property
+    def target_dims(self) -> Tuple[int, ...]:
+        return tuple(self.pvalues.shape)
+
+    @property
+    def stats(self) -> np.ndarray:
+        """The test statistic: :code:`tstats` or :code:`fstats`. Shape is
+        (\\*target_dims)."""
+        return self.fstats if self.statistic == "F" else self.tstats
+
+    @property
+    def dof(self) -> np.ndarray:
+        """Degrees of freedom of each target. Shape is (\\*target_dims)."""
+        return self.glm.dof
+
+    def significant(self, alpha: float = 0.05) -> np.ndarray:
+        """Which targets are significant.
+
+        Parameters
+        ----------
+        alpha : float, optional
+            Significance level.
+
+        Returns
+        -------
+        significant : np.ndarray
+            Boolean array, :code:`pvalues < alpha`. Shape is (\\*target_dims).
+            For cluster-based corrections this marks the points that belong
+            to a significant cluster, which does not establish that the
+            effect is confined to, or present at, every one of those points.
+        """
+        return self.pvalues < alpha
+
+    def summary(self) -> Dict:
+        """Summary of the test."""
+        summary = {
+            "contrast": self.contrast,
+            "statistic": self.statistic,
+            "target_dims": self.target_dims,
+            "correction": self.correction,
+            "tail": self.tail,
+            "parametric": self.parametric,
+            "n_significant (p<0.05)": int(np.sum(self.pvalues < 0.05)),
+            "min_pvalue": (
+                float(np.nanmin(self.pvalues))
+                if np.any(np.isfinite(self.pvalues))
+                else np.nan
+            ),
+        }
+        if not self.parametric:
+            summary.update(
+                {
+                    "metric": self.metric,
+                    "n_perm": self.n_perm,
+                    "perm_type": self.perm_type,
+                    "exact": self.exact,
+                    "pooled_dims": self.pooled_dims,
+                }
+            )
+        if self.clusters is not None:
+            summary["n_clusters"] = len(self.clusters)
+            summary["cluster_forming_threshold"] = self.cluster_forming_threshold
+        return summary
+
+    def __repr__(self) -> str:
+        items = ", ".join(f"{k}={v!r}" for k, v in self.summary().items())
+        return f"TestResult({items})"
+
+    def save(self, filename: str, include_data: bool = True) -> None:
+        """Save to a pickle file.
+
+        Parameters
+        ----------
+        filename : str
+            Output file.
+        include_data : bool, optional
+            Whether to keep the tested data (:code:`result.glm.data`) in the
+            file, which :meth:`effect_size` needs. :code:`False` makes the
+            file much smaller for large data.
+        """
+        _logger.info(f"Saving {filename}")
+        result = self
+        if not include_data:
+            result = replace(self, glm=replace(self.glm, data=None))
+        with open(filename, "wb") as file:
+            pickle.dump(result, file)
+
+    @classmethod
+    def load(cls, filename: str) -> "TestResult":
+        """Load from a pickle file.
+
+        Parameters
+        ----------
+        filename : str
+            File saved with :meth:`save`.
+
+        Returns
+        -------
+        result : TestResult
+        """
+        with open(filename, "rb") as file:
+            result = pickle.load(file)
+        if not isinstance(result, cls):
+            raise TypeError(f"{filename} does not contain a {cls.__name__}.")
+        return result
+
+    def effect_size(
+        self, n_boot: int = 1000, ci: float = 0.95, data: Optional[np.ndarray] = None
+    ):
+        """Effect sizes with confidence intervals.
+
+        The contrast estimate (cope) and, for a t-test, Cohen's d (the cope
+        divided by the residual standard deviation of the GLM) or, for an
+        F-test, partial eta squared, each with a confidence interval from a
+        bootstrap over the samples (subjects). See
+        :func:`osl_dynamics.stats.effect_size.effect_size`.
+
+        Parameters
+        ----------
+        n_boot : int, optional
+            Number of bootstrap samples. :code:`0` gives the parametric
+            confidence interval of the cope only.
+        ci : float, optional
+            Confidence level.
+        data : np.ndarray, optional
+            The data that were tested, if the result does not hold them.
+
+        Returns
+        -------
+        effect_size : osl_dynamics.stats.effect_size.EffectSize
+        """
+        from osl_dynamics.stats.effect_size import effect_size
+
+        if data is None:
+            data = self.glm.data
+        if data is None:
+            raise ValueError("Pass the data that were tested.")
+        if self.contrast_index is None:
+            raise ValueError("This result does not record which contrast was tested.")
+        return effect_size(
+            self.glm.design,
+            data,
+            contrast_index=self.contrast_index,
+            statistic=self.statistic,
+            blocks=self.blocks,
+            n_boot=n_boot,
+            ci=ci,
+        )
+
+    def plot_null(
+        self,
+        n_bins: int = 50,
+        ax=None,
+        filename: Optional[str] = None,
+    ):
+        """Plot the null distribution with the observed statistic.
+
+        Only available for permutation tests that kept the null distribution.
+
+        Parameters
+        ----------
+        n_bins : int, optional
+            Number of histogram bins.
+        ax : plt.Axes, optional
+            Axis to plot on.
+        filename : str, optional
+            Output filename.
+
+        Returns
+        -------
+        fig : plt.Figure
+            Only returned if :code:`ax=None` and :code:`filename=None`.
+        ax : plt.Axes
+            Only returned if :code:`ax=None` and :code:`filename=None`.
+        """
+        if self.null is None:
+            raise ValueError("This result has no null distribution to plot.")
+
+        import matplotlib.pyplot as plt
+
+        create_fig = ax is None
+        if create_fig:
+            fig, ax = plt.subplots(figsize=(6, 4))
+
+        if self.correction == "cluster":
+            stats = np.abs(self.cluster_stats) if self.cluster_stats is not None else []
+            observed_max = np.max(stats) if len(stats) else 0.0
+            label = "cluster statistic"
+        elif self.correction == "tfce":
+            observed_max = np.nanmax(np.abs(self.tfce_map))
+            label = "TFCE"
+        elif self.statistic == "F":
+            observed_max = np.nanmax(self.fstats)
+            label = "F"
+        else:
+            observed = self.tstats if self.metric == "tstats" else self.copes
+            if self.tail == 0:
+                observed = np.abs(observed)
+            elif self.tail == -1:
+                observed = -observed
+            observed_max = np.nanmax(observed)
+            label = "|{}|" if self.tail == 0 else "{}"
+            label = label.format("t" if self.metric == "tstats" else "cope")
+        null = self.null.reshape(-1)
+        ax.hist(null[np.isfinite(null)], bins=n_bins, color="tab:grey")
+        ax.axvline(observed_max, color="tab:red", label="observed max")
+        ax.axvline(
+            np.nanpercentile(null, 95), color="black", ls="--", label="95th percentile"
+        )
+        ax.set_xlabel(label)
+        ax.set_ylabel("Count")
+        ax.set_title(f"Null distribution: {self.contrast}")
+        ax.legend()
+
+        if filename is not None:
+            _logger.info(f"Saving {filename}")
+            fig = ax.get_figure()
+            fig.savefig(filename)
+            plt.close(fig)
+        elif create_fig:
+            return fig, ax

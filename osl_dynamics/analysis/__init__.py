@@ -19,8 +19,6 @@ Modules
   state/mode covariances into power maps and coherence networks.
 - :py:mod:`~osl_dynamics.analysis.static` — Static (time-averaged) power
   and functional connectivity.
-- :py:mod:`~osl_dynamics.analysis.statistics` — Statistical testing
-  (permutation tests, group comparisons).
 
 Tutorials
 ---------
@@ -40,7 +38,6 @@ Python example scripts
 ----------------------
 - `Spectra <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/spectra>`_
 - `Static analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/static>`_
-- `Statistics <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/statistics>`_
 - `MEG analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_analysis>`_
 - `fMRI analysis <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/fmri>`_
 - `Decoding <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/decoding>`_
@@ -58,7 +55,6 @@ _submodules = [
     "power",
     "spectral",
     "static",
-    "statistics",
     "prediction",
 ]
 

@@ -1,12 +1,10 @@
-:orphan:
-
 Dynamic Network Modes (DyNeMo)
 ==============================
 
 Introduction
 ------------
 
-DyNeMo overcomes two limitations of the `HMM <hmm.html>`_:
+DyNeMo overcomes two limitations of the :doc:`HMM <hmm>`:
 
 - The **Markovian assumption**: DyNeMo uses a recurrent neural network (LSTM [1]) to model long-range temporal dependencies in the latent variable.
 - The **mutual exclusivity of states**: DyNeMo models the data using a linear mixture of '**modes**'.
@@ -55,7 +53,7 @@ The generative model of DyNeMo is shown below.
 Inference
 ---------
 
-Similar to the `HMM <hmm.html>`_, we perform variational Bayes on the latent variables, i.e. the logits :math:`\theta_{1:T}`, and learn point estimates for the observation model parameters, i.e. the mode means :math:`\mu_j` and covariances :math:`D_j`.
+Similar to the :doc:`HMM <hmm>`, we perform variational Bayes on the latent variables, i.e. the logits :math:`\theta_{1:T}`, and learn point estimates for the observation model parameters, i.e. the mode means :math:`\mu_j` and covariances :math:`D_j`.
 
 Amortized Variational Inference
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -82,7 +80,7 @@ In the post-hoc analysis of a DyNeMo fit, we are interested in interpreting the 
 Summary Statistics
 ^^^^^^^^^^^^^^^^^^
 
-We can calculate the usual statistics we study with the `HMM <hmm.html>`_ by binarizing the mixing coefficient time course. The :doc:`DyNeMo Mixing Coefficients Analysis tutorial <../tutorials_build/5-3_dynemo_mixing_coefs>` discusses how to do this.
+We can calculate the usual statistics we study with the :doc:`HMM <hmm>` by binarizing the mixing coefficient time course. The :doc:`DyNeMo Mixing Coefficients Analysis tutorial <../tutorials_build/5-3_dynemo_mixing_coefs>` discusses how to do this.
 
 Alternatively, we can use the statistics calculated from the mixing coefficient time series, like the mean, standard deviation or kurtosis. Normally, we calculate these quantities on the reweighted mixing coefficients (to account for the magnitude of the mode covariances).
 
@@ -97,6 +95,6 @@ References
 ----------
 
 #. Long-short term memory. `Wikipedia <https://en.wikipedia.org/wiki/Long_short-term_memory>`_.
-#. C Gohil, et al., Mixtures of large-scale dynamic functional brain network modes. `Neuroimage, 2022 <https://www.sciencedirect.com/science/article/pii/S1053811922007108>`_.
+#. C Gohil, et al., Mixtures of large-scale dynamic functional brain network modes. `Neuroimage, 2022 <https://doi.org/10.1016/j.neuroimage.2022.119595>`_.
 #. D Kingma and M Welling, Auto-Encoding Variational Bayes. `arxiv:1312.6114, 2013 <https://arxiv.org/abs/1312.6114>`_.
-#. A Quinn, et al. The GLM-Spectrum: A multilevel framework for spectrum analysis with covariate and confound modelling. `bioRxiv, 2022 <https://www.biorxiv.org/content/10.1101/2022.11.14.516449v1>`_.
+#. A Quinn, et al., The GLM-spectrum: A multilevel framework for spectrum analysis with covariate and confound modelling. `Imaging Neuroscience, 2024 <https://doi.org/10.1162/imag_a_00082>`_.

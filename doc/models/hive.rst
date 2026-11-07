@@ -1,12 +1,10 @@
-:orphan:
-
 HIVE (HMM with Integrated Variability Estimation)
 ==================================================
 
 Introduction
 ------------
 
-HIVE extends the `HMM <hmm.html>`_ to explicitly model **inter-session variability** while inferring dynamic networks across a group [1]. The standard HMM assumes all sessions share exactly the same observation model parameters (state means and covariances). In practice, sessions from different subjects, scanners, or sites may have systematic differences in their functional networks. HIVE addresses this by learning an **embedding vector** (a "fingerprint") for each session, which modulates the group-level observation model parameters to produce session-specific parameters.
+HIVE extends the :doc:`HMM <hmm>` to explicitly model **inter-session variability** while inferring dynamic networks across a group [1]. The standard HMM assumes all sessions share exactly the same observation model parameters (state means and covariances). In practice, sessions from different subjects, scanners, or sites may have systematic differences in their functional networks. HIVE addresses this by learning an **embedding vector** (a "fingerprint") for each session, which modulates the group-level observation model parameters to produce session-specific parameters.
 
 This approach has two key benefits:
 
@@ -44,7 +42,7 @@ Key configuration options specific to HIVE:
 Post-hoc Analysis
 -----------------
 
-After fitting HIVE, you can perform the same post-hoc analyses as with the `HMM <hmm.html>`_ (summary statistics, spectral analysis, etc.). Additionally, you can analyse the **embedding vectors** to study inter-session variability:
+After fitting HIVE, you can perform the same post-hoc analyses as with the :doc:`HMM <hmm>` (summary statistics, spectral analysis, etc.). Additionally, you can analyse the **embedding vectors** to study inter-session variability:
 
 - Visualize the embedding space to see how sessions cluster.
 - Correlate embeddings with external variables (age, sex, scanner type, etc.).
@@ -53,4 +51,4 @@ After fitting HIVE, you can perform the same post-hoc analyses as with the `HMM 
 References
 ----------
 
-#. R Huang, C Gohil, M W Woolrich, Modelling variability in functional brain networks using embeddings. `bioRxiv, 2024 <https://www.biorxiv.org/content/10.1101/2024.01.29.577718>`_.
+#. R Huang, C Gohil, M W Woolrich, Modelling variability in functional brain networks using embeddings. `Imaging Neuroscience, 2026 <https://doi.org/10.1162/IMAG.a.1188>`_.

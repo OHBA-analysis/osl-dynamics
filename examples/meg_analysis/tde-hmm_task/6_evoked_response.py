@@ -17,7 +17,7 @@ import mne
 import pickle
 import numpy as np
 from glob import glob
-from osl_dynamics.analysis import statistics
+from osl_dynamics import stats
 from osl_dynamics.inference import modes
 from osl_dynamics.utils import plotting
 
@@ -84,12 +84,11 @@ epochs -= np.mean(
 #%% Stats testing
 
 # Calculate p-values
-pvalues = statistics.evoked_response_max_stat_perm(
+pvalues = stats.evoked_response(
     epochs,
     n_perm=1000,
     metric="copes",
-    n_jobs=8,
-)
+).pvalues
 
 # Plot
 plotting.plot_evoked_response(
