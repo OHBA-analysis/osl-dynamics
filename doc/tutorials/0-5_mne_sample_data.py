@@ -52,6 +52,8 @@ Prerequisites
 - `osl-dynamics <https://github.com/OHBA-analysis/osl-dynamics>`_.
 """
 
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/0-5_mne_sample_data.png"
+
 #%%
 # Download the dataset
 # ^^^^^^^^^^^^^^^^^^^^
