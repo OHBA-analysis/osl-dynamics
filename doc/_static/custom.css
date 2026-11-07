@@ -70,3 +70,29 @@ section.home-page > .institution-logos {
 .bd-main .bd-content .bd-article-container {
   max-width: 48em;
 }
+
+/* Left sidebar collapsed on page load (see sidebar-state.js): the same look
+   as the theme's collapsed sidebar, without the animation */
+@media (min-width: 960px) {
+  html.osld-sidebar-collapsed .bd-sidebar-primary {
+    --pst-sidebar-primary-width: 4rem;
+    overflow: hidden;
+  }
+  html.osld-sidebar-collapsed .bd-sidebar-primary .sidebar-primary-item:not(.pst-sidebar-collapse) {
+    opacity: 0;
+    visibility: hidden;
+  }
+  html.osld-sidebar-collapsed #pst-collapse-sidebar-button .pst-collapse-sidebar-label {
+    height: 0;
+    opacity: 0;
+    visibility: hidden;
+    width: 0;
+  }
+  html.osld-sidebar-collapsed #pst-collapse-sidebar-button .pst-icon {
+    transform: translateX(0.25em) rotate(180deg);
+  }
+}
+html.osld-sidebar-collapsed .bd-sidebar-primary,
+html.osld-sidebar-collapsed .bd-sidebar-primary * {
+  transition: none !important;
+}

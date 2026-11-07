@@ -219,6 +219,8 @@ html_extra_path = ["llms.txt"]
 
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
+# Keeps the left sidebar collapsed across pages once the reader collapses it
+html_js_files = ["sidebar-state.js"]
 
 html_theme_options = {
     "github_url": "https://github.com/OHBA-analysis/osl-dynamics",
