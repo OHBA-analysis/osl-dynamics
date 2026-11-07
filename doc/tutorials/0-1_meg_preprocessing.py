@@ -37,6 +37,8 @@ In this tutorial, we will use data from the `Wakeman-Henson dataset <https://www
 Output is written to ``derivatives/``.
 """
 
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/0-1_meg_preprocessing.png"
+
 #%%
 # Download the dataset
 # ^^^^^^^^^^^^^^^^^^^^

@@ -5,6 +5,8 @@ Epoching: Network Response
 In this tutorial we will cover how to epoch the inferred state/mode time courses. We will use the functionality in MNE to do this. This requires us to have the continuous training data in `.fif` format.
 """
 
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/6-1_epoching_alpha.png"
+
 #%%
 # Download source data
 # ^^^^^^^^^^^^^^^^^^^^

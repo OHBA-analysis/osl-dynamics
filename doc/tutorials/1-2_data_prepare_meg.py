@@ -10,6 +10,8 @@ In this tutorial we will go through common ways to prepare M/EEG data. This tuto
 4. Saving and Loading Prepared Data
 """
 
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/1-2_data_prepare_meg.png"
+
 #%%
 # Download the dataset
 # ^^^^^^^^^^^^^^^^^^^^

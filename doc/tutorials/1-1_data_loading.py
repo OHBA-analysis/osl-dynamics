@@ -12,6 +12,8 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 6. Loading Data in txt Format
 """
 
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/1-1_data_loading.png"
+
 #%%
 # The Data class
 # ^^^^^^^^^^^^^^

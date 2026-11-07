@@ -5,6 +5,8 @@ DyNeMo: Training
 This tutorial covers how to train a DyNeMo model. We will use MEG data in this tutorial, however, this can easily be substituted with fMRI data.
 """
 
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/3-3_dynemo_training.png"
+
 #%%
 # Getting the Data
 # ^^^^^^^^^^^^^^^^

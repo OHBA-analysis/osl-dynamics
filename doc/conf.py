@@ -177,6 +177,7 @@ sphinx_gallery_conf = {
     "run_stale_examples": True,          # Force re-run when building
     "within_subsection_order": FileNameSortKey,  # Build in alphabetical order of the filenames
     "backreferences_dir": "tutorials_build/backreferences",  # Lets minigallery find the tutorials
+    "remove_config_comments": True,  # e.g. sphinx_gallery_thumbnail_path in the tutorials
 }
 
 # The suffix of source filenames.
