@@ -269,9 +269,9 @@ def tfce(
     E: float = 0.5,
     H: float = 2.0,
 ) -> np.ndarray:
-    """Threshold-free cluster enhancement [1]_.
+    """Threshold-free cluster enhancement.
 
-    Each target's statistic is replaced by the integral over thresholds
+    Each target's statistic is replaced [1]_ by the integral over thresholds
     :code:`h` of :code:`extent(h) ** E * h ** H`, where :code:`extent(h)` is
     the size of the cluster containing the target at threshold :code:`h`.
 

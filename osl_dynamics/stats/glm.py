@@ -95,11 +95,11 @@ def residual_dof(X: np.ndarray) -> int:
 
 
 def hat_adjustment(varcopes: np.ndarray, hat: float) -> np.ndarray:
-    """'Hat' variance adjustment [1]_.
+    """'Hat' variance adjustment.
 
     Adds a fraction of the largest variance across targets to every target's
-    variance, which stops targets with implausibly small variances producing
-    very large t-statistics.
+    variance [1]_, which stops targets with implausibly small variances
+    producing very large t-statistics.
 
     Parameters
     ----------

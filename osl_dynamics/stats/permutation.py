@@ -879,19 +879,19 @@ def _reduce_maps(
 
 
 class ClusterPermutation(Permutation):
-    """Cluster-based permutation test [1]_ or threshold-free cluster
-    enhancement (TFCE) [2]_.
+    """Cluster-based permutation test or threshold-free cluster enhancement.
 
-    Clusters are connected sets of targets whose t-statistic exceeds the
-    cluster-forming threshold. The null distribution is the largest cluster
+    In the cluster-based test [1]_, clusters are connected sets of targets
+    whose t-statistic exceeds the cluster-forming threshold. The null distribution is the largest cluster
     statistic (the sum of the t-statistics in a cluster) found in each
     permutation, so the family-wise error rate is controlled across the
     whole map. A cluster's p-value says how often a cluster at least as
     large arises by chance anywhere in the map; it does not establish the
     effect at every target in the cluster, nor the cluster's exact extent.
 
-    With :code:`tfce`, the t-statistics are enhanced over all thresholds
-    instead and every target gets its own p-value.
+    With :code:`tfce`, threshold-free cluster enhancement [2]_ replaces the
+    threshold: the t-statistics are enhanced over all thresholds and every
+    target gets its own p-value.
 
     Parameters
     ----------
