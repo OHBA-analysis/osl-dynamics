@@ -2617,7 +2617,7 @@ def plot_design_matrix(
     """Plot a GLM design matrix.
 
     Displays the design matrix as a heatmap with feature names as column
-    labels and a diverging colormap centred at zero.
+    labels and a diverging colormap centered at zero.
 
     Parameters
     ----------

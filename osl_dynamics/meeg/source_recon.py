@@ -1733,7 +1733,7 @@ def _plot_bilateral_pairs(
             src_coords_mni[single_dipoles, j],
             s=26,
             facecolors="none",
-            edgecolors="grey",
+            edgecolors="gray",
             linewidths=0.7,
             zorder=4,
         )
@@ -1744,7 +1744,7 @@ def _plot_bilateral_pairs(
 
     # Dummy handles for the legend
     handles = [
-        plt.Line2D([], [], ls="", marker="o", ms=5, mfc="none", mec="grey"),
+        plt.Line2D([], [], ls="", marker="o", ms=5, mfc="none", mec="gray"),
         plt.Line2D([], [], ls="", marker="o", ms=4, c="tab:blue"),
         plt.Line2D([], [], marker="o", ms=2, c="tab:red"),
     ]

@@ -28,7 +28,7 @@ where :math:`m_k` and :math:`C_k` are state means and covariances and :math:`k` 
 
 :math:`p(s_t | s_{t-1})` is the temporal model for the hidden state. Because the probability of the next state only depends on the current state (known as the **Markovian constraint**), this conditional probability distribution can be represented as a matrix.
 
-The generative model is shown graphically below. The hidden states are the grey nodes and the observed data are white nodes. Arrows connect variables that are conditionally dependent.
+The generative model is shown graphically below. The hidden states are the gray nodes and the observed data are white nodes. Arrows connect variables that are conditionally dependent.
 
 .. image:: images/hmm-generative-model.jpeg
     :class: no-scaled-link

@@ -479,7 +479,7 @@ def extract_surfaces(
         # origin is a long way from the head, e.g. the subject was lying low
         # in the scanner. Move the head into the FOV and try again.
         print("Head is outside the MNI FOV, centring it...")
-        flirt_mri2mniaxes_xform = _centre_head_in_fov(
+        flirt_mri2mniaxes_xform = _center_head_in_fov(
             surfaces.mri_file, surfaces.std_brain_file, flirt_mri2mniaxes_xform
         )
         img_latest_density = _apply_mri2mniaxes_xform()
@@ -1265,12 +1265,12 @@ def remove_stray_headshape_points(
 
     # Project everything into the fiducial coordinate system
     def _project(pts: np.ndarray) -> np.ndarray:
-        centred = pts - origin[:, np.newaxis]
+        centered = pts - origin[:, np.newaxis]
         return np.array(
             [
-                ax_lr @ centred,
-                ax_ant @ centred,
-                ax_sup @ centred,
+                ax_lr @ centered,
+                ax_ant @ centered,
+                ax_sup @ centered,
             ]
         )
 
@@ -3230,14 +3230,14 @@ def _get_flirt_xform_between_axes(from_nii: str, target_nii: str) -> np.ndarray:
     return target2targetflirtcoords @ fromflirtcoords2from
 
 
-def _centre_head_in_fov(
+def _center_head_in_fov(
     from_nii: str, target_nii: str, flirt_xform: np.ndarray
 ) -> np.ndarray:
     """
     Translates a flirt xform so that the head in from_nii lands inside the FOV
     of target_nii.
 
-    The head is centred left-right and front-back and its top is put just below
+    The head is centered left-right and front-back and its top is put just below
     the top of the FOV, which is where the head is in the MNI template.
 
     flirt_xform must put from_nii on the same axes as target_nii, with the last
@@ -3264,10 +3264,10 @@ def _centre_head_in_fov(
     top = np.percentile(coords[:, 2], 99)
     head = coords[coords[:, 2] > top - 120]
 
-    centred_xform = flirt_xform.copy()
-    centred_xform[:2, 3] += fov[:2] / 2 - head[:, :2].mean(axis=0)
-    centred_xform[2, 3] += fov[2] - 15 - top
-    return centred_xform
+    centered_xform = flirt_xform.copy()
+    centered_xform[:2, 3] += fov[:2] / 2 - head[:, :2].mean(axis=0)
+    centered_xform[2, 3] += fov[2] - 15 - top
+    return centered_xform
 
 
 def _get_mne_xform_from_flirt_xform(

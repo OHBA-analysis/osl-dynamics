@@ -653,7 +653,7 @@ def circle_angles(order: List[int]) -> np.ndarray:
     return angleplot
 
 
-def optimise_sequence(
+def optimize_sequence(
     fo_density: np.ndarray, metric_to_use: int = 0, n_perms: int = 10**6
 ) -> np.ndarray:
     """Optimize the sequence to maximal circularity.

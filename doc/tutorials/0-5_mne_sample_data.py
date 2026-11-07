@@ -326,7 +326,7 @@ Prerequisites
 #%%
 # The beamformer prints how many pairs were found. To check the pairing, we
 # plot it (saved to ``session.src_dir/bilateral_dipoles.png``). Paired dipoles
-# are red and joined by a line, blue dots are midline dipoles, grey circles
+# are red and joined by a line, blue dots are midline dipoles, gray circles
 # are unpaired dipoles.
 #
 # .. code-block:: python

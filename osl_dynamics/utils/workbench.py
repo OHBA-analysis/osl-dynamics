@@ -147,7 +147,7 @@ def render(
         )
 
     if gui:
-        visualise(
+        visualize(
             cifti_left=cifti_left,
             cifti_right=cifti_right,
             inflation=inflation,
@@ -172,7 +172,7 @@ def create_scene(
     temp_scene.write_text(scene)
 
 
-def visualise(
+def visualize(
     cifti_left: pathlib.Path,
     cifti_right: pathlib.Path,
     inflation: int = 0,

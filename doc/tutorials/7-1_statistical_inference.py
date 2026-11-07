@@ -162,7 +162,7 @@ null = result_perm.null[:, t_index, state]
 observed = abs(result_perm.tstats[t_index, state])
 
 fig, ax = plt.subplots(figsize=(6, 3.5))
-ax.hist(null, bins=30, density=True, color="tab:grey", label="Permutation null of |t|")
+ax.hist(null, bins=30, density=True, color="tab:gray", label="Permutation null of |t|")
 t_axis = np.linspace(0, 4, 200)
 ax.plot(
     t_axis, 2 * scipy_stats.t.pdf(t_axis, df=n_subjects - 1), "k", label="Folded t-distribution"

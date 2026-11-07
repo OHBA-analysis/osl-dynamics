@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import ttest_rel
 
 from osl_dynamics.inference import modes
-from osl_dynamics.analysis.tinda import tinda, plot_cycle, optimise_sequence
+from osl_dynamics.analysis.tinda import tinda, plot_cycle, optimize_sequence
 
 def get_data(name, output_dir):
     if os.path.exists(output_dir):
@@ -36,7 +36,7 @@ print("Running TINDA")
 fo_density, fo_sum, stats = tinda(stc)
 
 print("Finding best circular sequence. This might take a while.")
-best_sequence = optimise_sequence(fo_density)
+best_sequence = optimize_sequence(fo_density)
 
 # Stats
 print("Finding statistically significant asymmetries in interval densities")

@@ -7,7 +7,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from osl_dynamics import simulation
-from osl_dynamics.analysis.tinda import tinda, plot_cycle, optimise_sequence
+from osl_dynamics.analysis.tinda import tinda, plot_cycle, optimize_sequence
 
 
 # Directory for plots
@@ -31,7 +31,7 @@ print("Running TINDA")
 fo_density, fo_sum, stats = tinda(sim_stc)
 
 print("Finding best circular sequence")
-best_sequence = optimise_sequence(fo_density)
+best_sequence = optimize_sequence(fo_density)
 
 print("Finding strongest interval asymmetries")
 mean_direction = np.squeeze(

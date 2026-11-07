@@ -163,7 +163,7 @@ def _worker(
     return id, status, elapsed, message
 
 
-def _summarise(results: list[tuple[str, str, float, str]]) -> None:
+def _summarize(results: list[tuple[str, str, float, str]]) -> None:
     """Print a summary of a run."""
     counts = Counter(status for _, status, _, _ in results)
     print(
@@ -260,7 +260,7 @@ def run(
         else:
             os.environ[var] = val
 
-    _summarise(results)
+    _summarize(results)
 
     if qc_dir is not None:
         report.generate_report(
