@@ -4,9 +4,7 @@ Hidden Markov Model (HMM)
 Introduction
 ------------
 
-The HMM is a popular model for studying time series data. The HMM has been used successfully to study neuroimaging data [1-8].
-
-This model consists of two parts:
+The HMM is a widely used model for time series and has been applied to neuroimaging data in many studies [1-8]. It has two parts:
 
 - A **hidden state** (also known as latent variable) whose dynamics are governed by a **transition probability matrix**.
 - An **observation model**, which is the process of generating data given the hidden state.
@@ -79,7 +77,7 @@ A set of canonical HMM networks trained on a large MEG dataset are available in 
 Post-hoc Analysis
 -----------------
 
-After we fit an HMM we're often interested in interpreting the hidden states. We typically do two types of analysis: studying statistics that summarise the hidden state time course (called summary statistics) and re-estimating spectral properties from the training data given the state time course. These are discussed below.
+Two analyses interpret the hidden states: statistics that summarise the state time course, and spectral properties re-estimated from the training data given the state time course.
 
 Summary Statistics
 ^^^^^^^^^^^^^^^^^^

@@ -4,12 +4,7 @@ HIVE (HMM with Integrated Variability Estimation)
 Introduction
 ------------
 
-HIVE extends the :doc:`HMM <hmm>` to explicitly model **inter-session variability** while inferring dynamic networks across a group [1]. The standard HMM assumes all sessions share exactly the same observation model parameters (state means and covariances). In practice, sessions from different subjects, scanners, or sites may have systematic differences in their functional networks. HIVE addresses this by learning an **embedding vector** (a "fingerprint") for each session, which modulates the group-level observation model parameters to produce session-specific parameters.
-
-This approach has two key benefits:
-
-- **Improved model fit**: By accounting for inter-session variability, HIVE can better describe the data compared to a standard HMM that forces all sessions to share identical parameters.
-- **Meaningful embeddings**: The learnt embedding vectors can capture sources of variation across a population (e.g. demographics, scanner types, sites) in an unsupervised manner.
+HIVE extends the :doc:`HMM <hmm>` to model **inter-session variability** while inferring dynamic networks across a group [1]. The HMM gives every session the same state means and covariances, although sessions from different subjects, scanners or sites differ systematically. HIVE learns an **embedding vector** (a "fingerprint") for each session that modulates the group-level parameters into session-specific ones. This fits the data better, and the embeddings capture sources of variation across the population (demographics, scanner, site) without supervision.
 
 Generative Model
 ----------------
@@ -31,22 +26,12 @@ The temporal model (transition probability matrix) is the same as the standard H
 Inference
 ---------
 
-HIVE uses the same Bayesian inference approach as the HMM (Expectation-Maximization) for the hidden states and transition probabilities. The embedding vectors and the deviation MLP parameters are learnt jointly during training. KL annealing can be used to stabilize the learning of the deviation parameters.
-
-Key configuration options specific to HIVE:
-
-- ``embeddings_dim``: Dimensionality of the embedding vectors.
-- ``spatial_embeddings_dim``: Dimensionality of spatial embeddings.
-- ``dev_n_layers``, ``dev_n_units``: Architecture of the MLP that predicts deviations.
+HIVE infers the hidden states and transition probabilities as the HMM does, and learns the embedding vectors and the deviation MLP jointly during training, with KL annealing to stabilise the deviations. The embedding and deviation-network sizes are set in :class:`osl_dynamics.models.hive.Config`.
 
 Post-hoc Analysis
 -----------------
 
-After fitting HIVE, you can perform the same post-hoc analyses as with the :doc:`HMM <hmm>` (summary statistics, spectral analysis, etc.). Additionally, you can analyse the **embedding vectors** to study inter-session variability:
-
-- Visualize the embedding space to see how sessions cluster.
-- Correlate embeddings with external variables (age, sex, scanner type, etc.).
-- Examine the session-specific deviations to understand how individual sessions differ from the group average.
+The post-hoc analyses of the :doc:`HMM <hmm>` apply. In addition, the **embedding vectors** can be visualised to see how sessions cluster, correlated with external variables (age, sex, scanner), and the session-specific deviations examined to see how a session differs from the group.
 
 References
 ----------

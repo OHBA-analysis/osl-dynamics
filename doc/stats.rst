@@ -1,18 +1,12 @@
 Statistical Significance Testing
 ================================
 
-The :mod:`osl_dynamics.stats <osl_dynamics.stats>` subpackage is the single place for statistical significance testing in osl-dynamics. Every test fits a General Linear Model (GLM) at each **target** (parcel, state, connection, time point, frequency, etc.) and corrects for the multiple comparisons across the targets, by default with non-parametric permutation tests that make no assumption about the distribution of the data.
-
-Start with the :doc:`Statistical Inference tutorial <tutorials_build/7-1_statistical_inference>`, which explains hypothesis testing, the GLM, permutation tests and every correction with figures. Then see the practical tutorials:
-
-- :doc:`Group Contrast <tutorials_build/7-2_group_contrast>`: comparing two groups of subjects (summary statistics, power maps, connectivity), with covariates.
-- :doc:`Network Response <tutorials_build/7-3_network_response>`: testing an epoched state/mode time course against zero with the maximum statistic, cluster-based permutations and TFCE.
-- :doc:`Custom Designs <tutorials_build/7-4_custom_designs>`: continuous regressors, your own design matrices and contrasts, parametric and one-tailed tests, clusters with a custom adjacency.
+:mod:`osl_dynamics.stats <osl_dynamics.stats>` fits a General Linear Model (GLM) at each **target** (parcel, state, connection, time point, frequency) and corrects for the multiple comparisons across targets, by default with permutation tests that make no assumption about the distribution of the data. The :doc:`Statistical Inference tutorial <tutorials_build/7-1_statistical_inference>` explains the methods with figures; the :doc:`statistics tutorials <tutorial_sections/statistics>` apply them to group contrasts, network responses and custom designs.
 
 Which function?
 ---------------
 
-All tests take an array with the subjects (or sessions) as the first dimension and any number of target dimensions, and return a :class:`~osl_dynamics.stats.results.TestResult` with the effect (:code:`copes`), the test statistic (:code:`stats`: t, or F for three or more groups), corrected p-values and a :code:`significant()` mask of the same shape as the targets.
+All tests take an array with the subjects as the first dimension and any number of target dimensions, and return a :class:`~osl_dynamics.stats.results.TestResult` with the effect (:code:`copes`), the statistic (:code:`stats`), corrected :code:`pvalues` and a :code:`significant()` mask of the same shape as the targets.
 
 .. list-table::
    :header-rows: 1
@@ -43,7 +37,7 @@ All tests take an array with the subjects (or sessions) as the first dimension a
      - :class:`~osl_dynamics.stats.design.DesignConfig` with :class:`~osl_dynamics.stats.permutation.MaxStatPermutation`, :class:`~osl_dynamics.stats.permutation.ClusterPermutation` or :class:`~osl_dynamics.stats.glm.GLM`
      - Chosen from the design
 
-Nuisance covariates (age, sex, head size, ...) are passed to the between-subject functions as :code:`covariates={"age": age, ...}` and regressed out with the Freedman-Lane permutation scheme. Every result has an :meth:`~osl_dynamics.stats.results.TestResult.effect_size` method giving the effect (cope) and Cohen's d (or partial eta squared for an F-test) with bootstrap confidence intervals, for reporting the size of a significant effect alongside its p-value.
+Nuisance covariates are passed to the between-subject functions as :code:`covariates={"age": age, ...}`. Every result has an :meth:`~osl_dynamics.stats.results.TestResult.effect_size` method giving Cohen's d (or partial eta squared for an F-test) with bootstrap confidence intervals.
 
 Which correction?
 -----------------
@@ -76,7 +70,7 @@ The :code:`correction` argument selects the correction for multiple comparisons.
      - Nothing
      - Exploration only. Never report uncorrected p-values alone.
 
-FWER is the family-wise error rate (the probability of any false positive); FDR is the false discovery rate (the expected fraction of false positives among the significant targets).
+FWER is the family-wise error rate (the probability of any false positive); FDR the false discovery rate (the expected fraction of false positives among the significant targets).
 
 Which data?
 -----------
@@ -116,12 +110,12 @@ Which data?
 Implementation notes
 --------------------
 
-- P-values from :math:`N` random permutations are :math:`(1 + b) / (N + 1)`, so the smallest attainable p-value is :math:`1 / (N + 1)`. Use at least 1000 permutations (10,000 for p < 0.001). When every permutation can be enumerated the test is exact (:code:`result.exact`).
-- Sign-flip tests need the noise to be symmetric about zero, which holds for baseline-corrected responses and paired differences. Row-shuffle tests make no distributional assumption.
-- Targets with missing values are fitted with the subjects that have a value for them (per-target complete-case analysis), with a warning.
+- P-values from :math:`N` random permutations are :math:`(1 + b) / (N + 1)`, so the smallest attainable p-value is :math:`1 / (N + 1)`: use at least 1000 permutations (10,000 for p < 0.001). When every permutation can be enumerated the test is exact (:code:`result.exact`).
+- Sign-flip tests need the noise to be symmetric about zero (true of baseline-corrected responses and paired differences); row-shuffle tests make no distributional assumption.
+- Targets with missing values are fitted with the subjects that have a value for them, with a warning.
 - Permutations use NumPy's global random state; :func:`osl_dynamics.utils.set_random_seed` makes them reproducible.
-- F-tests are one-sided by construction (the F-statistic has no direction); their :code:`tail` is always 0, and :code:`result.copes` holds the copes of the rows of the F-contrast.
-- Within-subject designs use exchangeability blocks (the :code:`blocks` argument of the permutation classes): rows are only shuffled within a subject, and sign flips flip a subject's rows together.
-- Confidence intervals from :meth:`~osl_dynamics.stats.results.TestResult.effect_size` are percentile bootstrap intervals over subjects (resampled within groups, or whole subjects in within-subject designs); :code:`n_boot=0` gives the parametric t interval of the cope.
+- F-tests have no direction (:code:`tail` is always 0); :code:`result.copes` holds the copes of the rows of the F-contrast.
+- Within-subject designs shuffle only within each subject (the :code:`blocks` argument of the permutation classes).
+- Effect size confidence intervals are percentile bootstrap intervals over subjects; :code:`n_boot=0` gives the parametric t interval of the cope.
 
 Also see the :doc:`FAQ <faq>` and the `example scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/statistics>`_.

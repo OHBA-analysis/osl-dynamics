@@ -4,9 +4,7 @@ Multi-Dynamic Network Modes (M-DyNeMo)
 Introduction
 ------------
 
-M-DyNeMo extends :doc:`DyNeMo <dynemo>` by allowing **separate temporal dynamics for power and functional connectivity (FC)** [1]. Standard DyNeMo assumes that power and FC share the same dynamics — i.e. both are described by the same set of mixing coefficients. M-DyNeMo relaxes this assumption, enabling the model to capture situations where power and connectivity evolve independently.
-
-This is motivated by the observation that power and FC dynamics can be **uncoupled** — they may change at different times or at different rates. For example, a brain region may increase in power without a corresponding change in its connectivity to other regions, or vice versa.
+M-DyNeMo extends :doc:`DyNeMo <dynemo>` with **separate temporal dynamics for power and functional connectivity (FC)** [1]. DyNeMo describes both with the same mixing coefficients; M-DyNeMo relaxes this, so that a region's power can change without a change in its connectivity, or vice versa.
 
 Generative Model
 ----------------
@@ -22,9 +20,7 @@ where:
 - :math:`R_t = \sum_j \beta_{jt} R_j` is the time-varying correlation matrix, controlling **functional connectivity**.
 - :math:`\alpha_{jt}` and :math:`\beta_{jt}` are separate sets of mixing coefficients for power and FC respectively.
 
-The key difference from DyNeMo is that :math:`\alpha_{jt}` and :math:`\beta_{jt}` are inferred independently, allowing power and FC to have different temporal dynamics.
-
-Like DyNeMo, the temporal model for both sets of mixing coefficients uses recurrent neural networks (LSTMs) to capture long-range temporal dependencies.
+As in DyNeMo, each set of mixing coefficients has a recurrent neural network as its temporal model.
 
 Inference
 ---------
@@ -41,7 +37,7 @@ After fitting M-DyNeMo, you obtain two sets of mixing coefficients:
 - **Alpha** (:math:`\alpha_{jt}`): mixing coefficients for power modes.
 - **Beta** (:math:`\beta_{jt}`): mixing coefficients for FC modes.
 
-These can be analysed separately to study the independent dynamics of power and connectivity. The same summary statistics (fractional occupancy, lifetimes, etc.) and spectral analysis approaches used with :doc:`DyNeMo <dynemo>` can be applied to each set of mixing coefficients independently.
+Each can be analysed with the summary statistics and spectral analysis used for :doc:`DyNeMo <dynemo>`.
 
 References
 ----------
