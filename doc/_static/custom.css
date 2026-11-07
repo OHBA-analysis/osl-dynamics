@@ -12,15 +12,50 @@
   margin-right: 0.3rem;
 }
 
-/* Institution logos at the bottom of the home page */
+/* Home page title with the institution logos on its right */
+section.home-page {
+  display: grid;
+  /* minmax(0, ...) so long content can't push the page wider than the screen */
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 2rem;
+}
+section.home-page > * {
+  grid-column: 1 / -1;
+}
+section.home-page > h1 {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
+}
 .institution-logos {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
+  gap: 1rem;
   align-items: center;
-  margin-top: 1.5rem;
+}
+section.home-page > .institution-logos {
+  grid-column: 2;
 }
 .institution-logos img {
-  height: 60px;
+  height: 80px;
   width: auto;
+}
+
+/* On narrow screens the logos go below the title */
+@media (max-width: 720px) {
+  section.home-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  section.home-page > h1,
+  section.home-page > .institution-logos {
+    grid-column: 1 / -1;
+    grid-row: auto;
+  }
+  .institution-logos {
+    margin-bottom: 1rem;
+  }
+  .institution-logos img {
+    height: 50px;
+  }
 }

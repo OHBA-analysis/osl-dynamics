@@ -1,7 +1,16 @@
 :html_theme.sidebar_secondary.remove:
 
+.. rst-class:: home-page
+
 OSL Dynamics
 ============
+
+.. raw:: html
+
+   <div class="institution-logos">
+     <a href="https://www.oxcin.ox.ac.uk/about/our-locations/OHBA"><img src="https://raw.githubusercontent.com/OHBA-analysis/osl-files/main/docs/logo/ohba-logo.png" alt="OHBA"></a>
+     <a href="https://www.oxcin.ox.ac.uk"><img src="https://raw.githubusercontent.com/OHBA-analysis/osl-files/main/docs/logo/oxcin-logo.png" alt="Oxford Centre for Integrative Neuroimaging"></a>
+   </div>
 
 .. rst-class:: lead
 
@@ -34,7 +43,7 @@ OSL Dynamics
 
       Preprocessing, coregistration, source reconstruction, parcellation and sign flipping.
 
-   .. grid-item-card:: :octicon:`git-branch` Models
+   .. grid-item-card:: :octicon:`workflow` Models
       :link: models/index
       :link-type: doc
 
@@ -64,26 +73,9 @@ OSL Dynamics
 
       Every class and function, with its parameters.
 
-Citing osl-dynamics
--------------------
-
 If you find this toolbox useful, please cite:
 
    Gohil, C., Huang, R., Roberts, E., van Es, M. W., Quinn, A. J., Vidaurre, D., & Woolrich, M. W. (2024). `osl-dynamics, a toolbox for modeling fast dynamic brain activity <https://elifesciences.org/articles/91949>`_. *eLife*, 12, RP91949.
-
-Getting help
-------------
-
-To request a new feature or report a bug, please create an issue on `GitHub <https://github.com/OHBA-analysis/osl-dynamics/issues>`_.
-
-osl-dynamics is developed by the `OHBA Methods Group <https://www.psych.ox.ac.uk/research/ohba-analysis-group>`_ at the University of Oxford.
-
-.. raw:: html
-
-   <div class="institution-logos">
-     <a href="https://www.oxcin.ox.ac.uk/about/our-locations/OHBA"><img src="https://raw.githubusercontent.com/OHBA-analysis/osl-files/main/docs/logo/ohba-logo.png" alt="OHBA"></a>
-     <a href="https://www.oxcin.ox.ac.uk"><img src="https://raw.githubusercontent.com/OHBA-analysis/osl-files/main/docs/logo/oxcin-logo.png" alt="Oxford Centre for Integrative Neuroimaging"></a>
-   </div>
 
 .. toctree::
    :hidden:
