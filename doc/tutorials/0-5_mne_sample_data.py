@@ -472,7 +472,7 @@ Prerequisites
 #   ``use_bilateral_pairs=True``.
 # - The pairing tolerance ``bilateral_tol`` defaults to half the dipole grid
 #   spacing, which is usually what you want.
-# - Use ``orthogonalisation=None`` when analyzing zero-lag correlated
+# - Use ``orthogonalisation=None`` when analysing zero-lag correlated
 #   responses — symmetric orthogonalisation would remove them.
 # - Check the dipole pairing QC plot (``bilateral_dipoles.png``).
 # - Use ``source_recon.virtual_electrodes`` to get the time course at a
