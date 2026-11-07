@@ -120,6 +120,7 @@ def _covariate_features(covariates: Optional[Dict[str, np.ndarray]]) -> list:
 def _run(
     design: Design,
     data: np.ndarray,
+    *,
     n_perm: int,
     correction: Optional[str],
     metric: str,
@@ -135,6 +136,7 @@ def _run(
     statistic: str = "t",
     blocks: Optional[np.ndarray] = None,
 ) -> TestResult:
+    """Run the test selected by :code:`correction` and :code:`parametric`."""
     if statistic == "F":
         if tail != 0:
             raise ValueError(
@@ -200,8 +202,11 @@ def _run(
     if parametric:
         glm_result = GLM(design).fit(data, hat=hat)
         if statistic == "F":
-            return glm_result.ftest(contrast_index, correction=correction)
-        return glm_result.test(contrast_index, correction=correction, tail=tail)
+            result = glm_result.ftest(contrast_index, correction=correction)
+        else:
+            result = glm_result.test(contrast_index, correction=correction, tail=tail)
+        result.blocks = blocks  # for bootstrapping effect sizes
+        return result
 
     perm = Permutation(
         design,
@@ -282,17 +287,17 @@ def evoked_response(
     return _run(
         design,
         data,
-        n_perm,
-        correction,
-        metric,
-        tail,
-        pooled_dims,
-        cluster_dims,
-        adjacency,
-        cluster_forming_threshold,
-        hat,
-        parametric,
-        n_jobs,
+        n_perm=n_perm,
+        correction=correction,
+        metric=metric,
+        tail=tail,
+        pooled_dims=pooled_dims,
+        cluster_dims=cluster_dims,
+        adjacency=adjacency,
+        cluster_forming_threshold=cluster_forming_threshold,
+        hat=hat,
+        parametric=parametric,
+        n_jobs=n_jobs,
     )
 
 
@@ -328,17 +333,17 @@ def paired_diff(
     return _run(
         design,
         data,
-        n_perm,
-        correction,
-        metric,
-        tail,
-        pooled_dims,
-        cluster_dims,
-        adjacency,
-        cluster_forming_threshold,
-        hat,
-        parametric,
-        n_jobs,
+        n_perm=n_perm,
+        correction=correction,
+        metric=metric,
+        tail=tail,
+        pooled_dims=pooled_dims,
+        cluster_dims=cluster_dims,
+        adjacency=adjacency,
+        cluster_forming_threshold=cluster_forming_threshold,
+        hat=hat,
+        parametric=parametric,
+        n_jobs=n_jobs,
     )
 
 
@@ -438,17 +443,17 @@ def group_diff(
     return _run(
         design,
         data,
-        n_perm,
-        correction,
-        metric,
-        tail,
-        pooled_dims,
-        cluster_dims,
-        adjacency,
-        cluster_forming_threshold,
-        hat,
-        parametric,
-        n_jobs,
+        n_perm=n_perm,
+        correction=correction,
+        metric=metric,
+        tail=tail,
+        pooled_dims=pooled_dims,
+        cluster_dims=cluster_dims,
+        adjacency=adjacency,
+        cluster_forming_threshold=cluster_forming_threshold,
+        hat=hat,
+        parametric=parametric,
+        n_jobs=n_jobs,
         statistic=statistic,
     )
 
@@ -511,10 +516,11 @@ def condition_diff(
                 f"conditions must be two different indices, got {conditions}."
             )
         for c in conditions:
-            if not 0 <= c < n_conditions:
+            if c != int(c) or not 0 <= c < n_conditions:
                 raise ValueError(
-                    f"condition {c} out of range for {n_conditions} conditions."
+                    f"condition {c} is not an index into {n_conditions} conditions."
                 )
+        conditions = tuple(int(c) for c in conditions)
 
     # One row per subject and condition
     y = data.reshape((n_subjects * n_conditions, *data.shape[2:]))
@@ -564,17 +570,17 @@ def condition_diff(
     return _run(
         design,
         y,
-        n_perm,
-        correction,
-        metric,
-        tail,
-        pooled_dims,
-        cluster_dims,
-        adjacency,
-        cluster_forming_threshold,
-        hat,
-        parametric,
-        n_jobs,
+        n_perm=n_perm,
+        correction=correction,
+        metric=metric,
+        tail=tail,
+        pooled_dims=pooled_dims,
+        cluster_dims=cluster_dims,
+        adjacency=adjacency,
+        cluster_forming_threshold=cluster_forming_threshold,
+        hat=hat,
+        parametric=parametric,
+        n_jobs=n_jobs,
         statistic=statistic,
         blocks=subject,
     )
@@ -622,17 +628,17 @@ def regression(
     return _run(
         design,
         data,
-        n_perm,
-        correction,
-        metric,
-        tail,
-        pooled_dims,
-        cluster_dims,
-        adjacency,
-        cluster_forming_threshold,
-        hat,
-        parametric,
-        n_jobs,
+        n_perm=n_perm,
+        correction=correction,
+        metric=metric,
+        tail=tail,
+        pooled_dims=pooled_dims,
+        cluster_dims=cluster_dims,
+        adjacency=adjacency,
+        cluster_forming_threshold=cluster_forming_threshold,
+        hat=hat,
+        parametric=parametric,
+        n_jobs=n_jobs,
     )
 
 

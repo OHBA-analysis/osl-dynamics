@@ -237,7 +237,7 @@ class Design:
             the design whose rows make up the F-contrast.
         """
         if (values is None) == (contrasts is None):
-            raise ValueError("Pass either values or contrasts, not both.")
+            raise ValueError("Pass exactly one of values or contrasts.")
         if contrasts is not None:
             if len(contrasts) == 0:
                 raise ValueError("contrasts must name at least one t-contrast.")

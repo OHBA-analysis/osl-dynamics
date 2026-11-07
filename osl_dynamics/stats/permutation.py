@@ -15,6 +15,7 @@ References
 import itertools
 import logging
 import math
+from dataclasses import dataclass
 from typing import Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -37,6 +38,7 @@ from osl_dynamics.stats.glm import (
     estimable_contrast,
     f_whitening,
     hat_adjustment,
+    residual_dof,
     validate_y,
 )
 from osl_dynamics.stats.results import TestResult
@@ -87,6 +89,22 @@ def _n_group_assignments(sizes: Sequence[int]) -> int:
     return n
 
 
+@dataclass
+class _TargetGroup:
+    """Quantities needed to compute the null statistics of the targets that
+    share a pattern of missing values (fitted with the same complete rows)."""
+
+    targets: np.ndarray  # indices of the targets in this group
+    rows: np.ndarray  # indices of the complete rows
+    dof: int  # residual degrees of freedom
+    w: np.ndarray  # copes = w @ y*, shape (n_contrast_rows, n_rows)
+    scale: float  # c (X'X)^+ c' for a t-contrast, numerator dof for an F-contrast
+    Q: np.ndarray  # orthonormal basis of the column space of the design
+    r: np.ndarray  # residuals after fitting the nuisance regressors
+    r2: np.ndarray  # sum of squares of r for each target
+    shuffle_units: list  # local indices of the rows shuffled among themselves
+
+
 class Permutation:
     """Permutation test of a GLM contrast with uncorrected p-values.
 
@@ -105,10 +123,10 @@ class Permutation:
         Number of permutations. If every possible permutation can be
         enumerated within this number the test is exact.
     perm_type : str, optional
-        :code:`'sign_flip'` (within-subject designs, tests of a mean) or
-        :code:`'row_shuffle'` (between-subject designs, group differences
-        and continuous regressors). Chosen from the feature and contrast
-        types if :code:`None`.
+        :code:`'sign_flip'` (one-sample tests: a response against zero, a
+        paired difference) or :code:`'row_shuffle'` (group differences,
+        condition differences and continuous regressors). Chosen from the
+        feature and contrast types if :code:`None`.
     tail : int, optional
         :code:`0` for a two-tailed test, :code:`1` to test for a positive
         effect, :code:`-1` for a negative effect.
@@ -419,14 +437,19 @@ class Permutation:
     def _resolve_pooled_dims(self, target_dims: Tuple[int, ...]) -> None:
         self.pooled_dims = ()
 
-    def _prepare_group(self, X: np.ndarray, y: np.ndarray, rows: np.ndarray) -> dict:
-        """Quantities needed to compute the null statistics of one
-        complete-case group of targets."""
+    def _prepare_group(
+        self, X: np.ndarray, y: np.ndarray, rows: np.ndarray, targets: np.ndarray
+    ) -> _TargetGroup:
+        """Quantities needed to compute the null statistics of the targets
+        that are complete for the given rows."""
         rows = np.where(rows)[0]
         X_r = X[rows]
-        y = y[rows]
+        y = y[rows][:, targets]
+        dof = residual_dof(X_r)
+        if dof < 1:
+            # Too few complete samples: the statistics of these targets are NaN
+            return _TargetGroup(targets, rows, dof, None, np.nan, None, None, None, [])
         pinv = np.linalg.pinv(X_r)
-        dof = X_r.shape[0] - np.linalg.matrix_rank(X_r)
 
         # Residuals of the data after fitting the nuisance regressors
         nuisance = self._contrast.nuisance_indices
@@ -458,26 +481,27 @@ class Permutation:
         else:
             w = f_whitening(c_pinv, name=self.contrast_name) @ c_pinv
             scale = float(w.shape[0])
-        return {
-            "rows": rows,
-            "dof": dof,
-            "w": w,
-            "scale": scale,
-            "Q": Q,
-            "r": r,
-            "r2": np.sum(r**2, axis=0),
-            "shuffle_units": [
-                local
-                for local in (
-                    np.where(np.isin(rows, unit))[0]
-                    for unit in self._shuffle_units(self._rows_to_shuffle())
-                )
-                if len(local) > 1
-            ],
-        }
+        # The rows shuffled among themselves, as indices into the complete rows
+        shuffle_units = []
+        for unit in self._shuffle_units(self._rows_to_shuffle()):
+            local = np.where(np.isin(rows, unit))[0]
+            if len(local) > 1:
+                shuffle_units.append(local)
+
+        return _TargetGroup(
+            targets=targets,
+            rows=rows,
+            dof=dof,
+            w=w,
+            scale=scale,
+            Q=Q,
+            r=r,
+            r2=np.sum(r**2, axis=0),
+            shuffle_units=shuffle_units,
+        )
 
     def _null_batch(
-        self, group: dict, perms: np.ndarray
+        self, group: _TargetGroup, perms: np.ndarray
     ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
         """Null numerators and denominators of one group of targets for a
         batch of permutations.
@@ -493,12 +517,15 @@ class Permutation:
             any hat adjustment. Shape is (batch_size, n_targets_in_group).
             :code:`None` if :code:`metric='copes'`.
         """
-        w, Q, r, r2 = group["w"], group["Q"], group["r"], group["r2"]
-        n_rows, n_r = w.shape
         batch_size = perms.shape[0]
+        if group.dof < 1:
+            nan = np.full((batch_size, len(group.targets)), np.nan)
+            return nan, nan
+        w, Q, r, r2 = group.w, group.Q, group.r, group.r2
+        n_rows, n_r = w.shape
 
         if self.perm_type == "sign_flip":
-            S = perms[:, group["rows"]]  # (batch, n_r)
+            S = perms[:, group.rows]  # (batch, n_r)
             W = S[:, None, :] * w[None, :, :]  # (batch, n_rows, n_r)
             QP = S[:, :, None] * Q[None, :, :]
         else:
@@ -506,8 +533,8 @@ class Permutation:
             # the relative order of the global permutation restricted to the
             # complete rows of each set of rows that are shuffled together
             I = np.tile(np.arange(n_r), (batch_size, 1))
-            for local in group["shuffle_units"]:
-                values = perms[:, group["rows"][local]]
+            for local in group.shuffle_units:
+                values = perms[:, group.rows[local]]
                 ranks = np.argsort(np.argsort(values, axis=1), axis=1)
                 I[:, local] = local[ranks]
             # y*_i = r_{I[i]}, so cope = sum_i w_i r_{I[i]} = W @ r with
@@ -529,7 +556,7 @@ class Permutation:
 
         proj = QP.transpose(0, 2, 1) @ r  # (batch, rank, n_targets)
         ss = _zero_small(r2[None, :] - np.sum(proj**2, axis=1), r2[None, :])
-        return numerator, group["scale"] * ss / group["dof"]
+        return numerator, group.scale * ss / group.dof
 
     def _statistic(self, groups: list, perms: np.ndarray, n_targets: int) -> np.ndarray:
         """Statistic of every target for a batch of permutations.
@@ -541,10 +568,10 @@ class Permutation:
         """
         numerator = np.empty((perms.shape[0], n_targets))
         denominator = np.empty((perms.shape[0], n_targets))
-        for group, targets in groups:
-            numerator[:, targets], d = self._null_batch(group, perms)
+        for group in groups:
+            numerator[:, group.targets], d = self._null_batch(group, perms)
             if d is not None:
-                denominator[:, targets] = d
+                denominator[:, group.targets] = d
         if self.metric == "copes":
             return numerator
         # The hat adjustment uses the maximum variance over all targets. A
@@ -579,7 +606,7 @@ class Permutation:
         self._before_permutations(glm_result)
 
         groups = [
-            (self._prepare_group(X, y[:, targets], rows), targets)
+            self._prepare_group(X, y, rows, targets)
             for rows, targets in complete_case_groups(X, y, warn=False)
         ]
 
@@ -594,66 +621,21 @@ class Permutation:
         self._observed = observed.reshape(target_dims)
         observed = self._transform_observed(self._observed)[None]
 
-        all_complete = len(groups) == 1 and len(groups[0][0]["rows"]) == X.shape[0]
+        all_complete = len(groups) == 1 and len(groups[0].rows) == X.shape[0]
         perms, exact = self._permutations(allow_exact_shuffle=all_complete)
         n_perm = perms.shape[0]
-        label = f"{self.statistic}-contrast '{self.contrast_name}'"
-        if self.blocks is not None:
-            label += f" within {self.blocks.max() + 1} blocks"
-        if exact:
-            _logger.info(
-                f"Enumerating all {n_perm} permutations of {label} (exact test)"
-            )
-        else:
-            _logger.info(f"Running {n_perm} {self.perm_type} permutations of {label}")
+        self._log_permutations(n_perm, exact)
 
-        nonpooled_dims = tuple(
-            d for d in range(len(target_dims)) if d not in self.pooled_dims
+        counts, null = self._count_exceedances(
+            groups, observed, perms, target_dims, n_targets
         )
-        null_shape = (n_perm, *[target_dims[d] for d in nonpooled_dims])
-        keep_null = math.prod(null_shape) <= _MAX_NULL_ELEMENTS
-        null = np.empty(null_shape) if keep_null else None
-        if not keep_null:
-            _logger.info("The null distribution is too large to keep")
-
-        n_features = X.shape[1] + 1
-        batch_size = int(
-            np.clip(
-                _MAX_BATCH_ELEMENTS // (n_features * n_targets * X.shape[0]), 1, n_perm
-            )
-        )
-        if self._max_batch_size is not None:
-            batch_size = min(batch_size, self._max_batch_size)
-
-        # Null statistics within floating point noise of the observed one
-        # count as at least as large (ties)
-        finite = observed[np.isfinite(observed)]
-        observed_scale = np.abs(finite).max() if finite.size else 0.0
-        counts = np.zeros(target_dims)
-        bar = progress(total=n_perm, desc="Permutations")
-        try:
-            for start in range(0, n_perm, batch_size):
-                batch = perms[start : start + batch_size]
-                stat = self._statistic(groups, batch, n_targets)
-                reduced = self._reduce(stat.reshape((len(batch), *target_dims)))
-                if keep_null:
-                    null[start : start + len(batch)] = reduced
-                finite = reduced[np.isfinite(reduced)]
-                scale = max(observed_scale, np.abs(finite).max() if finite.size else 0)
-                threshold = observed - _TIE_RTOL * scale
-                counts += np.sum(self._expand(reduced) >= threshold, axis=0)
-                bar.update(len(batch))
-        finally:
-            bar.close()
-            self._close()
 
         # Under an exact test the identity permutation is in the null and
         # equals the observed statistic, so no +1 is needed
         offset = 0 if exact else 1
         pvalues = (counts + offset) / (n_perm + offset)
 
-        # A target with an undefined statistic (e.g. zero variance) has no
-        # meaningful p-value
+        # A target with an undefined statistic has no meaningful p-value
         undefined = ~np.isfinite(self._observed)
         if undefined.any():
             _logger.warning(
@@ -700,6 +682,77 @@ class Permutation:
             contrast_index=self.contrast_index,
             blocks=self.blocks,
         )
+
+    def _log_permutations(self, n_perm: int, exact: bool) -> None:
+        label = f"{self.statistic}-contrast '{self.contrast_name}'"
+        if self.blocks is not None:
+            label += f" within {self.blocks.max() + 1} blocks"
+        if exact:
+            _logger.info(
+                f"Enumerating all {n_perm} permutations of {label} (exact test)"
+            )
+        else:
+            _logger.info(f"Running {n_perm} {self.perm_type} permutations of {label}")
+
+    def _count_exceedances(
+        self,
+        groups: list,
+        observed: np.ndarray,
+        perms: np.ndarray,
+        target_dims: Tuple[int, ...],
+        n_targets: int,
+    ) -> Tuple[np.ndarray, Optional[np.ndarray]]:
+        """Run the permutations in batches.
+
+        Returns
+        -------
+        counts : np.ndarray
+            Number of permutations whose (reduced) null statistic is at least
+            the observed one, for each target. Shape is (\\*target_dims).
+        null : np.ndarray
+            The null distribution, shape (n_perm, \\*nonpooled_dims), or
+            :code:`None` if it is too large to keep.
+        """
+        n_perm, n_samples = perms.shape
+        nonpooled_dims = [
+            d for d in range(len(target_dims)) if d not in self.pooled_dims
+        ]
+        null_shape = (n_perm, *[target_dims[d] for d in nonpooled_dims])
+        keep_null = math.prod(null_shape) <= _MAX_NULL_ELEMENTS
+        null = np.empty(null_shape) if keep_null else None
+        if not keep_null:
+            _logger.info("The null distribution is too large to keep")
+
+        # Permutations per batch, bounded by memory
+        n_features = self.glm.n_features + 1
+        batch_size = _MAX_BATCH_ELEMENTS // (n_features * n_targets * n_samples)
+        batch_size = int(np.clip(batch_size, 1, n_perm))
+        if self._max_batch_size is not None:
+            batch_size = min(batch_size, self._max_batch_size)
+
+        # Null statistics within floating point noise of the observed one
+        # count as at least as large (ties)
+        finite = observed[np.isfinite(observed)]
+        observed_scale = np.abs(finite).max() if finite.size else 0.0
+
+        counts = np.zeros(target_dims)
+        bar = progress(total=n_perm, desc="Permutations")
+        try:
+            for start in range(0, n_perm, batch_size):
+                batch = perms[start : start + batch_size]
+                stat = self._statistic(groups, batch, n_targets)
+                reduced = self._reduce(stat.reshape((len(batch), *target_dims)))
+                if keep_null:
+                    null[start : start + len(batch)] = reduced
+                finite = reduced[np.isfinite(reduced)]
+                scale = max(observed_scale, np.abs(finite).max() if finite.size else 0)
+                threshold = observed - _TIE_RTOL * scale
+                counts += np.sum(self._expand(reduced) >= threshold, axis=0)
+                bar.update(len(batch))
+        finally:
+            bar.close()
+            self._close()
+        return counts, null
 
     def summary(self) -> dict:
         """Summary of the test settings."""

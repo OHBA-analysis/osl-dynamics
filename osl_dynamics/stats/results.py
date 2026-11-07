@@ -2,7 +2,7 @@
 
 import logging
 import pickle
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -423,17 +423,24 @@ class TestResult:
         items = ", ".join(f"{k}={v!r}" for k, v in self.summary().items())
         return f"TestResult({items})"
 
-    def save(self, filename: str) -> None:
+    def save(self, filename: str, include_data: bool = True) -> None:
         """Save to a pickle file.
 
         Parameters
         ----------
         filename : str
             Output file.
+        include_data : bool, optional
+            Whether to keep the tested data (:code:`result.glm.data`) in the
+            file, which :meth:`effect_size` needs. :code:`False` makes the
+            file much smaller for large data.
         """
         _logger.info(f"Saving {filename}")
+        result = self
+        if not include_data:
+            result = replace(self, glm=replace(self.glm, data=None))
         with open(filename, "wb") as file:
-            pickle.dump(self, file)
+            pickle.dump(result, file)
 
     @classmethod
     def load(cls, filename: str) -> "TestResult":

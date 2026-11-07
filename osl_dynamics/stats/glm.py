@@ -86,12 +86,12 @@ def complete_case_groups(
     return groups
 
 
-def _check_enough_samples(n_complete: int, n_features: int) -> None:
-    if n_complete < n_features + 2:
-        raise ValueError(
-            f"Only {n_complete} complete samples for a design with {n_features} "
-            "features. At least n_features + 2 are needed."
-        )
+def residual_dof(X: np.ndarray) -> int:
+    """Residual degrees of freedom of a design matrix: the number of samples
+    minus its rank (0 for an empty matrix)."""
+    if X.shape[0] == 0:
+        return 0
+    return X.shape[0] - np.linalg.matrix_rank(X)
 
 
 def hat_adjustment(varcopes: np.ndarray, hat: float) -> np.ndarray:
@@ -274,8 +274,9 @@ def fit_ols(
     A contrast that is not estimable for a target (e.g. a group difference
     when the group has no data for that target) gets NaN statistics; an
     F-contrast that is partly estimable tests its estimable part with fewer
-    numerator degrees of freedom. Targets with zero residual variance get
-    NaN statistics unless :code:`hat > 0`.
+    numerator degrees of freedom. Targets with zero residual variance, or
+    with too few complete samples for any residual degrees of freedom, get
+    NaN statistics (the former unless :code:`hat > 0`).
     """
     X = np.asarray(X, dtype=float)
     y = np.asarray(y, dtype=float)
@@ -305,14 +306,25 @@ def fit_ols(
     f_copes = [np.empty((c.shape[0], n_targets)) for c in f_contrasts]
     f_dof = np.zeros((n_f_contrasts, n_targets), dtype=int)
     not_estimable = {}
+    too_few = 0
 
     for rows, targets in complete_case_groups(X, y, warn=warn):
         X_r = X[rows]
         y_r = y[rows][:, targets]
-        _check_enough_samples(X_r.shape[0], n_features)
+        dof_r = residual_dof(X_r)
+        dof[targets] = dof_r
+        if dof_r < 1:
+            too_few += len(targets)
+            betas[:, targets] = np.nan
+            copes[:, targets] = np.nan
+            varcopes[:, targets] = np.nan
+            f_num[:, targets] = np.nan
+            f_den[:, targets] = np.nan
+            for cb in f_copes:
+                cb[:, targets] = np.nan
+            continue
 
         pinv = np.linalg.pinv(X_r)
-        dof_r = X_r.shape[0] - np.linalg.matrix_rank(X_r)
         b = pinv @ y_r
         residuals = y_r - X_r @ b
         ss = _zero_small(np.sum(residuals**2, axis=0), np.sum(y_r**2, axis=0))
@@ -325,7 +337,6 @@ def fit_ols(
         betas[:, targets] = b
         copes[:, targets] = contrasts @ b
         varcopes[:, targets] = c_xtx_c[:, None] * s2[None, :]
-        dof[targets] = dof_r
 
         if n_contrasts:
             estimable = _estimable_rows(contrasts, X_r, pinv)
@@ -354,6 +365,11 @@ def fit_ols(
             f_num[i, targets] = np.sum((L @ C_est @ b) ** 2, axis=0)
             f_den[i, targets] = C_est.shape[0] * s2
 
+    if warn and too_few:
+        _logger.warning(
+            f"{too_few} of {n_targets} targets have too few complete samples for "
+            "any residual degrees of freedom. Their statistics are NaN."
+        )
     if warn:
         for name, n in not_estimable.items():
             _logger.warning(

@@ -39,9 +39,12 @@ class EffectSize:
         Cohen's d: the cope divided by the residual standard deviation of the
         GLM. For a group difference this is the difference in means in units
         of the (pooled, covariate-adjusted) standard deviation; for a
-        one-sample test the mean in units of the standard deviation; for a
-        within-subject design the standard deviation is that of the
-        within-subject residuals. Shape is (\\*target_dims). t-tests only.
+        one-sample test the mean in units of the standard deviation. For a
+        within-subject design (blocks) it is the difference divided by the
+        standard deviation of the within-subject difference (Cohen's d_z),
+        so :func:`~osl_dynamics.stats.inference.paired_diff` and
+        :func:`~osl_dynamics.stats.inference.condition_diff` agree. Shape is
+        (\\*target_dims). t-tests only.
     d_ci : np.ndarray, optional
         Confidence limits of :code:`d`. Shape is (2, \\*target_dims).
     eta2 : np.ndarray, optional
@@ -113,19 +116,20 @@ def _strata(design: Design, contrast) -> list:
     return [s for s in strata + [rest] if len(s)]
 
 
-def _estimates(X, y, contrast_matrix, f_contrast, statistic):
-    """Cope, d and partial eta squared from one fit."""
+def _estimates(X, y, contrast_matrix, f_contrast, statistic, d_scale):
+    """Cope and Cohen's d (t) or cope and partial eta squared (F) from one
+    fit. :code:`d_scale` multiplies the residual standard deviation to give
+    the standardiser of d."""
     if statistic == "t":
         betas, copes, varcopes, dof, *_ = fit_ols(X, y, contrast_matrix, warn=False)
         residuals = y - X @ betas
-        s2 = np.nansum(residuals**2, axis=0) / dof
         with np.errstate(divide="ignore", invalid="ignore"):
-            d = np.where(s2 > 0, copes[0] / np.sqrt(s2), np.nan)
+            s2 = np.nansum(residuals**2, axis=0) / dof
+            d = np.where(s2 > 0, copes[0] / (d_scale * np.sqrt(s2)), np.nan)
         return copes[0], d
-    *_, fstats, f_copes, f_dof = fit_ols(
+    *_, dof, fstats, f_copes, f_dof = fit_ols(
         X, y, np.zeros((0, X.shape[1])), warn=False, f_contrasts=[f_contrast]
     )
-    dof = X.shape[0] - np.linalg.matrix_rank(X)
     ss_effect = fstats[0] * f_dof[0]
     with np.errstate(invalid="ignore"):
         eta2 = ss_effect / (ss_effect + dof)
@@ -189,7 +193,14 @@ def effect_size(
     f_contrast = contrast.matrix if statistic == "F" else None
 
     y, target_dims = validate_y(data, X.shape[0])
-    cope, size = _estimates(X, y, contrast_matrix, f_contrast, statistic)
+
+    # Within blocks (e.g. subjects) d is standardised by the standard
+    # deviation of the within-block contrast score (Cohen's d_z), which is
+    # the residual standard deviation times the norm of the contrast; this
+    # makes a paired difference agree with a one-sample test of the
+    # differences. Otherwise by the residual standard deviation itself.
+    d_scale = np.linalg.norm(contrast.matrix) if blocks is not None else 1.0
+    cope, size = _estimates(X, y, contrast_matrix, f_contrast, statistic, d_scale)
 
     if n_boot == 0:
         if statistic == "F":
@@ -212,9 +223,9 @@ def effect_size(
             rows = _resample_rows(strata, blocks)
             try:
                 boot_cope[b], boot_size[b] = _estimates(
-                    X[rows], y[rows], contrast_matrix, f_contrast, statistic
+                    X[rows], y[rows], contrast_matrix, f_contrast, statistic, d_scale
                 )
-            except ValueError:  # too few complete samples in this resample
+            except np.linalg.LinAlgError:  # degenerate resample
                 boot_cope[b], boot_size[b] = np.nan, np.nan
             bar.update(1)
         bar.close()
