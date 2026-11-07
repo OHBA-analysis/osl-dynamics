@@ -1,6 +1,6 @@
 """Permutation tests for GLM contrasts.
 
-Null distributions are built with the Freedman-Lane scheme [1]_: the data are
+Null distributions are built with the Freedman-Lane scheme [#winkler2014]_: the data are
 regressed on the nuisance regressors (the features with a zero weight in the
 contrast), the residuals are sign-flipped or row-shuffled, the nuisance fit
 is added back and the full model is refitted. Without nuisance regressors
@@ -8,8 +8,8 @@ this is the same as permuting the data.
 
 References
 ----------
-.. [1] Winkler, A. M. et al. (2014). Permutation inference for the general
-       linear model. NeuroImage, 92, 381-397.
+.. [#winkler2014] Winkler, A. M. et al. (2014). Permutation inference for the
+   general linear model. NeuroImage, 92, 381-397.
 """
 
 import itertools
@@ -776,7 +776,7 @@ class MaxStatPermutation(Permutation):
 
     The null distribution is the maximum of the statistic over the pooled
     target dimensions in each permutation, which controls the family-wise
-    error rate across those dimensions [1]_.
+    error rate across those dimensions [#nichols2002]_.
 
     Parameters
     ----------
@@ -812,9 +812,9 @@ class MaxStatPermutation(Permutation):
 
     References
     ----------
-    .. [1] Nichols, T. E. & Holmes, A. P. (2002). Nonparametric permutation
-           tests for functional neuroimaging: a primer with examples. Human
-           Brain Mapping, 15(1), 1-25.
+    .. [#nichols2002] Nichols, T. E. & Holmes, A. P. (2002). Nonparametric
+       permutation tests for functional neuroimaging: a primer with examples.
+       Human Brain Mapping, 15(1), 1-25.
     """
 
     correction = "max_stat"
@@ -881,7 +881,7 @@ def _reduce_maps(
 class ClusterPermutation(Permutation):
     """Cluster-based permutation test or threshold-free cluster enhancement.
 
-    In the cluster-based test [1]_, clusters are connected sets of targets
+    In the cluster-based test [#maris2007]_, clusters are connected sets of targets
     whose t-statistic exceeds the cluster-forming threshold. The null distribution is the largest cluster
     statistic (the sum of the t-statistics in a cluster) found in each
     permutation, so the family-wise error rate is controlled across the
@@ -889,7 +889,7 @@ class ClusterPermutation(Permutation):
     large arises by chance anywhere in the map; it does not establish the
     effect at every target in the cluster, nor the cluster's exact extent.
 
-    With :code:`tfce`, threshold-free cluster enhancement [2]_ replaces the
+    With :code:`tfce`, threshold-free cluster enhancement [#smith2009]_ replaces the
     threshold: the t-statistics are enhanced over all thresholds and every
     target gets its own p-value.
 
@@ -940,11 +940,11 @@ class ClusterPermutation(Permutation):
 
     References
     ----------
-    .. [1] Maris, E. & Oostenveld, R. (2007). Nonparametric statistical
-           testing of EEG- and MEG-data. Journal of Neuroscience Methods,
-           164(1), 177-190.
-    .. [2] Smith, S. M. & Nichols, T. E. (2009). Threshold-free cluster
-           enhancement. NeuroImage, 44(1), 83-98.
+    .. [#maris2007] Maris, E. & Oostenveld, R. (2007). Nonparametric statistical
+       testing of EEG- and MEG-data. Journal of Neuroscience Methods, 164(1),
+       177-190.
+    .. [#smith2009] Smith, S. M. & Nichols, T. E. (2009). Threshold-free cluster
+       enhancement. NeuroImage, 44(1), 83-98.
     """
 
     _max_batch_size = 50

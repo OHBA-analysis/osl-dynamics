@@ -271,7 +271,7 @@ def tfce(
 ) -> np.ndarray:
     """Threshold-free cluster enhancement.
 
-    Each target's statistic is replaced [1]_ by the integral over thresholds
+    Each target's statistic is replaced [#smith2009]_ by the integral over thresholds
     :code:`h` of :code:`extent(h) ** E * h ** H`, where :code:`extent(h)` is
     the size of the cluster containing the target at threshold :code:`h`.
 
@@ -302,8 +302,8 @@ def tfce(
 
     References
     ----------
-    .. [1] Smith, S. M. & Nichols, T. E. (2009). Threshold-free cluster
-           enhancement. NeuroImage, 44(1), 83-98.
+    .. [#smith2009] Smith, S. M. & Nichols, T. E. (2009). Threshold-free cluster
+       enhancement. NeuroImage, 44(1), 83-98.
     """
     stat = np.nan_to_num(stat, nan=0.0, posinf=0.0, neginf=0.0)
     enhanced = np.zeros(stat.shape)

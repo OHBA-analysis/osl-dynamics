@@ -98,7 +98,7 @@ def hat_adjustment(varcopes: np.ndarray, hat: float) -> np.ndarray:
     """'Hat' variance adjustment.
 
     Adds a fraction of the largest variance across targets to every target's
-    variance [1]_, which stops targets with implausibly small variances
+    variance [#ridgway2012]_, which stops targets with implausibly small variances
     producing very large t-statistics.
 
     Parameters
@@ -116,9 +116,9 @@ def hat_adjustment(varcopes: np.ndarray, hat: float) -> np.ndarray:
 
     References
     ----------
-    .. [1] Ridgway, G. R. et al. (2012). The problem of low variance voxels
-           in statistical parametric mapping; a new hat avoids a 'haircut'.
-           NeuroImage, 59(3), 2131-2141.
+    .. [#ridgway2012] Ridgway, G. R. et al. (2012). The problem of low variance
+       voxels in statistical parametric mapping; a new hat avoids a 'haircut'.
+       NeuroImage, 59(3), 2131-2141.
     """
     if hat < 0:
         raise ValueError(f"hat must be non-negative, got {hat}.")
