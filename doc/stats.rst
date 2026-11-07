@@ -37,7 +37,7 @@ All tests take an array with the subjects as the first dimension and any number 
      - :class:`~osl_dynamics.stats.design.DesignConfig` with :class:`~osl_dynamics.stats.permutation.MaxStatPermutation`, :class:`~osl_dynamics.stats.permutation.ClusterPermutation` or :class:`~osl_dynamics.stats.glm.GLM`
      - Chosen from the design
 
-Nuisance covariates are passed to the between-subject functions as :code:`covariates={"age": age, ...}`. Every result has an :meth:`~osl_dynamics.stats.results.TestResult.effect_size` method giving Cohen's d (or partial eta squared for an F-test) with bootstrap confidence intervals.
+Sign-flip tests assume the noise is symmetric about zero, which holds for baseline-corrected responses and paired differences; row-shuffle tests make no distributional assumption. Nuisance covariates are passed to the between-subject functions as :code:`covariates={"age": age, ...}`. Every result has an :meth:`~osl_dynamics.stats.results.TestResult.effect_size` method giving Cohen's d (or partial eta squared for an F-test) with bootstrap confidence intervals.
 
 Which correction?
 -----------------
@@ -106,16 +106,5 @@ Which data?
    * - DyNeMo mixing coefficient statistics
      - (subjects, modes)
      - As summary statistics.
-
-Implementation notes
---------------------
-
-- P-values from :math:`N` random permutations are :math:`(1 + b) / (N + 1)`, so the smallest attainable p-value is :math:`1 / (N + 1)`: use at least 1000 permutations (10,000 for p < 0.001). When every permutation can be enumerated the test is exact (:code:`result.exact`).
-- Sign-flip tests need the noise to be symmetric about zero (true of baseline-corrected responses and paired differences); row-shuffle tests make no distributional assumption.
-- Targets with missing values are fitted with the subjects that have a value for them, with a warning.
-- Permutations use NumPy's global random state; :func:`osl_dynamics.utils.set_random_seed` makes them reproducible.
-- F-tests have no direction (:code:`tail` is always 0); :code:`result.copes` holds the copes of the rows of the F-contrast.
-- Within-subject designs shuffle only within each subject (the :code:`blocks` argument of the permutation classes).
-- Effect size confidence intervals are percentile bootstrap intervals over subjects; :code:`n_boot=0` gives the parametric t interval of the cope.
 
 Also see the :doc:`FAQ <faq>` and the `example scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/statistics>`_.
