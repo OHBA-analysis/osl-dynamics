@@ -65,10 +65,16 @@ section.home-page > .institution-logos {
   }
 }
 
+/* Let the page use more of a wide screen (the theme's default is 88rem), so
+   the text has room to be wider when both sidebars are shown */
+.bd-page-width {
+  max-width: 100rem;
+}
+
 /* Keep the text the same width on every page: without a right-hand
-   "On this page" panel the theme would let it grow to 60em */
+   "On this page" panel the theme would let it grow wider */
 .bd-main .bd-content .bd-article-container {
-  max-width: 48em;
+  max-width: 60em;
 }
 
 /* The home page has no sidebars, so it can be wider */
