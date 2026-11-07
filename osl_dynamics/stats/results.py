@@ -99,6 +99,9 @@ class GLMResult:
         Numerator degrees of freedom of each F-contrast at each target (the
         number of estimable rows, which can be smaller for targets with
         missing values). Shape is (n_f_contrasts, \\*target_dims).
+    data : np.ndarray, optional
+        The data that were fitted, kept for bootstrapping effect sizes.
+        Shape is (n_samples, \\*target_dims).
     """
 
     design: Design
@@ -109,6 +112,7 @@ class GLMResult:
     fstats: Optional[np.ndarray] = None
     f_copes: Optional[List[np.ndarray]] = field(default=None, repr=False)
     f_dof: Optional[np.ndarray] = None
+    data: Optional[np.ndarray] = field(default=None, repr=False)
 
     @property
     def tstats(self) -> np.ndarray:
@@ -197,6 +201,7 @@ class GLMResult:
             metric="tstats",
             parametric=True,
             glm=self,
+            contrast_index=contrast_index,
         )
 
     def ftest(
@@ -241,6 +246,7 @@ class GLMResult:
             statistic="F",
             fstats=self.fstats[contrast_index],
             f_dof=self.f_dof[contrast_index],
+            contrast_index=contrast_index,
         )
 
     def summary(self) -> Dict:
@@ -315,6 +321,12 @@ class TestResult:
     f_dof : np.ndarray, optional
         Numerator degrees of freedom of the F-test at each target. Shape is
         (\\*target_dims).
+    contrast_index : int, optional
+        Index of the contrast in the design (among the t-contrasts or the
+        F-contrasts according to :code:`statistic`).
+    blocks : np.ndarray, optional
+        Exchangeability blocks used by the permutations, see
+        :class:`~osl_dynamics.stats.permutation.Permutation`.
     """
 
     contrast: str
@@ -340,6 +352,8 @@ class TestResult:
     statistic: str = "t"
     fstats: Optional[np.ndarray] = None
     f_dof: Optional[np.ndarray] = None
+    contrast_index: Optional[int] = None
+    blocks: Optional[np.ndarray] = field(default=None, repr=False)
 
     @property
     def target_dims(self) -> Tuple[int, ...]:
@@ -439,6 +453,49 @@ class TestResult:
         if not isinstance(result, cls):
             raise TypeError(f"{filename} does not contain a {cls.__name__}.")
         return result
+
+    def effect_size(
+        self, n_boot: int = 1000, ci: float = 0.95, data: Optional[np.ndarray] = None
+    ):
+        """Effect sizes with confidence intervals.
+
+        The contrast estimate (cope) and, for a t-test, Cohen's d (the cope
+        divided by the residual standard deviation of the GLM) or, for an
+        F-test, partial eta squared, each with a confidence interval from a
+        bootstrap over the samples (subjects). See
+        :func:`osl_dynamics.stats.effect_size.effect_size`.
+
+        Parameters
+        ----------
+        n_boot : int, optional
+            Number of bootstrap samples. :code:`0` gives the parametric
+            confidence interval of the cope only.
+        ci : float, optional
+            Confidence level.
+        data : np.ndarray, optional
+            The data that were tested, if the result does not hold them.
+
+        Returns
+        -------
+        effect_size : osl_dynamics.stats.effect_size.EffectSize
+        """
+        from osl_dynamics.stats.effect_size import effect_size
+
+        if data is None:
+            data = self.glm.data
+        if data is None:
+            raise ValueError("Pass the data that were tested.")
+        if self.contrast_index is None:
+            raise ValueError("This result does not record which contrast was tested.")
+        return effect_size(
+            self.glm.design,
+            data,
+            contrast_index=self.contrast_index,
+            statistic=self.statistic,
+            blocks=self.blocks,
+            n_boot=n_boot,
+            ci=ci,
+        )
 
     def plot_null(
         self,

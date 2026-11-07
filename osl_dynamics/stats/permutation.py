@@ -128,6 +128,13 @@ class Permutation:
         direction, so :code:`tail` must be 0 and :code:`metric` must be
         :code:`'tstats'` (the statistic is F, reported as
         :code:`metric='fstats'`).
+    blocks : np.ndarray, optional
+        Exchangeability blocks: a label for each sample. Rows are only
+        shuffled within a block and sign flips flip a whole block, e.g. the
+        subject of each sample in a within-subject design with several
+        conditions (with an indicator regressor per subject as nuisance).
+        Shape is (n_samples,). Default is no blocks: every sample is
+        exchangeable with every other.
     """
 
     correction: Optional[str] = None
@@ -146,9 +153,11 @@ class Permutation:
         hat: float = 0.0,
         n_jobs: int = 1,
         statistic: str = "t",
+        blocks: Optional[np.ndarray] = None,
     ) -> None:
         self.design = design
         self.glm = GLM(design)
+        self.blocks = self._validate_blocks(blocks)
 
         if statistic not in ("t", "F"):
             raise ValueError(f"statistic must be 't' or 'F', got {statistic}.")
@@ -200,6 +209,25 @@ class Permutation:
     # ------------------------------------------------------------------
     # Permutation scheme
 
+    def _validate_blocks(self, blocks) -> Optional[np.ndarray]:
+        if blocks is None:
+            return None
+        blocks = np.asarray(blocks)
+        if blocks.shape != (self.glm.n_samples,):
+            raise ValueError(
+                f"blocks must have one label per sample, got shape {blocks.shape} "
+                f"for {self.glm.n_samples} samples."
+            )
+        return np.unique(blocks, return_inverse=True)[1].reshape(-1)
+
+    def _shuffle_units(self, rows: np.ndarray) -> list:
+        """The sets of rows that are shuffled among themselves: the rows to
+        shuffle, split by block when there are blocks."""
+        if self.blocks is None:
+            return [rows]
+        labels = self.blocks[rows]
+        return [rows[labels == label] for label in np.unique(labels)]
+
     def _resolve_perm_type(self, perm_type: Optional[str]) -> str:
         if perm_type is not None:
             if perm_type not in PERM_TYPES:
@@ -235,7 +263,7 @@ class Permutation:
         """Split the shuffled rows by the categorical feature they belong to,
         or :code:`None` if the contrast is not between categorical features
         with each row in exactly one of them, or the nuisance regressors
-        are not constant over the rows."""
+        are not constant over the rows that are shuffled among themselves."""
         indices = self._contrast.feature_indices
         X = self.glm.X
         if not np.all(np.array(self.design.feature_types)[indices] == "categorical"):
@@ -243,9 +271,10 @@ class Permutation:
         membership = X[rows][:, indices] != 0
         if not np.all(membership.sum(axis=1) == 1):
             return None
-        nuisance = X[rows][:, self._contrast.nuisance_indices]
-        if nuisance.size and not np.all(nuisance == nuisance[0], axis=0).all():
-            return None
+        nuisance = X[:, self._contrast.nuisance_indices]
+        for unit in self._shuffle_units(rows):
+            if nuisance.size and not np.all(nuisance[unit] == nuisance[unit[0]]):
+                return None
         return [rows[membership[:, j]] for j in range(len(indices))]
 
     def _permutations(
@@ -274,42 +303,60 @@ class Permutation:
         n = self.glm.n_samples
 
         if self.perm_type == "sign_flip":
-            if 2**n <= self.n_perm:
-                perms = np.array(list(itertools.product([-1, 1], repeat=n)))
-                return perms, True
-            return np.random.choice([-1, 1], size=(self.n_perm, n)), False
+            # One sign per block (per sample without blocks)
+            block = np.arange(n) if self.blocks is None else self.blocks
+            n_units = block.max() + 1
+            if 2**n_units <= self.n_perm:
+                signs = np.array(list(itertools.product([-1, 1], repeat=n_units)))
+                return signs[:, block], True
+            signs = np.random.choice([-1, 1], size=(self.n_perm, n_units))
+            return signs[:, block], False
 
         rows = self._rows_to_shuffle()
-        n_rows = len(rows)
+        units = self._shuffle_units(rows)
         identity = np.arange(n)
 
         # Exhaustive enumeration of the assignments of the shuffled rows to
-        # the groups (categorical features) in the contrast. Rearranging
-        # rows within a group does not change the statistic, so this visits
-        # every distinct statistic once. It is only exact when the nuisance
-        # regressors are constant over the shuffled rows, because under
-        # Freedman-Lane a shuffled residual inherits the nuisance values of
-        # the row it moves to.
+        # the groups (categorical features) in the contrast, within each
+        # unit. Rearranging rows within a group does not change the
+        # statistic, so this visits every distinct statistic once. It is
+        # only exact when the nuisance regressors are constant over the rows
+        # of a unit, because under Freedman-Lane a shuffled residual inherits
+        # the nuisance values of the row it moves to.
         rows_by_group = self._rows_by_group(rows)
         if allow_exact_shuffle and rows_by_group is not None:
-            sizes = [len(g) for g in rows_by_group]
-            n_total = _n_group_assignments(sizes)
+            unit_groups = [
+                [g for g in (np.intersect1d(group, unit) for group in rows_by_group)]
+                for unit in units
+            ]
+            n_total = math.prod(
+                _n_group_assignments([len(g) for g in groups]) for groups in unit_groups
+            )
             if n_total <= self.n_perm:
                 perms = np.tile(identity, (n_total, 1))
-                for i, assignment in enumerate(_group_assignments(rows_by_group)):
-                    for group_rows, chosen in zip(rows_by_group, assignment):
-                        perms[i, group_rows] = chosen
+                assignments = itertools.product(
+                    *[list(_group_assignments(groups)) for groups in unit_groups]
+                )
+                for i, assignment in enumerate(assignments):
+                    for groups, chosen in zip(unit_groups, assignment):
+                        for group_rows, chosen_rows in zip(groups, chosen):
+                            perms[i, group_rows] = chosen_rows
                 return perms, True
 
-        if allow_exact_shuffle and math.factorial(n_rows) <= self.n_perm:
-            perms = np.tile(identity, (math.factorial(n_rows), 1))
-            for i, p in enumerate(itertools.permutations(rows)):
-                perms[i, rows] = p
+        n_total = math.prod(math.factorial(len(unit)) for unit in units)
+        if allow_exact_shuffle and n_total <= self.n_perm:
+            perms = np.tile(identity, (n_total, 1))
+            for i, p in enumerate(
+                itertools.product(*[itertools.permutations(unit) for unit in units])
+            ):
+                for unit, unit_perm in zip(units, p):
+                    perms[i, unit] = unit_perm
             return perms, True
 
         perms = np.tile(identity, (self.n_perm, 1))
         for i in range(self.n_perm):
-            perms[i, rows] = np.random.permutation(rows)
+            for unit in units:
+                perms[i, unit] = np.random.permutation(unit)
         return perms, False
 
     # ------------------------------------------------------------------
@@ -419,7 +466,14 @@ class Permutation:
             "Q": Q,
             "r": r,
             "r2": np.sum(r**2, axis=0),
-            "shuffle_local": np.where(np.isin(rows, self._rows_to_shuffle()))[0],
+            "shuffle_units": [
+                local
+                for local in (
+                    np.where(np.isin(rows, unit))[0]
+                    for unit in self._shuffle_units(self._rows_to_shuffle())
+                )
+                if len(local) > 1
+            ],
         }
 
     def _null_batch(
@@ -450,10 +504,9 @@ class Permutation:
         else:
             # Induce a permutation of the complete rows from the global one:
             # the relative order of the global permutation restricted to the
-            # complete rows that are shuffled
-            local = group["shuffle_local"]
+            # complete rows of each set of rows that are shuffled together
             I = np.tile(np.arange(n_r), (batch_size, 1))
-            if len(local) > 1:
+            for local in group["shuffle_units"]:
                 values = perms[:, group["rows"][local]]
                 ranks = np.argsort(np.argsort(values, axis=1), axis=1)
                 I[:, local] = local[ranks]
@@ -545,6 +598,8 @@ class Permutation:
         perms, exact = self._permutations(allow_exact_shuffle=all_complete)
         n_perm = perms.shape[0]
         label = f"{self.statistic}-contrast '{self.contrast_name}'"
+        if self.blocks is not None:
+            label += f" within {self.blocks.max() + 1} blocks"
         if exact:
             _logger.info(
                 f"Enumerating all {n_perm} permutations of {label} (exact test)"
@@ -642,6 +697,8 @@ class Permutation:
             statistic=self.statistic,
             fstats=fstats,
             f_dof=f_dof,
+            contrast_index=self.contrast_index,
+            blocks=self.blocks,
         )
 
     def summary(self) -> dict:
@@ -697,6 +754,8 @@ class MaxStatPermutation(Permutation):
         Not used by this class.
     statistic : str, optional
         :code:`'t'` (default) or :code:`'F'`, see :class:`Permutation`.
+    blocks : np.ndarray, optional
+        Exchangeability blocks, see :class:`Permutation`.
 
     References
     ----------
@@ -719,6 +778,7 @@ class MaxStatPermutation(Permutation):
         hat: float = 0.0,
         n_jobs: int = 1,
         statistic: str = "t",
+        blocks: Optional[np.ndarray] = None,
     ) -> None:
         super().__init__(
             design,
@@ -730,6 +790,7 @@ class MaxStatPermutation(Permutation):
             hat=hat,
             n_jobs=n_jobs,
             statistic=statistic,
+            blocks=blocks,
         )
         self._requested_pooled_dims = pooled_dims
 
@@ -821,6 +882,8 @@ class ClusterPermutation(Permutation):
     statistic : str, optional
         :code:`'t'` (default) or :code:`'F'`, see :class:`Permutation`.
         Clusters of an F-test are formed from the F-statistics.
+    blocks : np.ndarray, optional
+        Exchangeability blocks, see :class:`Permutation`.
 
     References
     ----------
@@ -847,6 +910,7 @@ class ClusterPermutation(Permutation):
         hat: float = 0.0,
         n_jobs: int = 1,
         statistic: str = "t",
+        blocks: Optional[np.ndarray] = None,
     ) -> None:
         super().__init__(
             design,
@@ -858,6 +922,7 @@ class ClusterPermutation(Permutation):
             hat=hat,
             n_jobs=n_jobs,
             statistic=statistic,
+            blocks=blocks,
         )
         self.cluster_dims = cluster_dims
         self.adjacency = adjacency

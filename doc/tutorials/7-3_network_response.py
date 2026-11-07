@@ -123,6 +123,32 @@ for name, res in [("Max statistic", result_max), ("Cluster", result_cluster), ("
 # ^^^^^^^^^^^^^^^^^^^^^^^^^
 # A significant cluster shows that the network responds; it does not establish *when* the response starts and ends, because the extent of a cluster depends on the signal-to-noise ratio and the threshold. Report it as "network 1 showed a significant response (cluster-based permutation test, 1000 sign-flip permutations, p = 0.001), most pronounced between 0.12 and 0.32 s", not as "network 1 was active from 0.12 to 0.32 s". See the :doc:`Statistical Inference tutorial <7-1_statistical_inference>` for more on this.
 #
-# Covariates and conditions
-# ^^^^^^^^^^^^^^^^^^^^^^^^^
-# Nuisance covariates can be passed with the :code:`covariates` argument. To compare two conditions within subjects, pass the difference between the subject-specific responses for the two conditions to :func:`stats.paired_diff <osl_dynamics.stats.inference.paired_diff>`; to compare two groups of subjects use :func:`stats.group_diff <osl_dynamics.stats.inference.group_diff>` with :code:`correction="cluster"` and :code:`cluster_dims=0` (time).
+# Comparing conditions
+# ^^^^^^^^^^^^^^^^^^^^
+# Often each subject has a response per condition and the question is whether the responses differ between conditions. For two conditions, pass the difference between the subject-specific responses to :func:`stats.paired_diff <osl_dynamics.stats.inference.paired_diff>`. For any number of conditions, :func:`stats.condition_diff <osl_dynamics.stats.inference.condition_diff>` takes a `(subjects, conditions, time, networks)` array and fits a within-subject GLM: an indicator per condition plus an indicator per subject, so that the differences between subjects are modelled rather than left in the noise. The permutations shuffle the conditions within each subject (the subjects are **exchangeability blocks**). With three or more conditions it runs an F-test for any difference; :code:`conditions=(a, b)` tests a pair.
+#
+# Here we simulate three conditions where the response of network 1 is larger in condition 2, and the subjects differ in their overall response amplitude:
+
+n_conditions = 3
+responses = np.random.normal(size=(n_subjects, n_conditions, n_time, n_networks))
+responses = gaussian_filter1d(responses, sigma=3, axis=2)
+responses /= responses.std()
+responses[:, :, 80:130, 0] += 1.5 * np.hanning(50)
+responses[:, 2, 80:130, 0] += 2.5 * np.hanning(50)  # larger in condition 2
+responses += np.random.normal(size=(n_subjects, 1, 1, 1))  # subject amplitude
+responses -= responses[:, :, t < 0].mean(axis=2, keepdims=True)
+
+result_cond = stats.condition_diff(responses, correction="cluster", cluster_dims=0, n_perm=1000)
+print(result_cond)
+print("Networks with a condition effect:", np.unique(np.where(result_cond.significant())[1]))
+
+#%%
+# :code:`result_cond.stats` holds the F-statistics and :code:`result_cond.copes` the differences between consecutive conditions. The F-test says the conditions differ; which ones differ is a follow-up question:
+
+result_02 = stats.condition_diff(responses, conditions=(2, 0), correction="cluster", cluster_dims=0, n_perm=1000)
+print(result_02)
+
+#%%
+# Covariates and groups
+# ^^^^^^^^^^^^^^^^^^^^^
+# Nuisance covariates can be passed with the :code:`covariates` argument of the between-subject tests. To compare two groups of subjects use :func:`stats.group_diff <osl_dynamics.stats.inference.group_diff>` with :code:`correction="cluster"` and :code:`cluster_dims=0` (time).

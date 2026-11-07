@@ -338,6 +338,16 @@ How do I compare more than two groups?
 
 Pass all the group labels to :func:`~osl_dynamics.stats.inference.group_diff`. With three or more labels it runs an F-test (the GLM form of a one-way ANOVA, with permutations) for any difference between the groups. A significant F-test does not say which groups differ, so follow it with pairwise tests, ``groups=(1, 2)`` and so on, and correct for the number of pairs you report. For other questions, e.g. patients versus the mean of two control groups, write the contrast yourself with :class:`~osl_dynamics.stats.design.DesignConfig`, see the :doc:`Custom Designs tutorial <tutorials_build/7-4_custom_designs>`.
 
+How do I compare several conditions measured in the same subjects?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Use :func:`~osl_dynamics.stats.inference.condition_diff` with a ``(subjects, conditions, ...)`` array. It fits a within-subject GLM (an indicator per condition and per subject) and shuffles the conditions within each subject, so differences between subjects do not count as noise. With three or more conditions it runs an F-test for any difference, like a repeated measures ANOVA; ``conditions=(a, b)`` tests a pair. For two conditions, :func:`~osl_dynamics.stats.inference.paired_diff` on the difference gives the same result.
+
+How do I report the size of an effect?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Call ``result.effect_size()`` on any test result. It returns the effect in the units of the data (the cope, e.g. the group difference), Cohen's d for t-tests (the effect divided by the residual standard deviation, adjusted for covariates) or partial eta squared for F-tests, each with a confidence interval from a bootstrap over subjects. Report the effect size and its interval for the significant targets alongside the p-value.
+
 How do I account for age, sex or other confounds?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

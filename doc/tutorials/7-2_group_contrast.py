@@ -149,6 +149,19 @@ print(result_12.contrast)
 #%%
 # Each pairwise test controls the FWER across the targets on its own. If you report all the pairs, correct for their number as well (e.g. Bonferroni over the three pairs) or restrict yourself to the pairs you had a hypothesis about. Other contrasts (e.g. patients versus the mean of two control groups) can be specified with a custom design, see the :doc:`Custom Designs tutorial <7-4_custom_designs>`.
 #
+# Effect sizes
+# ^^^^^^^^^^^^
+# A p-value says whether an effect is detectable, not how large it is. :meth:`result.effect_size() <osl_dynamics.stats.results.TestResult.effect_size>` returns the group difference (the cope, in the units of the data) and Cohen's d (the difference divided by the residual standard deviation of the GLM, i.e. the pooled standard deviation adjusted for any covariates), each with a confidence interval from a bootstrap over subjects. For an F-test it returns partial eta squared instead of d.
+
+result = stats.group_diff(power_maps, assignments, n_perm=1000)
+effect = result.effect_size(n_boot=1000)
+print(effect)
+
+for parcel in range(5):
+    lo, hi = effect.d_ci[:, 1, parcel]
+    print(f"State 2, parcel {parcel}: d = {effect.d[1, parcel]:.2f} [{lo:.2f}, {hi:.2f}]")
+
+#%%
 # Reporting
 # ^^^^^^^^^
-# :code:`print(result)` summarises the test. For example, the analysis above would be reported as: "Power maps were compared between groups with a GLM permutation test (1000 row-shuffle permutations, two-tailed) with age and sex as covariates, using the maximum t-statistic across states and parcels to control the family-wise error rate at 5%."
+# :code:`print(result)` summarises the test. For example, the analysis above would be reported as: "Power maps were compared between groups with a GLM permutation test (1000 row-shuffle permutations, two-tailed) with age and sex as covariates, using the maximum t-statistic across states and parcels to control the family-wise error rate at 5%. Group 1 had higher power in state 2 (Cohen's d = 1.1 to 1.6 in the significant parcels, 95% bootstrap confidence intervals in Table 1)."

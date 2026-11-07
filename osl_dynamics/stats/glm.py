@@ -439,4 +439,5 @@ class GLM:
             fstats=fstats.reshape((self.n_f_contrasts, *target_dims)),
             f_copes=[c.reshape((c.shape[0], *target_dims)) for c in f_copes],
             f_dof=f_dof.reshape((self.n_f_contrasts, *target_dims)),
+            data=y.reshape((self.n_samples, *target_dims)),
         )

@@ -8,6 +8,7 @@ use :class:`~osl_dynamics.stats.permutation.MaxStatPermutation` or
 """
 
 import logging
+import re
 from typing import Dict, Optional, Sequence, Tuple
 
 import numpy as np
@@ -132,6 +133,7 @@ def _run(
     n_jobs: int,
     contrast_index: int = 0,
     statistic: str = "t",
+    blocks: Optional[np.ndarray] = None,
 ) -> TestResult:
     if statistic == "F":
         if tail != 0:
@@ -153,6 +155,7 @@ def _run(
             pooled_dims=pooled_dims,
             hat=hat,
             statistic=statistic,
+            blocks=blocks,
         )
         return perm.fit(data)
 
@@ -184,6 +187,7 @@ def _run(
             hat=hat,
             n_jobs=n_jobs,
             statistic=statistic,
+            blocks=blocks,
         )
         return perm.fit(data)
 
@@ -207,6 +211,7 @@ def _run(
         metric=metric,
         hat=hat,
         statistic=statistic,
+        blocks=blocks,
     )
     result = perm.fit(data)
     n_targets = result.pvalues.size
@@ -309,7 +314,8 @@ def paired_diff(
     """Test whether a paired difference differs from zero.
 
     A one-sample test of the mean difference over samples (usually subjects)
-    at every target, with sign-flip permutations.
+    at every target, with sign-flip permutations. For more than two
+    conditions see :func:`condition_diff`.
 
     Parameters
     ----------
@@ -447,6 +453,133 @@ def group_diff(
     )
 
 
+def condition_diff(
+    data: np.ndarray,
+    n_perm: int = 1000,
+    conditions: Optional[Tuple[int, int]] = None,
+    correction: Optional[str] = "max_stat",
+    metric: str = "tstats",
+    tail: int = 0,
+    pooled_dims: Optional[Sequence[int]] = None,
+    cluster_dims: Optional[Sequence[int]] = None,
+    adjacency: Optional[Dict] = None,
+    cluster_forming_threshold: Optional[float] = None,
+    hat: float = 0.0,
+    parametric: bool = True,
+    n_jobs: int = 1,
+) -> TestResult:
+    """Test for a difference between conditions measured in the same subjects.
+
+    A within-subject (repeated measures) design: the GLM has an indicator
+    regressor per condition and one per subject (nuisance), and the
+    permutations shuffle the conditions within each subject. With two
+    conditions (or :code:`conditions`) the difference between them is tested
+    with a t-contrast. With three or more conditions and no
+    :code:`conditions`, an F-test asks whether any condition differs from
+    the others (a repeated measures ANOVA with permutations); significant
+    targets can then be followed up with pairwise tests by passing
+    :code:`conditions`.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data for each subject and condition. Shape is
+        (n_subjects, n_conditions, \\*target_dims). A subject that lacks a
+        condition for some targets can have NaNs there.
+    conditions : tuple of int, optional
+        Two conditions to compare, :code:`(a, b)` (indices along the second
+        dimension). The effect returned is :code:`a - b`. Default is to
+        compare the two conditions when there are two, and to test for any
+        difference between the conditions (F-test) when there are more. For
+        the F-test :code:`result.copes` holds the differences between
+        consecutive conditions, :code:`result.stats` the F-statistics, and
+        :code:`tail` must be 0.
+    """
+    data = np.asarray(data, dtype=float)
+    if data.ndim < 2:
+        raise ValueError(
+            "data must have shape (n_subjects, n_conditions, *target_dims)."
+        )
+    n_subjects, n_conditions = data.shape[:2]
+    if n_conditions < 2:
+        raise ValueError("data must have at least two conditions.")
+    if conditions is None and n_conditions == 2:
+        conditions = (0, 1)
+    if conditions is not None:
+        if len(conditions) != 2 or conditions[0] == conditions[1]:
+            raise ValueError(
+                f"conditions must be two different indices, got {conditions}."
+            )
+        for c in conditions:
+            if not 0 <= c < n_conditions:
+                raise ValueError(
+                    f"condition {c} out of range for {n_conditions} conditions."
+                )
+
+    # One row per subject and condition
+    y = data.reshape((n_subjects * n_conditions, *data.shape[2:]))
+    condition = np.tile(np.arange(n_conditions), n_subjects)
+    subject = np.repeat(np.arange(n_subjects), n_conditions)
+    features = [
+        {
+            "name": f"Condition_{c}",
+            "values": (condition == c).astype(float),
+            "feature_type": "categorical",
+        }
+        for c in range(n_conditions)
+    ] + [
+        {
+            "name": f"Subject_{s}",
+            "values": (subject == s).astype(float),
+            "feature_type": "categorical",
+        }
+        for s in range(n_subjects)
+    ]
+
+    if conditions is not None:
+        contrast = [0] * len(features)
+        contrast[conditions[0]] = 1
+        contrast[conditions[1]] = -1
+        name = f"Condition_{conditions[0]}-Condition_{conditions[1]}"
+        design = DesignConfig(
+            features=features, contrasts=[{"name": name, "values": contrast}]
+        ).create_design()
+        statistic = "t"
+    else:
+        _logger.info(
+            f"Testing for any difference between the {n_conditions} conditions "
+            "with an F-test. Pass conditions=(a, b) to compare two of them."
+        )
+        rows = []
+        for a in range(n_conditions - 1):
+            row = [0] * len(features)
+            row[a], row[a + 1] = 1, -1
+            rows.append(row)
+        design = DesignConfig(
+            features=features,
+            f_contrasts=[{"name": "AnyConditionDifference", "values": rows}],
+        ).create_design()
+        statistic = "F"
+
+    return _run(
+        design,
+        y,
+        n_perm,
+        correction,
+        metric,
+        tail,
+        pooled_dims,
+        cluster_dims,
+        adjacency,
+        cluster_forming_threshold,
+        hat,
+        parametric,
+        n_jobs,
+        statistic=statistic,
+        blocks=subject,
+    )
+
+
 def regression(
     data: np.ndarray,
     regressor: np.ndarray,
@@ -505,4 +638,8 @@ def regression(
 
 for _function in (evoked_response, paired_diff, group_diff, regression):
     _function.__doc__ += _COMMON_PARAMETERS
+# Subject-level covariates are absorbed by the subject regressors
+condition_diff.__doc__ += re.sub(
+    r"    covariates : .*?(?=\n    \w+ :)", "", _COMMON_PARAMETERS, flags=re.S
+)
 del _function

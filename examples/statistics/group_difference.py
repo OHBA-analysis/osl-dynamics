@@ -31,3 +31,7 @@ pvalues = stats.group_diff(group_data, assignments, n_perm=100).pvalues
 significant = pvalues < 0.05
 
 print("significant features are:", np.squeeze(np.argwhere(significant)))
+
+# Effect sizes (Cohen's d) with bootstrap confidence intervals
+effect = stats.group_diff(group_data, assignments, n_perm=100).effect_size(n_boot=500)
+print("Cohen's d:", np.round(effect.d, 2))

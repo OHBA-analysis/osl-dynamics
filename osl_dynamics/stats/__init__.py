@@ -8,8 +8,8 @@ across targets.
 Modules
 -------
 - :py:mod:`~osl_dynamics.stats.inference` — Ready-made tests:
-  :func:`evoked_response`, :func:`paired_diff`, :func:`group_diff` and
-  :func:`regression`.
+  :func:`evoked_response`, :func:`paired_diff`, :func:`group_diff`,
+  :func:`condition_diff` and :func:`regression`.
 - :py:mod:`~osl_dynamics.stats.design` — :class:`DesignConfig` and
   :class:`Design` for specifying regressors and contrasts (t-contrasts and
   F-contrasts).
@@ -23,6 +23,8 @@ Modules
   :func:`holm` and :func:`fdr` corrections for p-values.
 - :py:mod:`~osl_dynamics.stats.results` — :class:`TestResult` and
   :class:`GLMResult` returned by the tests.
+- :py:mod:`~osl_dynamics.stats.effect_size` — :class:`EffectSize` with
+  bootstrap confidence intervals, from :meth:`TestResult.effect_size`.
 
 Tutorials
 ---------
@@ -42,8 +44,10 @@ Python example scripts
 
 from osl_dynamics.stats.correction import bonferroni, fdr, holm
 from osl_dynamics.stats.design import Design, DesignConfig
+from osl_dynamics.stats.effect_size import EffectSize
 from osl_dynamics.stats.glm import GLM
 from osl_dynamics.stats.inference import (
+    condition_diff,
     evoked_response,
     group_diff,
     paired_diff,

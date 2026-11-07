@@ -36,11 +36,14 @@ All tests take an array with the subjects (or sessions) as the first dimension a
    * - Does a quantity change with age, score, etc.?
      - :func:`~osl_dynamics.stats.inference.regression`
      - Row shuffle (between subject)
+   * - Do several conditions measured in the same subjects differ? (repeated measures ANOVA)
+     - :func:`~osl_dynamics.stats.inference.condition_diff` (an F-test, or a pair with :code:`conditions=(a, b)`)
+     - Row shuffle within each subject (exchangeability blocks)
    * - Something else (custom contrasts, F-contrasts over several t-contrasts)
      - :class:`~osl_dynamics.stats.design.DesignConfig` with :class:`~osl_dynamics.stats.permutation.MaxStatPermutation`, :class:`~osl_dynamics.stats.permutation.ClusterPermutation` or :class:`~osl_dynamics.stats.glm.GLM`
      - Chosen from the design
 
-Nuisance covariates (age, sex, head size, ...) are passed to every function as :code:`covariates={"age": age, ...}` and regressed out with the Freedman-Lane permutation scheme.
+Nuisance covariates (age, sex, head size, ...) are passed to the between-subject functions as :code:`covariates={"age": age, ...}` and regressed out with the Freedman-Lane permutation scheme. Every result has an :meth:`~osl_dynamics.stats.results.TestResult.effect_size` method giving the effect (cope) and Cohen's d (or partial eta squared for an F-test) with bootstrap confidence intervals, for reporting the size of a significant effect alongside its p-value.
 
 Which correction?
 -----------------
@@ -100,6 +103,9 @@ Which data?
    * - Network response (epoched state/mode time course)
      - (subjects, time, states)
      - :code:`evoked_response`, :code:`'cluster'` or :code:`'tfce'` along time (default), or :code:`'max_stat'` on copes.
+   * - Network response per condition
+     - (subjects, conditions, time, states)
+     - :code:`condition_diff`, :code:`'cluster'` with :code:`cluster_dims=0` (time); :code:`paired_diff` on the difference for two conditions.
    * - Spectra
      - (subjects, states, parcels, frequency)
      - :code:`group_diff`, :code:`'cluster'` with :code:`cluster_dims=2` (frequency).
@@ -115,5 +121,7 @@ Implementation notes
 - Targets with missing values are fitted with the subjects that have a value for them (per-target complete-case analysis), with a warning.
 - Permutations use NumPy's global random state; :func:`osl_dynamics.utils.set_random_seed` makes them reproducible.
 - F-tests are one-sided by construction (the F-statistic has no direction); their :code:`tail` is always 0, and :code:`result.copes` holds the copes of the rows of the F-contrast.
+- Within-subject designs use exchangeability blocks (the :code:`blocks` argument of the permutation classes): rows are only shuffled within a subject, and sign flips flip a subject's rows together.
+- Confidence intervals from :meth:`~osl_dynamics.stats.results.TestResult.effect_size` are percentile bootstrap intervals over subjects (resampled within groups, or whole subjects in within-subject designs); :code:`n_boot=0` gives the parametric t interval of the cope.
 
 Also see the :doc:`FAQ <faq>` and the `example scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/statistics>`_.

@@ -7,6 +7,7 @@ Example scripts for statistical significance testing with `osl_dynamics.stats`:
 - `network_response_cluster.py`: the same question with a cluster-based permutation test and TFCE.
 - `group_difference.py`: do two groups differ? Row-shuffle permutation test with covariates.
 - `three_groups.py`: do three groups differ? F-test for any difference, then pairwise tests.
+- `condition_difference.py`: do three conditions measured in the same subjects differ? Within-subject F-test, pairwise test and effect sizes.
 - `regression.py`: does a quantity change with age? Permutation test of a continuous regressor.
 
 See the [statistics documentation](https://osl-dynamics.readthedocs.io/en/latest/stats.html) for which test and correction to use.
