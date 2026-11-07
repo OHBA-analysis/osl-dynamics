@@ -64,7 +64,7 @@ Each step reads the files written by the steps before it and writes its own at p
    * - Orthogonalisation (optional)
      - Symmetric orthogonalisation [1]_ removes the zero-lag correlations between parcels caused by spatial leakage, needed for connectivity measures such as amplitude envelope correlation.
      - osl-dynamics
-     - :code:`orthogonalisation="symmetric"` in the parcellation step
+     - :code:`orthogonalisation="symmetric"` in :func:`~osl_dynamics.meeg.parcellation.parcellate_lcmv` or :func:`~osl_dynamics.meeg.parcellation.parcellate`
    * - Sign flipping
      - The sign of a beamformed parcel time course is arbitrary and differs between sessions. Each session's parcels are flipped to match a template covariance, so that sessions can be pooled for group-level models.
      - osl-dynamics
