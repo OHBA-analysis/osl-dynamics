@@ -61,10 +61,10 @@ Each step reads the files written by the steps before it and writes its own at p
      - One time course per parcel of an atlas: the first principal component of the parcel's voxels, computed straight from the sensor data. See the :doc:`parcellations page <parcellations/index>`.
      - osl-dynamics
      - :func:`~osl_dynamics.meeg.parcellation.parcellate_lcmv`, :func:`~osl_dynamics.meeg.parcellation.parcellate`
-   * - Orthogonalisation (optional)
-     - Symmetric orthogonalisation [1]_ removes the zero-lag correlations between parcels caused by spatial leakage, needed for connectivity measures such as amplitude envelope correlation.
+   * - Orthogonalization (optional)
+     - Symmetric orthogonalization [1]_ removes the zero-lag correlations between parcels caused by spatial leakage, needed for connectivity measures such as amplitude envelope correlation.
      - osl-dynamics
-     - :code:`orthogonalisation="symmetric"` in the parcellation step
+     - :func:`~osl_dynamics.meeg.parcellation.symmetric_orthogonalization`, or :code:`orthogonalization="symmetric"` in :func:`~osl_dynamics.meeg.parcellation.parcellate_lcmv` and :func:`~osl_dynamics.meeg.parcellation.parcellate`
    * - Sign flipping
      - The sign of a beamformed parcel time course is arbitrary and differs between sessions. Each session's parcels are flipped to match a template covariance, so that sessions can be pooled for group-level models.
      - osl-dynamics

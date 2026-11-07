@@ -57,7 +57,7 @@ def process_session(session):
     parcel_data = parcellation.parcellate_lcmv(
         session_files,
         parcellation_file=parcellation_file,
-        orthogonalisation="symmetric",
+        orthogonalization="symmetric",
     )
 
     parcellation.save_as_fif(

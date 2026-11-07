@@ -209,7 +209,7 @@ def parcellate(
     voxel_coords: np.ndarray,
     parcellation_file: str,
     method: str = "pca",
-    orthogonalisation: str | None = None,
+    orthogonalization: str | None = None,
 ) -> np.ndarray:
     """Parcellate data.
 
@@ -238,8 +238,8 @@ def parcellate(
                      average.
         'centroid' - Use the time course of the voxel nearest to each parcel
                      centroid.
-    orthogonalisation : str, optional
-        Method for orthogonalising the data. Can be None or 'symmetric'.
+    orthogonalization : str, optional
+        Method for orthogonalizing the data. Can be None or 'symmetric'.
 
     Returns
     -------
@@ -250,8 +250,8 @@ def parcellate(
     print("Parcellating data")
     print("-----------------")
 
-    if orthogonalisation not in [None, "symmetric"]:
-        raise ValueError("orthogonalisation must be None or 'symmetric'.")
+    if orthogonalization not in [None, "symmetric"]:
+        raise ValueError("orthogonalization must be None or 'symmetric'.")
 
     if method not in ["pca", "centroid"]:
         raise ValueError("method must be 'pca' or 'centroid'.")
@@ -275,11 +275,9 @@ def parcellate(
             voxel_data, parcellation, parcellation_file, voxel_coords
         )
 
-    # Orthogonalisation
-    if orthogonalisation == "symmetric":
-        parcel_data = _symmetric_orthogonalisation(
-            parcel_data, maintain_magnitudes=True
-        )
+    # Orthogonalization
+    if orthogonalization == "symmetric":
+        parcel_data = symmetric_orthogonalization(parcel_data, maintain_magnitudes=True)
 
     return parcel_data
 
@@ -287,7 +285,7 @@ def parcellate(
 def parcellate_lcmv(
     session: Session,
     parcellation_file: str,
-    orthogonalisation: str | None = None,
+    orthogonalization: str | None = None,
     data: str | mne.io.Raw | mne.Epochs | None = None,
     reject_by_annotation: str | None = "omit",
 ) -> np.ndarray:
@@ -308,8 +306,8 @@ def parcellate_lcmv(
     parcellation_file : str
         Path to parcellation file (in MNI space). The weights must be
         non-negative.
-    orthogonalisation : str, optional
-        Method for orthogonalising the data. Can be None or 'symmetric'.
+    orthogonalization : str, optional
+        Method for orthogonalizing the data. Can be None or 'symmetric'.
     data : str | mne.io.Raw | mne.Epochs, optional
         The data to calculate parcel time courses for, or the path to a fif
         file containing it. If None, session.preproc_file is used.
@@ -326,8 +324,8 @@ def parcellate_lcmv(
     print("Parcellating data")
     print("-----------------")
 
-    if orthogonalisation not in [None, "symmetric"]:
-        raise ValueError("orthogonalisation must be None or 'symmetric'.")
+    if orthogonalization not in [None, "symmetric"]:
+        raise ValueError("orthogonalization must be None or 'symmetric'.")
 
     parcellation_file = files.check_exists(
         parcellation_file, files.parcellation.directory
@@ -377,11 +375,9 @@ def parcellate_lcmv(
     if epochs_shape is not None:
         parcel_data = parcel_data.reshape(-1, *epochs_shape)
 
-    # Orthogonalisation
-    if orthogonalisation == "symmetric":
-        parcel_data = _symmetric_orthogonalisation(
-            parcel_data, maintain_magnitudes=True
-        )
+    # Orthogonalization
+    if orthogonalization == "symmetric":
+        parcel_data = symmetric_orthogonalization(parcel_data, maintain_magnitudes=True)
 
     return parcel_data
 
@@ -837,36 +833,43 @@ def _get_parcel_data_centroid(
     return voxel_data[indices]
 
 
-def _symmetric_orthogonalisation(
+def symmetric_orthogonalization(
     timeseries: np.ndarray,
     maintain_magnitudes: bool = False,
     compute_weights: bool = False,
 ) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-    """Symmetric orthogonalisation.
+    """Symmetric orthogonalization to correct for spatial leakage.
 
-    Returns orthonormal matrix L which is closest to A, as measured by the
-    Frobenius norm of (L-A). The orthogonal matrix is constructed from a
-    singular value decomposition of A.
+    Removes all zero-lag correlations between the parcel time courses,
+    including those inherited from spatial leakage between parcels
+    (Colclough et al., 2015). The orthogonalized time courses are the
+    closest orthonormal set to the original ones, as measured by the
+    Frobenius norm, and are calculated from a singular value decomposition.
 
-    If maintain_magnitudes is True, returns the orthogonal matrix L, whose
-    columns have the same magnitude as the respective columns of A, and which
-    is closest to A, as measured by the Frobenius norm of (L-A).
+    :func:`parcellate` and :func:`parcellate_lcmv` apply this with
+    :code:`orthogonalization="symmetric"`.
 
     Parameters
     ----------
-    timeseries : numpy.ndarray
-        (nparcels x ntpts) or (nparcels x ntpts x ntrials) data to orthoganlise.
-        In the latter case, the ntpts and ntrials dimensions are concatenated.
-    maintain_magnitudes : bool
-    compute_weights : bool
+    timeseries : np.ndarray
+        Parcel time courses. Shape must be (n_parcels, n_samples) or
+        (n_parcels, ...), e.g. (n_parcels, n_epochs, n_samples) for epoched
+        data, in which case every axis after the first is concatenated.
+        The number of parcels must not exceed the rank of the data.
+    maintain_magnitudes : bool, optional
+        Should each orthogonalized time course keep the magnitude (norm)
+        of the original? Otherwise each one has unit norm.
+    compute_weights : bool, optional
+        Should we also return the weights that orthogonalize the data?
 
     Returns
     -------
-    ortho_timeseries : numpy.ndarray
-        (nparcels x ntpts) or (nparcels x ntpts x ntrials) orthoganalised data
-    weights : numpy.ndarray
-        (optional output depending on compute_weights flag) weighting matrix
-        such that, ortho_timeseries = timeseries * weights
+    ortho_timeseries : np.ndarray
+        Orthogonalized time courses. Same shape as :code:`timeseries`.
+    weights : np.ndarray
+        Weights such that :code:`ortho_timeseries = (timeseries.reshape(
+        n_parcels, -1).T @ weights).T`. Shape is (n_parcels, n_parcels).
+        Only returned if :code:`compute_weights=True`.
 
     References
     ----------
@@ -874,23 +877,12 @@ def _symmetric_orthogonalisation(
     "A symmetric multivariate leakage correction for MEG connectomes,"
     NeuroImage 117, pp. 439-448 (2015)
     """
-    print("Performing symmetric orthogonalisation")
+    print("Performing symmetric orthogonalization")
 
-    if len(timeseries.shape) == 2:
-        # add dim for trials:
-        timeseries = np.expand_dims(timeseries, axis=2)
-        added_dim = True
-    else:
-        added_dim = False
-
-    nparcels = timeseries.shape[0]
-    ntpts = timeseries.shape[1]
-    ntrials = timeseries.shape[2]
-    compute_weights = False
-
-    # combine the trials and time dimensions together,
-    # we will re-separate them after the parcel timeseries are computed
-    timeseries = np.transpose(np.reshape(timeseries, (nparcels, ntpts * ntrials)))
+    # Concatenate every axis after the first (e.g. epochs and time), we
+    # re-separate them at the end
+    shape = timeseries.shape
+    timeseries = np.transpose(np.reshape(timeseries, (shape[0], -1)))
 
     if maintain_magnitudes:
         D = np.diag(np.sqrt(np.diag(np.transpose(timeseries) @ timeseries)))
@@ -927,13 +919,8 @@ def _symmetric_orthogonalisation(
             # ortho_timeseries = timeseries * weights
             weights = D @ weights @ D
 
-    # Re-separate the trials and time dimensions
-    ortho_timeseries = np.reshape(
-        np.transpose(ortho_timeseries), (nparcels, ntpts, ntrials)
-    )
-
-    if added_dim:
-        ortho_timeseries = np.squeeze(ortho_timeseries, axis=2)
+    # Re-separate the axes
+    ortho_timeseries = np.reshape(np.transpose(ortho_timeseries), shape)
 
     if compute_weights:
         return ortho_timeseries, weights
