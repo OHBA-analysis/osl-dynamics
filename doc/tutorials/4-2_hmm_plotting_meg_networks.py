@@ -12,6 +12,8 @@ In this tutorial we will plot networks from an HMM trained on source reconstruct
 6. Coherence vs Power
 """
 
+# sphinx_gallery_thumbnail_number = 17
+
 #%%
 # Download post-hoc spectra
 # ^^^^^^^^^^^^^^^^^^^^^^^^^
