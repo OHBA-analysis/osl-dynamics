@@ -2,8 +2,8 @@
 
 See the :doc:`documentation </models/hmm>` for a description of this model.
 
-See Also
---------
+References
+----------
 - D. Vidaurre, et al., "Spectrally resolved fast transient brain states in
   electrophysiological data". `Neuroimage 126, 81-95 (2016)
   <https://www.sciencedirect.com/science/article/pii/S1053811915010691>`_.

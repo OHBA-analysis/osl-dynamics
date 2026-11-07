@@ -63,7 +63,7 @@ class DiceCoefficientCallback(callbacks.Callback):
         """Action to perform at the end of an epoch.
 
         Parameters
-        ---------
+        ----------
         epochs : int
             Integer, index of epoch.
         logs : dict, optional
@@ -222,7 +222,7 @@ class KLAnnealingCallback(callbacks.Callback):
         """Action to perform at the end of an epoch.
 
         Parameters
-        ---------
+        ----------
         epochs : int
             Integer, index of epoch.
         logs : dict, optional
@@ -287,7 +287,7 @@ class EMADecayCallback(callbacks.Callback):
         """Action to perform at the end of an epoch.
 
         Parameters
-        ---------
+        ----------
         epochs : int
             Integer, index of epoch.
         logs : dict, optional
@@ -338,7 +338,7 @@ class SaveBestCallback(callbacks.ModelCheckpoint):
         """Action to perform at the end of an epoch.
 
         Parameters
-        ---------
+        ----------
         epochs : int
             Integer, index of epoch.
         logs : dict, optional
@@ -780,7 +780,7 @@ class GradientMonitoringCallback(tf.keras.callbacks.Callback):
         """Action to perform at the end of an epoch.
 
         Parameters
-        ---------
+        ----------
         epochs : int
             Index of epoch.
         logs : dict, optional
@@ -942,7 +942,7 @@ class SummaryStatsCallback(callbacks.Callback):
         """Action to perform at the end of an epoch.
 
         Parameters
-        ---------
+        ----------
         epochs : int
             Integer, index of epoch.
         logs : dict, optional

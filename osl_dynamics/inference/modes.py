@@ -429,12 +429,12 @@ def reduce_state_time_course(state_time_course: np.ndarray) -> np.ndarray:
 
     Parameters
     ----------
-    state_time_course: np.ndarray
+    state_time_course : np.ndarray
         State time course. Shape must be (n_samples, n_states).
 
     Returns
     -------
-    reduced_state_time_course: np.ndarray
+    reduced_state_time_course : np.ndarray
         Reduced state time course. Shape is (n_samples, n_reduced_states).
     """
     return state_time_course[:, ~np.all(state_time_course == 0, axis=0)]
@@ -657,8 +657,8 @@ def average_runs(
         This is a dictionary with keys :code:`'correlation'`,
         :code:`'dissimiarity'`, :code:`'ids'` and :code:`'linkage'`.
 
-    See Also
-    --------
+    References
+    ----------
     S. Alonso and D. Vidaurre, "Towards stability of dynamic FC estimates in
     neuroimaging and electrophysiology: solutions and limits" `Network
     Neuroscience (2023) <https://doi.org/10.1162/netn_a_00331>`_.

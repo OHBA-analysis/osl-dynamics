@@ -1503,7 +1503,7 @@ def _get_gridstep(coords: np.ndarray) -> int:
 
     Returns
     -------
-    gridstep: int
+    gridstep : int
         Spatial resolution of dipole grid in mm.
     """
     dists = np.linalg.norm(coords - coords[0], axis=-1)

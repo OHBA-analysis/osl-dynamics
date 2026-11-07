@@ -844,7 +844,7 @@ def coherence_spectra(cpsd: np.ndarray, keepdims: bool = False) -> np.ndarray:
     cpsd : np.ndarray
         Cross power spectra.
         Shape is (..., n_channels, n_channels, n_freq).
-    keepdims: bool, optional
+    keepdims : bool, optional
         Should we squeeze any axis of length 1?
 
     Returns
@@ -890,7 +890,7 @@ def partial_coherence_spectra(cpsd: np.ndarray, keepdims: bool = False) -> np.nd
     cpsd : np.ndarray
         Cross power spectra.
         Shape is (..., n_channels, n_channels, n_freq).
-    keepdims: bool, optional
+    keepdims : bool, optional
         Should we squeeze any axis of length 1?
 
     Returns
@@ -946,7 +946,7 @@ def partial_directed_coherence_spectra(
         spectra.
     tol : float, optional
         Tolerance for the Wilson factorization of the cross spectra.
-    keepdims: bool, optional
+    keepdims : bool, optional
         Should we squeeze any axis of length 1?
 
     Returns

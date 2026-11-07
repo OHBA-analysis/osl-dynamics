@@ -6,7 +6,7 @@ intended to use it on an HMM state time course to ask questions like what is
 the density of state :math:`j` in the first and second part of the interval
 between visits to state :math:`i`.
 
-See Also
+Examples
 --------
 `Example scripts <https://github.com/OHBA-analysis/osl-dynamics/blob/main\
 /examples/tinda>`_ for applying TINDA.

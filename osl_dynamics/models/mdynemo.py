@@ -2,7 +2,7 @@
 
 See the :doc:`model description </models/mdynemo>` for more details.
 
-See Also
+Examples
 --------
 `Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main\
 /examples/simulation/mdynemo_hmm-mvn.py>`_ for training M-DyNeMo on simulated

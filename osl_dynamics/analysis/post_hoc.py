@@ -218,7 +218,7 @@ def state_activations(
 
     Returns
     -------
-    slices: list of list of slice
+    slices : list of list of slice
         List containing state activations (index) in the order they occur for
         each state. This cannot necessarily be converted into an array as an
         equal number of elements in each array is not guaranteed.

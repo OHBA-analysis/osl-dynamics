@@ -193,8 +193,10 @@ def detect_bad_channels(
     separately (in no particular order).
 
     Note that with CTF data, mne.pick_types will return:
-        ~274 axial grads (as magnetometers) if picks='mag', ref_meg=False
-        ~28 reference axial grads if picks='grad'.
+
+    - ~274 axial grads (as magnetometers) if picks='mag', ref_meg=False
+    - ~28 reference axial grads if picks='grad'.
+
     Thus, it is recommended to use picks='mag' in combination with ref_mag=False,
     and picks='grad' separately (in no particular order).
     """
@@ -519,6 +521,7 @@ def ica_label(
     ic_labels : dict
         Dictionary with keys ``"labels"`` (list of str) and
         ``"y_pred_proba"`` (array of float).
+
     Notes
     -----
     For EEG data, use ``picks="eeg"`` and ``method="iclabel"``::
@@ -654,6 +657,7 @@ def ica_ecg_eog_correlation(
         Dictionary with keys ``"labels"`` (list of str) and
         ``"y_pred_proba"`` (array of float), compatible with
         :func:`plot_ica_components`.
+
     Notes
     -----
     For EEG data, use ``picks="eeg"``. Note that synthetic ECG detection

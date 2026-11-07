@@ -185,7 +185,7 @@ def reinitialize_layer_weights(layer: tf.keras.layers.Layer) -> None:
 
     Parameters
     ----------
-    layer: tf.keras.layers.Layer
+    layer : tf.keras.layers.Layer
         Layer to initialize weights for.
 
     Note

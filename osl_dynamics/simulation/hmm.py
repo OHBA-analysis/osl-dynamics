@@ -831,13 +831,13 @@ class HierarchicalHMM_MVN(Simulation):
         The list of :code:`stay_prob` values for the bottom level HMMs.
         Used when the correspondining entry in :code:`bottom_level_trans_prob`
         is a :code:`str`.
-    top_level_hmm_type: str, optional
+    top_level_hmm_type : str, optional
         The type of HMM to use at the top level, either :code:`'hmm'` or
         :code:`'hsmm'`.
-    top_level_gamma_shape: float, optional
+    top_level_gamma_shape : float, optional
         The shape parameter for the Gamma distribution used by
         the top level hmm when :code:`top_level_hmm_type='hsmm'`.
-    top_level_gamma_scale: float, optional
+    top_level_gamma_scale : float, optional
         The scale parameter for the Gamma distribution used by
         the top level hmm when :code:`top_level_hmm_type='hsmm'`.
     """

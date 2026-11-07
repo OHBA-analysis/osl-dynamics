@@ -1772,7 +1772,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
     initial_trans_prob : np.ndarray
         Initial transition probability matrix.
         Shape must be (n_states, n_states).
-    trans_prob_prior: np.ndarray
+    trans_prob_prior : np.ndarray
         Dirichlet prior for the transition probability matrix.
     initial_state_probs : np.ndarray
         Initial transition probability matrix.

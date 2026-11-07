@@ -638,7 +638,7 @@ def _get_parcel_weights(
         Function that takes an array of voxel indices and returns the
         (len(inds), len(inds)) covariance (normalised by n_samples) of these
         voxels.
-    parcellation_asmatrix: np.ndarray
+    parcellation_asmatrix : np.ndarray
         (nvoxels x n_parcels) parcel weights for each voxel.
     parcellation_file : str
         Parcellation file, used for the error message if a parcel does not
@@ -748,7 +748,7 @@ def _get_parcel_data_pca(
     ----------
     voxel_data : np.ndarray
         (nvoxels x n_time) or (nvoxels x n_time x n_trials).
-    parcellation_asmatrix: np.ndarray
+    parcellation_asmatrix : np.ndarray
         (nvoxels x n_parcels) parcel weights for each voxel.
     parcellation_file : str
         Parcellation file, used for the error message if a parcel does not

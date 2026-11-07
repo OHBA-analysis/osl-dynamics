@@ -8,6 +8,7 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
+import ast
 import inspect
 import os
 import re
@@ -103,17 +104,64 @@ extensions = [
     "sphinx.ext.doctest",
     "sphinx.ext.ifconfig",
     "sphinx.ext.mathjax",
-    "sphinx.ext.napoleon",
+    "numpydoc",
     "sphinx_gallery.gen_gallery",
     "autoapi.extension",
     "sphinx_sitemap",
     "myst_parser",
+    "sphinx_design",
 ]
 
-autodoc_typehints = "description"
+# The types are in the numpydoc docstrings
+autodoc_typehints = "none"
+
+# AutoAPI lists the members of a class, so numpydoc should not
+numpydoc_show_class_members = False
 
 autoapi_dirs = ["../osl_dynamics"]
 autoapi_template_dir = "_templates"
+# Each class and function gets its own page
+autoapi_own_page_level = "function"
+
+
+def _reexported_objects():
+    """Full names of the objects a package re-exports from its modules.
+
+    e.g. osl_dynamics.data.base.Data, which osl_dynamics/data/__init__.py
+    imports as osl_dynamics.data.Data.
+    """
+    names = set()
+    for init in Path("../osl_dynamics").rglob("__init__.py"):
+        package = ".".join(init.parent.relative_to("..").parts)
+        for node in ast.parse(init.read_text()).body:
+            if not isinstance(node, ast.ImportFrom) or node.module is None:
+                continue
+            if node.level:
+                module = ".".join([package, node.module])
+            else:
+                module = node.module
+            if module.startswith("osl_dynamics."):
+                names.update(f"{module}.{alias.name}" for alias in node.names)
+    return names
+
+
+REEXPORTED_OBJECTS = _reexported_objects()
+
+
+def skip_reexported(app, what, name, obj, skip, options):
+    """Document re-exported objects only where users import them from.
+
+    Without this each one gets two pages, e.g. osl_dynamics.data.Data and
+    osl_dynamics.data.base.Data.
+    """
+    # Packages also import whole modules, which keep their pages
+    if what != "module" and what != "package" and name in REEXPORTED_OBJECTS:
+        return True
+    return skip
+
+
+def setup(app):
+    app.connect("autoapi-skip-member", skip_reexported)
 autoapi_options = [
     "members",
     "undoc-members",
@@ -128,6 +176,7 @@ sphinx_gallery_conf = {
     "filename_pattern": r".*\.py",       # Include all .py files, can specific a particular set tutorials, e.g. r"1-.*\.py" for 1-*.py tutorials
     "run_stale_examples": True,          # Force re-run when building
     "within_subsection_order": FileNameSortKey,  # Build in alphabetical order of the filenames
+    "backreferences_dir": "tutorials_build/backreferences",  # Lets minigallery find the tutorials
 }
 
 # The suffix of source filenames.
@@ -167,6 +216,9 @@ sitemap_url_scheme = "{link}"
 # Extra files to copy to the root of the documentation site
 html_extra_path = ["llms.txt"]
 
+html_static_path = ["_static"]
+html_css_files = ["custom.css"]
+
 html_theme_options = {
     "github_url": "https://github.com/OHBA-analysis/osl-dynamics",
     "show_nav_level": 1,
@@ -184,6 +236,9 @@ html_sidebars = {
     "getting_started": [],
     "faq": [],
 }
+
+# Show e.g. "pca()" in a page's table of contents, not "osl_dynamics.data.Data.pca()"
+toc_object_entries_show_parents = "hide"
 
 # Remove "This Page; Show Source"
 html_show_sourcelink = False

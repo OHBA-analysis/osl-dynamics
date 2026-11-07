@@ -1,0 +1,26 @@
+/* Introductory paragraph on the home page */
+.lead {
+  font-size: 1.2rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Cards on the home page */
+.sd-card .sd-card-title {
+  font-weight: 600;
+}
+.sd-card .sd-card-title svg {
+  margin-right: 0.3rem;
+}
+
+/* Institution logos at the bottom of the home page */
+.institution-logos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2rem;
+  align-items: center;
+  margin-top: 1.5rem;
+}
+.institution-logos img {
+  height: 60px;
+  width: auto;
+}

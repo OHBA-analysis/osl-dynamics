@@ -114,7 +114,7 @@ class Topology:
 
         Parameters
         ----------
-        filename: str
+        filename : str
             The location of a .lout file
 
         """
@@ -142,7 +142,7 @@ class Topology:
 
         Parameters
         ----------
-        channel_names: list of str
+        channel_names : list of str
             A list of channel names which are present in the data.
             All others are removed.
         """

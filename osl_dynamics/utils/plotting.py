@@ -166,7 +166,7 @@ def get_colors(n: int, colormap: str = "magma") -> List[Tuple[float, ...]]:
 
     Returns
     -------
-    colors: list of tuple of float
+    colors : list of tuple of float
         Colors in RGBA format.
 
     Note
@@ -1039,7 +1039,7 @@ def plot_separate_time_series(
     time_series : np.ndarray
         Time series to be plotted. Should be (n_samples, n_lines). Each line is
         its own subplot.
-    sampling_frequency: float, optional
+    sampling_frequency : float, optional
         Sampling frequency of the input data, enabling us to label the x-axis.
     n_samples : int, optional
         Number of samples to be shown on the x-axis.
@@ -1236,22 +1236,22 @@ def plot_matrices(
 
     Parameters
     ----------
-    matrix: list of np.ndarray
+    matrix : list of np.ndarray
         The matrices to plot.
-    group_color_scale: bool, optional
+    group_color_scale : bool, optional
         If True, all matrices will have the same colormap scale, where we use
         the minimum and maximum across all matrices as the scale.
-    titles: list of str, optional
+    titles : list of str, optional
         Titles to give to each matrix axis.
-    main_title: str, optional
+    main_title : str, optional
         Main title to be placed at the top of the plot.
-    cmap: str or matplotlib.colors.ListedColormap, optional
+    cmap : str or matplotlib.colors.ListedColormap, optional
         Matplotlib colormap.
-    nan_color: str, optional
+    nan_color : str, optional
         Matplotlib color to use for :code:`NaN` values.
-    log_norm: bool, optional
+    log_norm : bool, optional
         Should we show the elements on a log scale?
-    filename: str, optional
+    filename : str, optional
         Output filename.
 
     Returns
@@ -1784,7 +1784,7 @@ def plot_alpha(
     ----------
     alpha : np.ndarray
         A collection of alphas passed as separate arguments.
-    n_samples: int, optional
+    n_samples : int, optional
         Number of time points to be plotted.
     cmap : str or matplotlib.colors.ListedColormap, optional
         Matplotlib colormap.

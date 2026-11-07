@@ -379,7 +379,7 @@ def gmm_threshold(
         or (n_channels, n_channels).
     subtract_mean : bool, optional
         Should we subtract the mean over modes before fitting a GMM?
-    mean_weights: np.ndarray, optional
+    mean_weights : np.ndarray, optional
         Numpy array with weightings for each mode/state to use to calculate
         the mean. Default is equal weighting.
     standardize : bool, optional
@@ -458,7 +458,7 @@ def fit_gmm(
         n_channels).
     subtract_mean : bool, optional
         Should we subtract the mean over modes before fitting a GMM?
-    mean_weights: np.ndarray, optional
+    mean_weights : np.ndarray, optional
         Numpy array with weightings for each mode/state to use to calculate
         the mean. Default is equal weighting.
     standardize : bool, optional
@@ -585,7 +585,7 @@ def threshold(
     """Return edges that exceed a threshold.
 
     Parameters
-    ---------
+    ----------
     conn_map : np.ndarray
         Connectivity matrix to threshold. Shape must be (n_components, n_modes,
         n_channels, n_channels), (n_modes, n_channels, n_channels) or

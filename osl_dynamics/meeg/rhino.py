@@ -288,23 +288,27 @@ def extract_surfaces(
     MRI file has a valid sform.
 
     In more detail:
-    1) Transform MRI to be aligned with the MNI axes so that BET works well
-    2) Use bet to skull strip MRI so that flirt works well
-    3) Use flirt to register skull stripped MRI to MNI space
-    4) Use BET/BETSURF to get:
-       a) The scalp surface (excluding nose), this gives the MRI-derived
+
+    1. Transform MRI to be aligned with the MNI axes so that BET works well
+    2. Use bet to skull strip MRI so that flirt works well
+    3. Use flirt to register skull stripped MRI to MNI space
+    4. Use BET/BETSURF to get:
+
+       a. The scalp surface (excluding nose), this gives the MRI-derived
           headshape points in native MRI space, which can be used in the
           headshape points registration later.
-       b) The scalp surface (outer skin), inner skull and brain surface, these
+       b. The scalp surface (outer skin), inner skull and brain surface, these
           can be used for forward modelling later. Note that  due to the unusual
           naming conventions used by BET:
+
           - bet_inskull_mesh_file is actually the brain surface
           - bet_outskull_mesh_file is actually the inner skull surface
           - bet_outskin_mesh_file is the outer skin/scalp surface
-    5) Add nose to scalp surface (optional)
-    6) Output the transform from MRI space to MNI
-    7) Output surfaces in MRI space
-    8) Use FNIRT to nonlinearly register the MRI to MNI space (optional)
+
+    5. Add nose to scalp surface (optional)
+    6. Output the transform from MRI space to MNI
+    7. Output surfaces in MRI space
+    8. Use FNIRT to nonlinearly register the MRI to MNI space (optional)
 
     Parameters
     ----------
@@ -1419,31 +1423,28 @@ def coregister_head_and_mri(
     registered to the MRI-derived scalp surface in native MRI space.
 
     In more detail:
-    1)  Map location of fiducials in MNI standard space brain to native MRI
-        space. These are then used as the location of the MRI-derived fiducials
-        in native MRI space.
 
-    2a) We have polhemus-derived fiducials in HEAD space and MRI-derived fiducials
-        in native MRI space. Use these to estimate the affine xform from native
-        MRI space to HEAD space.
+    1. Map location of fiducials in MNI standard space brain to native MRI
+       space. These are then used as the location of the MRI-derived fiducials
+       in native MRI space.
+    2. We have polhemus-derived fiducials in HEAD space and MRI-derived
+       fiducials in native MRI space. Use these to estimate the affine xform
+       from native MRI space to HEAD space.
 
-    2b) We can also optionally learn the best scaling to add to this affine
-        xform, such that the MRI-derived fiducials are scaled in size to better
-        match the polhemus-derived fiducials. This assumes that we trust the size
-        (e.g. in mm) of the polhemus-derived fiducials, but not the size of
-        MRI-derived fiducials. E.g. this might be the case if we do not trust
-        the size (e.g. in mm) of the MRI, or if we are using a template MRI
-        that would has not come from this subject.
-
-    3)  If a scaling is learnt in step 2, we apply it to MRI, and to anything
-        derived from MRI.
-
-    4)  Transform MRI-derived headshape points into HEAD space.
-
-    5)  We have the polhemus-derived headshape points in HEAD space and the
-        MRI-derived headshape (scalp surface) in native MRI space.  Use these
-        to estimate the affine xform from native MRI space using the ICP
-        algorithm initilaised using the xform estimate in step 2.
+       We can also optionally learn the best scaling to add to this affine
+       xform, such that the MRI-derived fiducials are scaled in size to better
+       match the polhemus-derived fiducials. This assumes that we trust the size
+       (e.g. in mm) of the polhemus-derived fiducials, but not the size of
+       MRI-derived fiducials. E.g. this might be the case if we do not trust
+       the size (e.g. in mm) of the MRI, or if we are using a template MRI
+       that would has not come from this subject.
+    3. If a scaling is learnt in step 2, we apply it to MRI, and to anything
+       derived from MRI.
+    4. Transform MRI-derived headshape points into HEAD space.
+    5. We have the polhemus-derived headshape points in HEAD space and the
+       MRI-derived headshape (scalp surface) in native MRI space.  Use these
+       to estimate the affine xform from native MRI space using the ICP
+       algorithm initilaised using the xform estimate in step 2.
 
     Parameters
     ----------
@@ -2451,6 +2452,7 @@ def forward_model(
         Files of the session.
     model : string, optional
         Options are:
+
         - 'Single Layer' to use single layer (brain/cortex).
           Recommended for MEG.
         - 'Triple Layer' to three layers (scalp, inner skull, brain/cortex).

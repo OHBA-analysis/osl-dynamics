@@ -137,13 +137,13 @@ def fit_gaussian_mixture(
         Number of standard deviations of the 'off' component the mean of the
         'on' component must be for the fit to be considered to have two
         components.
-    label_order: str, optional
+    label_order : str, optional
         How do we order the inferred classes?
     sklearn_kwargs : dict, optional
         Dictionary of keyword arguments to pass to
         `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable\
         /modules/generated/sklearn.mixture.GaussianMixture.html>`_.
-    return_statistics: bool, optional
+    return_statistics : bool, optional
         Should we return statistics of the Gaussian mixture components?
     show_plot : bool, optional
         Should we show the GMM fit to the distribution of :code:`X`.

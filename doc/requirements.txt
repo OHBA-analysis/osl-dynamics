@@ -2,6 +2,8 @@
 
 sphinx
 sphinx-gallery
+sphinx-design
+numpydoc
 sphinx-autoapi
 sphinx-sitemap
 pydata-sphinx-theme

@@ -2,7 +2,7 @@
 
 See the :doc:`HMM description </models/hmm>` for further details.
 
-See Also
+Examples
 --------
 `Example script <https://github.com/OHBA-analysis/osl-dynamics/blob/main\
 /examples/simulation/hmm_hmm-mvn_fisher-kernel.py>`_ applying the Fisher kernel

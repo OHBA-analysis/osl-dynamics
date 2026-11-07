@@ -64,7 +64,7 @@ def render(
         Default is :code:`True`.
     image_name : str, optional
         Filename of image to save.
-    input_is_cifti: bool
+    input_is_cifti : bool
         Whether the input file is a CIFTI file.
     """
     img = pathlib.Path(img)
