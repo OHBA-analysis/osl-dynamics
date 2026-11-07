@@ -11,6 +11,8 @@ In this tutorial we test for differences between groups of subjects with :func:`
 We also cover nuisance covariates, missing values, controlling the family-wise error rate per state and more than two groups. See the :doc:`Statistical Inference tutorial <7-1_statistical_inference>` for the background.
 """
 
+# sphinx_gallery_thumbnail_number = 3
+
 #%%
 # Subject-specific features
 # ^^^^^^^^^^^^^^^^^^^^^^^^^

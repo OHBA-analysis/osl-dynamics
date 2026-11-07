@@ -8,7 +8,7 @@ In this tutorial we analyze DyNeMo mixing coefficients. This tutorial covers:
 2. Binarizing the mixing coefficient time course
 """
 
-# sphinx_gallery_thumbnail_number = 7
+# sphinx_gallery_thumbnail_number = 2
 
 #%%
 # Download inferred parameters

@@ -15,6 +15,8 @@ The structure follows the excellent `Statistical inference <https://mne.tools/st
 The practical tutorials that follow show the tests on realistic analyses: :doc:`group contrasts <7-2_group_contrast>`, :doc:`network responses <7-3_network_response>` and :doc:`custom designs <7-4_custom_designs>`.
 """
 
+# sphinx_gallery_thumbnail_number = 6
+
 #%%
 # Simulated data
 # ^^^^^^^^^^^^^^

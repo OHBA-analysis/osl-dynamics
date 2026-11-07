@@ -11,6 +11,8 @@ In this tutorial we will plot networks from a DyNeMo model trained on source rec
 5. Coherence maps
 """
 
+# sphinx_gallery_thumbnail_number = 7
+
 #%%
 # Download post-hoc spectra
 # ^^^^^^^^^^^^^^^^^^^^^^^^^
