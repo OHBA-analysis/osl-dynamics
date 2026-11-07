@@ -1,19 +1,10 @@
-:orphan:
-
 Dynamic Network States (DyNeSte)
 ================================
 
 Introduction
 ------------
 
-DyNeSte combines elements of both the `HMM <hmm.html>`_ and `DyNeMo <dynemo.html>`_ to address their inherent trade-offs [1]. The HMM infers categorical brain network states that provide good interpretability but does not model long-range temporal structure due to its Markovian constraint. DyNeMo uses recurrent neural networks to model long-range temporal dependencies, but at the expense of interpretability (due to its mixture description of states).
-
-DyNeSte addresses this by combining:
-
-- **Discrete states** (like the HMM) for interpretability — we can directly calculate summary statistics such as fractional occupancies, lifetimes, and switching rates.
-- **Non-Markovian temporal dynamics** (like DyNeMo) for capturing long-range dependencies — using a recurrent neural network to model the temporal evolution of states.
-
-In both simulations and real resting-state magnetoencephalography (MEG) data, DyNeSte was able to recover plausible dynamic brain network states and showed superior performance over the HMM in capturing long-range temporal dependencies in network dynamics [1].
+DyNeSte combines the strengths of the :doc:`HMM <hmm>` and :doc:`DyNeMo <dynemo>` [1]: the HMM's **discrete states**, which are interpretable and give summary statistics directly (fractional occupancies, lifetimes, switching rates), with DyNeMo's **non-Markovian temporal model**, a recurrent neural network that captures long-range dependencies the HMM's Markovian constraint cannot. On resting-state MEG data it recovers plausible network states and captures long-range temporal structure better than the HMM [1].
 
 Generative Model
 ----------------
@@ -64,11 +55,9 @@ As with DyNeMo, **KL annealing** can be used to stabilize training — the KL te
 Post-hoc Analysis
 -----------------
 
-Because DyNeSte infers discrete states, the post-hoc analysis is the same as for the `HMM <hmm.html>`_. You can directly calculate summary statistics (fractional occupancy, mean lifetime, mean interval, switching rate) and use the multitaper approach for spectral analysis.
-
-See the :doc:`HMM post-hoc analysis documentation <hmm>` for details on these analyses.
+Because DyNeSte infers discrete states, the post-hoc analysis is the same as for the :doc:`HMM <hmm>`: summary statistics (fractional occupancy, mean lifetime, mean interval, switching rate) and multitaper spectral analysis.
 
 References
 ----------
 
-#. S Cho, R Huang, C Gohil, O Parker Jones, M W Woolrich, Modelling Discrete States and Long-Term Dynamics in Functional Brain Networks. `bioRxiv, 2025 <https://www.biorxiv.org/content/10.1101/2025.09.25.678554>`_.
+#. S Cho, R Huang, C Gohil, O Parker Jones, M W Woolrich, Modelling Discrete States and Long-Term Dynamics in Functional Brain Networks. `Imaging Neuroscience, 2026 <https://doi.org/10.1162/IMAG.a.1237>`_.

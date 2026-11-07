@@ -22,7 +22,8 @@ import numpy as np
 import pandas as pd
 
 from osl_dynamics import run_pipeline
-from osl_dynamics.analysis import statistics, power, connectivity
+from osl_dynamics import stats
+from osl_dynamics.analysis import power, connectivity
 from osl_dynamics.inference import modes
 from osl_dynamics.utils import plotting
 
@@ -60,12 +61,11 @@ def compare_summary_stats(data, output_dir, n_perm, n_jobs):
     n_states = fo.shape[-1]
 
     # Do statistical significance testing
-    _, p = statistics.group_diff_max_stat_perm(
+    p = stats.group_diff(
         data=sum_stats,
         assignments=assignments,
         n_perm=n_perm,
-        n_jobs=n_jobs,
-    )
+    ).pvalues
     p = p.reshape(4, n_states)
 
     # Plot
@@ -101,12 +101,13 @@ def compare_power_maps(data, output_dir, n_perm, significance_level, n_jobs):
     power_maps = power.variance_from_spectra(f, psd, nnmf)[:, 0]
 
     # Do statistical significance testing
-    power_map_diff, p = statistics.group_diff_max_stat_perm(
+    result = stats.group_diff(
         data=power_maps,
         assignments=assignments,
         n_perm=n_perm,
-        n_jobs=n_jobs,
     )
+    power_map_diff = result.copes
+    p = result.pvalues
 
     # Zero non-significant differences
     significant = p < significance_level
@@ -143,12 +144,13 @@ def compare_coherence_networks(data, output_dir, n_perm, significance_level, n_j
     c = c[:, :, m, n]
 
     # Do statistical significance testing
-    c_diff, p = statistics.group_diff_max_stat_perm(
+    result = stats.group_diff(
         data=c,
         assignments=assignments,
         n_perm=n_perm,
-        n_jobs=n_jobs,
     )
+    c_diff = result.copes
+    p = result.pvalues
 
     # Zero non-significant differences
     significant = p < significance_level

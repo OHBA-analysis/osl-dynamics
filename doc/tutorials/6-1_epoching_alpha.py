@@ -107,4 +107,4 @@ print(famous.shape)
 #%%
 # Statistical significance testing
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# We can average the trials (epochs) for a given subject and do stats to see if there's a significant response. See the :doc:`Network Response <tutorials_build/7-2_group_network_response>` tutorial for how to do group-level stats on the subject-level network responses.
+# We can average the trials (epochs) for a given subject and do stats to see if there's a significant response. See the :doc:`Network Response <7-3_network_response>` tutorial for how to do group-level stats on the subject-level network responses.

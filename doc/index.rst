@@ -18,11 +18,11 @@ This package contains models for analysing neuroimaging data. In particular, thi
 - Inferring and visualising dynamic (and static) functional networks.
 - Spectral estimation: including multitaper spectra and wavelet transforms.
 - Burst detection.
-- Statistical significance testing (using GLM permutations).
+- Statistical significance testing (GLM permutation tests with maximum statistic, cluster-based and TFCE corrections).
 - Simulating time series data (e.g. HMMs, autoregressive models, etc).
 - And much more!
 
-For more information on how to use osl-dynamics see the :doc:`documentation <documentation>`.
+New to osl-dynamics? Start with :doc:`Getting Started <getting_started>`, then work through the :doc:`tutorials <tutorials>`. The :doc:`User Guide <documentation>` describes the models, statistical significance testing and the parcellations in more depth, and the :doc:`API reference <autoapi/index>` documents every function.
 
 If you would like to request new features or if you're confident that you have found a bug, please create a new issue on the `GitHub issues <https://github.com/OHBA-analysis/osl-dynamics/issues>`_ page.
 
@@ -42,7 +42,8 @@ Contents
 
    Install <install>
    Getting Started <getting_started>
-   Documentation <documentation>
+   User Guide <documentation>
+   Tutorials <tutorials>
    FAQ <faq>
 
 

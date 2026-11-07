@@ -508,5 +508,5 @@ The output of this script is written to ``derivatives/``.
 #         reject_by_annotation="omit",
 #     )
 #
-# See the :doc:`documentation <../documentation>` for static and dynamic
+# See the :doc:`tutorials <../tutorials>` page for static and dynamic
 # network analysis tutorials.

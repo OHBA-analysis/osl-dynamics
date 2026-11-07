@@ -23,6 +23,10 @@ Modules
   steps on multiple sessions in parallel.
 - :py:mod:`~osl_dynamics.meeg.report` — HTML QC report generation.
 
+Documentation
+-------------
+- :doc:`M/EEG Processing </meeg>`
+
 Tutorials
 ---------
 - :doc:`MEG: Preprocessing, Source Reconstruction, Parcellation

@@ -12,6 +12,6 @@ This directory contains:
 - `simulation`: scripts for training models for dynamics on simulated data. These scripts can be useful for testing your setup is working correctly and highlight the pros/cons of various models.
 - `spectra`: scripts for calculating spectral properties.
 - `static`: scripts for static network analysis.
-- `statistics`: scripts for performing statistical significance testing (using non-parameteric GLM permutations).
+- `statistics`: scripts for statistical significance testing with GLM permutation tests (group differences, network responses, cluster-based tests, regressions).
 - `tinda`: scripts for using [TINDA](https://www.nature.com/articles/s41593-025-02052-8).
-- `toolbox_paper`: scripts for reproducing the results in the [eLife paper](https://elifesciences.org/reviewed-preprints/91949).
+- `toolbox_paper`: scripts for reproducing the results in the [eLife paper](https://elifesciences.org/articles/91949).
