@@ -9,9 +9,15 @@ template.
 For the common case of sign flipping a single parcellated fif file (or
 :class:`mne.io.Raw`) to match a saved template covariance, see
 :func:`sign_flip_mne_raw`.
+
+The covariances may also be **stacked** across frequency bands, shape
+``(n_bands, N, N)`` (see :func:`calc_cov_mne_raw`). The entries of every band are
+then pooled into one correlation and a single flip vector is shared across the
+bands. This helps when the broadband covariance carries little sign information
+(e.g. EEG). Templates for many sessions can be built with :func:`build_template`.
 """
 
-from typing import Optional, Tuple, Union
+from typing import Optional, Sequence, Tuple, Union
 
 import mne
 import numpy as np
@@ -44,6 +50,62 @@ def calc_cov(
     return np.cov(array.T)
 
 
+def calc_cov_mne_raw(
+    raw,
+    n_embeddings: int = 15,
+    standardize: bool = True,
+    frequency_bands: Optional[Sequence[Tuple[float, float]]] = None,
+    picks: str = "misc",
+) -> np.ndarray:
+    """Covariance of a parcellated fif file, optionally per frequency band.
+
+    Each band is band-pass filtered on the continuous data before bad segments
+    are dropped, so the filter does not ring at the gaps.
+
+    Parameters
+    ----------
+    raw : str or mne.io.Raw
+        Path to a parcellated fif file, or a loaded :class:`mne.io.Raw` object.
+    n_embeddings : int, optional
+        Number of time-delay embeddings.
+    standardize : bool, optional
+        Standardize the embedded data before computing the covariance.
+    frequency_bands : list of tuple, optional
+        ``(low, high)`` band edges in Hz, e.g.
+        ``[(1, 4), (4, 8), (8, 13), (13, 30)]``. If ``None``, the broadband
+        covariance is returned.
+    picks : str, optional
+        Channel type holding the parcel time courses.
+
+    Returns
+    -------
+    cov : np.ndarray
+        Shape ``(N, N)`` if ``frequency_bands`` is ``None``, otherwise
+        ``(n_bands, N, N)``, where ``N = n_channels * n_embeddings``.
+    """
+    if not isinstance(raw, mne.io.BaseRaw):
+        raw = mne.io.read_raw_fif(str(raw), preload=True, verbose=False)
+
+    def _cov(r):
+        data = r.get_data(picks=picks, reject_by_annotation="omit", verbose=False)
+        return calc_cov(data.T, n_embeddings, standardize)
+
+    if frequency_bands is None:
+        return _cov(raw)
+    return np.stack(
+        [
+            _cov(raw.copy().load_data().filter(low, high, picks=picks, verbose=False))
+            for low, high in frequency_bands
+        ]
+    )
+
+
+def _triu_entries(M: np.ndarray, n_embeddings: int) -> np.ndarray:
+    """Entries compared by :func:`calc_corr`, pooled over any leading axes."""
+    m, n = np.triu_indices(M.shape[-1], k=n_embeddings)
+    return M[..., m, n].ravel()
+
+
 def calc_corr(
     M1: np.ndarray, M2: np.ndarray, n_embeddings: int, mode: Optional[str] = None
 ) -> float:
@@ -56,7 +118,9 @@ def calc_corr(
     Parameters
     ----------
     M1, M2 : np.ndarray
-        Covariance matrices of the same shape.
+        Covariance matrices of the same shape, ``(N, N)`` or stacked across
+        frequency bands ``(n_bands, N, N)`` (the entries of all bands are
+        pooled).
     n_embeddings : int
         Number of time-delay embeddings (sets the skipped diagonal offset).
     mode : str, optional
@@ -71,14 +135,19 @@ def calc_corr(
     if mode == "abs":
         M1 = np.abs(M1)
         M2 = np.abs(M2)
-    m, n = np.triu_indices(M1.shape[0], k=n_embeddings)
-    return np.corrcoef([M1[m, n], M2[m, n]])[0, 1]
+    return np.corrcoef(
+        [_triu_entries(M1, n_embeddings), _triu_entries(M2, n_embeddings)]
+    )[0, 1]
 
 
 def apply_flips_to_cov(
     cov: np.ndarray, flips: np.ndarray, n_embeddings: int
 ) -> np.ndarray:
-    """Apply a ``±1`` per-channel flip vector to an embedded covariance."""
+    """Apply a ``±1`` per-channel flip vector to an embedded covariance.
+
+    ``cov`` may be ``(N, N)`` or stacked across frequency bands
+    ``(n_bands, N, N)``.
+    """
     f = np.repeat(flips, n_embeddings)[np.newaxis, ...]
     return cov * (f.T @ f)
 
@@ -102,7 +171,8 @@ class _FlipObjective:
     Parameters
     ----------
     cov, template_cov : np.ndarray
-        Session and template embedded covariances (from :func:`calc_cov`).
+        Session and template embedded covariances (from :func:`calc_cov`),
+        ``(N, N)`` or stacked across frequency bands ``(n_bands, N, N)``.
     n_channels : int
         Number of channels (parcels).
     n_embeddings : int
@@ -123,37 +193,41 @@ class _FlipObjective:
 
         # Validate shapes so misuse fails with a clear message rather than a
         # confusing error deeper in the search.
-        if C.ndim != 2 or C.shape[0] != C.shape[1]:
-            raise ValueError(f"cov must be a square 2D array, got shape {C.shape}.")
+        if C.ndim not in (2, 3) or C.shape[-1] != C.shape[-2]:
+            raise ValueError(
+                "cov must be a square (N, N) or stacked (n_bands, N, N) array, "
+                f"got shape {C.shape}."
+            )
         if C.shape != T.shape:
             raise ValueError(
                 f"cov {C.shape} and template_cov {T.shape} must have the same shape."
             )
-        if C.shape[0] != N:
+        if C.shape[-1] != N:
             raise ValueError(
-                f"cov side length {C.shape[0]} must equal "
+                f"cov side length {C.shape[-1]} must equal "
                 f"n_channels * n_embeddings = {n_channels} * {E} = {N}."
             )
 
-        # The exact entries calc_corr compares (strict upper triangle, k=E). All
-        # of these fall in off-diagonal channel blocks; within-channel blocks are
-        # skipped and do not depend on the sign.
+        # The exact entries calc_corr compares (strict upper triangle, k=E,
+        # pooled over the bands of a stacked covariance). All of these fall in
+        # off-diagonal channel blocks; within-channel blocks are skipped and do
+        # not depend on the sign.
         rows, cols = np.triu_indices(N, k=E)
-        c = C[rows, cols]
-        t = T[rows, cols]
-        pc = rows // E  # channel of each selected row
-        qc = cols // E  # channel of each selected column
+        n_bands = 1 if C.ndim == 2 else C.shape[0]
+        c = _triu_entries(C, E).astype(np.float64)
+        t = _triu_entries(T, E).astype(np.float64)
+        # Flat (channel of row, channel of column) index of each entry
+        pq = np.tile((rows // E) * n_channels + cols // E, n_bands)
 
-        A = np.zeros((n_channels, n_channels))
-        B = np.zeros((n_channels, n_channels))
-        np.add.at(A, (pc, qc), c * t)
-        np.add.at(B, (pc, qc), c)
+        size = n_channels * n_channels
+        A = np.bincount(pq, c * t, size).reshape(n_channels, n_channels)
+        B = np.bincount(pq, c, size).reshape(n_channels, n_channels)
         # Symmetrize; the diagonal stays zero (within-channel entries excluded).
         self.A = A + A.T
         self.B = B + B.T
 
         self.n_channels = n_channels
-        self.S = float(len(rows))  # number of compared entries, |S|
+        self.S = float(len(c))  # number of compared entries, |S|
         self.mT = t.sum() / self.S  # mean of the template over S
         self.sigT = np.sqrt((t * t).sum() / self.S - self.mT**2)  # std of template
         self.K = (c * c).sum() / self.S  # mean of C^2 over S (flip-invariant)
@@ -239,7 +313,9 @@ def find_flips(
     Parameters
     ----------
     cov : np.ndarray
-        This session's embedded covariance (from :func:`calc_cov`).
+        This session's embedded covariance (from :func:`calc_cov`), ``(N, N)``
+        or stacked across frequency bands ``(n_bands, N, N)`` (from
+        :func:`calc_cov_mne_raw`).
     template_cov : np.ndarray
         Template embedded covariance to align to (same shape as ``cov``).
     n_channels : int
@@ -286,6 +362,63 @@ def find_flips(
             best_flips, best_metric = flips, metric
 
     return best_flips.astype(int), float(best_metric)
+
+
+def build_template(
+    covs: Sequence[np.ndarray],
+    n_channels: int,
+    n_embeddings: int,
+    n_iter: int = 2,
+) -> Tuple[np.ndarray, int]:
+    """Build a template covariance from many sessions.
+
+    1. Medoid: the session whose covariance is most similar to all others,
+       using the sign-invariant (``mode="abs"``) correlation of
+       :func:`calc_corr`.
+    2. ``n_iter`` rounds of: align every session to the current template with
+       :func:`find_flips`, then set the template to the mean of the aligned
+       covariances.
+
+    The template keeps the (arbitrary) sign convention of the medoid session.
+    Align it to another template with :func:`find_flips` if needed.
+
+    Parameters
+    ----------
+    covs : list of np.ndarray
+        Embedded covariance of each session, each ``(N, N)`` or stacked across
+        frequency bands ``(n_bands, N, N)``.
+    n_channels : int
+        Number of channels (parcels).
+    n_embeddings : int
+        Number of time-delay embeddings used to build the covariances.
+    n_iter : int, optional
+        Number of align-to-mean rounds after the medoid.
+
+    Returns
+    -------
+    template_cov : np.ndarray
+        Template covariance, same shape as each element of ``covs``.
+    medoid : int
+        Index of the medoid session.
+    """
+    # Sign-invariant similarity of every pair of sessions, as one matrix
+    # product of the standardized absolute entries
+    v = np.array([np.abs(_triu_entries(c, n_embeddings)) for c in covs], np.float32)
+    v -= v.mean(axis=1, keepdims=True)
+    v /= v.std(axis=1, keepdims=True)
+    sim = v @ v.T
+    del v
+    np.fill_diagonal(sim, 0)
+    medoid = int(np.argmax(sim.sum(axis=1)))
+
+    template = np.asarray(covs[medoid], dtype=np.float64)
+    for _ in range(n_iter):
+        aligned = np.zeros_like(template)
+        for c in covs:
+            flips, _ = find_flips(c, template, n_channels, n_embeddings)
+            aligned += apply_flips_to_cov(c, flips, n_embeddings)
+        template = aligned / len(covs)
+    return template, medoid
 
 
 def sign_flip(
@@ -356,6 +489,7 @@ def sign_flip_mne_raw(
     standardize: bool = True,
     picks: str = "misc",
     extra_chans: Union[str, list, None] = "stim",
+    frequency_bands: Optional[Sequence[Tuple[float, float]]] = None,
 ) -> Union[Tuple[np.ndarray, float], "mne.io.Raw"]:
     """Sign flip a parcellated fif file to match a template covariance.
 
@@ -389,6 +523,19 @@ def sign_flip_mne_raw(
     extra_chans : str or list of str, optional
         Extra channels (e.g. ``"stim"``) to copy from the input to the output.
         Passed to :func:`osl_dynamics.meeg.parcellation.save_as_fif`.
+    frequency_bands : list of tuple, optional
+        ``(low, high)`` band edges in Hz. If passed, the flips are found on the
+        covariances of the band-pass filtered data stacked across bands (see
+        :func:`calc_cov_mne_raw`), and ``template_cov`` must be stacked in the
+        same way, shape ``(n_bands, N, N)``.
+
+    Returns
+    -------
+    flips, corr : np.ndarray, float
+        If ``output_file`` is passed: the per-parcel ``+1``/``-1`` signs that
+        were applied and the correlation with ``template_cov``.
+    raw : mne.io.Raw
+        If ``output_file`` is ``None``: the sign-flipped data.
 
     Examples
     --------
@@ -416,7 +563,16 @@ def sign_flip_mne_raw(
 
     parcel_data = raw.get_data(picks=picks, reject_by_annotation="omit")
 
-    flipped_data, _, _ = sign_flip(parcel_data, template_cov, n_embeddings, standardize)
+    if frequency_bands is None:
+        flipped_data, flips, corr = sign_flip(
+            parcel_data, template_cov, n_embeddings, standardize
+        )
+    else:
+        if not isinstance(template_cov, np.ndarray):
+            template_cov = np.load(str(template_cov))
+        cov = calc_cov_mne_raw(raw, n_embeddings, standardize, frequency_bands, picks)
+        flips, corr = find_flips(cov, template_cov, parcel_data.shape[0], n_embeddings)
+        flipped_data = parcel_data * flips[:, np.newaxis]
 
     if output_file is None:
         return convert_to_mne_raw(
@@ -427,3 +583,4 @@ def sign_flip_mne_raw(
         )
 
     save_as_fif(flipped_data, raw, filename=output_file, extra_chans=extra_chans)
+    return flips, corr
