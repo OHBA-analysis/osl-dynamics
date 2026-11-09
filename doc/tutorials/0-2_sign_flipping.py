@@ -23,7 +23,8 @@ covers:
 2. Visualizing the sign ambiguity across sessions.
 3. Aligning the signs to a fixed template covariance.
 4. Using the median session as a template instead.
-5. Sign flipping arrays and fif files inside a processing pipeline.
+5. Aligning to a template from another dataset (two-stage sign flipping).
+6. Sign flipping arrays and fif files inside a processing pipeline.
 
 Note, sign flipping is a *cross-session* step — it aligns sessions to each
 other — so it is applied to a group of parcellated sessions after
@@ -199,6 +200,47 @@ fig.tight_layout()
 #
 #     data = Data(arrays)
 #     data.align_channel_signs(n_embeddings=15, standardize=True)
+
+#%%
+# Aligning to a template from another dataset
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# Sometimes the template comes from a *different* dataset, e.g. the template
+# covariance of a pre-trained model, which may have been recorded on another
+# scanner, with different preprocessing, or a different population. An
+# individual session may then match the template only weakly, and the flip
+# search becomes unreliable: one wrongly flipped parcel in one session is
+# enough to add spurious covariance dynamics.
+#
+# Passing ``two_stage=True`` splits the problem in two:
+#
+# 1. Build a template from the sessions in the Data object
+#    (:func:`sign_flipping.build_template
+#    <osl_dynamics.data.sign_flipping.build_template>`): the session most
+#    similar to all the others is used as a starting point, every session is
+#    aligned to it, and the template is replaced by the mean of the aligned
+#    covariances (repeated for a couple of rounds).
+# 2. Align this group template to the external template with a *single* flip
+#    vector, then align each session to the (now aligned) group template.
+#
+# Each session only has to match its own dataset, which it does well, and the
+# mismatch between the datasets is absorbed by one flip search on a clean,
+# averaged covariance. The log reports the correlation of the group template
+# with the external template, which is a useful summary of how well the new
+# dataset matches the one the template came from.
+#
+# .. code-block:: python
+#
+#     data = Data(arrays)
+#     data.align_channel_signs(
+#         template_cov="template_cov.npy",  # from the other dataset
+#         n_embeddings=15,
+#         standardize=True,
+#         two_stage=True,
+#     )
+#
+# With a single session the two approaches are identical. Passing
+# ``two_stage=True`` without a template aligns the sessions to the group
+# template as it is, which is a more robust alternative to the median session.
 
 #%%
 # Sign flipping arrays

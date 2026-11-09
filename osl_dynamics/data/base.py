@@ -1055,10 +1055,20 @@ class Data:
         n_embeddings: int = 1,
         standardize: bool = True,
         use_raw: bool = False,
+        two_stage: bool = False,
     ) -> "Data":
         """Align the sign of each channel across sessions.
 
         If no template data/covariance is passed, we use the median session.
+
+        If :code:`two_stage=True`, we first build a template from the sessions
+        in this Data object (:func:`~osl_dynamics.data.sign_flipping.build_template`),
+        align this group template to the passed template, then align each
+        session to the group template. This is recommended when aligning to a
+        template from a different dataset (e.g. a pre-trained model), which an
+        individual session may match poorly: each session only has to match
+        its own dataset, and the mismatch between datasets is absorbed by a
+        single flip of the group template.
 
         Parameters
         ----------
@@ -1082,6 +1092,12 @@ class Data:
             Should we standardize the data before comparing across sessions?
         use_raw : bool, optional
             Should we prepare the original 'raw' data that we loaded?
+        two_stage : bool, optional
+            Should we align the sessions to a template built from this
+            dataset, which is itself aligned to :code:`template_data` /
+            :code:`template_cov`? Without a template, the sessions are aligned
+            to the group template as it is. With a single session this is
+            identical to :code:`two_stage=False`.
 
         Returns
         -------
@@ -1148,16 +1164,48 @@ class Data:
         )
 
         # Calculate/get template covariances
-        if template_cov is None and template_data is None:
+        if template_data is not None:
+            _logger.info("Using template data to calculate template covariance")
+            template_cov = _calc_cov(template_data)
+
+        if two_stage:
+            # Stage 1: template from the sessions in this dataset
+            group_cov, medoid = sign_flipping.build_template(
+                covs,
+                self.n_channels,
+                n_embeddings,
+                n_random_starts=n_random_starts,
+            )
+            _logger.info(
+                f"Built group template from {self.n_sessions} sessions "
+                f"(medoid: session {medoid})"
+            )
+
+            # Stage 2: align the group template to the passed template
+            if template_cov is not None:
+                flips, corr = sign_flipping.find_flips(
+                    group_cov,
+                    template_cov,
+                    self.n_channels,
+                    n_embeddings,
+                    n_random_starts=n_random_starts,
+                )
+                _logger.info(
+                    f"Group template correlation with template: {corr:.3f} "
+                    f"({np.sum(flips == -1)}/{self.n_channels} channels flipped)"
+                )
+                group_cov = sign_flipping.apply_flips_to_cov(
+                    group_cov, flips, n_embeddings
+                )
+
+            template_cov = group_cov
+
+        elif template_cov is None:
             metrics = _calc_metrics(covs)
             metrics_sum = np.sum(metrics, axis=1)
             argmedian = np.argsort(metrics_sum)[len(metrics_sum) // 2]
             _logger.info(f"Using session {argmedian} as template")
             template_cov = covs[argmedian]
-
-        if template_data is not None:
-            _logger.info("Using template data to calculate template covariance")
-            template_cov = _calc_cov(template_data)
 
         # Perform the sign flipping
         tcovs = [template_cov] * self.n_sessions

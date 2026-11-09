@@ -15,6 +15,13 @@ The covariances may also be **stacked** across frequency bands, shape
 then pooled into one correlation and a single flip vector is shared across the
 bands. This helps when the broadband covariance carries little sign information
 (e.g. EEG). Templates for many sessions can be built with :func:`build_template`.
+
+To align a dataset to a template from *another* dataset (e.g. the template of a
+pre-trained model), build a template from the new dataset, align that single
+template to the external one, and align each session to it. Individual sessions
+only have to match their own dataset, and the mismatch between the datasets is
+absorbed by one flip of the group template. This is
+``Data.align_channel_signs(template_cov=..., two_stage=True)``.
 """
 
 from typing import Optional, Sequence, Tuple, Union
@@ -369,6 +376,7 @@ def build_template(
     n_channels: int,
     n_embeddings: int,
     n_iter: int = 2,
+    n_random_starts: int = 3,
 ) -> Tuple[np.ndarray, int]:
     """Build a template covariance from many sessions.
 
@@ -393,6 +401,8 @@ def build_template(
         Number of time-delay embeddings used to build the covariances.
     n_iter : int, optional
         Number of align-to-mean rounds after the medoid.
+    n_random_starts : int, optional
+        Random restarts of each :func:`find_flips` search.
 
     Returns
     -------
@@ -415,7 +425,9 @@ def build_template(
     for _ in range(n_iter):
         aligned = np.zeros_like(template)
         for c in covs:
-            flips, _ = find_flips(c, template, n_channels, n_embeddings)
+            flips, _ = find_flips(
+                c, template, n_channels, n_embeddings, n_random_starts=n_random_starts
+            )
             aligned += apply_flips_to_cov(c, flips, n_embeddings)
         template = aligned / len(covs)
     return template, medoid
