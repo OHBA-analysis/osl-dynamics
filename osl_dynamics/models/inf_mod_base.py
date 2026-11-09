@@ -579,7 +579,9 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
         kl_loss = np.mean(predictions["kl_loss"])
         return ll_loss, kl_loss
 
-    def free_energy(self, dataset, **kwargs) -> float:
+    def free_energy(
+        self, dataset, concatenate: bool = True, **kwargs
+    ) -> Union[float, np.ndarray]:
         """Calculates the variational free energy of a dataset.
 
         Note, this method returns a free energy which may have a significantly
@@ -592,16 +594,25 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data.
             Dataset to calculate the variational free energy for.
+        concatenate : bool, optional
+            Should we calculate a single free energy for the whole dataset?
+            If :code:`False`, a free energy is calculated for each session.
 
         Returns
         -------
-        free_energy : float
-            Variational free energy for the dataset.
+        free_energy : float or np.ndarray
+            Variational free energy for the dataset, or for each session if
+            :code:`concatenate=False` (shape (n_sessions,)).
         """
-        dataset = self.make_dataset(dataset, concatenate=True)
-        ll_loss, kl_loss = self.losses(dataset, **kwargs)
-        free_energy = ll_loss + kl_loss
-        return free_energy
+
+        def _free_energy(ds):
+            ll_loss, kl_loss = self.losses(ds, **kwargs)
+            return ll_loss + kl_loss
+
+        if concatenate:
+            return _free_energy(self.make_dataset(dataset, concatenate=True))
+        datasets = self.make_dataset(dataset, concatenate=False)
+        return np.array([_free_energy(ds) for ds in datasets])
 
 
 @dataclass
@@ -1114,7 +1125,9 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
 
         return prior
 
-    def free_energy(self, dataset) -> float:
+    def free_energy(
+        self, dataset, concatenate: bool = True
+    ) -> Union[float, np.ndarray]:
         r"""Get the variational free energy of HMM-based models.
 
         This calculates:
@@ -1128,11 +1141,15 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
         ----------
         dataset : tf.data.Dataset or osl_dynamics.data.Data
             Dataset to evaluate the free energy for.
+        concatenate : bool, optional
+            Should we calculate a single free energy for the whole dataset?
+            If :code:`False`, a free energy is calculated for each session.
 
         Returns
         -------
-        free_energy : float
-            Variational free energy.
+        free_energy : float or np.ndarray
+            Variational free energy for the dataset, or for each session if
+            :code:`concatenate=False` (shape (n_sessions,)).
         """
         if self.is_multi_gpu:
             raise ValueError(
@@ -1141,27 +1158,36 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
                 "osl_dynamics.models.load(..., single_gpu=True)."
             )
 
-        dataset = self.make_dataset(dataset, concatenate=True)
+        def _free_energy(ds, desc):
+            free_energy = []
+            weights = []
+            for batch in progress(ds, desc=desc):
+                predictions = self.predict(batch, verbose=0)
+                nll = predictions["ll_loss"][0]
+                entropy = self.get_posterior_entropy(
+                    predictions["gamma"], predictions["xi"]
+                )
+                prior = self.get_posterior_expected_prior(
+                    predictions["gamma"], predictions["xi"]
+                )
+                fe = nll + entropy - prior
+                if self.config.model_name == "HIVE":
+                    kl_loss = predictions["kl_loss"][0]
+                    fe += kl_loss
+                free_energy.append(fe)
+                weights.append(batch["data"].shape[0])
+            return np.average(free_energy, weights=weights)
 
-        free_energy = []
-        weights = []
-        for batch in progress(dataset, desc="Calculating free energy"):
-            predictions = self.predict(batch, verbose=0)
-            nll = predictions["ll_loss"][0]
-            entropy = self.get_posterior_entropy(
-                predictions["gamma"], predictions["xi"]
-            )
-            prior = self.get_posterior_expected_prior(
-                predictions["gamma"], predictions["xi"]
-            )
-            fe = nll + entropy - prior
-            if self.config.model_name == "HIVE":
-                kl_loss = predictions["kl_loss"][0]
-                fe += kl_loss
-            free_energy.append(fe)
-            weights.append(batch["data"].shape[0])
-
-        return np.average(free_energy, weights=weights)
+        if concatenate:
+            dataset = self.make_dataset(dataset, concatenate=True)
+            return _free_energy(dataset, "Calculating free energy")
+        datasets = self.make_dataset(dataset, concatenate=False)
+        return np.array(
+            [
+                _free_energy(ds, f"Calculating free energy (session {i})")
+                for i, ds in enumerate(datasets)
+            ]
+        )
 
     def evidence(self, dataset) -> float:
         """Calculate the model evidence, :math:`p(x)`, of HMM on a dataset.
