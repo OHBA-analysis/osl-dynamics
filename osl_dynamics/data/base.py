@@ -1062,9 +1062,10 @@ class Data:
         If no template data/covariance is passed, we use the median session.
 
         If :code:`two_stage=True`, we first build a template from the sessions
-        in this Data object (:func:`~osl_dynamics.data.sign_flipping.build_template`),
-        align this group template to the passed template, then align each
-        session to the group template. This is recommended when aligning to a
+        in this Data object (:func:`~osl_dynamics.data.sign_flipping.build_template`)
+        and find the flips that align it to the passed template, then align
+        each session to the group template and apply those flips on top. This
+        is recommended when aligning to a
         template from a different dataset (e.g. a pre-trained model), which an
         individual session may match poorly: each session only has to match
         its own dataset, and the mismatch between datasets is absorbed by a
@@ -1127,24 +1128,15 @@ class Data:
         def _calc_cov(array):
             return sign_flipping.calc_cov(array, n_embeddings, standardize)
 
-        def _calc_metrics(covs):
-            metric = np.zeros([self.n_sessions, self.n_sessions])
-            for i in progress(range(self.n_sessions), desc="Comparing sessions"):
-                for j in range(i + 1, self.n_sessions):
-                    metric[i, j] = sign_flipping.calc_corr(
-                        covs[i], covs[j], n_embeddings, mode="abs"
-                    )
-                    metric[j, i] = metric[i, j]
-            return metric
-
         def _find_and_apply_flips(cov, tcov, array, ind):
             flips, best_metric = sign_flipping.find_flips(
                 cov,
                 tcov,
-                self.n_channels,
                 n_embeddings,
                 n_random_starts=n_random_starts,
             )
+            if template_flips is not None:
+                flips = flips * template_flips
             _logger.debug(
                 f"Session {ind}, best correlation with template: {best_metric:.3f}"
             )
@@ -1168,11 +1160,13 @@ class Data:
             _logger.info("Using template data to calculate template covariance")
             template_cov = _calc_cov(template_data)
 
+        # Flips that align the template to the passed template (two-stage only)
+        template_flips = None
+
         if two_stage:
             # Stage 1: template from the sessions in this dataset
             group_cov, medoid = sign_flipping.build_template(
                 covs,
-                self.n_channels,
                 n_embeddings,
                 n_random_starts=n_random_starts,
             )
@@ -1181,28 +1175,26 @@ class Data:
                 f"(medoid: session {medoid})"
             )
 
-            # Stage 2: align the group template to the passed template
+            # Stage 2: flips that align the group template to the passed
+            # template, applied on top of each session's flips
             if template_cov is not None:
-                flips, corr = sign_flipping.find_flips(
+                template_flips, corr = sign_flipping.find_flips(
                     group_cov,
                     template_cov,
-                    self.n_channels,
                     n_embeddings,
                     n_random_starts=n_random_starts,
                 )
                 _logger.info(
                     f"Group template correlation with template: {corr:.3f} "
-                    f"({np.sum(flips == -1)}/{self.n_channels} channels flipped)"
-                )
-                group_cov = sign_flipping.apply_flips_to_cov(
-                    group_cov, flips, n_embeddings
+                    f"({np.sum(template_flips == -1)}/{self.n_channels} "
+                    "channels flipped)"
                 )
 
             template_cov = group_cov
 
         elif template_cov is None:
-            metrics = _calc_metrics(covs)
-            metrics_sum = np.sum(metrics, axis=1)
+            similarity = sign_flipping._abs_similarity(covs, n_embeddings)
+            metrics_sum = np.sum(similarity, axis=1)
             argmedian = np.argsort(metrics_sum)[len(metrics_sum) // 2]
             _logger.info(f"Using session {argmedian} as template")
             template_cov = covs[argmedian]

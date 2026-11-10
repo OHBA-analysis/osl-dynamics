@@ -219,8 +219,9 @@ fig.tight_layout()
 #    similar to all the others is used as a starting point, every session is
 #    aligned to it, and the template is replaced by the mean of the aligned
 #    covariances (repeated for a couple of rounds).
-# 2. Align this group template to the external template with a *single* flip
-#    vector, then align each session to the (now aligned) group template.
+# 2. Find the *single* flip vector that aligns this group template to the
+#    external template. Each session is then aligned to the group template and
+#    this flip vector is applied on top.
 #
 # Each session only has to match its own dataset, which it does well, and the
 # mismatch between the datasets is absorbed by one flip search on a clean,
@@ -303,6 +304,37 @@ print("Signs applied:", flips)
 # ``mne.io.Raw`` object instead of being written to disk::
 #
 #     raw = sign_flipping.sign_flip_mne_raw(parc_fif, "template_cov.npy")
+#
+# Only the parcel channels are flipped; every other channel, the annotations
+# and the data in bad segments are kept (bad segments are left out of the
+# covariance).
+#
+# The two-stage alignment works the same way with fif files: build a template
+# from (a subset of) the dataset's sessions, find the flips that align it to
+# the external template, and pass them as ``template_flips``:
+#
+# .. code-block:: python
+#
+#     parc_fifs = sorted(glob("derivatives/*/lcmv-parc-raw.fif"))
+#     covs = [sign_flipping.calc_cov_mne_raw(f, n_embeddings=15) for f in parc_fifs]
+#     dataset_cov, _ = sign_flipping.build_template(covs, n_embeddings=15)
+#     template_flips, corr = sign_flipping.find_flips(
+#         dataset_cov, np.load("template_cov.npy"), n_embeddings=15
+#     )
+#
+#     for parc_fif in parc_fifs:
+#         sign_flipping.sign_flip_mne_raw(
+#             parc_fif,
+#             template_cov=dataset_cov,
+#             output_file=parc_fif.replace("lcmv-parc-raw.fif", "sflip-lcmv-parc-raw.fif"),
+#             template_flips=template_flips,
+#         )
+#
+# For EEG, pass ``frequency_bands=[(1, 4), (4, 8), (8, 13), (13, 30)]`` to
+# ``calc_cov_mne_raw`` and ``sign_flip_mne_raw``: the flips are then found on
+# the covariances of each band, pooled together, which carry more sign
+# information than the broadband covariance. The external template must be
+# stacked across the same bands.
 #
 # Next steps
 # ^^^^^^^^^^
