@@ -422,11 +422,16 @@ The output of this script is written to ``derivatives/``.
 # Source reconstruction leaves the sign of each parcel time course
 # arbitrary, so the same parcel can have opposite polarity in different
 # sessions. Before pooling sessions to train a model we align these signs
-# against a common **template covariance**. This is a *cross-session* step,
-# so we build the template once (e.g. from a reference session, or the
-# median of a pilot batch) and save it to disk — then every session is
-# flipped to match it. See the :doc:`Sign Flipping tutorial
-# <0-2_sign_flipping>` for how to build and save ``template_cov.npy``.
+# against a common **template covariance**. Here each session is flipped on
+# its own, so we need the template before processing the sessions: build it
+# once and save it to disk — then every session is flipped to match it. The
+# template usually comes from the same dataset (e.g. a reference session, or
+# :func:`sign_flipping.build_template_mne_raw
+# <osl_dynamics.data.sign_flipping.build_template_mne_raw>` on the
+# parcellated fifs of a pilot batch); it only needs to come from another
+# dataset if you want to match that dataset's signs. See the
+# :doc:`Sign Flipping tutorial <0-2_sign_flipping>` for how to build and save
+# ``template_cov.npy``.
 #
 # With a saved template, :func:`sign_flipping.sign_flip
 # <osl_dynamics.data.sign_flipping.sign_flip>` flips the ``parcel_data``

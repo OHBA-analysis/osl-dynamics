@@ -1059,7 +1059,13 @@ class Data:
     ) -> "Data":
         """Align the sign of each channel across sessions.
 
-        If no template data/covariance is passed, we use the median session.
+        Each session is flipped to match a template covariance. If no template
+        data/covariance is passed, the median session is used as the template
+        (ranked by the sign-invariant similarity of its covariance to the other
+        sessions). Pass a template to fix the sign convention, e.g. one built
+        from the same dataset (a reference session or
+        :func:`~osl_dynamics.data.sign_flipping.build_template`), or one from
+        another dataset.
 
         If :code:`two_stage=True`, we first build a template from the sessions
         in this Data object (:func:`~osl_dynamics.data.sign_flipping.build_template`)

@@ -16,14 +16,15 @@ the :doc:`FAQ <../faq>` for more.
 
 **Sign flipping** removes this ambiguity: for each session we search for the
 per-parcel ``+1``/``-1`` vector whose (time-delay embedded) covariance best
-matches a common template, and flip the parcels accordingly. This tutorial
+matches a common **template**, and flip the parcels accordingly. This tutorial
 covers:
 
 1. Simulating parcellated data.
 2. Visualizing the sign ambiguity across sessions.
-3. Aligning the signs to a fixed template covariance.
-4. Using the median session as a template instead.
-5. Aligning to a template from another dataset (two-stage sign flipping).
+3. What the template is.
+4. Sign flipping with the default template: the median session.
+5. Specifying a template, either from the same dataset or from another
+   dataset.
 6. Sign flipping arrays and fif files inside a processing pipeline.
 
 Note, sign flipping is a *cross-session* step — it aligns sessions to each
@@ -85,38 +86,43 @@ from osl_dynamics.data import sign_flipping
 n_embeddings = 15
 standardize = True
 
+def similarity_matrix(covs, mode="signed"):
+    """Session-by-session similarity of the covariances."""
+    n = len(covs)
+    matrix = np.zeros([n, n])
+    for i in range(n):
+        for j in range(n):
+            matrix[i, j] = sign_flipping.calc_corr(covs[i], covs[j], n_embeddings, mode=mode)
+    return matrix
+
 # Covariance of the time-delay embedded data for each session
 ts = data.time_series()  # list of (n_samples, n_channels) arrays
 covs = [sign_flipping.calc_cov(x, n_embeddings, standardize) for x in ts]
 
-# Session-by-session similarity of the covariances
-n_sessions = len(covs)
-signed = np.zeros([n_sessions, n_sessions])
-absolute = np.zeros([n_sessions, n_sessions])
-for i in range(n_sessions):
-    for j in range(n_sessions):
-        signed[i, j] = sign_flipping.calc_corr(covs[i], covs[j], n_embeddings)
-        absolute[i, j] = sign_flipping.calc_corr(covs[i], covs[j], n_embeddings, mode="abs")
+signed = similarity_matrix(covs)
+absolute = similarity_matrix(covs, mode="abs")
 
 #%%
 # Let's plot both similarity matrices side by side.
 
 import matplotlib.pyplot as plt
 
-fig, axes = plt.subplots(1, 2, figsize=(10, 4.5))
-for ax, matrix, title in zip(
-    axes,
+def plot_similarity(matrices, titles):
+    fig, axes = plt.subplots(1, len(matrices), figsize=(10, 4.5))
+    for ax, matrix, title in zip(axes, matrices, titles):
+        im = ax.imshow(matrix, vmin=-1, vmax=1, cmap="RdBu_r")
+        ax.set_title(title)
+        ax.set_xlabel("Session")
+        ax.set_ylabel("Session")
+        ax.set_xticks(range(n_sessions))
+        ax.set_yticks(range(n_sessions))
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    fig.tight_layout()
+
+plot_similarity(
     [signed, absolute],
     ["Signed (sign-sensitive)", "Absolute (sign-invariant)"],
-):
-    im = ax.imshow(matrix, vmin=-1, vmax=1, cmap="RdBu_r")
-    ax.set_title(title)
-    ax.set_xlabel("Session")
-    ax.set_ylabel("Session")
-    ax.set_xticks(range(n_sessions))
-    ax.set_yticks(range(n_sessions))
-    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-fig.tight_layout()
+)
 
 #%%
 # The **absolute** matrix (right) is high everywhere: the sessions share the
@@ -125,31 +131,108 @@ fig.tight_layout()
 # difference is exactly the sign ambiguity: the structure is shared, but the
 # signs are not aligned. Sign flipping aligns them.
 #
-# Aligning to a template covariance
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# We align every session to a **fixed template covariance**. We build the
-# template once from a chosen reference session and save it to disk.
+# The template
+# ^^^^^^^^^^^^
+# Because the sign of each parcel is arbitrary, there is no "correct" sign to
+# recover. All we need is for every session to use the *same* sign
+# convention. So we pick a reference covariance — the **template** — and flip
+# the parcels of each session so that its covariance best matches the
+# template. Sessions that all match the same template then match each other.
 #
-# Using a fixed, saved template (rather than the median session of the current
-# batch, which is the default) means the sign convention is identical every
-# time you run the pipeline — so you can add more sessions later, or pool this
-# dataset with another, and the signs still match. This reproducibility is why
-# it is worth saving the template.
+# The template only sets which sign convention we end up with, so any
+# covariance with the same structure as our sessions will do. There are two
+# options:
+#
+# - **The default: the median session.** If you do not pass a template, one of
+#   the sessions being flipped is used. You do not need anything else, and
+#   this is all most analyses need.
+# - **A template you specify.** You pass the template covariance yourself. It
+#   can come from the *same* dataset (e.g. a reference session) or from
+#   *another* dataset (e.g. the data used to train a pre-trained model).
+#
+# Default: the median session
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# We do the sign flipping with the
+# :meth:`Data.align_channel_signs <osl_dynamics.data.Data.align_channel_signs>`
+# method. Without a template, it ranks the sessions by how similar their
+# covariance is to all the other sessions (using the sign-invariant
+# correlation) and uses the median session as the template. The log says which
+# session was chosen. Every session is then flipped to match it, in place.
+#
+# We pass the same embedding settings as above, so the flips are found on the
+# covariances we just plotted.
+
+data.align_channel_signs(n_embeddings=n_embeddings, standardize=standardize)
+
+#%%
+# To check the effect, we recompute the signed similarity matrix from the
+# (now flipped) data and compare it with the one before flipping.
+
+covs_flipped = [
+    sign_flipping.calc_cov(x, n_embeddings, standardize) for x in data.time_series()
+]
+signed_flipped = similarity_matrix(covs_flipped)
+
+plot_similarity(
+    [signed, signed_flipped],
+    ["Signed, before flipping", "Signed, after flipping"],
+)
+
+#%%
+# After flipping, every pair of sessions is positively correlated and the
+# signed matrix looks like the absolute one: the signs are aligned and the
+# sessions are ready to be pooled for training a model.
+#
+# Specifying a template
+# ^^^^^^^^^^^^^^^^^^^^^
+# The median session is picked from whichever sessions are in the Data
+# object, so the sign convention can change if you rerun with sessions added
+# or removed. Pass your own template when you need the sign convention to be
+# fixed, e.g.
+#
+# - to add more sessions later and keep the signs of the sessions you have
+#   already flipped,
+# - to flip sessions one at a time in a processing pipeline (see
+#   `Sign flipping arrays`_ and `MNE-Python FIF Files`_ below): there is no
+#   batch of sessions to take a median from, so a template is required,
+# - to match the signs of another dataset, e.g. the data used to train a
+#   pre-trained model.
+#
+# The template is the covariance of the time-delay embedded data (see
+# :func:`calc_cov <osl_dynamics.data.sign_flipping.calc_cov>`), built with the
+# same ``n_embeddings`` and ``standardize`` settings used for the flipping.
+# Pass it to ``align_channel_signs`` with ``template_cov`` (an array, or the
+# path to a ``.npy`` file). Alternatively, pass a session's time series with
+# ``template_data`` and the covariance is computed for you.
+#
+# A template from the same dataset
+# ********************************
+# The simplest choice is a session from the dataset you are flipping. Here we
+# use session 0 as the reference and save its covariance, so we can reuse the
+# same template every time we run the pipeline.
+#
+# :func:`sign_flipping.build_template
+# <osl_dynamics.data.sign_flipping.build_template>` is a more robust
+# alternative: it starts from the session most similar to all the others,
+# aligns every session to it, and averages the aligned covariances. A template
+# averaged over sessions is less noisy than any one session.
+# :func:`sign_flipping.build_template_mne_raw
+# <osl_dynamics.data.sign_flipping.build_template_mne_raw>` does the same from
+# parcellated fif files.
+
+# Start again from the original (unflipped) data
+data = Data(arrays)
 
 # Build the template from a reference session and save it
-template_index = 0
-template_cov = sign_flipping.calc_cov(ts[template_index], n_embeddings, standardize)
+template_cov = sign_flipping.calc_cov(ts[0], n_embeddings, standardize)
 np.save("template_cov.npy", template_cov)
 
 # Correlation of each session with the template *before* flipping
 before = np.array([sign_flipping.calc_corr(c, template_cov, n_embeddings) for c in covs])
 
 #%%
-# We do the sign flipping with the
-# :meth:`Data.align_channel_signs <osl_dynamics.data.Data.align_channel_signs>`
-# method. We pass the path to the saved template covariance and the same
-# embedding settings we used to build it. The method searches for the best
-# per-parcel flips for each session and applies them in place.
+# We pass the path to the saved template covariance to ``align_channel_signs``
+# along with the same embedding settings we used to build it.
 
 data.align_channel_signs(
     template_cov="template_cov.npy",
@@ -185,47 +268,29 @@ ax.legend()
 fig.tight_layout()
 
 #%%
-# The sessions are now sign aligned and ready to be pooled for training a
-# model.
-#
-# Using the median session as a template
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# If you do not pass a template, ``align_channel_signs`` picks the *median*
-# session of the batch as the template automatically. This is convenient for a
-# one-off analysis, but the choice of template then depends on which sessions
-# happen to be in the batch — so it is not reproducible if you add or remove
-# sessions later.
-#
-# .. code-block:: python
-#
-#     data = Data(arrays)
-#     data.align_channel_signs(n_embeddings=15, standardize=True)
-
-#%%
-# Aligning to a template from another dataset
-# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# A template from another dataset
+# *******************************
 # Sometimes the template comes from a *different* dataset, e.g. the template
 # covariance of a pre-trained model, which may have been recorded on another
-# scanner, with different preprocessing, or a different population. An
-# individual session may then match the template only weakly, and the flip
-# search becomes unreliable: one wrongly flipped parcel in one session is
-# enough to add spurious covariance dynamics.
+# scanner, with different preprocessing, or a different population. You only
+# need this if you want the signs to match that dataset: for an analysis of
+# your own data, a template from the same dataset is enough.
 #
-# Passing ``two_stage=True`` splits the problem in two:
+# An individual session may match a template from another dataset only
+# weakly, and the flip search becomes unreliable: one wrongly flipped parcel
+# in one session is enough to add spurious covariance dynamics. Passing
+# ``two_stage=True`` splits the problem in two:
 #
 # 1. Build a template from the sessions in the Data object
 #    (:func:`sign_flipping.build_template
-#    <osl_dynamics.data.sign_flipping.build_template>`): the session most
-#    similar to all the others is used as a starting point, every session is
-#    aligned to it, and the template is replaced by the mean of the aligned
-#    covariances (repeated for a couple of rounds).
-# 2. Find the *single* flip vector that aligns this group template to the
-#    external template. Each session is then aligned to the group template and
-#    this flip vector is applied on top.
+#    <osl_dynamics.data.sign_flipping.build_template>`, see above).
+# 2. Find the *single* flip vector that aligns this dataset template to the
+#    external template. Each session is then aligned to the dataset template
+#    and this flip vector is applied on top.
 #
 # Each session only has to match its own dataset, which it does well, and the
 # mismatch between the datasets is absorbed by one flip search on a clean,
-# averaged covariance. The log reports the correlation of the group template
+# averaged covariance. The log reports the correlation of the dataset template
 # with the external template, which is a useful summary of how well the new
 # dataset matches the one the template came from.
 #
@@ -233,14 +298,14 @@ fig.tight_layout()
 #
 #     data = Data(arrays)
 #     data.align_channel_signs(
-#         template_cov="template_cov.npy",  # from the other dataset
+#         template_cov="other_dataset_template_cov.npy",
 #         n_embeddings=15,
 #         standardize=True,
 #         two_stage=True,
 #     )
 #
 # With a single session the two approaches are identical. Passing
-# ``two_stage=True`` without a template aligns the sessions to the group
+# ``two_stage=True`` without a template aligns the sessions to the dataset
 # template as it is, which is a more robust alternative to the median session.
 
 #%%
@@ -279,20 +344,33 @@ print("Signs applied:", flips)
 # MNE-Python FIF Files
 # ^^^^^^^^^^^^^^^^^^^^
 # In a batch processing pipeline you often want to sign flip each session's
-# parcellated fif independently against a template you saved earlier
-# — for example inside ``osl_dynamics.meeg.parallel.run``.
+# parcellated fif independently — for example inside
+# ``osl_dynamics.meeg.parallel.run``.
 # :func:`sign_flipping.sign_flip_mne_raw
 # <osl_dynamics.data.sign_flipping.sign_flip_mne_raw>` wraps ``sign_flip``
 # for this: pass a parcellated fif (a path or an ``mne.io.Raw``) and a
 # template covariance (a path or an array), and it reads the parcel data,
 # flips it, and saves the sign-flipped fif.
 #
+# Each file is flipped on its own, so there is no median session to fall back
+# on and you must pass a template. It does not have to come from another
+# dataset: build it from the parcellated fifs of the dataset you are flipping
+# (or a subset of them) with :func:`sign_flipping.build_template_mne_raw
+# <osl_dynamics.data.sign_flipping.build_template_mne_raw>` and save it.
+#
 # .. code-block:: python
 #
 #     from glob import glob
+#     import numpy as np
 #     from osl_dynamics.data import sign_flipping
 #
-#     for parc_fif in sorted(glob("derivatives/*/lcmv-parc-raw.fif")):
+#     parc_fifs = sorted(glob("derivatives/*/lcmv-parc-raw.fif"))
+#
+#     # Template from this dataset
+#     template_cov, _ = sign_flipping.build_template_mne_raw(parc_fifs, n_jobs=8)
+#     np.save("template_cov.npy", template_cov)
+#
+#     for parc_fif in parc_fifs:
 #         sflip_parc_fif = parc_fif.replace("lcmv-parc-raw.fif", "sflip-lcmv-parc-raw.fif")
 #         sign_flipping.sign_flip_mne_raw(
 #             parc_fif,
@@ -309,32 +387,29 @@ print("Signs applied:", flips)
 # and the data in bad segments are kept (bad segments are left out of the
 # covariance).
 #
-# The two-stage alignment works the same way with fif files: build a template
-# from (a subset of) the dataset's sessions, find the flips that align it to
-# the external template, and pass them as ``template_flips``:
+# To match a template from another dataset, use the two-stage alignment: find
+# the flips that align the dataset template to the external template, and pass
+# them as ``template_flips``:
 #
 # .. code-block:: python
 #
-#     parc_fifs = sorted(glob("derivatives/*/lcmv-parc-raw.fif"))
-#     covs = [sign_flipping.calc_cov_mne_raw(f, n_embeddings=15) for f in parc_fifs]
-#     dataset_cov, _ = sign_flipping.build_template(covs, n_embeddings=15)
 #     template_flips, corr = sign_flipping.find_flips(
-#         dataset_cov, np.load("template_cov.npy"), n_embeddings=15
+#         template_cov, np.load("other_dataset_template_cov.npy"), n_embeddings=15
 #     )
 #
 #     for parc_fif in parc_fifs:
 #         sign_flipping.sign_flip_mne_raw(
 #             parc_fif,
-#             template_cov=dataset_cov,
+#             template_cov=template_cov,
 #             output_file=parc_fif.replace("lcmv-parc-raw.fif", "sflip-lcmv-parc-raw.fif"),
 #             template_flips=template_flips,
 #         )
 #
 # For EEG, pass ``frequency_bands=[(1, 4), (4, 8), (8, 13), (13, 30)]`` to
-# ``calc_cov_mne_raw`` and ``sign_flip_mne_raw``: the flips are then found on
-# the covariances of each band, pooled together, which carry more sign
-# information than the broadband covariance. The external template must be
-# stacked across the same bands.
+# ``build_template_mne_raw`` and ``sign_flip_mne_raw``: the flips are then
+# found on the covariances of each band, pooled together, which carry more
+# sign information than the broadband covariance. A template from another
+# dataset must be stacked across the same bands.
 #
 # Next steps
 # ^^^^^^^^^^

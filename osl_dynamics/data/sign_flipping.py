@@ -4,7 +4,11 @@ Source reconstruction leaves the sign of each channel (parcel) arbitrary, so the
 same parcel can have opposite polarity across sessions. Before pooling sessions
 we align these signs: for each session we search for the ``+1``/``-1`` per-channel
 vector whose (time-delay embedded, standardized) covariance best matches a
-template covariance.
+template covariance. The template only sets the sign convention: it is usually
+built from the dataset being flipped (:meth:`Data.align_channel_signs
+<osl_dynamics.data.Data.align_channel_signs>` uses the median session by
+default), and only needs to come from another dataset to match that dataset's
+signs (see two-stage alignment below).
 
 Building blocks:
 
