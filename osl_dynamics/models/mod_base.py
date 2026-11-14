@@ -183,6 +183,14 @@ class ModelBase:
         # Compile
         self.model.compile(optimizer, **kwargs)
 
+        # Create the optimizer variables and keep their initial values
+        self._initial_optimizer_values = None
+        if hasattr(self.model.optimizer, "build"):
+            self.model.optimizer.build(self.model.trainable_variables)
+            self._initial_optimizer_values = [
+                (v, v.numpy()) for v in _optimizer_variables(self.model.optimizer)
+            ]
+
         # Add losses to metrics to print during training
         self.add_metrics_for_loss()
 
@@ -684,6 +692,19 @@ class ModelBase:
             self.reset_weights()
             self.compile()
 
+    def reset_without_compiling(self) -> None:
+        """Reset the model weights and the optimizer variables.
+
+        The model is not re-compiled, so the compiled training step is reused.
+        """
+        if getattr(self, "_initial_optimizer_values", None) is None:
+            self.reset()
+            return
+        with self.config.strategy.scope():
+            self.reset_weights()
+            for variable, value in self._initial_optimizer_values:
+                variable.assign(value)
+
     def make_dataset(
         self,
         inputs: Union["data.Data", str, np.ndarray, Dataset],
@@ -1076,3 +1097,16 @@ class ModelBase:
     def is_multi_gpu(self) -> bool:
         """Returns True if the model's strategy is MirroredStrategy."""
         return isinstance(self.config.strategy, tf.distribute.MirroredStrategy)
+
+
+def _optimizer_variables(optimizer) -> list:
+    """Variables of an optimizer and of the optimizers it wraps."""
+    variables = list(optimizer.variables)
+    decay = getattr(optimizer, "decay", None)
+    if isinstance(decay, tf.Variable):
+        variables.append(decay)
+    for name in ["base_optimizer", "ema_optimizer"]:
+        wrapped = getattr(optimizer, name, None)
+        if wrapped is not None:
+            variables += _optimizer_variables(wrapped)
+    return variables
