@@ -1930,12 +1930,6 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
 
     @tf.function
     def _baum_welch(self, log_B: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-        # The forward and backward recursions run over time with tf.scan,
-        # vectorised over the sequences of the batch: each time step is
-        # computed and stored once (writing each step into the full
-        # [batch, time, state] tensor would copy the whole tensor at every
-        # step).
-
         # Small error for improving the numerical stability of the log-likelihood
         eps = tf.experimental.numpy.finfo(self.compute_dtype).eps
 
@@ -1951,9 +1945,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         log_B = tf.transpose(tf.cast(log_B, self.compute_dtype), [1, 0, 2])
 
         if self.implementation == "rescale":
-            # Likelihoods relative to the maximum over states at each time
-            # point (the probabilities are normalised below, so this only
-            # avoids over/underflow)
+            # Subtract the maximum over states for numerical stability
             log_B -= tf.reduce_max(log_B, axis=-1, keepdims=True)
             B = tf.exp(log_B)
 
@@ -2140,14 +2132,6 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         # mu.shape = (n_states, n_channels) or (None, n_states, n_channels)
         # sigma.shape = (n_states, n_channels, n_channels)
         #               or (None, n_states, n_channels, n_channels)
-        #
-        # log N(x | mu_k, sigma_k) = -D/2 log(2 pi) - sum(log(diag(L_k)))
-        #                            - |L_k^-1 (x - mu_k)|^2 / 2,
-        # with sigma_k = L_k L_k^T. All time points (and sequences, if the
-        # parameters are shared) are solved together as one right-hand side
-        # per state, so the gradient with respect to L_k is one matrix
-        # product rather than an outer product per time point (as when the
-        # Cholesky factor is broadcast against every time point).
         x = tf.cast(x, tf.float32)
         mu = tf.cast(mu, tf.float32)
         sigma = tf.cast(sigma, tf.float32)
@@ -2156,6 +2140,7 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         n_channels = tf.shape(x)[2]
         const = -0.5 * tf.cast(n_channels, tf.float32) * np.log(2 * np.pi)
 
+        # log N(x | mu, sigma) with sigma = L L^T
         L = tf.linalg.cholesky(sigma)
         log_det = tf.reduce_sum(tf.math.log(tf.linalg.diag_part(L)), axis=-1)
 
