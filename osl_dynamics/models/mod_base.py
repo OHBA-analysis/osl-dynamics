@@ -17,7 +17,6 @@ import yaml
 import numpy as np
 import tensorflow as tf
 from tensorflow.data import Dataset
-from tensorflow.keras import optimizers
 
 try:
     # Keras scales the loss by the number of GPUs and unscales it to report it
@@ -31,7 +30,7 @@ except ImportError:
 import osl_dynamics
 from osl_dynamics import data
 import osl_dynamics.data.tf as dtf
-from osl_dynamics.inference import callbacks, initializers
+from osl_dynamics.inference import callbacks, initializers, optimizers
 from osl_dynamics.utils.misc import (
     NumpyLoader,
     get_argument,
@@ -164,22 +163,18 @@ class ModelBase:
 
         Parameters
         ----------
-        optimizer : str or tf.keras.optimizers.Optimizer
-            Optimizer to use when compiling.
+        optimizer : str or tf.keras.optimizers.Optimizer, optional
+            Optimizer to use when compiling. Defaults to the optimizer in the
+            config. For models with a hidden Markov state, this optimizer is
+            used for the parameters other than the transition probability
+            matrix and initial state probabilities.
+        **kwargs : keyword arguments, optional
+            Keyword arguments for the keras compile method.
         """
         with self.config.strategy.scope():
 
             # Optimizer
-            if optimizer is None:
-                optimizer = optimizers.get(
-                    {
-                        "class_name": self.config.optimizer.lower(),
-                        "config": {
-                            "learning_rate": self.config.learning_rate,
-                            "clipnorm": self.config.gradient_clip,
-                        },
-                    }
-                )
+            optimizer = self._make_optimizer(optimizer)
 
             # Compile
             self.model.compile(optimizer, **kwargs)
@@ -189,7 +184,8 @@ class ModelBase:
             if hasattr(self.model.optimizer, "build"):
                 self.model.optimizer.build(self.model.trainable_variables)
                 self._initial_optimizer_values = [
-                    (v, v.numpy()) for v in _optimizer_variables(self.model.optimizer)
+                    (v, v.numpy())
+                    for v in optimizers.get_variables(self.model.optimizer)
                 ]
 
             # Add losses to metrics to print during training
@@ -197,6 +193,29 @@ class ModelBase:
 
             # Skip training steps with a NaN or inf
             self.skip_non_finite_steps()
+
+    def _base_optimizer(self) -> tf.keras.optimizers.Optimizer:
+        """Optimizer from the config."""
+        return tf.keras.optimizers.get(
+            {
+                "class_name": self.config.optimizer.lower(),
+                "config": {
+                    "learning_rate": self.config.learning_rate,
+                    "clipnorm": self.config.gradient_clip,
+                },
+            }
+        )
+
+    def _make_optimizer(
+        self, optimizer: Optional[Union[str, tf.keras.optimizers.Optimizer]] = None
+    ) -> tf.keras.optimizers.Optimizer:
+        """Optimizer to compile the model with.
+
+        Called by :code:`compile` in the distribution strategy scope.
+        """
+        if optimizer is None:
+            return self._base_optimizer()
+        return tf.keras.optimizers.get(optimizer)
 
     def add_metrics_for_loss(self) -> None:
         """Add a metric for each model output loss."""
@@ -1091,16 +1110,3 @@ class ModelBase:
     def is_multi_gpu(self) -> bool:
         """Returns True if the model's strategy is MirroredStrategy."""
         return isinstance(self.config.strategy, tf.distribute.MirroredStrategy)
-
-
-def _optimizer_variables(optimizer) -> list:
-    """Variables of an optimizer and of the optimizers it wraps."""
-    variables = list(optimizer.variables)
-    decay = getattr(optimizer, "decay", None)
-    if isinstance(decay, tf.Variable):
-        variables.append(decay)
-    for name in ["base_optimizer", "ema_optimizer"]:
-        wrapped = getattr(optimizer, name, None)
-        if wrapped is not None:
-            variables += _optimizer_variables(wrapped)
-    return variables

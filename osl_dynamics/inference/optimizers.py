@@ -95,3 +95,27 @@ class MarkovStateModelOptimizer(Optimizer):
         # Apply gradients with the EMA optimizer
         if ema_grads and ema_vars:
             self.ema_optimizer.apply_gradients(zip(ema_grads, ema_vars))
+
+
+def get_variables(optimizer: tf.keras.optimizers.Optimizer) -> List[tf.Variable]:
+    """Variables of an optimizer, including those of the optimizers it wraps.
+
+    Parameters
+    ----------
+    optimizer : tf.keras.optimizers.Optimizer
+        The optimizer.
+
+    Returns
+    -------
+    variables : list
+        Variables of the optimizer, the decay of an
+        :code:`ExponentialMovingAverage` optimizer, and the variables of the
+        optimizers wrapped by a :code:`MarkovStateModelOptimizer`.
+    """
+    variables = list(optimizer.variables)
+    if isinstance(optimizer, ExponentialMovingAverage):
+        variables.append(optimizer.decay)
+    if isinstance(optimizer, MarkovStateModelOptimizer):
+        variables += get_variables(optimizer.base_optimizer)
+        variables += get_variables(optimizer.ema_optimizer)
+    return variables

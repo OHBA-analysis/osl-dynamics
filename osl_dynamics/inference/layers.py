@@ -1,6 +1,6 @@
 """Custom Tensorflow layers."""
 
-import platform
+import functools
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
@@ -14,6 +14,7 @@ from tensorflow.keras import (
 )
 
 import osl_dynamics.inference.initializers as osld_initializers
+from osl_dynamics.inference import tf_ops
 
 tfb = tfp.bijectors
 
@@ -1903,18 +1904,15 @@ def _forward_backward_log(log_B, P, Pi_0):
     return gamma, xi
 
 
-_compiled_functions = {}
-
-
+@functools.cache
 def _compiled(func):
-    """func compiled with XLA, or without it where TensorFlow does not support
-    XLA (macOS GPUs, tensorflow-metal)."""
-    if func not in _compiled_functions:
-        jit_compile = not (
-            platform.system() == "Darwin" and tf.config.list_physical_devices("GPU")
-        )
-        _compiled_functions[func] = tf.function(func, jit_compile=jit_compile)
-    return _compiled_functions[func]
+    """func as a tf.function, compiled with XLA where it is supported.
+
+    This is done on first use rather than at import because checking the
+    devices initializes them, after which :code:`tf_ops.gpu_growth` and
+    :code:`tf_ops.select_gpu` no longer work.
+    """
+    return tf.function(func, jit_compile=tf_ops.xla_supported())
 
 
 class HiddenMarkovStateInferenceLayer(layers.Layer):

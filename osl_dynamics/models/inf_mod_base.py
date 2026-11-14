@@ -711,49 +711,46 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
 
         return super().fit(*args, **kwargs)
 
-    def compile(
-        self,
-        optimizer: Optional[Union[str, tf.keras.optimizers.Optimizer]] = None,
-        **kwargs,
-    ) -> None:
-        """Compile the model.
+    def _make_optimizer(
+        self, optimizer: Optional[Union[str, tf.keras.optimizers.Optimizer]] = None
+    ) -> tf.keras.optimizers.Optimizer:
+        """Optimizer that updates the hidden Markov state parameters with an
+        exponential moving average.
 
         Parameters
         ----------
-        optimizer : str or tf.keras.optimizers.Optimizer
-            Optimizer to use when compiling.
+        optimizer : str or tf.keras.optimizers.Optimizer, optional
+            Optimizer for the parameters other than the transition probability
+            matrix and initial state probabilities. Defaults to the optimizer
+            in the config.
+
+        Returns
+        -------
+        optimizer : osl_dynamics.inference.optimizers.MarkovStateModelOptimizer
+            Optimizer for the model.
         """
+        if isinstance(optimizer, optimizers.MarkovStateModelOptimizer):
+            return optimizer
 
-        with self.config.strategy.scope():
-            # EMA optimizer for HMM state parameters
-            decay = (
-                1 + self.config.trans_prob_update_delay
-            ) ** -self.config.trans_prob_update_forget
-            ema_optimizer = optimizers.ExponentialMovingAverage(
-                self.config.learning_rate, decay
-            )
-            ema_variables = self.model.get_layer("hid_state_inf").trainable_variables
+        # Optimizer for all other trainable parameters
+        base_optimizer = super()._make_optimizer(optimizer)
 
-            # Optimizer for all other trainable parameters
-            base_optimizer = tf.keras.optimizers.get(
-                {
-                    "class_name": self.config.optimizer.lower(),
-                    "config": {
-                        "learning_rate": self.config.learning_rate,
-                    },
-                }
-            )
+        # EMA optimizer for HMM state parameters
+        decay = (
+            1 + self.config.trans_prob_update_delay
+        ) ** -self.config.trans_prob_update_forget
+        ema_optimizer = optimizers.ExponentialMovingAverage(
+            self.config.learning_rate, decay
+        )
+        ema_variables = self.model.get_layer("hid_state_inf").trainable_variables
 
-            # Combine into a single optimizer for the model
-            optimizer = optimizers.MarkovStateModelOptimizer(
-                base_optimizer,
-                ema_optimizer,
-                ema_variables,
-                learning_rate=self.config.learning_rate,
-            )
-
-            # Compile
-            super().compile(optimizer, **kwargs)
+        # Combine into a single optimizer for the model
+        return optimizers.MarkovStateModelOptimizer(
+            base_optimizer,
+            ema_optimizer,
+            ema_variables,
+            learning_rate=self.config.learning_rate,
+        )
 
     def get_alpha(
         self,
