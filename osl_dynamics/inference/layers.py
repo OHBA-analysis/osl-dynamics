@@ -1809,9 +1809,7 @@ def _forward_backward_rescale(log_B, P, Pi_0):
         b, c = inputs
         return tf.matmul(beta * b, P, transpose_b=True) / (c + eps)
 
-    beta = tf.scan(
-        backward, (B[1:], scale[1:]), initializer=beta_T, reverse=True
-    )
+    beta = tf.scan(backward, (B[1:], scale[1:]), initializer=beta_T, reverse=True)
     beta = tf.concat([beta, beta_T[tf.newaxis]], axis=0)
 
     # Marginal probabilities
@@ -1881,9 +1879,7 @@ def _forward_backward_log(log_B, P, Pi_0):
             tf.expand_dims(log_beta + log_b, axis=1) + log_P, axis=-1
         )
 
-    log_beta = tf.scan(
-        backward, log_B[1:], initializer=log_beta_T, reverse=True
-    )
+    log_beta = tf.scan(backward, log_B[1:], initializer=log_beta_T, reverse=True)
     log_beta = tf.concat([log_beta, log_beta_T[tf.newaxis]], axis=0)
 
     # Marginal probabilities
@@ -1893,9 +1889,7 @@ def _forward_backward_log(log_B, P, Pi_0):
     # Joint probabilities
     log_b = log_beta[1:] + log_B[1:]
     log_xi = (
-        log_P
-        + tf.expand_dims(log_alpha[:-1], axis=3)
-        + tf.expand_dims(log_b, axis=2)
+        log_P + tf.expand_dims(log_alpha[:-1], axis=3) + tf.expand_dims(log_b, axis=2)
     )
     log_xi -= tf.reduce_logsumexp(log_xi, axis=(2, 3), keepdims=True)
 
@@ -2106,7 +2100,9 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         if log_B.shape[1] == 1:
             # One time point: no transitions
             log_gamma = tf.math.log(Pi_0) + log_B
-            gamma = tf.exp(log_gamma - tf.reduce_logsumexp(log_gamma, axis=-1, keepdims=True))
+            gamma = tf.exp(
+                log_gamma - tf.reduce_logsumexp(log_gamma, axis=-1, keepdims=True)
+            )
             xi = tf.zeros(
                 [tf.shape(log_B)[0], 0, self.n_states, self.n_states],
                 dtype=self.compute_dtype,
