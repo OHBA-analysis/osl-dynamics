@@ -3414,7 +3414,8 @@ def _rigid_transform_3D(
     Returns
     -------
     xform : numpy.ndarray
-        Calculated affine transform, does not include scaling.
+        Calculated affine transform (rotation and translation), to be applied
+        after scaling_xform: B is approximated by xform @ scaling_xform @ A.
     scaling_xform : numpy.ndarray
         Calculated scaling transform (a diagonal 4x4 matrix),
         does not include rotation or translation.
@@ -3446,7 +3447,10 @@ def _rigid_transform_3D(
         U2, S2, V2t = np.linalg.svd(Bm @ np.linalg.pinv(RAm))
         S2 = np.identity(3) * np.mean(S2[S2 > 1e-9])
         scaling_xform[0:3, 0:3] = S2
-    t = -R @ centroid_A + centroid_B
+    # The scaling is applied first (about the origin), then the rotation and
+    # translation, so the translation must map the scaled centroid of A onto
+    # the centroid of B
+    t = centroid_B - R @ scaling_xform[0:3, 0:3] @ centroid_A
     xform = np.eye(4)
     xform[0:3, 0:3] = R
     xform[0:3, -1] = np.reshape(t, (1, -1))
