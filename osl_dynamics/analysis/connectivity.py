@@ -430,7 +430,7 @@ def gmm_threshold(
         filename,
         plot_kwargs,
     )
-    conn_map = threshold(conn_map, percentile, subtract_mean)
+    conn_map = threshold(conn_map, percentile, subtract_mean, mean_weights)
     return conn_map
 
 
@@ -532,6 +532,9 @@ def fit_gmm(
             else:
                 c = conn_map[i, j, m, n]
 
+            # The percentile of the threshold is computed over all entries,
+            # which threshold() is applied to
+            c_all = c
             if keep_positive_only:
                 # Only keep positive entries
                 # (this is what's done in MATLAB OSL's teh_graph_gmm_fit)
@@ -569,7 +572,7 @@ def fit_gmm(
             )
 
             # Calculate the percentile from the threshold
-            percentiles[i, j] = stats.percentileofscore(c, threshold)
+            percentiles[i, j] = stats.percentileofscore(c_all, threshold)
 
     return np.squeeze(percentiles)
 

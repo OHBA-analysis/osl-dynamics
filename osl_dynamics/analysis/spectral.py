@@ -1039,7 +1039,7 @@ def decompose_spectra(
     coherences: np.ndarray,
     n_components: int,
     max_iter: int = 50000,
-    random_state: Optional[int] = None,
+    random_state: Optional[int] = 0,
     verbose: int = 0,
 ) -> np.ndarray:
     """Uses non-negative matrix factorization to decompose spectra.
@@ -1057,7 +1057,8 @@ def decompose_spectra(
         <https://scikit-learn.org/stable/modules/generated/sklearn\
         .decomposition.non_negative_factorization.html>`_.
     random_state : int, optional
-        Seed for the random number generator.
+        Seed for the randomized SVD that initializes the factorization.
+        The default makes the result reproducible.
     verbose : int, optional
         Show verbose? (:code:`1`) yes, (:code:`0`) no.
 

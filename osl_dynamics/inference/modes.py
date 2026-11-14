@@ -104,7 +104,9 @@ def gmm_time_courses(
     sklearn_kwargs : dict, optional
         Keyword arguments to pass to `sklean.mixture.GaussianMixture \
         <https://scikit-learn.org/stable/modules/generated/\
-        sklearn.mixture.GaussianMixture.html>`_.
+        sklearn.mixture.GaussianMixture.html>`_. Defaults to
+        :code:`max_iter=5000, n_init=3, tol=1e-3`; pass :code:`tol=1e-10`
+        to fit the mixtures to convergence (slower).
     plot_kwargs : dict, optional
         Dictionary of keyword arguments to pass to
         :func:`osl_dynamics.utils.plotting.plot_gmm`.
@@ -138,7 +140,10 @@ def gmm_time_courses(
             a = alpha[sub][:, mode]
 
             # Fit the GMM
-            default_sklearn_kwargs = {"max_iter": 5000, "n_init": 3}
+            # tol=1e-3 (sklearn's default) for speed: a converged fit
+            # (tol=1e-10) changes the binarized time courses by a few
+            # percent but is ~16x slower
+            default_sklearn_kwargs = {"max_iter": 5000, "n_init": 3, "tol": 1e-3}
             sklearn_kwargs = override_dict_defaults(
                 default_sklearn_kwargs, sklearn_kwargs
             )

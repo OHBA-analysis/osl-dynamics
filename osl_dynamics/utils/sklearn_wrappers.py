@@ -143,6 +143,10 @@ def fit_gaussian_mixture(
         Dictionary of keyword arguments to pass to
         `sklearn.mixture.GaussianMixture <https://scikit-learn.org/stable\
         /modules/generated/sklearn.mixture.GaussianMixture.html>`_.
+        :code:`tol` defaults to :code:`1e-10` rather than sklearn's
+        :code:`1e-3`: with sklearn's default, EM can stop after a few
+        iterations, far from the maximum likelihood, at a point that
+        depends on the random initialization.
     return_statistics : bool, optional
         Should we return statistics of the Gaussian mixture components?
     show_plot : bool, optional
@@ -165,6 +169,10 @@ def fit_gaussian_mixture(
 
     if sklearn_kwargs is None:
         sklearn_kwargs = {}
+
+    # Fit the mixture to convergence (sklearn's default tol=1e-3 on the
+    # change in the mean log-likelihood can stop EM after a few iterations)
+    sklearn_kwargs = {"tol": 1e-10, **sklearn_kwargs}
 
     if plot_kwargs is None:
         plot_kwargs = {}
@@ -239,8 +247,9 @@ def fit_gaussian_mixture(
 
         # Calculate the probability of each data point belonging to each
         # component. The variable 'a' is the 'activation'
-        dX = max(X_) / 100
-        x = np.arange(means[0], max(X_) + dX, dX)
+        X_max = X_[:, 0].max()
+        dX = X_max / 100
+        x = np.arange(means[0], X_max + dX, dX)
         a = np.array(
             [stats.norm.pdf(x, loc, scale) for loc, scale in zip(means, stddevs)]
         ).T
