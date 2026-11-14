@@ -1,5 +1,6 @@
 """Custom Tensorflow layers."""
 
+import platform
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
@@ -1757,7 +1758,6 @@ class MultiLayerPerceptronLayer(layers.Layer):
         return inputs
 
 
-@tf.function(jit_compile=True)
 def _forward_backward_rescale(log_B, P, Pi_0):
     """Forward-backward recursions for a batch of sequences.
 
@@ -1829,7 +1829,6 @@ def _forward_backward_rescale(log_B, P, Pi_0):
     return gamma, xi
 
 
-@tf.function(jit_compile=True)
 def _forward_backward_log(log_B, P, Pi_0):
     """Forward-backward recursions for a batch of sequences.
 
@@ -1908,6 +1907,20 @@ def _forward_backward_log(log_B, P, Pi_0):
     gamma = tf.transpose(gamma, [1, 0, 2])
     xi = tf.transpose(xi, [1, 0, 2, 3])
     return gamma, xi
+
+
+_compiled_functions = {}
+
+
+def _compiled(func):
+    """func compiled with XLA, or without it where TensorFlow does not support
+    XLA (macOS GPUs, tensorflow-metal)."""
+    if func not in _compiled_functions:
+        jit_compile = not (
+            platform.system() == "Darwin" and tf.config.list_physical_devices("GPU")
+        )
+        _compiled_functions[func] = tf.function(func, jit_compile=jit_compile)
+    return _compiled_functions[func]
 
 
 class HiddenMarkovStateInferenceLayer(layers.Layer):
@@ -2101,8 +2114,8 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             return gamma, xi
 
         if self.implementation == "rescale":
-            return _forward_backward_rescale(log_B, P, Pi_0)
-        return _forward_backward_log(log_B, P, Pi_0)
+            return _compiled(_forward_backward_rescale)(log_B, P, Pi_0)
+        return _compiled(_forward_backward_log)(log_B, P, Pi_0)
 
     def _trans_prob_update(self, gamma: tf.Tensor, xi: tf.Tensor) -> tf.Tensor:
         if self.n_states == 1:
@@ -2152,6 +2165,15 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                         # No trainable variables to calculate the gradient for
                         return
 
+                    # The values are summed over replicas with a distribution
+                    # strategy, so each replica returns its share of the mean
+                    replica_context = tf.distribute.get_replica_context()
+                    n_replicas = (
+                        1
+                        if replica_context is None
+                        else replica_context.num_replicas_in_sync
+                    )
+
                     grads = []
                     variables = kwargs["variables"]
                     for v in variables:
@@ -2159,7 +2181,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                             update = self._trans_prob_update(gamma, xi)
                         if "initial_state_probs" in v.name:
                             update = tf.reduce_mean(gamma[:, 0], axis=0)
-                        update = tf.cast(update, tf.float32)
+                        update = tf.cast(update, tf.float32) / n_replicas
                         grads.append(update)
                     return None, grads
 
