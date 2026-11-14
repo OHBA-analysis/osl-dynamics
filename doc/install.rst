@@ -3,6 +3,8 @@ Installation
 
 osl-dynamics is available on `conda-forge <https://anaconda.org/conda-forge/osl-dynamics>`_ and `PyPI <https://pypi.org/project/osl-dynamics>`_.
 
+.. _conda-install:
+
 Conda installation (recommended)
 --------------------------------
 
@@ -22,6 +24,8 @@ Then create an environment with osl-dynamics in it:
     conda activate osld
 
 This installs osl-dynamics with everything it needs. This includes `MNE-Python <https://mne.tools/stable/index.html>`_ and `TensorFlow <https://www.tensorflow.org/>`_.
+
+On Windows, the command above will not work because conda-forge has no TensorFlow for Windows. See :doc:`install/windows` instead.
 
 Pip installation
 ----------------
@@ -46,27 +50,19 @@ or, if you have an NVIDIA GPU:
 
 Note that pip will not install the non-Python libraries that some dependencies need, which is why we recommend conda.
 
-BMRC cluster (Oxford)
----------------------
+Platform-specific instructions
+------------------------------
 
-On the Biomedical Research Computing (BMRC) cluster, `conda` is available as a software module:
+The instructions above are for Linux and macOS. For Windows and the Oxford BMRC cluster, see:
 
-.. code::
+- :doc:`install/windows`
+- :doc:`install/bmrc`
 
-    module load Miniforge3
+.. toctree::
+   :hidden:
 
-and osl-dynamics can be installed with:
-
-.. code::
-
-    mamba create -n osld -c conda-forge osl-dynamics
-    conda activate osld
-
-The above can be run on the login nodes (`clusterX.bmrc.ox.ac.uk`). On `compg017` you will need to set the following to use conda:
-
-.. code::
-
-    unset https_proxy http_proxy no_proxy HTTPS_PROXY HTTP_PROXY NO_PROXY
+   install/windows
+   install/bmrc
 
 Install the latest development code (optional)
 ----------------------------------------------

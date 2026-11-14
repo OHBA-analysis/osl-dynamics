@@ -236,6 +236,7 @@ html_theme_options = {
 html_sidebars = {
     "index": [],
     "install": [],
+    "install/*": [],
     "getting_started": [],
     "faq": [],
 }
