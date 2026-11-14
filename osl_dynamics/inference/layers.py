@@ -1,5 +1,6 @@
 """Custom Tensorflow layers."""
 
+import functools
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
@@ -13,6 +14,7 @@ from tensorflow.keras import (
 )
 
 import osl_dynamics.inference.initializers as osld_initializers
+from osl_dynamics.inference import tf_ops
 
 tfb = tfp.bijectors
 
@@ -1757,6 +1759,162 @@ class MultiLayerPerceptronLayer(layers.Layer):
         return inputs
 
 
+def _forward_backward_rescale(log_B, P, Pi_0):
+    """Forward-backward recursions for a batch of sequences.
+
+    Parameters
+    ----------
+    log_B : tf.Tensor
+        Log-likelihood of each state, shape (batch, time, state).
+    P : tf.Tensor
+        Transition probability matrix.
+    Pi_0 : tf.Tensor
+        Initial state probabilities.
+
+    Returns
+    -------
+    gamma : tf.Tensor
+        Marginal posterior, shape (batch, time, state).
+    xi : tf.Tensor
+        Joint posterior, shape (batch, time - 1, state, state).
+    """
+    # Small error for improving the numerical stability
+    eps = tf.experimental.numpy.finfo(log_B.dtype).eps
+
+    # Time first: [time, batch, state]
+    log_B = tf.transpose(log_B, [1, 0, 2])
+
+    # Subtract the maximum over states for numerical stability
+    log_B -= tf.reduce_max(log_B, axis=-1, keepdims=True)
+    B = tf.exp(log_B)
+
+    # Forward pass: alpha_t = (alpha_{t-1} @ P) * B_t / scale_t
+    alpha_0 = Pi_0 * B[0]
+    scale_0 = tf.reduce_sum(alpha_0, axis=-1, keepdims=True)
+    alpha_0 /= scale_0 + eps
+
+    def forward(carry, b):
+        alpha, _ = carry
+        alpha = tf.matmul(alpha, P) * b
+        scale = tf.reduce_sum(alpha, axis=-1, keepdims=True)
+        return alpha / (scale + eps), scale
+
+    alpha, scale = tf.scan(forward, B[1:], initializer=(alpha_0, scale_0))
+    alpha = tf.concat([alpha_0[tf.newaxis], alpha], axis=0)
+    scale = tf.concat([scale_0[tf.newaxis], scale], axis=0)
+
+    # Backward pass: beta_t = ((beta_{t+1} * B_{t+1}) @ P.T) / scale_{t+1}
+    beta_T = tf.ones_like(alpha_0)
+
+    def backward(beta, inputs):
+        b, c = inputs
+        return tf.matmul(beta * b, P, transpose_b=True) / (c + eps)
+
+    beta = tf.scan(backward, (B[1:], scale[1:]), initializer=beta_T, reverse=True)
+    beta = tf.concat([beta, beta_T[tf.newaxis]], axis=0)
+
+    # Marginal probabilities
+    gamma = alpha * beta
+    gamma /= tf.reduce_sum(gamma, axis=-1, keepdims=True)
+
+    # Joint probabilities
+    b = beta[1:] * B[1:]
+    xi = P * tf.expand_dims(alpha[:-1], axis=3) * tf.expand_dims(b, axis=2)
+    xi /= tf.reduce_sum(xi, axis=(2, 3), keepdims=True)
+
+    # Batch first: [batch, time, state], [batch, time - 1, state, state]
+    gamma = tf.transpose(gamma, [1, 0, 2])
+    xi = tf.transpose(xi, [1, 0, 2, 3])
+    return gamma, xi
+
+
+def _forward_backward_log(log_B, P, Pi_0):
+    """Forward-backward recursions for a batch of sequences.
+
+    Parameters
+    ----------
+    log_B : tf.Tensor
+        Log-likelihood of each state, shape (batch, time, state).
+    P : tf.Tensor
+        Transition probability matrix.
+    Pi_0 : tf.Tensor
+        Initial state probabilities.
+
+    Returns
+    -------
+    gamma : tf.Tensor
+        Marginal posterior, shape (batch, time, state).
+    xi : tf.Tensor
+        Joint posterior, shape (batch, time - 1, state, state).
+    """
+    # Small error for improving the numerical stability
+    eps = tf.experimental.numpy.finfo(log_B.dtype).eps
+
+    # Time first: [time, batch, state]
+    log_B = tf.transpose(log_B, [1, 0, 2])
+
+    # Calculate log probabilities
+    log_P = tf.math.log(P + eps)
+    log_Pi_0 = tf.math.log(Pi_0 + eps)
+
+    # Forward pass
+    log_alpha_0 = log_Pi_0 + log_B[0]
+
+    def forward(log_alpha, log_b):
+        return (
+            tf.reduce_logsumexp(
+                tf.expand_dims(log_alpha, axis=1) + tf.transpose(log_P),
+                axis=-1,
+            )
+            + log_b
+        )
+
+    log_alpha = tf.scan(forward, log_B[1:], initializer=log_alpha_0)
+    log_alpha = tf.concat([log_alpha_0[tf.newaxis], log_alpha], axis=0)
+
+    # Backward pass
+    log_beta_T = tf.zeros_like(log_alpha_0)
+
+    def backward(log_beta, log_b):
+        return tf.reduce_logsumexp(
+            tf.expand_dims(log_beta + log_b, axis=1) + log_P, axis=-1
+        )
+
+    log_beta = tf.scan(backward, log_B[1:], initializer=log_beta_T, reverse=True)
+    log_beta = tf.concat([log_beta, log_beta_T[tf.newaxis]], axis=0)
+
+    # Marginal probabilities
+    log_gamma = log_alpha + log_beta
+    log_gamma -= tf.reduce_logsumexp(log_gamma, axis=-1, keepdims=True)
+
+    # Joint probabilities
+    log_b = log_beta[1:] + log_B[1:]
+    log_xi = (
+        log_P + tf.expand_dims(log_alpha[:-1], axis=3) + tf.expand_dims(log_b, axis=2)
+    )
+    log_xi -= tf.reduce_logsumexp(log_xi, axis=(2, 3), keepdims=True)
+
+    # Convert from log probabilities to probabilities
+    gamma = tf.exp(log_gamma)
+    xi = tf.exp(log_xi)
+
+    # Batch first: [batch, time, state], [batch, time - 1, state, state]
+    gamma = tf.transpose(gamma, [1, 0, 2])
+    xi = tf.transpose(xi, [1, 0, 2, 3])
+    return gamma, xi
+
+
+@functools.cache
+def _compiled(func):
+    """func as a tf.function, compiled with XLA where it is supported.
+
+    This is done on first use rather than at import because checking the
+    devices initializes them, after which :code:`tf_ops.gpu_growth` and
+    :code:`tf_ops.select_gpu` no longer work.
+    """
+    return tf.function(func, jit_compile=tf_ops.xla_supported())
+
+
 class HiddenMarkovStateInferenceLayer(layers.Layer):
     """Hidden Markov state inference layer.
 
@@ -1928,203 +2086,30 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             learnable_tensors_layer = self.layers[1]
             return learnable_tensors_layer(tf.constant(1))
 
-    @tf.function
     def _baum_welch(self, log_B: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-        def _get_indices(time, batch_size):
-            return tf.concat(
-                [
-                    tf.expand_dims(tf.range(batch_size, dtype=tf.int32), axis=1),
-                    tf.fill((batch_size, 1), time),
-                ],
-                axis=1,
+        # The gradient is given by call's custom_gradient, so no gradient is
+        # needed through the recursions
+        P = tf.stop_gradient(tf.cast(self.get_trans_prob(), self.compute_dtype))
+        Pi_0 = tf.stop_gradient(
+            tf.cast(self.get_initial_state_probs(), self.compute_dtype)
+        )
+        log_B = tf.stop_gradient(tf.cast(log_B, self.compute_dtype))
+
+        if log_B.shape[1] == 1:
+            # One time point: no transitions
+            log_gamma = tf.math.log(Pi_0) + log_B
+            gamma = tf.exp(
+                log_gamma - tf.reduce_logsumexp(log_gamma, axis=-1, keepdims=True)
             )
-
-        # Small error for improving the numerical stability of the log-likelihood
-        eps = tf.experimental.numpy.finfo(self.compute_dtype).eps
-
-        # Batch size
-        batch_size = tf.shape(log_B)[0]
-
-        # Transition probability matrix
-        P = self.get_trans_prob()
-        P = tf.cast(P, self.compute_dtype)
-
-        # Initial state probailities
-        Pi_0 = self.get_initial_state_probs()
-        Pi_0 = tf.cast(Pi_0, self.compute_dtype)
+            xi = tf.zeros(
+                [tf.shape(log_B)[0], 0, self.n_states, self.n_states],
+                dtype=self.compute_dtype,
+            )
+            return gamma, xi
 
         if self.implementation == "rescale":
-
-            def _rescale(probs, scale, indices, time, update_scale=True):
-                # Rescale probabilities to help with numerical stability
-                # (over/underflow)
-                if update_scale:
-                    scale = tf.tensor_scatter_nd_update(
-                        scale, indices, tf.reduce_sum(probs[:, time], axis=-1)
-                    )
-                probs = tf.tensor_scatter_nd_update(
-                    probs,
-                    indices,
-                    probs[:, time] / tf.expand_dims(scale[:, time] + eps, axis=-1),
-                )
-                return probs, scale
-
-            # Temporary variables used in the calculation
-            alpha = tf.zeros(
-                [batch_size, self.sequence_length, self.n_states],
-                dtype=self.compute_dtype,
-            )
-            beta = tf.zeros(
-                [batch_size, self.sequence_length, self.n_states],
-                dtype=self.compute_dtype,
-            )
-            scale = tf.zeros(
-                [batch_size, self.sequence_length], dtype=self.compute_dtype
-            )
-
-            # Renormalize the log-likelihood for numerical stability
-            max_values = tf.reduce_max(log_B, axis=-1, keepdims=True)
-            max_values = tf.minimum(max_values, 0.0)
-            log_B -= max_values
-
-            # Calculate likelihood
-            B = tf.exp(log_B)
-
-            # Forward pass
-            def cond(i, alpha, scale):
-                return i < self.sequence_length
-
-            def body(i, alpha, scale):
-                indices = _get_indices(i, batch_size)
-                values = tf.cond(
-                    tf.equal(i, 0),
-                    lambda: Pi_0 * B[:, 0],
-                    lambda: (
-                        tf.reduce_sum(
-                            tf.expand_dims(alpha[:, i - 1], axis=1) * tf.transpose(P),
-                            axis=-1,
-                        )
-                        * B[:, i]
-                    ),
-                )
-                alpha = tf.tensor_scatter_nd_update(alpha, indices, values)
-                alpha, scale = _rescale(alpha, scale, indices, i)
-                return i + 1, alpha, scale
-
-            i = tf.constant(0)
-            _, alpha, scale = tf.while_loop(
-                cond=cond, body=body, loop_vars=[i, alpha, scale]
-            )
-
-            # Backward pass
-            def cond(i, beta, scale):
-                return i > 0
-
-            def body(i, beta, scale):
-                indices = _get_indices(i - 1, batch_size)
-                values = tf.cond(
-                    tf.equal(i, self.sequence_length),
-                    lambda: tf.ones_like(beta[:, -1]),
-                    lambda: tf.reduce_sum(
-                        tf.expand_dims(beta[:, i] * B[:, i], axis=1) * P,
-                        axis=-1,
-                    ),
-                )
-                beta = tf.tensor_scatter_nd_update(beta, indices, values)
-                beta, _ = _rescale(beta, scale, indices, i - 1, update_scale=False)
-                return i - 1, beta, scale
-
-            i = tf.constant(self.sequence_length)
-            _, beta, scale = tf.while_loop(
-                cond=cond, body=body, loop_vars=[i, beta, scale]
-            )
-
-            # Marginal probabilities
-            gamma = alpha * beta
-            gamma /= tf.reduce_sum(gamma, axis=-1, keepdims=True)
-
-            # Joint probabilities
-            b = beta[:, 1:] * B[:, 1:]
-            xi = P * tf.expand_dims(alpha[:, :-1], axis=3) * tf.expand_dims(b, axis=2)
-            xi /= tf.reduce_sum(xi, axis=(2, 3), keepdims=True)
-
-        if self.implementation == "log":
-            # Temporary variables used in the calculation
-            log_alpha = tf.zeros(
-                [batch_size, self.sequence_length, self.n_states],
-                dtype=self.compute_dtype,
-            )
-            log_beta = tf.zeros(
-                [batch_size, self.sequence_length, self.n_states],
-                dtype=self.compute_dtype,
-            )
-
-            # Calculate log probabilities
-            log_P = tf.math.log(P + eps)
-            log_Pi_0 = tf.math.log(Pi_0 + eps)
-
-            # Forward pass
-            def cond(i, log_alpha):
-                return i < self.sequence_length
-
-            def body(i, log_alpha):
-                indices = _get_indices(i, batch_size)
-                values = tf.cond(
-                    tf.equal(i, 0),
-                    lambda: log_Pi_0 + log_B[:, 0],
-                    lambda: (
-                        tf.reduce_logsumexp(
-                            tf.expand_dims(log_alpha[:, i - 1], axis=1)
-                            + tf.transpose(log_P),
-                            axis=-1,
-                        )
-                        + log_B[:, i]
-                    ),
-                )
-                log_alpha = tf.tensor_scatter_nd_update(log_alpha, indices, values)
-                return i + 1, log_alpha
-
-            i = tf.constant(0)
-            _, log_alpha = tf.while_loop(cond=cond, body=body, loop_vars=[i, log_alpha])
-
-            # Backward pass
-            def cond(i, log_beta):
-                return i > 0
-
-            def body(i, log_beta):
-                indices = _get_indices(i - 1, batch_size)
-                values = tf.cond(
-                    tf.equal(i, self.sequence_length),
-                    lambda: tf.zeros_like(log_beta[:, -1]),
-                    lambda: tf.reduce_logsumexp(
-                        tf.expand_dims(log_beta[:, i] + log_B[:, i], axis=1) + log_P,
-                        axis=-1,
-                    ),
-                )
-                log_beta = tf.tensor_scatter_nd_update(log_beta, indices, values)
-                return i - 1, log_beta
-
-            i = tf.constant(self.sequence_length)
-            _, log_beta = tf.while_loop(cond=cond, body=body, loop_vars=[i, log_beta])
-
-            # Marginal probabilities
-            log_gamma = log_alpha + log_beta
-            log_gamma -= tf.reduce_logsumexp(log_gamma, axis=-1, keepdims=True)
-
-            # Joint probabilities
-            log_b = log_beta[:, 1:] + log_B[:, 1:]
-            log_xi = (
-                log_P
-                + tf.expand_dims(log_alpha[:, :-1], axis=3)
-                + tf.expand_dims(log_b, axis=2)
-            )
-            log_xi -= tf.reduce_logsumexp(log_xi, axis=(2, 3), keepdims=True)
-
-            # Convert from log probabilities to probabilities
-            gamma = tf.exp(log_gamma)
-            xi = tf.exp(log_xi)
-
-        return gamma, xi
+            return _compiled(_forward_backward_rescale)(log_B, P, Pi_0)
+        return _compiled(_forward_backward_log)(log_B, P, Pi_0)
 
     def _trans_prob_update(self, gamma: tf.Tensor, xi: tf.Tensor) -> tf.Tensor:
         if self.n_states == 1:
@@ -2174,6 +2159,15 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                         # No trainable variables to calculate the gradient for
                         return
 
+                    # The values are summed over replicas with a distribution
+                    # strategy, so each replica returns its share of the mean
+                    replica_context = tf.distribute.get_replica_context()
+                    n_replicas = (
+                        1
+                        if replica_context is None
+                        else replica_context.num_replicas_in_sync
+                    )
+
                     grads = []
                     variables = kwargs["variables"]
                     for v in variables:
@@ -2181,7 +2175,7 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
                             update = self._trans_prob_update(gamma, xi)
                         if "initial_state_probs" in v.name:
                             update = tf.reduce_mean(gamma[:, 0], axis=0)
-                        update = tf.cast(update, tf.float32)
+                        update = tf.cast(update, tf.float32) / n_replicas
                         grads.append(update)
                     return None, grads
 
@@ -2215,23 +2209,40 @@ class SeparateLogLikelihoodLayer(layers.Layer):
     def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         x, mu, sigma = inputs
         # x.shape = (None, sequence_length, n_channels)
-        # mu.shape = (None, n_states, n_channels)
-        # sigma.shape = (None, n_states, n_channels, n_channels)
+        # mu.shape = (n_states, n_channels) or (None, n_states, n_channels)
+        # sigma.shape = (n_states, n_channels, n_channels)
+        #               or (None, n_states, n_channels, n_channels)
+        x = tf.cast(x, tf.float32)
+        mu = tf.cast(mu, tf.float32)
+        sigma = tf.cast(sigma, tf.float32)
+        batch_size = tf.shape(x)[0]
+        sequence_length = tf.shape(x)[1]
+        n_channels = tf.shape(x)[2]
+        const = -0.5 * tf.cast(n_channels, tf.float32) * np.log(2 * np.pi)
 
-        # Add the sequence length dimension
-        mu = tf.expand_dims(mu, axis=-3)
-        sigma = tf.expand_dims(sigma, axis=-4)
+        # log N(x | mu, sigma) with sigma = L L^T
+        L = tf.linalg.cholesky(sigma)
+        log_det = tf.reduce_sum(tf.math.log(tf.linalg.diag_part(L)), axis=-1)
 
-        # Calculate log-likelihood for each state
-        log_likelihood = tf.TensorArray(tf.float32, size=self.n_states)
-        for state in range(self.n_states):
-            mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=tf.gather(mu, state, axis=-2),
-                scale_tril=tf.linalg.cholesky(tf.gather(sigma, state, axis=-3)),
-                allow_nan_stats=False,
+        if mu.shape.rank == 2 and sigma.shape.rank == 3:
+            # Parameters shared by all sequences
+            X = tf.transpose(tf.reshape(x, [-1, n_channels]))  # (D, N*T)
+            d = tf.expand_dims(X, axis=0) - tf.expand_dims(mu, axis=-1)  # (K, D, N*T)
+            z = tf.linalg.triangular_solve(L, d, lower=True)
+            quad = tf.reduce_sum(tf.square(z), axis=-2)  # (K, N*T)
+            log_likelihood = const - tf.expand_dims(log_det, axis=-1) - 0.5 * quad
+            log_likelihood = tf.reshape(
+                tf.transpose(log_likelihood),
+                [batch_size, sequence_length, self.n_states],
             )
-            log_likelihood = log_likelihood.write(state, mvn.log_prob(x))
-        log_likelihood = tf.transpose(log_likelihood.stack(), perm=[1, 2, 0])
+        else:
+            # Parameters for each sequence
+            X = tf.expand_dims(tf.transpose(x, [0, 2, 1]), axis=1)  # (N, 1, D, T)
+            d = X - tf.expand_dims(mu, axis=-1)  # (N, K, D, T)
+            z = tf.linalg.triangular_solve(L, d, lower=True)
+            quad = tf.reduce_sum(tf.square(z), axis=-2)  # (N, K, T)
+            log_likelihood = const - tf.expand_dims(log_det, axis=-1) - 0.5 * quad
+            log_likelihood = tf.transpose(log_likelihood, [0, 2, 1])
 
         return log_likelihood  # shape = (None, sequence_length, n_states)
 

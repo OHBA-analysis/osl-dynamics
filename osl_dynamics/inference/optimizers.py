@@ -62,6 +62,15 @@ class MarkovStateModelOptimizer(Optimizer):
         self.ema_optimizer = ema_optimizer
         self.ema_variable_ids = [id(v) for v in ema_variables]
 
+    def build(self, var_list: List[tf.Variable]) -> None:
+        super().build(var_list)
+        base_vars = [v for v in var_list if id(v) not in self.ema_variable_ids]
+        ema_vars = [v for v in var_list if id(v) in self.ema_variable_ids]
+        if base_vars:
+            self.base_optimizer.build(base_vars)
+        if ema_vars:
+            self.ema_optimizer.build(ema_vars)
+
     def apply_gradients(
         self, grads_and_vars: List[Tuple[tf.Tensor, tf.Variable]], **kwargs
     ) -> None:
@@ -86,3 +95,27 @@ class MarkovStateModelOptimizer(Optimizer):
         # Apply gradients with the EMA optimizer
         if ema_grads and ema_vars:
             self.ema_optimizer.apply_gradients(zip(ema_grads, ema_vars))
+
+
+def get_variables(optimizer: tf.keras.optimizers.Optimizer) -> List[tf.Variable]:
+    """Variables of an optimizer, including those of the optimizers it wraps.
+
+    Parameters
+    ----------
+    optimizer : tf.keras.optimizers.Optimizer
+        The optimizer.
+
+    Returns
+    -------
+    variables : list
+        Variables of the optimizer, the decay of an
+        :code:`ExponentialMovingAverage` optimizer, and the variables of the
+        optimizers wrapped by a :code:`MarkovStateModelOptimizer`.
+    """
+    variables = list(optimizer.variables)
+    if isinstance(optimizer, ExponentialMovingAverage):
+        variables.append(optimizer.decay)
+    if isinstance(optimizer, MarkovStateModelOptimizer):
+        variables += get_variables(optimizer.base_optimizer)
+        variables += get_variables(optimizer.ema_optimizer)
+    return variables
