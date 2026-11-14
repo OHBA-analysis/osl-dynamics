@@ -724,35 +724,36 @@ class MarkovStateInferenceModelBase(InitializationMixin, ModelBase):
             Optimizer to use when compiling.
         """
 
-        # EMA optimizer for HMM state parameters
-        decay = (
-            1 + self.config.trans_prob_update_delay
-        ) ** -self.config.trans_prob_update_forget
-        ema_optimizer = optimizers.ExponentialMovingAverage(
-            self.config.learning_rate, decay
-        )
-        ema_variables = self.model.get_layer("hid_state_inf").trainable_variables
+        with self.config.strategy.scope():
+            # EMA optimizer for HMM state parameters
+            decay = (
+                1 + self.config.trans_prob_update_delay
+            ) ** -self.config.trans_prob_update_forget
+            ema_optimizer = optimizers.ExponentialMovingAverage(
+                self.config.learning_rate, decay
+            )
+            ema_variables = self.model.get_layer("hid_state_inf").trainable_variables
 
-        # Optimizer for all other trainable parameters
-        base_optimizer = tf.keras.optimizers.get(
-            {
-                "class_name": self.config.optimizer.lower(),
-                "config": {
-                    "learning_rate": self.config.learning_rate,
-                },
-            }
-        )
+            # Optimizer for all other trainable parameters
+            base_optimizer = tf.keras.optimizers.get(
+                {
+                    "class_name": self.config.optimizer.lower(),
+                    "config": {
+                        "learning_rate": self.config.learning_rate,
+                    },
+                }
+            )
 
-        # Combine into a single optimizer for the model
-        optimizer = optimizers.MarkovStateModelOptimizer(
-            base_optimizer,
-            ema_optimizer,
-            ema_variables,
-            learning_rate=self.config.learning_rate,
-        )
+            # Combine into a single optimizer for the model
+            optimizer = optimizers.MarkovStateModelOptimizer(
+                base_optimizer,
+                ema_optimizer,
+                ema_variables,
+                learning_rate=self.config.learning_rate,
+            )
 
-        # Compile
-        super().compile(optimizer, **kwargs)
+            # Compile
+            super().compile(optimizer, **kwargs)
 
     def get_alpha(
         self,

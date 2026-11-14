@@ -148,24 +148,25 @@ class Model(MarkovStateInferenceModelBase):
         )
 
     def compile(self, optimizer=None, **kwargs):
-        if optimizer is None:
-            c = self.config
-            options = dict(c.optimizer_kwargs or {})
-            options.setdefault("learning_rate", c.learning_rate)
-            if c.gradient_clip is not None:
-                options.setdefault("clipnorm", c.gradient_clip)
-            base = tf.keras.optimizers.get(
-                {"class_name": c.optimizer.lower(), "config": options}
-            )
-            decay = (1 + c.trans_prob_update_delay) ** -c.trans_prob_update_forget
-            ema = optimizers.ExponentialMovingAverage(c.learning_rate, decay)
-            optimizer = optimizers.MarkovStateModelOptimizer(
-                base,
-                ema,
-                self.model.get_layer("hid_state_inf").trainable_variables,
-                learning_rate=c.learning_rate,
-            )
-        ModelBase.compile(self, optimizer=optimizer, **kwargs)
+        with self.config.strategy.scope():
+            if optimizer is None:
+                c = self.config
+                options = dict(c.optimizer_kwargs or {})
+                options.setdefault("learning_rate", c.learning_rate)
+                if c.gradient_clip is not None:
+                    options.setdefault("clipnorm", c.gradient_clip)
+                base = tf.keras.optimizers.get(
+                    {"class_name": c.optimizer.lower(), "config": options}
+                )
+                decay = (1 + c.trans_prob_update_delay) ** -c.trans_prob_update_forget
+                ema = optimizers.ExponentialMovingAverage(c.learning_rate, decay)
+                optimizer = optimizers.MarkovStateModelOptimizer(
+                    base,
+                    ema,
+                    self.model.get_layer("hid_state_inf").trainable_variables,
+                    learning_rate=c.learning_rate,
+                )
+            ModelBase.compile(self, optimizer=optimizer, **kwargs)
 
     def _dataset_sequence_length(self) -> int:
         return self.raw_sequence_length

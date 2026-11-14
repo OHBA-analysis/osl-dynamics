@@ -82,7 +82,7 @@ class InitializationMixin:
         The candidate's setup is run again so the weight initializers hold
         the best candidate's parameters (a later reset() returns to them).
         """
-        self.reset_without_compiling()
+        self.reset()
         if setup is not None:
             setup()
         self.set_weights(weights)
@@ -258,7 +258,7 @@ class InitializationMixin:
 
         best_score = np.inf
         for name, dataset, setup in candidates:
-            self.reset_without_compiling()
+            self.reset()
             if setup is not None:
                 setup()
 

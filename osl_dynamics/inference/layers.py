@@ -2081,11 +2081,25 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
             learnable_tensors_layer = self.layers[1]
             return learnable_tensors_layer(tf.constant(1))
 
-    @tf.function
     def _baum_welch(self, log_B: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
-        P = tf.cast(self.get_trans_prob(), self.compute_dtype)
-        Pi_0 = tf.cast(self.get_initial_state_probs(), self.compute_dtype)
-        log_B = tf.cast(log_B, self.compute_dtype)
+        # The gradient is given by call's custom_gradient, so no gradient is
+        # needed through the recursions
+        P = tf.stop_gradient(tf.cast(self.get_trans_prob(), self.compute_dtype))
+        Pi_0 = tf.stop_gradient(
+            tf.cast(self.get_initial_state_probs(), self.compute_dtype)
+        )
+        log_B = tf.stop_gradient(tf.cast(log_B, self.compute_dtype))
+
+        if log_B.shape[1] == 1:
+            # One time point: no transitions
+            log_gamma = tf.math.log(Pi_0) + log_B
+            gamma = tf.exp(log_gamma - tf.reduce_logsumexp(log_gamma, axis=-1, keepdims=True))
+            xi = tf.zeros(
+                [tf.shape(log_B)[0], 0, self.n_states, self.n_states],
+                dtype=self.compute_dtype,
+            )
+            return gamma, xi
+
         if self.implementation == "rescale":
             return _forward_backward_rescale(log_B, P, Pi_0)
         return _forward_backward_log(log_B, P, Pi_0)
@@ -2194,7 +2208,7 @@ class SeparateLogLikelihoodLayer(layers.Layer):
         L = tf.linalg.cholesky(sigma)
         log_det = tf.reduce_sum(tf.math.log(tf.linalg.diag_part(L)), axis=-1)
 
-        if sigma.shape.rank == 3:
+        if mu.shape.rank == 2 and sigma.shape.rank == 3:
             # Parameters shared by all sequences
             X = tf.transpose(tf.reshape(x, [-1, n_channels]))  # (D, N*T)
             d = tf.expand_dims(X, axis=0) - tf.expand_dims(mu, axis=-1)  # (K, D, N*T)
