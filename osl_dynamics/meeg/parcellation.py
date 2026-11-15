@@ -21,8 +21,6 @@ from osl_dynamics.meeg.session import (
     read_data,
 )
 
-from osl_dynamics.meeg import source_recon
-
 _logger = logging.getLogger("osl-dynamics")
 
 
@@ -331,6 +329,8 @@ def parcellate_lcmv(
         parcellation_file, files.parcellation.directory
     )
     print(f"Using parcellation: {parcellation_file}")
+
+    from osl_dynamics.meeg import source_recon
 
     check_up_to_date(session, "LCMV filters")
 
@@ -708,6 +708,8 @@ def _empty_parcels_message(
     empty_parcels: list[int], parcellation_file: str, voxel_coords: np.ndarray
 ) -> str:
     """Error message for parcels that do not contain any dipoles."""
+    from osl_dynamics.meeg import source_recon
+
     msg = f"{len(empty_parcels)} parcel(s) do not contain any dipoles: {empty_parcels}."
     parcellation = Parcellation(parcellation_file)
     centers = np.round(parcellation.roi_centers()[empty_parcels]).astype(int)
@@ -808,6 +810,8 @@ def _get_parcel_data_centroid(
     parcel_data : np.ndarray
         (n_parcels, n_time) or (n_parcels, n_time, n_trials).
     """
+    from osl_dynamics.meeg import source_recon
+
     print("Calculating parcel time courses with centroid")
 
     parcellation = Parcellation(parcellation_file)

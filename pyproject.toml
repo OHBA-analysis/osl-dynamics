@@ -109,6 +109,7 @@ osl-dynamics-download-data = "osl_dynamics.files._fetch:download_data_cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
+include = ["osl_dynamics*"]
 
 [tool.setuptools]
 include-package-data = true
