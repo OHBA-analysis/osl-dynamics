@@ -537,7 +537,7 @@ class Model(MarkovStateInferenceModelBase):
 
                 # Reset back to group-level model parameters
                 self.load_weights(f"{store_dir}/model.weights.h5")
-                self.compile()
+                self.reset_optimizer()
 
         # Reset hyperparameters
         self.config.n_epochs = original_n_epochs

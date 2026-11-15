@@ -1,7 +1,7 @@
 """Custom Tensorflow layers."""
 
 import functools
-from typing import List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -1133,10 +1133,7 @@ class MixVectorsLayer(layers.Layer):
         alpha, mu = inputs
 
         # Calculate the mixture: m_t = Sum_j alpha_jt mu_j
-        alpha = tf.expand_dims(alpha, axis=-1)
-        mu = tf.expand_dims(tf.expand_dims(mu, axis=0), axis=0)
-        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
-        return m
+        return tf.einsum("btj,jc->btc", alpha, mu)
 
 
 class MixMatricesLayer(layers.Layer):
@@ -1154,10 +1151,64 @@ class MixMatricesLayer(layers.Layer):
         alpha, D = inputs
 
         # Calculate the mixture: C_t = Sum_j alpha_jt D_j
-        alpha = tf.expand_dims(tf.expand_dims(alpha, axis=-1), axis=-1)
-        D = tf.expand_dims(tf.expand_dims(D, axis=0), axis=0)
-        C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
-        return C
+        return tf.einsum("btj,jkl->btkl", alpha, D)
+
+
+@tf.custom_gradient
+def _mvn_log_prob(
+    x: tf.Tensor, mu: tf.Tensor, sigma: tf.Tensor
+) -> Tuple[tf.Tensor, Callable]:
+    r"""Multivariate normal log-likelihood with an analytic gradient.
+
+    The log-likelihood is calculated with
+    :code:`tfp.distributions.MultivariateNormalTriL`. The gradient is
+    calculated from
+
+    - :math:`\partial \log p / \partial \mu = \Sigma^{-1} (x - \mu)`
+    - :math:`\partial \log p / \partial \Sigma = -\frac{1}{2} (\Sigma^{-1}
+      - \Sigma^{-1} (x - \mu) (x - \mu)^T \Sigma^{-1})`
+
+    using the Cholesky factor from the forward pass.
+
+    Parameters
+    ----------
+    x : tf.Tensor
+        Data. Shape is (..., n_channels).
+    mu : tf.Tensor
+        Means. Shape is (..., n_channels).
+    sigma : tf.Tensor
+        Covariances. Shape is (..., n_channels, n_channels).
+        All inputs must have the same batch shape (...).
+
+    Returns
+    -------
+    log_prob : tf.Tensor
+        Log-likelihood. Shape is (...).
+    """
+    cholesky = tf.linalg.cholesky(sigma)
+    mvn = tfp.distributions.MultivariateNormalTriL(
+        loc=mu, scale_tril=cholesky, allow_nan_stats=False
+    )
+    log_prob = mvn.log_prob(x)
+
+    def grad(dy):
+        # dy.shape = (...)
+        identity = tf.eye(
+            tf.shape(sigma)[-1],
+            batch_shape=tf.shape(sigma)[:-2],
+            dtype=sigma.dtype,
+        )
+        sigma_inv = tf.linalg.cholesky_solve(cholesky, identity)
+        s = tf.linalg.matvec(sigma_inv, x - mu)  # Sigma^-1 (x - mu)
+        d_mu = dy[..., tf.newaxis] * s
+        d_sigma = (
+            -0.5
+            * dy[..., tf.newaxis, tf.newaxis]
+            * (sigma_inv - s[..., :, tf.newaxis] * s[..., tf.newaxis, :])
+        )
+        return -d_mu, d_mu, d_sigma
+
+    return log_prob, grad
 
 
 class LogLikelihoodLossLayer(layers.Layer):
@@ -1184,15 +1235,20 @@ class LogLikelihoodLossLayer(layers.Layer):
         """
         x, mu, sigma = inputs
 
-        # Multivariate normal distribution
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma),
-            allow_nan_stats=False,
+        # Broadcast to a common shape
+        batch_shape = tf.broadcast_dynamic_shape(
+            tf.broadcast_dynamic_shape(tf.shape(x)[:-1], tf.shape(mu)[:-1]),
+            tf.shape(sigma)[:-2],
+        )
+        n_channels = tf.shape(sigma)[-1:]
+        x = tf.broadcast_to(x, tf.concat([batch_shape, n_channels], axis=0))
+        mu = tf.broadcast_to(mu, tf.concat([batch_shape, n_channels], axis=0))
+        sigma = tf.broadcast_to(
+            sigma, tf.concat([batch_shape, n_channels, n_channels], axis=0)
         )
 
         # Calculate the log-likelihood
-        ll_loss = mvn.log_prob(x)
+        ll_loss = _mvn_log_prob(x, mu, sigma)
 
         if self.calculation == "sum":
             # Sum over time dimension and average over the batch dimension
@@ -1515,15 +1571,10 @@ class CategoricalLogLikelihoodLossLayer(layers.Layer):
         x, mu, sigma, probs = inputs
 
         # Log-likelihood for each state
-        ll_loss = tf.zeros(shape=tf.shape(x)[:-1])
-        for i in range(self.n_states):
-            mvn = tfp.distributions.MultivariateNormalTriL(
-                loc=tf.gather(mu, i, axis=-2),
-                scale_tril=tf.linalg.cholesky(tf.gather(sigma, i, axis=-3)),
-                allow_nan_stats=False,
-            )
-            a = mvn.log_prob(x)
-            ll_loss += probs[:, :, i] * a
+        ll_loss = _separate_log_likelihood(x, mu, sigma, self.n_states)
+
+        # Weight by the state probabilities
+        ll_loss = tf.reduce_sum(probs * ll_loss, axis=-1)
 
         if self.calculation == "sum":
             # Sum over time dimension and average over the batch dimension
@@ -1629,17 +1680,9 @@ class MixSessionSpecificParametersLayer(layers.Layer):
         # - D.shape       = (None, n_modes, n_channels, n_channels)
         alpha, mu, D = inputs
 
-        # Add the sequence dimension
-        mu = tf.expand_dims(mu, axis=1)
-        D = tf.expand_dims(D, axis=1)
-
-        # Next mix with the time course
-        alpha = tf.expand_dims(alpha, axis=-1)
-        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
-
-        alpha = tf.expand_dims(alpha, axis=-1)
-        C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
-
+        # Mix with the time course
+        m = tf.einsum("btj,bjc->btc", alpha, mu)
+        C = tf.einsum("btj,bjkl->btkl", alpha, D)
         return m, C
 
 
@@ -2191,6 +2234,64 @@ class HiddenMarkovStateInferenceLayer(layers.Layer):
         return (output_shape_0, tuple(output_shape_1))
 
 
+def _separate_log_likelihood(
+    x: tf.Tensor, mu: tf.Tensor, sigma: tf.Tensor, n_states: int
+) -> tf.Tensor:
+    """Multivariate normal log-likelihood for each state.
+
+    Parameters
+    ----------
+    x : tf.Tensor
+        Data. Shape is (None, sequence_length, n_channels).
+    mu : tf.Tensor
+        Means. Shape is (n_states, n_channels) or
+        (None, n_states, n_channels).
+    sigma : tf.Tensor
+        Covariances. Shape is (n_states, n_channels, n_channels) or
+        (None, n_states, n_channels, n_channels).
+    n_states : int
+        Number of states.
+
+    Returns
+    -------
+    log_likelihood : tf.Tensor
+        Log-likelihood. Shape is (None, sequence_length, n_states).
+    """
+    x = tf.cast(x, tf.float32)
+    mu = tf.cast(mu, tf.float32)
+    sigma = tf.cast(sigma, tf.float32)
+    batch_size = tf.shape(x)[0]
+    sequence_length = tf.shape(x)[1]
+    n_channels = tf.shape(x)[2]
+    const = -0.5 * tf.cast(n_channels, tf.float32) * np.log(2 * np.pi)
+
+    # log N(x | mu, sigma) with sigma = L L^T
+    L = tf.linalg.cholesky(sigma)
+    log_det = tf.reduce_sum(tf.math.log(tf.linalg.diag_part(L)), axis=-1)
+
+    if mu.shape.rank == 2 and sigma.shape.rank == 3:
+        # Parameters shared by all sequences
+        X = tf.transpose(tf.reshape(x, [-1, n_channels]))  # (D, N*T)
+        d = tf.expand_dims(X, axis=0) - tf.expand_dims(mu, axis=-1)  # (K, D, N*T)
+        z = tf.linalg.triangular_solve(L, d, lower=True)
+        quad = tf.reduce_sum(tf.square(z), axis=-2)  # (K, N*T)
+        log_likelihood = const - tf.expand_dims(log_det, axis=-1) - 0.5 * quad
+        log_likelihood = tf.reshape(
+            tf.transpose(log_likelihood),
+            [batch_size, sequence_length, n_states],
+        )
+    else:
+        # Parameters for each sequence
+        X = tf.expand_dims(tf.transpose(x, [0, 2, 1]), axis=1)  # (N, 1, D, T)
+        d = X - tf.expand_dims(mu, axis=-1)  # (N, K, D, T)
+        z = tf.linalg.triangular_solve(L, d, lower=True)
+        quad = tf.reduce_sum(tf.square(z), axis=-2)  # (N, K, T)
+        log_likelihood = const - tf.expand_dims(log_det, axis=-1) - 0.5 * quad
+        log_likelihood = tf.transpose(log_likelihood, [0, 2, 1])
+
+    return log_likelihood
+
+
 class SeparateLogLikelihoodLayer(layers.Layer):
     """Layer to calculate the log-likelihood for different HMM states.
 
@@ -2208,43 +2309,7 @@ class SeparateLogLikelihoodLayer(layers.Layer):
 
     def call(self, inputs: List[tf.Tensor], **kwargs) -> tf.Tensor:
         x, mu, sigma = inputs
-        # x.shape = (None, sequence_length, n_channels)
-        # mu.shape = (n_states, n_channels) or (None, n_states, n_channels)
-        # sigma.shape = (n_states, n_channels, n_channels)
-        #               or (None, n_states, n_channels, n_channels)
-        x = tf.cast(x, tf.float32)
-        mu = tf.cast(mu, tf.float32)
-        sigma = tf.cast(sigma, tf.float32)
-        batch_size = tf.shape(x)[0]
-        sequence_length = tf.shape(x)[1]
-        n_channels = tf.shape(x)[2]
-        const = -0.5 * tf.cast(n_channels, tf.float32) * np.log(2 * np.pi)
-
-        # log N(x | mu, sigma) with sigma = L L^T
-        L = tf.linalg.cholesky(sigma)
-        log_det = tf.reduce_sum(tf.math.log(tf.linalg.diag_part(L)), axis=-1)
-
-        if mu.shape.rank == 2 and sigma.shape.rank == 3:
-            # Parameters shared by all sequences
-            X = tf.transpose(tf.reshape(x, [-1, n_channels]))  # (D, N*T)
-            d = tf.expand_dims(X, axis=0) - tf.expand_dims(mu, axis=-1)  # (K, D, N*T)
-            z = tf.linalg.triangular_solve(L, d, lower=True)
-            quad = tf.reduce_sum(tf.square(z), axis=-2)  # (K, N*T)
-            log_likelihood = const - tf.expand_dims(log_det, axis=-1) - 0.5 * quad
-            log_likelihood = tf.reshape(
-                tf.transpose(log_likelihood),
-                [batch_size, sequence_length, self.n_states],
-            )
-        else:
-            # Parameters for each sequence
-            X = tf.expand_dims(tf.transpose(x, [0, 2, 1]), axis=1)  # (N, 1, D, T)
-            d = X - tf.expand_dims(mu, axis=-1)  # (N, K, D, T)
-            z = tf.linalg.triangular_solve(L, d, lower=True)
-            quad = tf.reduce_sum(tf.square(z), axis=-2)  # (N, K, T)
-            log_likelihood = const - tf.expand_dims(log_det, axis=-1) - 0.5 * quad
-            log_likelihood = tf.transpose(log_likelihood, [0, 2, 1])
-
-        return log_likelihood  # shape = (None, sequence_length, n_states)
+        return _separate_log_likelihood(x, mu, sigma, self.n_states)
 
     def compute_output_shape(self, input_shape: tf.TensorShape) -> tf.TensorShape:
         x_shape = input_shape[0]  # (None, sequence_length, n_channels)

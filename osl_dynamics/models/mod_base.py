@@ -712,6 +712,16 @@ class ModelBase:
         """
         with self.config.strategy.scope():
             self.reset_weights()
+            self.reset_optimizer()
+
+    def reset_optimizer(self) -> None:
+        """Reset the optimizer to its state after :code:`compile`.
+
+        The optimizer variables (e.g. the learning rate and the number of
+        iterations) are set back to their values after :code:`compile`. The
+        compiled training step is reused.
+        """
+        with self.config.strategy.scope():
             if getattr(self, "_initial_optimizer_values", None) is None:
                 self.compile()
                 return
