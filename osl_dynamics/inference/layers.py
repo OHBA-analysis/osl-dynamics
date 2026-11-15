@@ -1151,11 +1151,6 @@ class MixMatricesLayer(layers.Layer):
         alpha, D = inputs
 
         # Calculate the mixture: C_t = Sum_j alpha_jt D_j
-        #
-        # einsum does this as one matrix multiplication, without creating an
-        # array with shape (None, sequence_length, n_modes, n_channels,
-        # n_channels). The indices are written out because an ellipsis
-        # makes this a batch of small matrix multiplications, which is slow
         return tf.einsum("btj,jkl->btkl", alpha, D)
 
 
@@ -1173,9 +1168,7 @@ def _mvn_log_prob(
     - :math:`\partial \log p / \partial \Sigma = -\frac{1}{2} (\Sigma^{-1}
       - \Sigma^{-1} (x - \mu) (x - \mu)^T \Sigma^{-1})`
 
-    using the Cholesky factor from the forward pass. This is much faster than
-    differentiating through the Cholesky decomposition when there is a
-    covariance matrix for every time point.
+    using the Cholesky factor from the forward pass.
 
     Parameters
     ----------
@@ -1200,8 +1193,6 @@ def _mvn_log_prob(
 
     def grad(dy):
         # dy.shape = (...)
-        # The identity matrices are not broadcast, because broadcasting
-        # in cholesky_solve is slow on GPUs
         identity = tf.eye(
             tf.shape(sigma)[-1],
             batch_shape=tf.shape(sigma)[:-2],
@@ -1242,8 +1233,7 @@ class LogLikelihoodLossLayer(layers.Layer):
         """
         x, mu, sigma = inputs
 
-        # Broadcast to a common shape, so the gradients of
-        # _mvn_log_prob have the shape of its inputs
+        # Broadcast to a common shape
         batch_shape = tf.broadcast_dynamic_shape(
             tf.broadcast_dynamic_shape(tf.shape(x)[:-1], tf.shape(mu)[:-1]),
             tf.shape(sigma)[:-2],
