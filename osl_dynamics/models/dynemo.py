@@ -635,6 +635,11 @@ class Model(VariationalInferenceModelBase):
                 covariances.append(c)
 
                 # Reset back to group-level model parameters
+                #
+                # We compile instead of calling reset_optimizer because
+                # tracing the training step again restarts the random
+                # draws, so each session's result doesn't depend on the
+                # sessions before it
                 self.load_weights(f"{store_dir}/model.weights.h5")
                 self.compile()
 
@@ -724,6 +729,11 @@ class Model(VariationalInferenceModelBase):
                 covariances.append(c)
 
                 # Reset back to group-level model parameters
+                #
+                # We compile instead of calling reset_optimizer because
+                # tracing the training step again restarts the random
+                # draws, so each session's result doesn't depend on the
+                # sessions before it
                 self.load_weights(f"{store_dir}/model_weights.weights.h5")
                 self.compile()
 

@@ -1,7 +1,7 @@
 """Custom Tensorflow layers."""
 
 import functools
-from typing import List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -1133,10 +1133,7 @@ class MixVectorsLayer(layers.Layer):
         alpha, mu = inputs
 
         # Calculate the mixture: m_t = Sum_j alpha_jt mu_j
-        alpha = tf.expand_dims(alpha, axis=-1)
-        mu = tf.expand_dims(tf.expand_dims(mu, axis=0), axis=0)
-        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
-        return m
+        return tf.einsum("btj,jc->btc", alpha, mu)
 
 
 class MixMatricesLayer(layers.Layer):
@@ -1154,10 +1151,71 @@ class MixMatricesLayer(layers.Layer):
         alpha, D = inputs
 
         # Calculate the mixture: C_t = Sum_j alpha_jt D_j
-        alpha = tf.expand_dims(tf.expand_dims(alpha, axis=-1), axis=-1)
-        D = tf.expand_dims(tf.expand_dims(D, axis=0), axis=0)
-        C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
-        return C
+        #
+        # einsum does this as one matrix multiplication, without creating an
+        # array with shape (None, sequence_length, n_modes, n_channels,
+        # n_channels). The indices are written out because an ellipsis
+        # makes this a batch of small matrix multiplications, which is slow
+        return tf.einsum("btj,jkl->btkl", alpha, D)
+
+
+@tf.custom_gradient
+def _mvn_log_prob(
+    x: tf.Tensor, mu: tf.Tensor, sigma: tf.Tensor
+) -> Tuple[tf.Tensor, Callable]:
+    r"""Multivariate normal log-likelihood with an analytic gradient.
+
+    The log-likelihood is calculated with
+    :code:`tfp.distributions.MultivariateNormalTriL`. The gradient is
+    calculated from
+
+    - :math:`\partial \log p / \partial \mu = \Sigma^{-1} (x - \mu)`
+    - :math:`\partial \log p / \partial \Sigma = -\frac{1}{2} (\Sigma^{-1}
+      - \Sigma^{-1} (x - \mu) (x - \mu)^T \Sigma^{-1})`
+
+    using the Cholesky factor from the forward pass. This is much faster than
+    differentiating through the Cholesky decomposition when there is a
+    covariance matrix for every time point.
+
+    Parameters
+    ----------
+    x : tf.Tensor
+        Data. Shape is (..., n_channels).
+    mu : tf.Tensor
+        Means. Shape is (..., n_channels).
+    sigma : tf.Tensor
+        Covariances. Shape is (..., n_channels, n_channels).
+        All inputs must have the same batch shape (...).
+
+    Returns
+    -------
+    log_prob : tf.Tensor
+        Log-likelihood. Shape is (...).
+    """
+    cholesky = tf.linalg.cholesky(sigma)
+    mvn = tfp.distributions.MultivariateNormalTriL(
+        loc=mu, scale_tril=cholesky, allow_nan_stats=False
+    )
+    log_prob = mvn.log_prob(x)
+
+    def grad(dy):
+        # dy.shape = (...)
+        # The identity matrices are not broadcast, because broadcasting
+        # in cholesky_solve is slow on GPUs
+        identity = tf.eye(
+            tf.shape(sigma)[-1],
+            batch_shape=tf.shape(sigma)[:-2],
+            dtype=sigma.dtype,
+        )
+        sigma_inv = tf.linalg.cholesky_solve(cholesky, identity)
+        s = tf.linalg.matvec(sigma_inv, x - mu)  # Sigma^-1 (x - mu)
+        d_mu = dy[..., tf.newaxis] * s
+        d_sigma = -0.5 * dy[..., tf.newaxis, tf.newaxis] * (
+            sigma_inv - s[..., :, tf.newaxis] * s[..., tf.newaxis, :]
+        )
+        return -d_mu, d_mu, d_sigma
+
+    return log_prob, grad
 
 
 class LogLikelihoodLossLayer(layers.Layer):
@@ -1184,15 +1242,21 @@ class LogLikelihoodLossLayer(layers.Layer):
         """
         x, mu, sigma = inputs
 
-        # Multivariate normal distribution
-        mvn = tfp.distributions.MultivariateNormalTriL(
-            loc=mu,
-            scale_tril=tf.linalg.cholesky(sigma),
-            allow_nan_stats=False,
+        # Broadcast to a common shape, so the gradients of
+        # _mvn_log_prob have the shape of its inputs
+        batch_shape = tf.broadcast_dynamic_shape(
+            tf.broadcast_dynamic_shape(tf.shape(x)[:-1], tf.shape(mu)[:-1]),
+            tf.shape(sigma)[:-2],
+        )
+        n_channels = tf.shape(sigma)[-1:]
+        x = tf.broadcast_to(x, tf.concat([batch_shape, n_channels], axis=0))
+        mu = tf.broadcast_to(mu, tf.concat([batch_shape, n_channels], axis=0))
+        sigma = tf.broadcast_to(
+            sigma, tf.concat([batch_shape, n_channels, n_channels], axis=0)
         )
 
         # Calculate the log-likelihood
-        ll_loss = mvn.log_prob(x)
+        ll_loss = _mvn_log_prob(x, mu, sigma)
 
         if self.calculation == "sum":
             # Sum over time dimension and average over the batch dimension
@@ -1629,17 +1693,9 @@ class MixSessionSpecificParametersLayer(layers.Layer):
         # - D.shape       = (None, n_modes, n_channels, n_channels)
         alpha, mu, D = inputs
 
-        # Add the sequence dimension
-        mu = tf.expand_dims(mu, axis=1)
-        D = tf.expand_dims(D, axis=1)
-
-        # Next mix with the time course
-        alpha = tf.expand_dims(alpha, axis=-1)
-        m = tf.reduce_sum(tf.multiply(alpha, mu), axis=2)
-
-        alpha = tf.expand_dims(alpha, axis=-1)
-        C = tf.reduce_sum(tf.multiply(alpha, D), axis=2)
-
+        # Mix with the time course
+        m = tf.einsum("btj,bjc->btc", alpha, mu)
+        C = tf.einsum("btj,bjkl->btkl", alpha, D)
         return m, C
 
 

@@ -712,6 +712,18 @@ class ModelBase:
         """
         with self.config.strategy.scope():
             self.reset_weights()
+            self.reset_optimizer()
+
+    def reset_optimizer(self) -> None:
+        """Reset the optimizer to its state after :code:`compile`.
+
+        The optimizer variables (e.g. the learning rate, the number of
+        iterations and the moment estimates of Adam) are set back to their
+        values after :code:`compile`. Unlike calling :code:`compile` again,
+        the compiled training step is reused, so it isn't traced again. Use
+        this to train from a fresh optimizer, e.g. after loading weights.
+        """
+        with self.config.strategy.scope():
             if getattr(self, "_initial_optimizer_values", None) is None:
                 self.compile()
                 return
