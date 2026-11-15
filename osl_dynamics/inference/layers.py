@@ -1201,8 +1201,10 @@ def _mvn_log_prob(
         sigma_inv = tf.linalg.cholesky_solve(cholesky, identity)
         s = tf.linalg.matvec(sigma_inv, x - mu)  # Sigma^-1 (x - mu)
         d_mu = dy[..., tf.newaxis] * s
-        d_sigma = -0.5 * dy[..., tf.newaxis, tf.newaxis] * (
-            sigma_inv - s[..., :, tf.newaxis] * s[..., tf.newaxis, :]
+        d_sigma = (
+            -0.5
+            * dy[..., tf.newaxis, tf.newaxis]
+            * (sigma_inv - s[..., :, tf.newaxis] * s[..., tf.newaxis, :])
         )
         return -d_mu, d_mu, d_sigma
 
