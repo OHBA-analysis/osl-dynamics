@@ -1,7 +1,7 @@
 Statistical Significance Testing
 ================================
 
-:mod:`osl_dynamics.stats <osl_dynamics.stats>` fits a General Linear Model (GLM) at each **target** (parcel, state, connection, time point, frequency) and corrects for the multiple comparisons across targets, by default with permutation tests that make no assumption about the distribution of the data. The :doc:`Statistical Inference tutorial <tutorials_build/7-1_statistical_inference>` explains the methods with figures; the :doc:`statistics tutorials <tutorial_sections/statistics>` apply them to group contrasts, network responses and custom designs.
+:mod:`osl_dynamics.stats <osl_dynamics.stats>` fits a General Linear Model (GLM) at each **target** (parcel, state, connection, time point, frequency) and corrects for the multiple comparisons across targets, by default with permutation tests that make no assumption about the distribution of the data. The :doc:`Statistical Inference tutorial </tutorials_build/7-1_statistical_inference>` explains the methods with figures; the :doc:`statistics tutorials </tutorial_sections/statistics>` apply them to group contrasts, network responses and custom designs.
 
 Which function?
 ---------------
@@ -107,4 +107,4 @@ Which data?
      - (subjects, modes)
      - As summary statistics.
 
-Also see the :doc:`FAQ <faq>` and the `example scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/statistics>`_.
+Also see the :doc:`FAQ </faq>` and the `example scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/statistics>`_.

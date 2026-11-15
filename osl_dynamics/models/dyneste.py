@@ -1,6 +1,6 @@
 """Dynamic Network States (DyNeStE).
 
-See the :doc:`model description </models/dyneste>` for more details.
+See the :doc:`model description </user_guide/models/dyneste>` for more details.
 """
 
 import logging

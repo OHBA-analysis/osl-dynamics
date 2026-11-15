@@ -1,6 +1,6 @@
 """HIVE (HMM with Integrated Variability Estimation).
 
-See the :doc:`model description </models/hive>` for more details.
+See the :doc:`model description </user_guide/models/hive>` for more details.
 """
 
 import logging

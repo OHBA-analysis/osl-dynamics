@@ -10,4 +10,4 @@ Example scripts for statistical significance testing with `osl_dynamics.stats`:
 - `condition_difference.py`: do three conditions measured in the same subjects differ? Within-subject F-test, pairwise test and effect sizes.
 - `regression.py`: does a quantity change with age? Permutation test of a continuous regressor.
 
-See the [statistics documentation](https://osl-dynamics.readthedocs.io/en/latest/stats.html) for which test and correction to use.
+See the [statistics documentation](https://osl-dynamics.readthedocs.io/en/latest/user_guide/stats.html) for which test and correction to use.

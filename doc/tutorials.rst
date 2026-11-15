@@ -20,7 +20,7 @@ If you are new to osl-dynamics, start with the :doc:`Getting Started <getting_st
 M/EEG Processing
 ----------------
 
-From raw sensor recordings to parcellated source-space time courses: preprocessing, surface extraction, coregistration, source reconstruction, parcellation and sign flipping. See the :doc:`M/EEG Processing <meeg>` page for an overview of the steps.
+From raw sensor recordings to parcellated source-space time courses: preprocessing, surface extraction, coregistration, source reconstruction, parcellation and sign flipping. See the :doc:`M/EEG Processing <user_guide/meeg>` page for an overview of the steps.
 
 .. minigallery::
 
@@ -102,7 +102,7 @@ Epoching state and mode time courses around events to get network responses.
 Statistical Significance Testing
 --------------------------------
 
-GLM permutation tests for group contrasts, network responses, conditions and custom designs, with the background on the methods. See the :doc:`statistics page <stats>` for which test and correction to use.
+GLM permutation tests for group contrasts, network responses, conditions and custom designs, with the background on the methods. See the :doc:`statistics page <user_guide/stats>` for which test and correction to use.
 
 .. minigallery::
 

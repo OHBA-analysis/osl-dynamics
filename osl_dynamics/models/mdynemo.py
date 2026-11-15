@@ -1,6 +1,6 @@
 """Multi-Dynamic Network Modes (M-DyNeMo).
 
-See the :doc:`model description </models/mdynemo>` for more details.
+See the :doc:`model description </user_guide/models/mdynemo>` for more details.
 
 Examples
 --------

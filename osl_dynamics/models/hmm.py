@@ -1,6 +1,6 @@
 """Hidden Markov Model (HMM) with a Multivariate Normal observation model.
 
-See the :doc:`documentation </models/hmm>` for a description of this model.
+See the :doc:`documentation </user_guide/models/hmm>` for a description of this model.
 
 References
 ----------

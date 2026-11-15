@@ -1,7 +1,7 @@
 Statistical Significance Testing
 ================================
 
-GLM permutation tests for group contrasts, network responses, conditions and custom designs, with the background on the methods. See the :doc:`statistics page <../stats>` for which test and correction to use.
+GLM permutation tests for group contrasts, network responses, conditions and custom designs, with the background on the methods. See the :doc:`statistics page <../user_guide/stats>` for which test and correction to use.
 
 .. toctree::
    :hidden:

@@ -8,5 +8,6 @@ sphinx-autoapi
 sphinx-sitemap
 pydata-sphinx-theme
 myst-parser
+sphinx-reredirects
 
 -e .[tf]

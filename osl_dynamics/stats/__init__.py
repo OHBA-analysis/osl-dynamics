@@ -35,7 +35,7 @@ Tutorials
 
 Documentation
 -------------
-- :doc:`Statistical Significance Testing </stats>`
+- :doc:`Statistical Significance Testing </user_guide/stats>`
 
 Python example scripts
 ----------------------

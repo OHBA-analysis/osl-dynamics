@@ -1,7 +1,7 @@
 M/EEG Processing
 ================
 
-From raw sensor recordings to parcellated source-space time courses: preprocessing, surface extraction, coregistration, source reconstruction, parcellation and sign flipping. See the :doc:`M/EEG Processing <../meeg>` page for an overview of the steps.
+From raw sensor recordings to parcellated source-space time courses: preprocessing, surface extraction, coregistration, source reconstruction, parcellation and sign flipping. See the :doc:`M/EEG Processing <../user_guide/meeg>` page for an overview of the steps.
 
 .. toctree::
    :hidden:

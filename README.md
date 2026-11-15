@@ -67,7 +67,7 @@ mamba create -n osld -c conda-forge osl-dynamics
 conda activate osld
 ```
 
-See the [installation page](https://osl-dynamics.readthedocs.io/en/latest/install.html) for more information.
+See the [installation page](https://osl-dynamics.readthedocs.io/en/latest/install/index.html) for more information.
 
 ## Documentation
 

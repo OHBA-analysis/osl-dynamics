@@ -9,16 +9,22 @@
 # serve to show the default.
 
 import ast
+import atexit
 import inspect
+import json
 import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.request
 from pathlib import Path
 
+from sphinx.util import logging
 from sphinx_gallery.sorting import FileNameSortKey
+
+logger = logging.getLogger(__name__)
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -31,13 +37,13 @@ OSL_FILES_URL = "https://github.com/OHBA-analysis/osl-files"
 
 
 def fetch_parcellation_docs():
-    """Copy the parcellation pages from osl-files into doc/parcellations.
+    """Copy the parcellation pages from osl-files into doc/user_guide/parcellations.
 
     The pages are written and kept in osl-files, this copy is not committed.
     Parcellations without a picture are left out. A failed download stops the
     build, so that Read the Docs keeps serving the last good version.
     """
-    destination = Path(__file__).parent / "parcellations"
+    destination = Path(__file__).parent / "user_guide" / "parcellations"
 
     with tempfile.TemporaryDirectory() as clone:
         subprocess.run(
@@ -110,6 +116,7 @@ extensions = [
     "sphinx_sitemap",
     "myst_parser",
     "sphinx_design",
+    "sphinx_reredirects",
 ]
 
 # The types are in the numpydoc docstrings
@@ -122,6 +129,13 @@ autoapi_dirs = ["../osl_dynamics"]
 autoapi_template_dir = "_templates"
 # Each class and function gets its own page
 autoapi_own_page_level = "function"
+autoapi_options = [
+    "members",
+    "undoc-members",
+    "show-inheritance",
+    "show-module-summary",
+    "imported-members",
+]
 
 
 def _reexported_objects():
@@ -162,23 +176,6 @@ def skip_reexported(app, what, name, obj, skip, options):
 
 def setup(app):
     app.connect("autoapi-skip-member", skip_reexported)
-autoapi_options = [
-    "members",
-    "undoc-members",
-    "show-inheritance",
-    "show-module-summary",
-    "imported-members",
-]
-
-sphinx_gallery_conf = {
-    "examples_dirs": "tutorials",        # Contains source .py files
-    "gallery_dirs": "tutorials_build",   # Where to output rendered gallery
-    "filename_pattern": r".*\.py",       # Include all .py files, can specific a particular set tutorials, e.g. r"1-.*\.py" for 1-*.py tutorials
-    "run_stale_examples": True,          # Force re-run when building
-    "within_subsection_order": FileNameSortKey,  # Build in alphabetical order of the filenames
-    "backreferences_dir": "tutorials_build/backreferences",  # Lets minigallery find the tutorials
-    "remove_config_comments": True,  # e.g. sphinx_gallery_thumbnail_path in the tutorials
-}
 
 # The suffix of source filenames.
 source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
@@ -198,6 +195,89 @@ author = "OHBA Methods Group, University of Oxford"
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = "sphinx"
+
+# -- Redirects -----------------------------------------------------------------
+
+# Old URLs of the pages moved into install/ and user_guide/
+redirects = {
+    "install": "install/index.html",
+    "documentation": "user_guide/index.html",
+    "meeg": "user_guide/meeg.html",
+    "stats": "user_guide/stats.html",
+}
+for folder in ["models", "parcellations"]:
+    for page in (Path(__file__).parent / "user_guide" / folder).iterdir():
+        if page.suffix in source_suffix:
+            redirects[f"{folder}/{page.stem}"] = f"../user_guide/{folder}/{page.stem}.html"
+
+# -- Tutorials -----------------------------------------------------------------
+
+OSF_PROJECT = "by2tc"
+
+
+def list_osf_files(url):
+    """Download URL of each file in an OSF folder and its subfolders."""
+    urls = {}
+    while url:
+        with urllib.request.urlopen(url, timeout=30) as response:
+            page = json.load(response)
+        for item in page["data"]:
+            if item["attributes"]["kind"] == "folder":
+                folder = item["relationships"]["files"]["links"]["related"]["href"]
+                urls.update(list_osf_files(folder))
+            else:
+                path = item["attributes"]["materialized_path"].lstrip("/")
+                urls[path] = item["links"]["download"]
+        url = page["links"]["next"]
+    return urls
+
+
+def setup_osf_downloads():
+    """Set up the OSF downloads and return the pattern for the tutorials to execute.
+
+    Lists the files in the OSF project and puts an osf command that runs
+    osf_cache.py first on PATH. If the files cannot be listed, tutorials that
+    download from OSF are not executed and are built without outputs.
+    """
+    try:
+        urls = list_osf_files(
+            f"https://api.osf.io/v2/nodes/{OSF_PROJECT}/files/osfstorage/"
+        )
+    except Exception as error:
+        needs_osf = sorted(
+            path.name
+            for path in Path(__file__).parent.glob("tutorials/*.py")
+            if re.search(r"^\s*[^#\s].*osf -p", path.read_text(), flags=re.M)
+        )
+        logger.warning(
+            "Could not list the OSF files (%s), not executing tutorials: %s",
+            error,
+            ", ".join(needs_osf),
+        )
+        names = "|".join(re.escape(name) for name in needs_osf)
+        return rf"[\\/](?!(?:{names})$)[^\\/]+\.py$"
+
+    directory = Path(tempfile.mkdtemp(prefix="osf_"))
+    atexit.register(shutil.rmtree, directory, ignore_errors=True)
+    (directory / f"{OSF_PROJECT}.json").write_text(json.dumps(urls))
+    command = directory / "osf"
+    script = Path(__file__).parent / "_ext" / "osf_cache.py"
+    command.write_text(f'#!/bin/sh\nexec "{sys.executable}" "{script}" "$@"\n')
+    command.chmod(0o755)
+    os.environ["OSF_CACHE_DIR"] = str(directory)
+    os.environ["PATH"] = f"{directory}{os.pathsep}{os.environ['PATH']}"
+    return r".*\.py"
+
+
+sphinx_gallery_conf = {
+    "examples_dirs": "tutorials",        # Contains source .py files
+    "gallery_dirs": "tutorials_build",   # Where to output rendered gallery
+    "filename_pattern": setup_osf_downloads(),  # Tutorials to execute, e.g. r"1-.*\.py" for 1-*.py tutorials
+    "run_stale_examples": True,          # Force re-run when building
+    "within_subsection_order": FileNameSortKey,  # Build in alphabetical order of the filenames
+    "backreferences_dir": "tutorials_build/backreferences",  # Lets minigallery find the tutorials
+    "remove_config_comments": True,  # e.g. sphinx_gallery_thumbnail_path in the tutorials
+}
 
 # -- Options for HTML output ---------------------------------------------------
 
@@ -228,14 +308,13 @@ html_theme_options = {
     "header_links_before_dropdown": 6,
     "logo": {"text": "OSL Dynamics"},
     # The User Guide landing page has no sections, so no right-hand page TOC
-    "secondary_sidebar_items": {"**": ["page-toc"], "documentation": []},
+    "secondary_sidebar_items": {"**": ["page-toc"], "user_guide/index": []},
 }
 
 # Remove the left "Section Navigation" sidebar on pages that are a section by
 # themselves. The User Guide, Tutorials and API Reference sections keep it.
 html_sidebars = {
     "index": [],
-    "install": [],
     "install/*": [],
     "getting_started": [],
     "faq": [],

@@ -25,7 +25,7 @@ Modules
 
 Documentation
 -------------
-- :doc:`M/EEG Processing </meeg>`
+- :doc:`M/EEG Processing </user_guide/meeg>`
 
 Tutorials
 ---------

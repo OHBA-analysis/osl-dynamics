@@ -28,7 +28,11 @@ dist/*
 sdist/*
 doc/tutorials_build/*
 doc/sg_execution_times.rst
-doc/parcellations/
+doc/user_guide/parcellations/
+# Data the tutorials download when the docs are built
+doc/tutorials/*
+!doc/tutorials/*.py
+!doc/tutorials/README.rst
 cover/*
 MANIFEST
 

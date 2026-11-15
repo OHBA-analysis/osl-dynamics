@@ -20,7 +20,7 @@ OSL Dynamics
    :gutter: 3
 
    .. grid-item-card:: :octicon:`download` Install
-      :link: install
+      :link: install/index
       :link-type: doc
 
       Install from conda-forge or PyPI, and check your GPU is working.
@@ -38,25 +38,25 @@ OSL Dynamics
       Each stage of an analysis on real data, as scripts and notebooks you can download.
 
    .. grid-item-card:: :octicon:`pulse` M/EEG Processing
-      :link: meeg
+      :link: user_guide/meeg
       :link-type: doc
 
       Preprocessing, coregistration, source reconstruction, parcellation and sign flipping.
 
    .. grid-item-card:: :octicon:`workflow` Models
-      :link: models/index
+      :link: user_guide/models/index
       :link-type: doc
 
       The HMM, DyNeMo and other generative models for dynamic brain networks.
 
    .. grid-item-card:: :octicon:`graph` Statistics
-      :link: stats
+      :link: user_guide/stats
       :link-type: doc
 
       GLM permutation tests with maximum statistic, cluster-based and TFCE corrections.
 
    .. grid-item-card:: :octicon:`apps` Parcellations
-      :link: parcellations/index
+      :link: user_guide/parcellations/index
       :link-type: doc
 
       The brain parcellations available in osl-dynamics.
@@ -80,8 +80,8 @@ If you find this toolbox useful, please cite:
 .. toctree::
    :hidden:
 
-   Install <install>
+   Install <install/index>
    Getting Started <getting_started>
-   User Guide <documentation>
+   User Guide <user_guide/index>
    Tutorials <tutorials>
    FAQ <faq>

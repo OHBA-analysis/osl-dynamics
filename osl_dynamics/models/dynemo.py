@@ -1,6 +1,6 @@
 """Dynamic Network Modes (DyNeMo).
 
-See the :doc:`documentation </models/dynemo>` for a description of this model.
+See the :doc:`documentation </user_guide/models/dynemo>` for a description of this model.
 """
 
 import os

@@ -1,6 +1,6 @@
 """Implementation of the Fisher kernel for prediction studies.
 
-See the :doc:`HMM description </models/hmm>` for further details.
+See the :doc:`HMM description </user_guide/models/hmm>` for further details.
 
 Examples
 --------

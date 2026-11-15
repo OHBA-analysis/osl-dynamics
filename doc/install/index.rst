@@ -25,7 +25,7 @@ Then create an environment with osl-dynamics in it:
 
 This installs osl-dynamics with everything it needs. This includes `MNE-Python <https://mne.tools/stable/index.html>`_ and `TensorFlow <https://www.tensorflow.org/>`_.
 
-On Windows, the command above will not work because conda-forge has no TensorFlow for Windows. See :doc:`install/windows` instead.
+On Windows, the command above will not work because conda-forge has no TensorFlow for Windows. See :doc:`windows` instead.
 
 Pip installation
 ----------------
@@ -55,14 +55,14 @@ Platform-specific instructions
 
 The instructions above are for Linux and macOS. For Windows and the Oxford BMRC cluster, see:
 
-- :doc:`install/windows`
-- :doc:`install/bmrc`
+- :doc:`windows`
+- :doc:`bmrc`
 
 .. toctree::
    :hidden:
 
-   install/windows
-   install/bmrc
+   windows
+   bmrc
 
 Install the latest development code (optional)
 ----------------------------------------------

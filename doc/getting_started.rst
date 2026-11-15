@@ -1,24 +1,24 @@
 Getting Started
 ===============
 
-This page provides a quick introduction to osl-dynamics. For installation instructions, see :doc:`Install <install>`.
+This page provides a quick introduction to osl-dynamics. For installation instructions, see :doc:`Install <install/index>`.
 
 Overview
 --------
 
 osl-dynamics is a Python toolbox for studying dynamic brain networks from neuroimaging data (M/EEG and fMRI). It provides:
 
-- **M/EEG processing**: preprocessing, source reconstruction (LCMV beamformer) and parcellation (see :doc:`M/EEG Processing <meeg>`).
-- **Generative models** for inferring dynamic brain networks, e.g. the Hidden Markov Model (HMM) and Dynamic Network Modes (DyNeMo) (see :doc:`Models <models/index>`).
+- **M/EEG processing**: preprocessing, source reconstruction (LCMV beamformer) and parcellation (see :doc:`M/EEG Processing <user_guide/meeg>`).
+- **Generative models** for inferring dynamic brain networks, e.g. the Hidden Markov Model (HMM) and Dynamic Network Modes (DyNeMo) (see :doc:`Models <user_guide/models/index>`).
 - **Post-hoc analysis tools**: spectral analysis, summary statistics, and network visualization.
 - **Static analysis**: time-averaged power and connectivity analysis.
-- **Statistical testing**: GLM permutation tests for group and condition comparisons, network responses and regressions, with maximum statistic, cluster-based and TFCE corrections for multiple comparisons, and effect sizes with confidence intervals (see :doc:`Statistical Significance Testing <stats>`).
+- **Statistical testing**: GLM permutation tests for group and condition comparisons, network responses and regressions, with maximum statistic, cluster-based and TFCE corrections for multiple comparisons, and effect sizes with confidence intervals (see :doc:`Statistical Significance Testing <user_guide/stats>`).
 - **Simulation tools**: for generating synthetic time series data.
 
 M/EEG Processing
 -----------------
 
-If you are starting from raw M/EEG data, osl-dynamics includes a full processing pipeline covering preprocessing, surface extraction, coregistration, source reconstruction (LCMV beamformer), and parcellation. The :doc:`M/EEG Processing <meeg>` page describes the steps and the software behind them. See the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>` for a step-by-step walkthrough, or the `batch processing scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for running multiple sessions in parallel.
+If you are starting from raw M/EEG data, osl-dynamics includes a full processing pipeline covering preprocessing, surface extraction, coregistration, source reconstruction (LCMV beamformer), and parcellation. The :doc:`M/EEG Processing <user_guide/meeg>` page describes the steps and the software behind them. See the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>` for a step-by-step walkthrough, or the `batch processing scripts <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_preproc>`_ for running multiple sessions in parallel.
 
 A Typical Workflow
 ------------------
@@ -122,6 +122,6 @@ What Next?
 ----------
 
 - **Tutorials**: Work through the :doc:`tutorials <tutorials>` for detailed examples covering M/EEG processing, data loading, model training, post-hoc analysis and statistical testing, with links to example scripts and workshop materials.
-- **User Guide**: Read the :doc:`User Guide <documentation>` for how the :doc:`processing pipeline <meeg>`, the :doc:`models <models/index>` and the :doc:`statistical tests <stats>` work and when to use which.
+- **User Guide**: Read the :doc:`User Guide <user_guide/index>` for how the :doc:`processing pipeline <user_guide/meeg>`, the :doc:`models <user_guide/models/index>` and the :doc:`statistical tests <user_guide/stats>` work and when to use which.
 - **FAQ**: Check the :doc:`FAQ <faq>` for common questions about preprocessing, choosing a model and its hyperparameters, and interpreting results.
 - **API reference**: Browse the :doc:`API docs <autoapi/index>` for detailed information on all classes and functions.

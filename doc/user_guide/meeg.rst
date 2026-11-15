@@ -1,7 +1,7 @@
 M/EEG Processing
 ================
 
-The models in osl-dynamics are trained on **parcel time courses**: one time course per brain region, reconstructed from the sensors. :mod:`osl_dynamics.meeg <osl_dynamics.meeg>` takes raw recordings all the way there. This page describes the steps and the software behind them; the :doc:`MEG Preprocessing tutorial <tutorials_build/0-1_meg_preprocessing>` runs them on one session, the :doc:`batch processing tutorials <tutorial_sections/meeg_processing>` on many sessions in parallel.
+The models in osl-dynamics are trained on **parcel time courses**: one time course per brain region, reconstructed from the sensors. :mod:`osl_dynamics.meeg <osl_dynamics.meeg>` takes raw recordings all the way there. This page describes the steps and the software behind them; the :doc:`MEG Preprocessing tutorial </tutorials_build/0-1_meg_preprocessing>` runs them on one session, the :doc:`batch processing tutorials </tutorial_sections/meeg_processing>` on many sessions in parallel.
 
 .. toctree::
    :maxdepth: 1
@@ -68,7 +68,7 @@ Each step reads the files written by the steps before it and writes its own at p
    * - Sign flipping
      - The sign of a beamformed parcel time course is arbitrary and differs between sessions. Each session's parcels are flipped to match a template covariance, so that sessions can be pooled for group-level models.
      - osl-dynamics
-     - :meth:`Data.align_channel_signs <osl_dynamics.data.Data.align_channel_signs>` (:doc:`tutorial <tutorials_build/0-2_sign_flipping>`)
+     - :meth:`Data.align_channel_signs <osl_dynamics.data.Data.align_channel_signs>` (:doc:`tutorial </tutorials_build/0-2_sign_flipping>`)
    * - Quality control
      - PSDs and power maps of the parcel time courses, and an HTML report with one row per session next to its QC plots.
      - osl-dynamics

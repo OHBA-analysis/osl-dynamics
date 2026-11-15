@@ -124,27 +124,27 @@ Modeling
 What is the Hidden Markov Model (HMM)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See the model description page :doc:`here <models/hmm>`.
+See the model description page :doc:`here <user_guide/models/hmm>`.
 
 What is Dynamic Network Modes (DyNeMo)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See the model description page :doc:`here <models/dynemo>`.
+See the model description page :doc:`here <user_guide/models/dynemo>`.
 
 What is Dynamic Network States (DyNeSte)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See the model description page :doc:`here <models/dyneste>`.
+See the model description page :doc:`here <user_guide/models/dyneste>`.
 
 What is Multi-Dynamic Network Modes (M-DyNeMo)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See the model description page :doc:`here <models/mdynemo>`.
+See the model description page :doc:`here <user_guide/models/mdynemo>`.
 
 What is HIVE (HMM with Integrated Variability Estimation)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See the model description page :doc:`here <models/hive>`.
+See the model description page :doc:`here <user_guide/models/hive>`.
 
 What model should I use?
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -170,7 +170,7 @@ If we are interested in modeling transient bursts of oscillations (spectral even
 
 Note, when we train on TDE data, because the differences we want to model are reflected in the covariance of the data, we don't need to model the state means (we can just fix them to zero). Whereas, when we train on AE data, the differences we want to model are contained in the mean, so we learn the state means.
 
-Also note, once we have inferred a latent description, such as HMM states or DyNeMo modes, we can go back to the original unprepared data (i.e. before the AE/TDE) and re-estimate properties of this time series based on the inferred latent description. This is what's done when we estimate post-hoc spectra, see the 'Spectral Analysis' section in the model descriptions: :doc:`HMM <models/hmm>` and :doc:`DyNeMo <models/dynemo>`.
+Also note, once we have inferred a latent description, such as HMM states or DyNeMo modes, we can go back to the original unprepared data (i.e. before the AE/TDE) and re-estimate properties of this time series based on the inferred latent description. This is what's done when we estimate post-hoc spectra, see the 'Spectral Analysis' section in the model descriptions: :doc:`HMM <user_guide/models/hmm>` and :doc:`DyNeMo <user_guide/models/dynemo>`.
 
 What are hyperparameters?
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -186,14 +186,14 @@ How do I choose what hyperparameters to use?
 Unfortunately, many modern machine learning models come with hyperparameters (parameters that are not part of the generative model) which need to be pre-specified. The best approach is to try and few combinations and do the following:
 
 - Make sure any conclusions are robust to the choice of hyperparameters.
-- Use the variational free energy (see the :doc:`model descriptions <models/index>`) to compare models. Preferably, the variational free energy would be calculated on a hold out validation dataset, which is not used for training.
+- Use the variational free energy (see the :doc:`model descriptions <user_guide/models/index>`) to compare models. Preferably, the variational free energy would be calculated on a hold out validation dataset, which is not used for training.
 
 The :mod:`config API <osl_dynamics.config_api>` has wrapper functions for training an :func:`HMM <osl_dynamics.config_api.wrappers.train_hmm>` or :func:`DyNeMo <osl_dynamics.config_api.wrappers.train_dynemo>`, which pre-specify hyperparameters that have worked well in the past. These might be a good place to start.
 
 I have trained a model with the same hyperparameters on the same data multiple times, why do I get a different value for the final loss (cost function)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Many modern machine learning models have a problem of **local optima**. When we train a model on complex and noisy data there may be multiple values for the model parameters (see the 'What are hyperparameters?' question for the definition of 'model parameters') that can lead to similar values for the **cost function**. In our case, the cost function is the **variational free energy** (see the :doc:`HMM description <models/hmm>` for further details). Additionally, different final values for the cost function can occur due to different initial values for the model parameters and the stochasticity in updating the model parameters during training.
+Many modern machine learning models have a problem of **local optima**. When we train a model on complex and noisy data there may be multiple values for the model parameters (see the 'What are hyperparameters?' question for the definition of 'model parameters') that can lead to similar values for the **cost function**. In our case, the cost function is the **variational free energy** (see the :doc:`HMM description <user_guide/models/hmm>` for further details). Additionally, different final values for the cost function can occur due to different initial values for the model parameters and the stochasticity in updating the model parameters during training.
 
 Unfortunately, there is no solution to this. With more data this becomes less of a problem. The recommendation is to train a model multiple times and select the model with the best (lowest) variational free energy for further analysis. Preferably the variational free energy would be calculated using a hold out validation dataset rather than the training data. However, it is common just to compare the variational free energy on the training dataset.
 
@@ -298,12 +298,12 @@ Generally, it's difficult to say whether or not one summary statistic is more im
 How does the multitaper spectrum calculation work?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See the 'Spectral Analysis' section of the :doc:`HMM description <models/hmm>`.
+See the 'Spectral Analysis' section of the :doc:`HMM description <user_guide/models/hmm>`.
 
 How does the regression spectrum calculation work?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See the 'Spectral Analysis' section of the :doc:`DyNeMo model description <models/dynemo>`.
+See the 'Spectral Analysis' section of the :doc:`DyNeMo model description <user_guide/models/dynemo>`.
 
 Statistical Significance Testing
 --------------------------------
@@ -311,7 +311,7 @@ Statistical Significance Testing
 Which correction for multiple comparisons should I use?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Use the default maximum statistic (``correction="max_stat"``) for targets without a natural neighbourhood: states, parcels, connections and summary statistics. Use a cluster-based test (``"cluster"``) or TFCE (``"tfce"``) for effects that are extended along time or frequency, such as network responses and spectra. Use FDR (``"fdr"``) when you test very many targets (e.g. a connectivity matrix) and a small fraction of false positives is acceptable. See the :doc:`statistics page <stats>` for a table and the :doc:`Statistical Inference tutorial <tutorials_build/7-1_statistical_inference>` for a comparison on the same data.
+Use the default maximum statistic (``correction="max_stat"``) for targets without a natural neighbourhood: states, parcels, connections and summary statistics. Use a cluster-based test (``"cluster"``) or TFCE (``"tfce"``) for effects that are extended along time or frequency, such as network responses and spectra. Use FDR (``"fdr"``) when you test very many targets (e.g. a connectivity matrix) and a small fraction of false positives is acceptable. See the :doc:`statistics page <user_guide/stats>` for a table and the :doc:`Statistical Inference tutorial <tutorials_build/7-1_statistical_inference>` for a comparison on the same data.
 
 How many permutations do I need?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

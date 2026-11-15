@@ -60,7 +60,7 @@ the appropriate inference base class):
    * - :py:mod:`~osl_dynamics.models.hmm`
      - Markov
      - Hidden Markov Model with MVN observations.
-       See :doc:`model description </models/hmm>`.
+       See :doc:`model description </user_guide/models/hmm>`.
    * - :py:mod:`~osl_dynamics.models.hmm_poi`
      - Markov
      - HMM with Poisson observations.
@@ -68,16 +68,16 @@ the appropriate inference base class):
      - Markov
      - HMM with Integrated Variability Estimation
        (session-specific parameters via embeddings).
-       See :doc:`model description </models/hive>`.
+       See :doc:`model description </user_guide/models/hive>`.
    * - :py:mod:`~osl_dynamics.models.dynemo`
      - Variational
      - Dynamic Network Modes (continuous mode mixing via RNN).
-       See :doc:`model description </models/dynemo>`.
+       See :doc:`model description </user_guide/models/dynemo>`.
    * - :py:mod:`~osl_dynamics.models.mdynemo`
      - Variational
      - Multi-Dynamic Network Modes (separate dynamics for
        power and connectivity).
-       See :doc:`model description </models/mdynemo>`.
+       See :doc:`model description </user_guide/models/mdynemo>`.
    * - :py:mod:`~osl_dynamics.models.sc_dynemo`
      - Variational
      - Single-Channel DyNeMo (extends DyNeMo).
@@ -88,7 +88,7 @@ the appropriate inference base class):
      - Variational
      - Dynamic Network States (discrete states with
        non-Markovian temporal model).
-       See :doc:`model description </models/dyneste>`.
+       See :doc:`model description </user_guide/models/dyneste>`.
 
 **Utilities** (``obs_mod.py``)
 
@@ -128,7 +128,7 @@ or, if you installed osl-dynamics with pip:
 
     pip install "osl-dynamics[tf]"
 
-See https://osl-dynamics.readthedocs.io/en/latest/install.html\
+See https://osl-dynamics.readthedocs.io/en/latest/install/index.html\
 """
 
 
