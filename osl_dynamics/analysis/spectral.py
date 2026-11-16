@@ -631,6 +631,12 @@ def regression_spectra(
     sigma : np.ndarray
         Group-level standard deviation of the windowed :code:`alpha` for each
         mode. Shape is (n_modes,). Only returned if :code:`return_sigma=True`.
+
+    References
+    ----------
+    Quinn, A. J. et al. (2024). The GLM-spectrum: A multilevel framework for
+    spectrum analysis with covariate and confound modelling. Imaging
+    Neuroscience, 2. https://doi.org/10.1162/imag_a_00082
     """
 
     # Validation

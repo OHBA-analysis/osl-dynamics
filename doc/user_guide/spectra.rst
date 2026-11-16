@@ -27,7 +27,7 @@ The spectrum at time :math:`t` is modeled as a mixture of the spectra of each st
 .. math::
     P_t(f) = \sum_j \alpha_{jt} P_j(f).
 
-:func:`~osl_dynamics.analysis.spectral.regression_spectra` calculates a spectrogram :math:`P_t` (cross spectra in a sliding window of :code:`window_length` samples, each split into :code:`n_sub_windows` Hann-tapered sub-windows), averages :code:`alpha` over the same windows and fits the mixture with least squares. The frequency resolution is set by the sub-window length, :code:`window_length / n_sub_windows` samples.
+:func:`~osl_dynamics.analysis.spectral.regression_spectra` calculates a spectrogram :math:`P_t` (cross spectra in a sliding window of :code:`window_length` samples, each split into :code:`n_sub_windows` Hann-tapered sub-windows), averages :code:`alpha` over the same windows and fits the mixture with least squares, i.e. a GLM-spectrum [1]_. The frequency resolution is set by the sub-window length, :code:`window_length / n_sub_windows` samples.
 
 For DyNeMo, pass the mixing coefficients returned by the model. The mixing coefficients re-weighted with :func:`~osl_dynamics.inference.modes.reweight_alphas` are for summary statistics.
 
@@ -176,3 +176,8 @@ Power maps and coherence networks
 
 - **Power maps.** The coefficients integrated over frequency with :func:`~osl_dynamics.analysis.power.variance_from_spectra`: the change in power from the static power, as a fraction of each parcel's variance (with the default :code:`standardize=True`). Red is an increase and blue a decrease. Pass :code:`frequency_range` (e.g. :code:`[8, 12]`) for a frequency band. Divide by the intercept for the relative change in power. Use the coefficients, not :math:`S + \beta_j`, for power maps and to compare modes.
 - **Coherence networks.** The edges with the largest changes in coherence, increases (red) and decreases (blue).
+
+References
+----------
+
+.. [1] Quinn, A. J. et al. (2024). The GLM-spectrum: A multilevel framework for spectrum analysis with covariate and confound modelling. `Imaging Neuroscience <https://doi.org/10.1162/imag_a_00082>`_, 2.
