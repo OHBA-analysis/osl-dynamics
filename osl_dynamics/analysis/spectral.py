@@ -804,7 +804,8 @@ def rescale_regression_coefs(
     # Number of arrays
     n_sessions = len(alpha)
 
-    # Window alphas to match the windowing of STFT
+    # Window alphas to match the windowing of STFT, using the same windows as
+    # regression_spectra
     alpha = [
         _window_mean(
             a,
@@ -812,7 +813,7 @@ def rescale_regression_coefs(
             window_length,
             step_size=step_size,
             n_sub_windows=n_sub_windows,
-        )
+        )[_inner_windows(a.shape[0], window_length, step_size)]
         for a in alpha
     ]
 
@@ -2035,15 +2036,50 @@ def _regress_welch_spectrogram(
         n_sub_windows=n_sub_windows,
     )
     a = _window_mean(alpha, "hann", window_length, step_size, n_sub_windows)
+
+    # Only use windows that do not overlap the zero padding at the start/end
+    keep = _inner_windows(data.shape[0], window_length, step_size)
     coefs, intercept = linear_regression(
-        a,
-        p,
+        a[keep],
+        p[keep],
         fit_intercept=True,
         normalize=True,
         log_message=False,
         n_jobs=1,
     )
     return f, coefs, intercept
+
+
+def _inner_windows(n_samples: int, window_length: int, step_size: int) -> np.ndarray:
+    """Windows of :func:`_welch_spectrogram` that do not overlap the zero padding.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples in the data.
+    window_length : int
+        Number of data points in a window.
+    step_size : int
+        Step size for shifting the window.
+
+    Returns
+    -------
+    indices : np.ndarray
+        Indices of the windows that only contain data.
+    """
+    window_length = int(window_length)
+    step_size = int(step_size)
+    n_windows = n_samples // step_size
+
+    # Window i covers samples i * step_size - window_length // 2 to
+    # i * step_size - window_length // 2 + window_length of the data
+    start = np.arange(n_windows) * step_size - window_length // 2
+    indices = np.flatnonzero((start >= 0) & (start + window_length <= n_samples))
+    if len(indices) == 0:
+        raise ValueError(
+            f"Each session must have at least window_length={window_length} samples."
+        )
+    return indices
 
 
 def _window_mean(
@@ -2096,18 +2132,18 @@ def _window_mean(
         a_window = alpha[j : j + window_length]
 
         # Calculate alpha for the sub-window by taking the mean
-        # over time after applying the windowing function
+        # over time weighted by the windowing function
         a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
         for k in range(n_sub_windows):
-            a_sub_window[k] = np.mean(
+            a_sub_window[k] = np.average(
                 a_window[
                     k
                     * window_length
                     // n_sub_windows : (k + 1)
                     * window_length
                     // n_sub_windows
-                ]
-                * window[..., np.newaxis],
+                ],
+                weights=window,
                 axis=0,
             )
 
