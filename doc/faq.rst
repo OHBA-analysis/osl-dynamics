@@ -303,7 +303,7 @@ See the 'Spectral Analysis' section of the :doc:`HMM description <user_guide/mod
 How does the regression spectrum calculation work?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-See the 'Spectral Analysis' section of the :doc:`DyNeMo model description <user_guide/models/dynemo>`.
+See the :doc:`Spectral Analysis <user_guide/spectra>` page, which also describes how to interpret and plot the regression spectra.
 
 Statistical Significance Testing
 --------------------------------
