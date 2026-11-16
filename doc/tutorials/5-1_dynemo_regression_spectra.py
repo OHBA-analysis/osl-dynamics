@@ -76,33 +76,19 @@ for a, x in zip(alpha, trimmed_data):
     print(a.shape, x.shape)
 
 #%%
-# If the first dimension of these arrays don't match then the wrong value for `n_embeddings` or `sequence_length` was used when we trimemd the data.
+# If the first dimension of these arrays don't match then the wrong value for `n_embeddings` or `sequence_length` was used when we trimmed the data.
 #
-# Reweight the mixing coefficients
-# ********************************
-# The mixing coefficients inferred by DyNeMo do not account for the 'size' of each mode covariance. Before calculate the mode spectra, we reweight the mixing coefficients using the trace of each mode covariance. First, let's load the inferred mode covariances.
-
-import numpy as np
-
-covs = np.load("results/inf_params/covs.npy")
-
-#%%
-# Now, let's reweight the mixing coefficients.
-
-
-from osl_dynamics.inference import modes
-
-alpha = modes.reweight_alphas(alpha, covs)
-
-#%%
+# We use the mixing coefficients inferred by DyNeMo directly, not the re-weighted mixing coefficients (:func:`modes.reweight_alphas <osl_dynamics.inference.modes.reweight_alphas>`), which are for summary statistics.
+#
 # Calculating Subject/Mode Spectra
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-# Using the reweights mixing coefficients and source space data, we can calculate the spectral properties of each mode.
+# Using the mixing coefficients and source space data, we can calculate the spectral properties of each mode.
 #
 # Power spectra and coherences
 # ****************************
-# We want to calculate the power spectrum and coherence of each mode. A linear regression approach where we regress the spectrogram (time-varying spectra) with the inferred mixing coefficients. We do this with the :func:`analysis.spectral.regression_spectra <osl_dynamics.analysis.spectral.regression_spectra>` function in osl-dynamics. Let's first run this function, then we'll discuss its output.
+# We want to calculate the power spectrum and coherence of each mode. We calculate a spectrogram (time-varying spectra) and fit it as a mixture of the mode spectra weighted by the mixing coefficients. We do this with the :func:`analysis.spectral.regression_spectra <osl_dynamics.analysis.spectral.regression_spectra>` function in osl-dynamics. Let's first run this function, then we'll discuss its output.
 
+import numpy as np
 from osl_dynamics.analysis import spectral
 
 # Calculate regression spectra for each mode and subject (will take a few minutes)
@@ -127,7 +113,14 @@ print(coh.shape)
 print(w.shape)
 
 #%%
-# We can see the `f` array is 1D, it corresponds to the frequency axis. The `psd` array corresponds to the PSDs and is (subjects, 2, states, channels, frequencies), the second dimension corresponds to the regression coefficients and intercept for each subject. The `coh` array corresponds to the pairwise coherence and is (subjects, states, channels, channels, frequencies). `w` is an array containing weights for each subject when calculating a group average.
+# We can see:
+#
+# - `f` is 1D and is the frequency axis.
+# - `psd` is (subjects, 2, modes, channels, frequencies). The second dimension contains the regression coefficients (index 0) and intercept (index 1) for each subject. The intercept is the static (time-averaged) PSD. The coefficients are the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient: positive where a mode has more power than the static PSD and negative where it has less.
+# - `coh` is (subjects, modes, channels, channels, frequencies). It is the change in coherence from the static coherence for a one standard deviation increase in a mode's mixing coefficient.
+# - `w` contains the weight for each subject when calculating a group average.
+#
+# The coefficients of every subject are scaled by the same standard deviation, so the subject-specific spectra can be averaged and compared. See the :doc:`Spectral Analysis </user_guide/spectra>` page of the User Guide for how to interpret these outputs and what to plot.
 #
 # Calculating the spectrum can be time consuming so it is useful to save it as a numpy file, which can be loaded very quickly.
 

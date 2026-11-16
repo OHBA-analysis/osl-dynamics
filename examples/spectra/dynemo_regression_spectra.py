@@ -2,9 +2,7 @@
 
 import os
 import pickle
-import numpy as np
 from osl_dynamics.data import Data
-from osl_dynamics.inference import modes
 from osl_dynamics.analysis import spectral
 
 def get_data(name, rename):
@@ -28,9 +26,6 @@ data = Data("source_data", n_jobs=5)
 data = data.trim_time_series(n_embeddings=15, sequence_length=200)
 
 alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
-
-covs = np.load("results/inf_params/covs.npy")
-alpha = modes.reweight_alphas(alpha, covs)
 
 f, psd, coh, w = spectral.regression_spectra(
     data=data,

@@ -45,13 +45,13 @@ w = np.load("results/spectra/w.npy")
 #%%
 # PSDs
 # ^^^^
-# We can plot the power spectra to see what oscillations typically occur when a particular state is on. Let's first print the shape of the multitaper spectra to understand the format of the data.
+# We can plot the power spectra to see what oscillations typically occur when a particular mode is active. Let's first print the shape of the regression spectra to understand the format of the data.
 
 print(f.shape)
 print(psd.shape)
 
 #%%
-# We can see: `f` is the frequency axis and `psd` is a (subjects, 2, modes, channels, frequencies) array. The second axis in `psd` corresponds to the regression coefficients and intercept when we calculated the mode spectra using :func:`analysis.spectral.regression_spectra <osl_dynamics.analysis.spectral.regression_spectra>`. The intercept term corresponds to the time average (static) spectra and the regression coefficients describe the variation about the average. We're not interested in the static spectra, so we just want to retain the regression coefficients.
+# We can see: `f` is the frequency axis and `psd` is a (subjects, 2, modes, channels, frequencies) array. The second axis in `psd` corresponds to the regression coefficients and intercept when we calculated the mode spectra using :func:`analysis.spectral.regression_spectra <osl_dynamics.analysis.spectral.regression_spectra>`. The intercept is the time-averaged (static) PSD. The regression coefficients are the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient. We plot the regression coefficients. See the :doc:`Spectral Analysis </user_guide/spectra>` page of the User Guide for more details.
 
 psd_coefs = psd[:, 0]
 print(psd_coefs.shape)
@@ -93,17 +93,16 @@ mean_p = np.average(p, axis=0, weights=w)
 print(mean_p.shape)
 
 #%%
-# Now we can plot the power map for each mode.
+# Now we can plot the power map for each mode. The power maps are the change in power from the static power: red regions have more power when a mode is active and blue regions have less.
 
 # Display the power maps (takes a few seconds to appear)
 fig, ax = power.save(
     mean_p,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
-    subtract_mean=True,  # just for visualization
 )
 
 #%%
-# We can see recognisable functional networks, which gives us confidence in the DyNeMo fit. We also see the networks are more localized than typical HMM states.
+# We can see recognizable functional networks, which gives us confidence in the DyNeMo fit. We also see the networks are more localized than typical HMM states. A DyNeMo fit often has one mode with a small covariance that takes most of the mixing coefficients: its power map is negative everywhere.
 #
 # Coherence networks
 # ^^^^^^^^^^^^^^^^^^
@@ -120,13 +119,13 @@ c = connectivity.mean_coherence_from_spectra(f, coh)
 print(c.shape)
 
 #%%
-# We now have a (subjects, modes, channels, channels) array. Next we need to average over subjects and threshold the coherence networks.
+# We now have a (subjects, modes, channels, channels) array. This is the change in coherence from the static coherence: positive where the coherence increases when a mode is active and negative where it decreases. Next we average over subjects and show the edges with the largest increase in coherence.
 
 # Average over subjects
 mean_c = np.average(c, axis=0, weights=w)
 
-# Threshold the top 3% relative to the mean
-thres_mean_c = connectivity.threshold(mean_c, percentile=97, subtract_mean=True)
+# Threshold the top 3% of edges, keeping only increases
+thres_mean_c = connectivity.threshold(np.clip(mean_c, 0, None), percentile=97)
 
 #%%
 # Now we can visualize the networks.
@@ -142,12 +141,13 @@ connectivity.save(
 #
 # Coherence maps
 # ^^^^^^^^^^^^^^
-# We can display the coherence as a spatial map rather than a graphical network by averaging the edges for each parcel.
+# We can display the coherence as a spatial map rather than a graphical network by averaging the edges for each parcel (excluding the diagonal, which is the relative change in power).
 
-mean_c_map = connectivity.mean_connections(mean_c)
+n_parcels = mean_c.shape[-1]
+mean_c[:, range(n_parcels), range(n_parcels)] = 0
+mean_c_map = np.sum(mean_c, axis=-1) / (n_parcels - 1)
 
 fig, ax = power.save(
     mean_c_map,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
-    subtract_mean=True,  # just for visualization
 )

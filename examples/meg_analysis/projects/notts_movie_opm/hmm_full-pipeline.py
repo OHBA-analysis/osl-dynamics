@@ -160,23 +160,8 @@ f, psd, coh, w = analysis.spectral.regression_spectra(
 # Average subject-specific PSDs to get the group-level mode PSDs
 gpsd = np.average(psd, axis=0, weights=w)
 
-# Sum regression coefficients and intercept and calculate mean over channels
-P = np.sum(gpsd, axis=0)
-p = np.mean(P, axis=1)
-e = np.std(P, axis=1) / np.sqrt(P.shape[1])
-
-plotting.plot_line(
-    [f] * p.shape[0],
-    p,
-    labels=[f"Mode {i}" for i in range(1, p.shape[0] + 1)],
-    errors=[p - e, p + e],
-    x_range=[0, 45],
-    x_label="Frequency (Hz)",
-    y_label="PSD (a.u.)",
-    filename=f"{analysis_dir}/psd1.png",
-)
-
-# Just plot the regression coefficients averaged over channels
+# Plot the regression coefficients (change from the static PSD) averaged
+# over channels
 P = gpsd[0]
 p = np.mean(P, axis=1)
 e = np.std(P, axis=1) / np.sqrt(P.shape[1])
@@ -189,7 +174,7 @@ plotting.plot_line(
     x_range=[0, 45],
     x_label="Frequency (Hz)",
     y_label="PSD (a.u.)",
-    filename=f"{analysis_dir}/psd2.png",
+    filename=f"{analysis_dir}/psd.png",
 )
 
 # Average subject-specific coherences to get the group-level mode coherences
@@ -200,28 +185,28 @@ gcoh = np.average(coh, axis=0, weights=w)
 # Source reconstruction files
 parcellation_file = "atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz"
 
-# Calculate relative (regression coefficients only) power maps using the mode PSDs
+# Calculate power maps (change from the static power) using the regression
+# coefficients
 power_map = analysis.power.variance_from_spectra(f, gpsd[0])
 analysis.power.save(
     power_map=power_map,
     parcellation_file=parcellation_file,
     filename=f"{maps_dir}/power_.png",
-    subtract_mean=True,
 )
 
 # Calculate connectivity maps using mode coherences
 coh_map = analysis.connectivity.mean_coherence_from_spectra(f, gcoh)
 
-# Use a GMM to threshold the connectivity maps
+# Use a GMM to threshold the connectivity maps (increases in coherence only)
 coh_map = analysis.connectivity.gmm_threshold(
     coh_map,
-    subtract_mean=True,
+    keep_positive_only=True,
     standardize=True,
     one_component_percentile=95,
     n_sigma=2,
     filename=f"{maps_dir}/gmm_coh_.png",
     plot_kwargs={
-        "x_label": "Standardized Relative Coherence",
+        "x_label": "Standardized Change in Coherence",
         "y_label": "Probability",
     },
 )
