@@ -29,16 +29,14 @@ The spectrum at time :math:`t` is modeled as a mixture of the spectra of each st
 
 :func:`~osl_dynamics.analysis.spectral.regression_spectra` calculates a spectrogram :math:`P_t` (cross spectra in a sliding window of :code:`window_length` samples, each split into :code:`n_sub_windows` Hann-tapered sub-windows), averages :code:`alpha` over the same windows and fits the mixture with least squares, i.e. a GLM-spectrum [1]_. The frequency resolution is set by the sub-window length, :code:`window_length / n_sub_windows` samples.
 
-For DyNeMo, pass the mixing coefficients returned by the model. The mixing coefficients re-weighted with :func:`~osl_dynamics.inference.modes.reweight_alphas` are for summary statistics.
-
 Definitions
 ***********
 
 **Static spectrum** :math:`S`. The time-averaged spectrum of the data, :math:`S = \sum_j \bar{\alpha}_j P_j`, where :math:`\bar{\alpha}_j` is the mean of :code:`alpha` for mode :math:`j`.
 
-**Mode spectrum** :math:`P_j`. The spectrum when only state/mode :math:`j` is active. For the HMM, this is the spectrum of the state. For DyNeMo, the mixing coefficients of a mode rarely approach one, so :math:`P_j` is an extrapolation and should not be interpreted.
+**Mode spectrum** :math:`P_j`. The spectrum when only state/mode :math:`j` is active. For the HMM, this is the spectrum of the state. For DyNeMo, the mixing coefficients of a mode rarely approach one, so :math:`P_j` is an extrapolation that doesn't typically arise.
 
-**Standard deviation** :math:`\sigma_j`. The standard deviation of the windowed :code:`alpha` for mode :math:`j`, averaged over sessions. It is the typical size of the fluctuations in a mode's :code:`alpha` over the window length. For the HMM, it is the typical change in the fraction of a window spent in a state. :math:`\sigma_j` decreases with longer windows and depends on the sessions passed.
+**Standard deviation** :math:`\sigma_j`. The standard deviation of the windowed :code:`alpha` for mode :math:`j`, averaged over sessions. It is the typical size of the fluctuations in a mode's :code:`alpha` over the window length.
 
 Outputs
 *******
