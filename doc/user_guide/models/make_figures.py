@@ -12,6 +12,7 @@ writes the figures somewhere else.
 """
 
 import argparse
+import re
 from pathlib import Path
 
 import matplotlib as mpl
@@ -70,18 +71,96 @@ STYLE = {
     "mathtext.cal": "cmsy10",
     "mathtext.fallback": "stixsans",
     "svg.fonttype": "path",
-    "savefig.dpi": 300,
+    "svg.hashsalt": "osl-dynamics",
+    "savefig.dpi": 200,
 }
 
 RNG_SEED = 42
 
 
-def save(fig, name, fmt):
-    """Save a figure to the output directory."""
+def save(fig, name, fmt, smooth_images=False):
+    """Save a figure to the output directory.
+
+    Pass smooth_images=True to let the viewer smooth images embedded at their
+    own resolution (:code:`interpolation="none"`) in an SVG.
+    """
     path = OUTPUT_DIR / f"{name}.{fmt}"
-    fig.savefig(path, bbox_inches="tight", pad_inches=0.03, facecolor="white")
+    metadata = {"Date": None} if fmt in ["svg", "pdf"] else None
+    fig.savefig(
+        path, bbox_inches="tight", pad_inches=0.03, facecolor="white", metadata=metadata
+    )
     plt.close(fig)
+    if fmt == "svg":
+        compact_svg(path, smooth_images)
     print(f"Saved {path}")
+
+
+NUMBER = re.compile(r"-?\d+\.\d+")
+
+
+def _round_number(match):
+    """Round a number to 2 decimal places and remove trailing zeros."""
+    value = f"{float(match.group()):.2f}".rstrip("0").rstrip(".")
+    return "0" if value == "-0" else value
+
+
+def _format(value):
+    """Format a number with at most 2 decimal places."""
+    text = f"{value:.2f}".rstrip("0").rstrip(".")
+    return "0" if text in ["-0", ""] else text
+
+
+def _compact_path(d):
+    """Write path data with relative coordinates rounded to 0.01 pt."""
+    tokens = d.replace(",", " ").split()
+    n_args = {"M": 2, "L": 2, "Q": 4, "C": 6, "Z": 0}
+    out = []
+    current = start = (0.0, 0.0)
+    previous = None
+    i = 0
+    while i < len(tokens):
+        command = tokens[i].upper()
+        i += 1
+        if command not in n_args:
+            # Unexpected path data, leave it unchanged
+            return d
+        if command == "Z":
+            out.append("z")
+            current = start
+            previous = "z"
+            continue
+        args = [round(float(x), 2) for x in tokens[i : i + n_args[command]]]
+        i += n_args[command]
+        if not out:
+            # The first move is absolute
+            out.append("M" + " ".join(_format(x) for x in args))
+            current = start = (args[0], args[1])
+            previous = "m"
+            continue
+        deltas = [x - current[j % 2] for j, x in enumerate(args)]
+        letter = command.lower()
+        text = " ".join(_format(x) for x in deltas)
+        if letter == previous and letter in "lcq":
+            # A repeated command is implicit
+            out.append(" " + text if not text.startswith("-") else text)
+        else:
+            out.append(letter + text)
+        previous = letter
+        current = (args[-2], args[-1])
+        if command == "M":
+            start = current
+    return "".join(out)
+
+
+def compact_svg(path, smooth_images=False):
+    """Make an SVG smaller: round path coordinates to 0.01 pt and remove metadata and whitespace."""
+    text = path.read_text()
+    if smooth_images:
+        text = re.sub(r"image-rendering:[a-z-]+;?", "", text)
+    text = re.sub(r"<metadata>.*?</metadata>", "", text, flags=re.S)
+    text = re.sub(r' d="([^"]*)"', lambda m: f' d="{_compact_path(m.group(1))}"', text)
+    text = re.sub(r">\s+<", "><", text)
+    path.write_text(text)
 
 
 # -- Drawing helpers -----------------------------------------------------------
@@ -204,22 +283,31 @@ def state_band(ax, stc, t, alpha=1.0):
         )
 
 
-def stacked(ax, t, alpha, gap=0.6, step=False):
+def stacked(ax, t, alpha, gap=0.6, step=False, max_points=250):
     """Stacked area plot of probabilities, with thin white lines between layers.
 
-    Pass step=True for a one-hot state time course.
+    Pass step=True for a one-hot state time course. Otherwise, at most
+    max_points time points are drawn.
     """
-    cumulative = np.zeros(len(t))
-    for k in range(alpha.shape[1]):
-        top = cumulative + alpha[:, k]
-        ax.fill_between(
-            t, cumulative, top, color=STATES[k], lw=0, step="post" if step else None
-        )
-        if k < alpha.shape[1] - 1:
-            ax.plot(t, top, color="white", lw=gap, drawstyle="steps-post" if step else "default")
-        cumulative = top
+    t = np.asarray(t)
+    alpha = np.asarray(alpha)
+    xlim = (t[0], t[-1])
+    if step:
+        # First time point of each state visit, and the last time point
+        change = np.flatnonzero(np.any(np.diff(alpha, axis=0) != 0, axis=1)) + 1
+        keep = np.unique(np.concatenate([[0], change, [len(t) - 1]]))
+    else:
+        keep = np.unique(np.linspace(0, len(t) - 1, min(len(t), max_points)).round().astype(int))
+    t, alpha = t[keep], alpha[keep]
+    tops = np.cumsum(alpha, axis=1)
+
+    # Each layer is filled from zero, starting with the top layer
+    for k in reversed(range(alpha.shape[1])):
+        ax.fill_between(t, 0, tops[:, k], color=STATES[k], lw=0, step="post" if step else None)
+    for k in range(alpha.shape[1] - 1):
+        ax.plot(t, tops[:, k], color="white", lw=gap, drawstyle="steps-post" if step else "default")
     ax.set_ylim(0, 1)
-    ax.set_xlim(t[0], t[-1])
+    ax.set_xlim(*xlim)
 
 
 # -- Simulations ---------------------------------------------------------------
@@ -1306,14 +1394,18 @@ def dynemo_regression_spectra(fmt):
         bottom=0.16,
     )
     ax = fig.add_subplot(gs[0, 0])
-    ax.pcolormesh(
-        ts_,
-        fs_[keep],
+    # The spectrogram is embedded at its own resolution and smoothed by the viewer
+    df = fs_[1] - fs_[0]
+    dt = ts_[1] - ts_[0]
+    ax.imshow(
         S[keep],
         cmap=SEQUENTIAL,
+        vmin=0,
         vmax=np.percentile(S[keep], 99),
-        shading="gouraud",
-        rasterized=True,
+        origin="lower",
+        aspect="auto",
+        interpolation="none",
+        extent=[ts_[0] - dt / 2, ts_[-1] + dt / 2, fs_[keep][0] - df / 2, fs_[keep][-1] + df / 2],
     )
     ax.set_xlim(0, 10)
     ax.set_ylim(2, 30)
@@ -1342,17 +1434,20 @@ def dynemo_regression_spectra(fmt):
     ax = fig.add_subplot(right[1])
     ax.axhline(0, color=FAINT, lw=0.6)
     for j in range(3):
-        ax.plot(f, coefs[j], color=STATES[j], lw=1.3)
-        k = np.argmax(coefs[j])
-        ax.text(f[k], coefs[j][k] * 1.04, f"Mode {j + 1}", fontsize=8.5, ha="center", va="bottom")
+        ax.plot(f, coefs[j], color=STATES[j], lw=1.3, label=f"Mode {j + 1}")
+    ax.legend(
+        loc="upper right",
+        frameon=False,
+        handlelength=1.2,
+        borderaxespad=0,
+    )
     ax.set_xlim(f[0], f[-1])
-    ax.set_ylim(None, 1.3 * coefs.max())
     ax.set_yticks([0])
     ax.set_xlabel("Frequency (Hz)")
     ax.set_title("Regression coefficients", loc="left", pad=4)
     panel_label(ax, "c", x=-0.08, y=1.0)
 
-    save(fig, "dynemo-regression-spectra", fmt)
+    save(fig, "dynemo-regression-spectra", fmt, smooth_images=True)
 
 
 # -- DyNeStE -------------------------------------------------------------------
@@ -1488,7 +1583,7 @@ def dyneste_gumbel_softmax(fmt):
         gridspec_kw={"hspace": 0.45, "left": 0.2, "right": 0.86},
     )
     for ax, (y, title) in zip(axes, rows):
-        stacked(ax, t, y)
+        stacked(ax, t, y, max_points=len(t))
         ax.set_yticks([0, 1])
         ax.spines["left"].set_bounds(0, 1)
         ax.text(-0.04, 0.5, title, transform=ax.transAxes, ha="right", va="center")
