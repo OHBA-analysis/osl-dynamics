@@ -527,24 +527,46 @@ def regression_spectra(
     calc_coh: bool = True,
     return_weights: bool = False,
     return_coef_int: bool = False,
+    return_sigma: bool = False,
     keepdims: bool = False,
     n_jobs: int = 1,
 ):
     r"""Calculates mode-specific spectra by regressing a spectrogram with alpha.
 
-    We use :func:`osl_dynamics.analysis.spectral._welch_spectrogram`
-    to calculate the spectrogram. Only windows that do not overlap the start
-    or end of the data are used.
+    We calculate a spectrogram :math:`P_t` with
+    :func:`osl_dynamics.analysis.spectral._welch_spectrogram` and average
+    :code:`alpha` over the same windows. Only windows that do not overlap the
+    start or end of the data are used.
 
     If :code:`alpha` sums to one at each time point, the spectrogram is
     modeled as a mixture of mode spectra, :math:`P_t = \sum_j \alpha_{jt}
-    P_j`. The intercept is the static (time-averaged) spectrum and the
-    coefficient for mode :math:`j` is :math:`\sigma_j (P_j - \text{intercept})`,
-    where :math:`\sigma_j` is the standard deviation of the windowed
-    :code:`alpha` for mode :math:`j`. Otherwise, we use a linear regression
-    with standardized regressors and an intercept. In both cases, the
-    coefficients are the change in the spectrum for a one standard deviation
-    increase in a mode's :code:`alpha`.
+    P_j`, where :math:`P_j` is the spectrum when only mode :math:`j` is
+    active. We return:
+
+    - The **intercept**: the static (time-averaged) spectrum,
+      :math:`S = \sum_j \bar{\alpha}_j P_j`.
+    - The **coefficients**: :math:`\beta_j = \sigma_j (P_j - S)`, the change
+      in the spectrum from the static spectrum for a one standard deviation
+      increase in mode :math:`j`'s :code:`alpha`. :math:`\sigma_j` is the
+      standard deviation of the windowed :code:`alpha`, averaged over
+      sessions.
+    - The **coherence**: the change in coherence from the static coherence,
+
+      .. math::
+          C_{jxy} = \frac{\text{Re}(\beta_{jxy} e^{-i\phi_{xy}})}{\sqrt{S_{xx}
+          S_{yy}}},
+
+      where :math:`\phi_{xy}` is the phase of :math:`S_{xy}`. The diagonal is
+      the relative change in power, :math:`\beta_{jxx} / S_{xx}`.
+
+    The mode spectrum is :math:`P_j = S + \beta_j / \sigma_j`. If :code:`alpha`
+    does not sum to one (e.g. a subset of modes), we use a linear regression
+    with standardized regressors and an intercept.
+
+    Power maps and coherence networks should be calculated from the
+    coefficients and coherence without subtracting the mean over modes. See
+    the :doc:`User Guide </user_guide/spectra>` for how to interpret and plot
+    the outputs.
 
     Parameters
     ----------
@@ -576,6 +598,9 @@ def regression_spectra(
     return_coef_int : bool, optional
         Should we return the regression coefficients and intercept
         separately for the mode PSDs?
+    return_sigma : bool, optional
+        Should we return the group-level standard deviation of the windowed
+        :code:`alpha` used to scale the coefficients?
     keepdims : bool, optional
         Should we enforce a (n_sessions, n_states, ...) array is returned for
         :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimension
@@ -594,11 +619,15 @@ def regression_spectra(
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
     coh : np.ndarray
-        Mode coherences. Shape is (n_sessions, n_modes, n_channels, n_channels,
-        n_freq). Any axis of length 1 is removed if :code:`keepdims=False`.
+        Change in coherence for each mode. Shape is (n_sessions,
+        n_modes, n_channels, n_channels, n_freq). Any axis of length 1 is
+        removed if :code:`keepdims=False`.
     w : np.ndarray
         Weight for each session-specific PSD. Shape is (n_sessions,).
         Only returned if :code:`return_weights=True`.
+    sigma : np.ndarray
+        Group-level standard deviation of the windowed :code:`alpha` for each
+        mode. Shape is (n_modes,). Only returned if :code:`return_sigma=True`.
     """
 
     # Validation
@@ -676,26 +705,49 @@ def regression_spectra(
         label="session",
     )
 
-    # Unpack results
-    Pj = []
-    for result in results:
-        f, coefs, intercept = result
-        Pj.append([coefs, [intercept] * coefs.shape[0]])
-    Pj = np.array(Pj)
-
     # Weights for calculating a group-average spectrum
     n_samples = [d.shape[0] for d in data]
     w = np.array(n_samples) / np.sum(n_samples)
+
+    # Group-level standard deviation of the windowed alpha for each mode,
+    # averaged over the sessions where the mode's alpha varies
+    sigma = np.array([result[3] for result in results])
+    used = sigma > 0
+    total_weight = np.sum(w[:, np.newaxis] * used, axis=0)
+    group_sigma = np.divide(
+        np.sum(w[:, np.newaxis] * sigma, axis=0),
+        total_weight,
+        out=np.full(sigma.shape[1], np.nan),
+        where=total_weight > 0,
+    )
+
+    # Unpack results, rescaling the coefficients to the change in the spectrum
+    # for a one group-level standard deviation increase in a mode's alpha
+    Pj = []
+    for result, s, u in zip(results, sigma, used):
+        f, coefs, intercept, _ = result
+        # Modes with a constant alpha in this session have no estimate (NaN)
+        scale = np.divide(
+            group_sigma, s, out=np.full_like(group_sigma, np.nan), where=u
+        )
+        scale = scale.reshape((-1,) + (1,) * (coefs.ndim - 1))
+        coefs = (coefs * scale).astype(coefs.dtype)
+        Pj.append([coefs, [intercept] * coefs.shape[0]])
+    Pj = np.array(Pj)
+
+    # Optional outputs
+    extra = []
+    if return_weights:
+        extra.append(w)
+    if return_sigma:
+        extra.append(group_sigma)
 
     if not calc_coh:
         if not return_coef_int:
             # Sum coefficients and intercept
             Pj = np.sum(Pj, axis=1)
 
-        if return_weights:
-            return f, np.squeeze(Pj), w
-        else:
-            return f, np.squeeze(Pj)
+        return (f, np.squeeze(Pj), *extra)
 
     # Number of channels and frequency bins
     n_channels = data[0].shape[1]
@@ -732,13 +784,19 @@ def regression_spectra(
         p = P[i, :, :, range(n_channels), range(n_channels)].real
         psd[i] = np.rollaxis(p, axis=0, start=3)
 
-        # Calculate coherence
-        for k in range(n_channels):
-            for l in range(n_channels):
-                Pxy = P[i, 0, :, k, l]  # regression coefficients
-                Pxx = P[i, 1, :, k, k].real  # regression intercept
-                Pyy = P[i, 1, :, l, l].real  # regression intercept
-                coh[i, :, k, l] = np.abs(Pxy) / np.sqrt(Pxx * Pyy)
+        # Coherence: change in the cross spectrum in the direction (phase) of
+        # the static cross spectrum, normalized by the static power
+        coefs, intercept = P[i, 0], P[i, 1]
+        pxx = intercept[:, range(n_channels), range(n_channels)].real
+        norm = np.sqrt(pxx[:, :, np.newaxis] * pxx[:, np.newaxis, :])
+        abs_intercept = np.abs(intercept)
+        phase = np.divide(
+            intercept,
+            abs_intercept,
+            out=np.zeros_like(intercept),
+            where=abs_intercept > 0,
+        )
+        coh[i] = np.real(coefs * np.conj(phase)) / norm
 
     if not return_coef_int:
         # Sum coefficients and intercept
@@ -749,96 +807,7 @@ def regression_spectra(
         psd = np.squeeze(psd)
         coh = np.squeeze(coh)
 
-    if return_weights:
-        return f, psd, coh, w
-    else:
-        return f, psd, coh
-
-
-def rescale_regression_coefs(
-    psd: np.ndarray,
-    alpha: Union[np.ndarray, list],
-    window_length: int,
-    step_size: int,
-    n_sub_windows: int = 1,
-) -> np.ndarray:
-    """Rescales regression coefficients with maximum regressor values.
-
-    Parameters
-    ----------
-    psd : np.ndarray
-        Mode PSDs. Shape must be (n_sessions, 2, n_modes, n_channels, n_freq).
-    alpha : np.ndarray or list
-        Inferred mode mixing coefficients. Shape must be (n_sessions, n_samples,
-        n_modes) or (n_samples, n_modes).
-    window_length : int
-        Number samples used as the window to calculate a PSD.
-    step_size : int
-        Step size used for shifting the window.
-    n_sub_windows : int, optional
-        Number of sub-windows used to average the spectra. :code:`window_length`
-        must be divisible by :code:`n_sub_windows`.
-
-    Returns
-    -------
-    psd : np.ndarray
-        Mode PSDs rescaled with maximum regressor values.
-        Shape is identical to the input.
-    """
-
-    # Validation
-    if psd.ndim == 4:
-        psd = psd[np.newaxis, ...]
-
-    if psd.ndim != 5:
-        raise ValueError(
-            "psd must have shape (n_sessions, 2, n_modes, n_channels, n_freqs)."
-        )
-
-    if isinstance(alpha, np.ndarray) and alpha.ndim == 2:
-        alpha = [alpha]
-
-    if len(psd) != len(alpha):
-        raise ValueError(
-            "A different number of arrays has been passed for "
-            f"psd and alpha: len(psd)={len(psd)}, "
-            f"len(alpha)={len(alpha)}."
-        )
-
-    for i in range(len(alpha)):
-        if alpha[i].shape[1] != psd[i].shape[1]:
-            raise ValueError("psd and alpha must have same number of modes.")
-
-    # Prevent in-place operation
-    psd = psd.copy()
-
-    # Number of arrays
-    n_sessions = len(alpha)
-
-    # Window alphas to match the windowing of STFT, using the same windows as
-    # regression_spectra
-    alpha = [
-        _window_mean(
-            a,
-            "hann",
-            window_length,
-            step_size=step_size,
-            n_sub_windows=n_sub_windows,
-        )[_inner_windows(a.shape[0], window_length, step_size)]
-        for a in alpha
-    ]
-
-    # Normalize the alphas
-    alpha = [(a - np.mean(a, axis=0)) / np.std(a, axis=0) for a in alpha]
-
-    # Get maximum regressor values
-    max_alpha = [np.max(a, axis=0) for a in alpha]
-
-    # Rescale the regression coefficients
-    for n in range(n_sessions):
-        psd[n, 0] *= np.expand_dims(max_alpha[n], axis=(1, 2))
-
-    return psd
+    return (f, psd, coh, *extra)
 
 
 def coherence_spectra(cpsd: np.ndarray, keepdims: bool = False) -> np.ndarray:
@@ -2036,6 +2005,9 @@ def _regress_welch_spectrogram(
     intercept : np.ndarray
         Intercept. Shape is (n_channels * (n_channels + 1) / 2, n_freq)
         if :code:`calc_cpsd=True`, otherwise it is (n_channels, n_freq).
+    sigma : np.ndarray
+        Standard deviation of the windowed alpha for each mode.
+        Shape is (n_modes,).
     """
     _, f, p = _welch_spectrogram(
         data=data,
@@ -2050,11 +2022,13 @@ def _regress_welch_spectrogram(
 
     # Only use windows that do not overlap the zero padding at the start/end
     keep = _inner_windows(data.shape[0], window_length, step_size)
-    coefs, intercept = _regress_spectrogram(a[keep], p[keep])
-    return f, coefs, intercept
+    coefs, intercept, sigma = _regress_spectrogram(a[keep], p[keep])
+    return f, coefs, intercept, sigma
 
 
-def _regress_spectrogram(a: np.ndarray, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def _regress_spectrogram(
+    a: np.ndarray, p: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Regress a spectrogram on windowed mode time courses.
 
     Parameters
@@ -2067,20 +2041,25 @@ def _regress_spectrogram(a: np.ndarray, p: np.ndarray) -> Tuple[np.ndarray, np.n
     Returns
     -------
     coefs : np.ndarray
-        Regression coefficients. Shape is (n_modes, ...).
+        Change in the spectrum for a one standard deviation increase in each
+        mode time course. Shape is (n_modes, ...).
     intercept : np.ndarray
         Intercept. Shape is (...).
+    sigma : np.ndarray
+        Standard deviation of each mode time course. Shape is (n_modes,).
     """
     sums = np.sum(a, axis=1)
     if not np.allclose(sums, sums[0], rtol=1e-4, atol=0):
-        return linear_regression(
-            a,
+        sigma = np.std(a, axis=0)
+        coefs, intercept = linear_regression(
+            a.copy(),
             p,
             fit_intercept=True,
             normalize=True,
             log_message=False,
             n_jobs=1,
         )
+        return coefs, intercept, sigma
 
     # The mode time courses sum to a constant: model the spectrogram as a
     # mixture of mode spectra, P_t = sum_j a_tj P_j
@@ -2094,11 +2073,12 @@ def _regress_spectrogram(a: np.ndarray, p: np.ndarray) -> Tuple[np.ndarray, np.n
     # Intercept: static spectrum. Coefficients: change in the spectrum for a
     # one standard deviation increase in a mode's time course
     intercept = np.mean(y, axis=0)
-    coefs = np.std(a, axis=0)[:, np.newaxis] * (mode_spectra - intercept)
+    sigma = np.std(a, axis=0)
+    coefs = sigma[:, np.newaxis] * (mode_spectra - intercept)
 
     coefs = coefs.reshape((a.shape[1],) + p.shape[1:]).astype(p.dtype)
     intercept = intercept.reshape(p.shape[1:]).astype(p.dtype)
-    return coefs, intercept
+    return coefs, intercept, sigma
 
 
 def _inner_windows(n_samples: int, window_length: int, step_size: int) -> np.ndarray:
@@ -2140,7 +2120,10 @@ def _window_mean(
     step_size: int,
     n_sub_windows: int,
 ) -> np.ndarray:
-    """Applies a windowing function to a time series and takes the mean.
+    """Mean of a time series in each window of :func:`_welch_spectrogram`.
+
+    The mean in each sub-window is weighted by the square of the windowing
+    function, which is how the periodogram weights each sample.
 
     Parameters
     ----------
@@ -2183,7 +2166,7 @@ def _window_mean(
         a_window = alpha[j : j + window_length]
 
         # Calculate alpha for the sub-window by taking the mean
-        # over time weighted by the windowing function
+        # over time weighted by the squared windowing function
         a_sub_window = np.empty([n_sub_windows, n_modes], dtype=np.float32)
         for k in range(n_sub_windows):
             a_sub_window[k] = np.average(
@@ -2194,7 +2177,7 @@ def _window_mean(
                     * window_length
                     // n_sub_windows
                 ],
-                weights=window,
+                weights=window**2,
                 axis=0,
             )
 

@@ -1089,7 +1089,7 @@ def regression_spectra(data, output_dir: str, kwargs: dict) -> None:
         Path to output directory.
     kwargs : dict
         Keyword arguments to pass to
-        :func:`osl_dynamics.analysis.spectral.regress_spectra`. Defaults to::
+        :func:`osl_dynamics.analysis.spectral.regression_spectra`. Defaults to::
 
             {'sampling_frequency': data.sampling_frequency,
              'window_length': 4 * sampling_frequency,
@@ -1146,19 +1146,16 @@ def regression_spectra(data, output_dir: str, kwargs: dict) -> None:
 
     spectra = spectral.regression_spectra(data=data, alpha=alpha, **kwargs)
 
-    # Unpack spectra and save
-    return_weights = kwargs.pop("return_weights", False)
-    if return_weights:
-        f, psd, coh, w = spectra
-        save(f"{spectra_dir}/f.npy", f)
-        save(f"{spectra_dir}/psd.npy", psd)
-        save(f"{spectra_dir}/coh.npy", coh)
-        save(f"{spectra_dir}/w.npy", w)
-    else:
-        f, psd, coh = spectra
-        save(f"{spectra_dir}/f.npy", f)
-        save(f"{spectra_dir}/psd.npy", psd)
-        save(f"{spectra_dir}/coh.npy", coh)
+    # Save the outputs
+    names = ["f", "psd"]
+    if kwargs.get("calc_coh", True):
+        names.append("coh")
+    if kwargs.get("return_weights", False):
+        names.append("w")
+    if kwargs.get("return_sigma", False):
+        names.append("sigma")
+    for name, x in zip(names, spectra):
+        save(f"{spectra_dir}/{name}.npy", x)
 
 
 def plot_group_ae_networks(
@@ -1634,14 +1631,13 @@ def plot_group_tde_dynemo_networks(
         integrate spectra over. Defaults to the full frequency range.
     percentile : float, optional
         Percentile for thresholding the coherence networks. Default is 97, which
-        corresponds to the top 3% of edges (relative to the mean across states).
-    plot_save_kwargs : dict, optional
+        corresponds to the top 3% of edges (increases in coherence only).
+    power_save_kwargs : dict, optional
         Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::
 
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/pow_.png',
-             'subtract_mean': True,
              'plot_kwargs': {'symmetric_cbar': True}}
     conn_save_kwargs : dict, optional
         Keyword arguments to pass to :func:`osl_dynamics.analysis.connectivity.save`. Defaults to::
@@ -1720,7 +1716,6 @@ def plot_group_tde_dynemo_networks(
     default_power_save_kwargs = {
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
-        "subtract_mean": True,
         "plot_kwargs": {"symmetric_cbar": True},
     }
     if "plot_kwargs" in power_save_kwargs:
@@ -1741,8 +1736,8 @@ def plot_group_tde_dynemo_networks(
         f, gcoh, frequency_range=frequency_range
     )
 
-    # Threshold
-    gc = connectivity.threshold(gc, percentile=percentile, subtract_mean=True)
+    # Threshold, keeping only increases in coherence
+    gc = connectivity.threshold(np.clip(gc, 0, None), percentile=percentile)
 
     # Save coherence networks
     default_conn_save_kwargs = {
