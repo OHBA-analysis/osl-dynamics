@@ -1,63 +1,101 @@
-Dynamic Network States (DyNeSte)
+Dynamic Network States (DyNeStE)
 ================================
 
-Introduction
-------------
+DyNeStE [2] combines the **mutually exclusive states** of the :doc:`HMM <hmm>`, which are interpretable and give summary statistics directly, with the **recurrent neural network (RNN) temporal model** of :doc:`DyNeMo <dynemo>`, which can capture long-range temporal dependencies that the HMM's Markovian assumption cannot. On resting-state MEG data, DyNeStE finds plausible network states and captures long-range temporal structure better than the HMM [2].
 
-DyNeSte combines the strengths of the :doc:`HMM <hmm>` and :doc:`DyNeMo <dynemo>` [1]: the HMM's **discrete states**, which are interpretable and give summary statistics directly (fractional occupancies, lifetimes, switching rates), with DyNeMo's **non-Markovian temporal model**, a recurrent neural network that captures long-range dependencies the HMM's Markovian constraint cannot. On resting-state MEG data it recovers plausible network states and captures long-range temporal structure better than the HMM [1].
+.. list-table::
+   :widths: 25 75
+
+   * - Time course
+     - States: one state is active at each time point
+   * - Observation model
+     - Multivariate normal
+   * - Temporal model
+     - Recurrent neural network (LSTM by default)
+   * - Training
+     - Amortized variational inference with the Gumbel-Softmax distribution, a GPU helps
+   * - API
+     - :class:`~osl_dynamics.models.dyneste.Config`, :class:`~osl_dynamics.models.dyneste.Model`
+   * - Examples
+     - `Simulation <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/dyneste_hmm-mvn.py>`_, `Long-range dependencies <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/dyneste_long-range-dep.py>`_
 
 Generative Model
 ----------------
 
-Mathematically, the generative model (joint probability distribution) is
+The generative model (joint probability distribution) is
 
 .. math::
-    p(x_{1:T}, s_{1:T}) = p(x_1 | s_1) p(s_1) \prod_{t=2}^T p(x_t | s_t) p(s_t | s_{1:t-1}),
+    p(x_{1:T}, s_{1:T}) = p(s_1) p(x_1 | s_1) \prod_{t=2}^T p(s_t | s_{1:t-1}) p(x_t | s_t),
 
-where :math:`x_{1:T}` denotes a sequence of observed data (:math:`x_1, x_2, ..., x_T`) and :math:`s_{1:T}` denotes a sequence of hidden states (:math:`s_1, s_2, ..., s_T`).
+where :math:`x_{1:T}` is the observed data and :math:`s_{1:T}` is the sequence of hidden states.
 
-The observation model is the same as the HMM — a multivariate normal distribution:
-
-.. math::
-    p(x_t | s_t = k) = \mathcal{N}(m_k, C_k),
-
-where :math:`m_k` and :math:`C_k` are state means and covariances and :math:`k` indexes the active state.
-
-The key difference from the HMM is the temporal model: :math:`p(s_t | s_{1:t-1})` depends on the **entire history** of states, not just the previous state. This is achieved using a recurrent neural network (**Model RNN**) that predicts a categorical distribution over states based on the full history:
+The **observation model** is the same as the :doc:`HMM <hmm>`'s, a multivariate normal distribution with a mean, :math:`m_k`, and covariance, :math:`C_k`, for each state:
 
 .. math::
-    p(s_t | s_{1:t-1}) = \mathrm{Cat}(\mathrm{softmax}(\theta^{\mathrm{mod}}_t)),
+    p(x_t | s_t = k) = \mathcal{N}(m_k, C_k).
 
-where :math:`\theta^{\mathrm{mod}}_t` are logits predicted by the Model RNN given the history of states :math:`s_{1:t-1}`.
-
-Inference
----------
-
-DyNeSte uses **amortized variational inference** to learn the model parameters. An **inference RNN** takes the observed data as input and predicts the posterior distribution over states at each time point:
+The **temporal model** is where DyNeStE differs from the HMM: the probability of the next state depends on the **whole history** of states, not just the previous state. A recurrent neural network (the **model RNN**) predicts the logits of a categorical distribution from the previous states:
 
 .. math::
-    q(s_t) = \mathrm{Cat}(\mathrm{softmax}(\theta^{\mathrm{inf}}_t)),
+    p(s_t | s_{1:t-1}) = \mathrm{Cat}(\mathrm{softmax}(\theta^{\mathrm{mod}}_t)).
 
-where :math:`\theta^{\mathrm{inf}}_t` are logits predicted by the inference RNN.
+.. figure:: images/dyneste-graphical-model.svg
+    :class: no-scaled-link
+    :width: 640
+    :align: center
 
-To handle the discrete nature of the states during training, DyNeSte uses the **Gumbel-Softmax** reparameterization trick, which provides a differentiable approximation to sampling from a categorical distribution. The temperature of the Gumbel-Softmax distribution can be annealed during training (starting high and decreasing) to produce increasingly discrete state assignments.
+    DyNeStE as a graphical model. Each state depends on all of the previous states (gray arcs), not just the previous one as in the :doc:`HMM <hmm>`.
 
-Cost Function
-^^^^^^^^^^^^^
+Training
+--------
 
-The cost function used to train DyNeSte is the variational free energy, consisting of:
+DyNeStE in osl-dynamics [1] uses **amortized variational inference**, as :doc:`DyNeMo <dynemo>` does. A bidirectional **inference RNN** predicts the posterior for the state at each time point from the data in the sequence, :math:`x_{1:L}`:
 
-- A **log-likelihood** term: how well the observation model explains the data given the inferred states.
-- A **KL divergence** term: how close the inferred state probabilities (from the inference RNN) are to the prior (from the model RNN).
+.. math::
+    q(s_t | x_{1:L}) = \mathrm{Cat}(\mathrm{softmax}(\theta^{\mathrm{inf}}_t)).
 
-As with DyNeMo, **KL annealing** can be used to stabilize training — the KL term is slowly turned on over the first part of training.
+The cost function is the **variational free energy**, the sum of:
+
+- the negative **log-likelihood** of the data, :math:`-\sum_t \sum_k q(s_t = k) \log \mathcal{N}(x_t | m_k, C_k)`, which uses the state probabilities directly;
+- the **KL divergence** between the posterior, :math:`q(s_t | x_{1:L})`, and the prior from the model RNN, :math:`p(s_t | s_{1:t-1})`.
+
+The model RNN needs samples of the state sequence. Sampling from a categorical distribution isn't differentiable, so DyNeStE samples from the **Gumbel-Softmax** (or Concrete) distribution [3, 4], a continuous relaxation of the categorical distribution that lets the gradients pass through the sampling. Its temperature, :math:`\tau`, controls how close the samples are to one-hot vectors.
+
+.. figure:: images/dyneste-training.svg
+    :class: no-scaled-link
+    :width: 840
+    :align: center
+
+    Amortized variational inference in DyNeStE. The inference RNN predicts the posterior for the states. The log-likelihood uses the state probabilities, and Gumbel-Softmax samples of the states are passed to the model RNN, which predicts the prior. The cost is the negative log-likelihood plus the KL divergence between the posterior and the prior.
+
+.. figure:: images/dyneste-gumbel-softmax.svg
+    :class: no-scaled-link
+    :width: 780
+    :align: center
+
+    Gumbel-Softmax samples from the same posterior (top) at three temperatures. A lower temperature gives samples that are closer to a sequence of one-hot states.
+
+The temperature can be annealed during training (``do_gs_annealing=True``), from ``initial_gs_temperature`` to ``final_gs_temperature`` over ``n_gs_annealing_epochs`` epochs, so that the samples become closer to discrete states. As with DyNeMo, **KL annealing** (``do_kl_annealing=True``) can be used to stabilize training.
+
+Initialization and Hyperparameters
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+DyNeStE is initialized with :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_state_time_course_initialization` by default (``init_method``). :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs the initialization and then ``fit``, and with ``best_of`` it keeps the run with the lowest free energy. The main hyperparameters are the number of states (``n_states``), ``sequence_length``, the number of units in the RNNs (``inference_n_units`` and ``model_n_units``), the Gumbel-Softmax temperatures, ``n_kl_annealing_epochs``, ``batch_size``, ``learning_rate`` and ``n_epochs``.
 
 Post-hoc Analysis
 -----------------
 
-Because DyNeSte infers discrete states, the post-hoc analysis is the same as for the :doc:`HMM <hmm>`: summary statistics (fractional occupancy, mean lifetime, mean interval, switching rate) and multitaper spectral analysis.
+:meth:`model.get_alpha <osl_dynamics.models.inf_mod_base.VariationalInferenceModelBase.get_alpha>` returns the state probabilities, :math:`q(s_t)`. Because DyNeStE infers mutually exclusive states, the post-hoc analysis is the same as for the :doc:`HMM <hmm>`:
+
+- **Summary statistics** of the state time course (from :func:`~osl_dynamics.inference.modes.argmax_time_courses`): fractional occupancy, mean lifetime, mean interval and switching rate. See the :doc:`HMM Summary Statistics tutorial </tutorials_build/4-3_hmm_summary_stats>`.
+- **Spectral analysis** with the multitaper (:func:`~osl_dynamics.analysis.spectral.multitaper_spectra`), and power maps and coherence networks from the spectra. See the :doc:`HMM Multitaper Spectra </tutorials_build/4-1_hmm_multitaper_spectra>` and :doc:`HMM Plotting MEG Networks </tutorials_build/4-2_hmm_plotting_meg_networks>` tutorials.
+
+The summary statistics can be compared between groups or conditions with the :doc:`statistical significance testing </user_guide/stats>` tools. :meth:`~osl_dynamics.models.dyneste.Model.sample_alpha` samples state time courses from the trained model RNN, which can be used to check the long-range temporal structure the model has learned, e.g. the distribution of state lifetimes.
 
 References
 ----------
 
-#. S Cho, R Huang, C Gohil, O Parker Jones, M W Woolrich, Modelling Discrete States and Long-Term Dynamics in Functional Brain Networks. `Imaging Neuroscience, 2026 <https://doi.org/10.1162/IMAG.a.1237>`_.
+1. C Gohil, et al., osl-dynamics, a toolbox for modeling fast dynamic brain activity. `eLife, 2024 <https://elifesciences.org/articles/91949>`_.
+2. S Cho, R Huang, C Gohil, O Parker Jones, M W Woolrich, Modelling discrete states and long-term dynamics in functional brain networks. `Imaging Neuroscience, 2026 <https://doi.org/10.1162/IMAG.a.1237>`_.
+3. E Jang, S Gu, B Poole, Categorical reparameterization with Gumbel-Softmax. `arXiv:1611.01144, 2016 <https://arxiv.org/abs/1611.01144>`_.
+4. C J Maddison, et al., The Concrete distribution: a continuous relaxation of discrete random variables. `arXiv:1611.00712, 2016 <https://arxiv.org/abs/1611.00712>`_.

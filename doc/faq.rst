@@ -131,7 +131,7 @@ What is Dynamic Network Modes (DyNeMo)?
 
 See the model description page :doc:`here <user_guide/models/dynemo>`.
 
-What is Dynamic Network States (DyNeSte)?
+What is Dynamic Network States (DyNeStE)?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 See the model description page :doc:`here <user_guide/models/dyneste>`.
@@ -149,11 +149,11 @@ See the model description page :doc:`here <user_guide/models/hive>`.
 What model should I use?
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-Unfortunately, there is no clear cut answer to this question. The main models in this package are the Hidden Markov Model (HMM), Dynamic Network Modes (DyNeMo), Dynamic Network States (DyNeSte), Multi-Dynamic Network Modes (M-DyNeMo), and HIVE. All are valid options. The pros and cons of each are:
+Unfortunately, there is no clear cut answer to this question. The main models in this package are the Hidden Markov Model (HMM), Dynamic Network Modes (DyNeMo), Dynamic Network States (DyNeStE), Multi-Dynamic Network Modes (M-DyNeMo), and HIVE. All are valid options. The pros and cons of each are:
 
 - The **HMM** uses mutually exclusive states with a Markovian temporal model. For resting-state data, the access to interpretable summary statistics such as state fractional occupancies, lifetimes, etc. might be worth the compromised description of the data using mutually exclusive states. Practically, the HMM is the quickest to train and does not require a GPU.
 - **DyNeMo** describes the data as a linear mixture of networks and uses an RNN for the temporal model, which can capture long-range dependencies. The lack of mutual exclusivity can complicate interpretation. With task data, DyNeMo may provide a cleaner description of how the brain responds to a task.
-- **DyNeSte** combines the discrete states of the HMM with the non-Markovian temporal model of DyNeMo. This gives you interpretable summary statistics while also capturing long-range temporal dependencies. Like DyNeMo, DyNeSte benefits from a GPU for training.
+- **DyNeStE** combines the discrete states of the HMM with the non-Markovian temporal model of DyNeMo. This gives you interpretable summary statistics while also capturing long-range temporal dependencies. Like DyNeMo, DyNeStE benefits from a GPU for training.
 - **M-DyNeMo** extends DyNeMo by allowing separate dynamics for power and functional connectivity. Use this when you suspect power and connectivity may evolve independently.
 - **HIVE** extends the HMM to model inter-session variability using embedding vectors. Use this when you have data from multiple sessions/subjects and want to capture how sessions differ from the group average (e.g. due to demographics, scanner type, or site).
 
@@ -227,11 +227,11 @@ As explained in 'I have trained a model with the same hyperparameters on the sam
 
 - For the HMM use::
 
-    model.random_state_time_course_initialization(n_init=3, n_epochs=1)
+    model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
 
 - For DyNeMo use::
 
-    model.random_subset_initialization(n_init=5, n_epochs=2)
+    model.random_subset_initialization(data, n_init=5, n_epochs=2)
 
 Can I do static analysis with this package?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -384,29 +384,6 @@ Messages are printed by the ``"osl-dynamics"`` logger, so they can also be writt
     logging.getLogger("osl-dynamics").addHandler(logging.FileHandler("osld.log"))
 
 When the output is not a terminal or notebook (e.g. the log of a job on a cluster), progress bars are updated every 30 seconds. This can be changed with the ``TQDM_MININTERVAL`` environment variable.
-
-I've used the Matlab HMM-MAR toolbox before, how do I switch to Python?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-If you're completely new to Python, you may find reading up on how to install Python using Anaconda useful.
-
-If you're familiar with Python and would just like to switch to osl-dynamics to train an HMM and for post-hoc analysis, all you need from the Matlab code is the training data you used in HMM-MAR. It is common in HMM-MAR to save the training data as vanilla :code:`.mat` files using something like the following::
-
-    mat_files = cell(length(subjects_to_do),1);
-    T_all = cell(length(subjects_to_do),1);
-    for ss = 1:length(subjects_to_do)
-        mat_files{ss} = [matrixfilesdir 'subject' num2str(ss) '.mat'];
-        [~,T_ss] = read_spm_file(parcellated_Ds{ss},mat_files{ss});
-        T_all{ss} = T_ss;
-    end
-
-The above code snippet was taken from the example `here <https://github.com/OHBA-analysis/HMM-MAR/blob/master/examples/NatComms2018_fullpipeline.m>`_. If you have the :code:`subject1.mat, subject2.mat, ...` files, you can easily load them into osl-dynamics using the Data class::
-
-    from osl_dynamics.data import Data
-
-    data = Data(['subject1.mat', 'subject2.mat', ...])
-
-And use osl-dynamics as normal.
 
 I found a bug, what do I do?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

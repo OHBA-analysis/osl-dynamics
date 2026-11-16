@@ -119,7 +119,7 @@ include-package-data = true
 
 [tool.codespell]
 # Ref: https://github.com/codespell-project/codespell#using-a-config-file
-skip = '.git*,*.pdf,*.gii,*.scene'
+skip = '.git*,*.pdf,*.gii,*.scene,*.svg'
 check-hidden = true
 # ignore-regex = ''
 ignore-words-list = 'fo,fro,commun'

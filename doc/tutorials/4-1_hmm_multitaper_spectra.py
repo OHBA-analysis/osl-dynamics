@@ -5,8 +5,6 @@ HMM: Multitaper Spectra
 In this tutorial we calculate subject and state-specific multitaper spectra using a trained HMM and **source space** data. Here, we should **not** use the prepared (e.g. TDE-PCA) data.
 """
 
-# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/4-1_hmm_multitaper_spectra.png"
-
 #%%
 # Download source data
 # ^^^^^^^^^^^^^^^^^^^^
@@ -117,3 +115,5 @@ np.save("results/spectra/f.npy", f)
 np.save("results/spectra/psd.npy", psd)
 np.save("results/spectra/coh.npy", coh)
 np.save("results/spectra/w.npy", w)
+
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/4-1_hmm_multitaper_spectra.png"

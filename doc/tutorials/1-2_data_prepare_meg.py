@@ -10,8 +10,6 @@ In this tutorial we will go through common ways to prepare M/EEG data. This tuto
 4. Saving and Loading Prepared Data
 """
 
-# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/1-2_data_prepare_meg.png"
-
 #%%
 # Download the dataset
 # ^^^^^^^^^^^^^^^^^^^^
@@ -153,3 +151,5 @@ print(data)
 # We can see from the number of samples it is the amplitude envelope data that we previously prepared.
 #
 # Note, if we saved data that included PCA in preparation. The `pca_components` attribute will be loaded from the pickle file when we load data using the Data class.
+
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/1-2_data_prepare_meg.png"

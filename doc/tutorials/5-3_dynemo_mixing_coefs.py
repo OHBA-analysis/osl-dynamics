@@ -8,8 +8,6 @@ In this tutorial we analyze DyNeMo mixing coefficients. This tutorial covers:
 2. Binarizing the mixing coefficient time course
 """
 
-# sphinx_gallery_thumbnail_number = 2
-
 #%%
 # Download inferred parameters
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -212,3 +210,5 @@ print(np.mean(fo, axis=0), 2)
 # We can see the GMM thresholds identify more mode activations, which are reflected in the higher fractional occupancies.
 #
 # With a mode activation time course we can do the same analysis we did for the HMM state time courses. See the :doc:`HMM Summary Statistics tutorial <../tutorials_build/4-3_hmm_summary_stats>` for more details.
+
+# sphinx_gallery_thumbnail_number = 2

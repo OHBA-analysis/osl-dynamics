@@ -37,8 +37,6 @@ In this tutorial, we will use data from the `Wakeman-Henson dataset <https://www
 Output is written to ``derivatives/``.
 """
 
-# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/0-1_meg_preprocessing.png"
-
 #%%
 # Download the dataset
 # ^^^^^^^^^^^^^^^^^^^^
@@ -462,3 +460,5 @@ Output is written to ``derivatives/``.
 #
 # - **CTF:** Use ``mne.io.read_raw_ctf()`` to load data. Set ``chantypes=["mag"]`` and adjust ``rank`` (CTF data is not MaxFiltered, so the rank is typically higher). Fiducials/headshape points may need to be extracted from a ``.pos`` file rather than the data file — pass ``pos_file`` to ``Session``.
 # - **OPM:** Loading depends on the OPM system. Adjust ``chantypes`` and ``rank`` accordingly.
+
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/0-1_meg_preprocessing.png"

@@ -12,8 +12,6 @@ In this tutorial we demonstrate the various options for loading data. This tutor
 6. Loading Data in txt Format
 """
 
-# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/1-1_data_loading.png"
-
 #%%
 # The Data class
 # ^^^^^^^^^^^^^^
@@ -177,7 +175,7 @@ print(mat)
 mat.keys()
 
 #%%
-# The important field is `X`, which is the one that contains the 2D time series data for this subject. Note, MATLAB files created using the `HMM-MAR <https://github.com/OHBA-analysis/HMM-MAR>`_ toolbox come in the above format, i.e. with a `X` and `T` field. For us, only the `X` matters.
+# The important field is `X`, which contains the 2D time series data for this subject.
 #
 # Loading MATLAB data into the Data class
 # ***************************************
@@ -254,3 +252,5 @@ files =[
 ]
 data = Data(files)
 print(data)
+
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/1-1_data_loading.png"

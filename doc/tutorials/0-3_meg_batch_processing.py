@@ -39,8 +39,6 @@ also has a structural MRI. The data is organized as::
 The output of this script is written to ``derivatives/``.
 """
 
-# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/0-3_meg_batch_processing.png"
-
 #%%
 # Step 0: Find File Paths
 # ^^^^^^^^^^^^^^^^^^^^^^^
@@ -517,3 +515,5 @@ The output of this script is written to ``derivatives/``.
 #
 # See the :doc:`tutorials <../tutorials>` page for static and dynamic
 # network analysis tutorials.
+
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/0-3_meg_batch_processing.png"

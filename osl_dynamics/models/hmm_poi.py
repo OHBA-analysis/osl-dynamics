@@ -1,4 +1,4 @@
-"""Hidden Markov Model (HMM) with a Possion observation model."""
+"""Hidden Markov Model (HMM) with a Poisson observation model."""
 
 import logging
 from dataclasses import dataclass
