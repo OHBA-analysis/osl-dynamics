@@ -117,7 +117,7 @@ print(w.shape)
 #
 # - `f` is 1D and is the frequency axis.
 # - `psd` is (subjects, 2, modes, channels, frequencies). The second dimension contains the regression coefficients (index 0) and intercept (index 1) for each subject. The intercept is the static (time-averaged) PSD. The coefficients are the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient: positive where a mode has more power than the static PSD and negative where it has less.
-# - `coh` is (subjects, modes, channels, channels, frequencies). It is the change in coherence from the static coherence for a one standard deviation increase in a mode's mixing coefficient.
+# - `coh` is (subjects, modes, channels, channels, frequencies). It is the change in the cross spectrum, normalized by the static power (change in coherence), for a one standard deviation increase in a mode's mixing coefficient. It includes changes in both coherence and power.
 # - `w` contains the weight for each subject when calculating a group average.
 #
 # The coefficients of every subject are scaled by the same standard deviation, so the subject-specific spectra can be averaged and compared. See the :doc:`Spectral Analysis </user_guide/spectra>` page of the User Guide for how to interpret these outputs and what to plot.

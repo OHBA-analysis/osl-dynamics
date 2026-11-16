@@ -1631,7 +1631,7 @@ def plot_group_tde_dynemo_networks(
         integrate spectra over. Defaults to the full frequency range.
     percentile : float, optional
         Percentile for thresholding the coherence networks. Default is 97, which
-        corresponds to the 3% of edges with the largest changes in coherence.
+        corresponds to the 3% of edges with the largest changes in coherence (increases or decreases).
     power_save_kwargs : dict, optional
         Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::

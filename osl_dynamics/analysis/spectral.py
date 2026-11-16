@@ -550,14 +550,16 @@ def regression_spectra(
       increase in mode :math:`j`'s :code:`alpha`. :math:`\sigma_j` is the
       standard deviation of the windowed :code:`alpha`, averaged over
       sessions.
-    - The **coherence**: the change in coherence from the static coherence,
+    - The **coherence**: the change in the cross spectrum normalized by the
+      static power (change in coherence),
 
       .. math::
           C_{jxy} = \frac{\text{Re}(\beta_{jxy} e^{-i\phi_{xy}})}{\sqrt{S_{xx}
           S_{yy}}},
 
-      where :math:`\phi_{xy}` is the phase of :math:`S_{xy}`. The diagonal is
-      the relative change in power, :math:`\beta_{jxx} / S_{xx}`.
+      where :math:`\phi_{xy}` is the phase of :math:`S_{xy}`. It includes
+      changes in both coherence and power. The diagonal is the relative change
+      in power, :math:`\beta_{jxx} / S_{xx}`.
 
     The mode spectrum is :math:`P_j = S + \beta_j / \sigma_j`. If :code:`alpha`
     does not sum to one (e.g. a subset of modes), we use a linear regression
@@ -619,7 +621,8 @@ def regression_spectra(
         n_channels, n_freq). Any axis of length 1 is removed if
         :code:`keepdims=False`.
     coh : np.ndarray
-        Change in coherence for each mode. Shape is (n_sessions,
+        Change in the cross spectrum normalized by the static power (change
+        in coherence) for each mode. Shape is (n_sessions,
         n_modes, n_channels, n_channels, n_freq). Any axis of length 1 is
         removed if :code:`keepdims=False`.
     w : np.ndarray

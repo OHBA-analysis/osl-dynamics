@@ -64,14 +64,14 @@ Outputs
      - Gives the mode spectrum, :math:`P_j = S + \beta_j / \sigma_j`.
    * - :code:`coh`
      - :math:`C_j`
-     - The change in coherence from the static coherence for a one standard deviation increase in mode :math:`j`'s :code:`alpha`.
+     - The change in the cross spectrum, normalized by the static power (change in coherence), for a one standard deviation increase in mode :math:`j`'s :code:`alpha`.
 
-The coherence is the change in the cross spectrum in the direction of the static cross spectrum, normalized by the static power:
+The coherence is the change in the cross spectrum in the direction of the static cross spectrum, normalized by the static power (change in coherence):
 
 .. math::
     C_{jxy} = \frac{\text{Re}(\beta_{jxy} e^{-i\phi_{xy}})}{\sqrt{S_{xx} S_{yy}}},
 
-where :math:`\phi_{xy}` is the phase of :math:`S_{xy}`. It is positive where the coherence increases and negative where it decreases. The diagonal is the relative change in power, :math:`\beta_{jxx} / S_{xx}`.
+where :math:`\phi_{xy}` is the phase of :math:`S_{xy}`. It includes changes in both coherence and power: it increases when the coherence between :math:`x` and :math:`y` increases or when the power at :math:`x` or :math:`y` increases. The diagonal is the relative change in power, :math:`\beta_{jxx} / S_{xx}`.
 
 Positive coefficients mean a mode has more power than the static spectrum and negative coefficients mean less. The changes of all modes balance around the static spectrum, so some modes can be negative everywhere: e.g. a DyNeMo mode with a small covariance that takes most of the mixing coefficients.
 
@@ -128,10 +128,6 @@ For regression spectra, plot the coefficients and coherences directly, without s
     c_thres = connectivity.threshold(c, percentile=98, absolute_value=True)
     connectivity.save(c_thres, parcellation_file=parcellation_file, filename="coh_.png")
 
-    # Coherence maps: mean change in coherence of each parcel's edges
-    n_parcels = c.shape[-1]
-    c[:, range(n_parcels), range(n_parcels)] = 0
-    power.save(c.sum(axis=-1) / (n_parcels - 1), parcellation_file=parcellation_file, filename="coh_map_.png")
 
 - **PSDs.** The coefficients, which show the frequencies where a mode has more or less power than the static spectrum.
 - **Power maps.** The coefficients integrated over frequency with :func:`~osl_dynamics.analysis.power.variance_from_spectra`: the change in power from the static power, as a fraction of each parcel's variance (with the default :code:`standardize=True`). Red is an increase and blue a decrease. Pass :code:`frequency_range` (e.g. :code:`[8, 12]`) for a frequency band. Divide by the intercept for the relative change in power.

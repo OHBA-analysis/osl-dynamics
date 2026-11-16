@@ -8,7 +8,6 @@ In this tutorial we will plot networks from a DyNeMo model trained on source rec
 2. PSDs
 3. Power maps
 4. Coherence networks
-5. Coherence maps
 """
 
 # sphinx_gallery_thumbnail_number = 7
@@ -119,7 +118,7 @@ c = connectivity.mean_coherence_from_spectra(f, coh)
 print(c.shape)
 
 #%%
-# We now have a (subjects, modes, channels, channels) array. This is the change in coherence from the static coherence: positive where the coherence increases when a mode is active and negative where it decreases. Next we average over subjects and show the edges with the largest changes in coherence.
+# We now have a (subjects, modes, channels, channels) array. This is the change in the cross spectrum, normalized by the static power (change in coherence), when a mode is active: it includes changes in both coherence and power. Next we average over subjects and show the edges with the largest changes.
 
 # Average over subjects
 mean_c = np.average(c, axis=0, weights=w)
@@ -136,17 +135,4 @@ connectivity.save(
 )
 
 #%%
-# We can see the increases in coherence (red) are in the same regions as the increases in power. We expect these networks will improve with more subjects.
-#
-# Coherence maps
-# ^^^^^^^^^^^^^^
-# We can display the coherence as a spatial map rather than a graphical network by averaging the edges for each parcel (excluding the diagonal, which is the relative change in power).
-
-n_parcels = mean_c.shape[-1]
-mean_c[:, range(n_parcels), range(n_parcels)] = 0
-mean_c_map = np.sum(mean_c, axis=-1) / (n_parcels - 1)
-
-fig, ax = power.save(
-    mean_c_map,
-    parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
-)
+# Red edges are increases and blue edges are decreases. The networks are in the same regions as the changes in power. We expect these networks will improve with more subjects.

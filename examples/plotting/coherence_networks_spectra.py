@@ -36,7 +36,7 @@ conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, frequency_range=[1,
 # - Plot the top X % of connections relative to the means across states/modes.
 # - Use a GMM to calculate a threshold (X) for us.
 if regression_spectra:
-    # The coherence is the change from the static coherence: plot the 5% of
+    # The coherence is a change from the static spectrum: plot the 5% of
     # connections with the largest changes (increases or decreases)
     conn_map = connectivity.threshold(conn_map, percentile=95, absolute_value=True)
 else:
