@@ -100,8 +100,9 @@ For regression spectra, plot the coefficients and coherences directly, without s
 
     import numpy as np
     from osl_dynamics.analysis import spectral, power, connectivity
+    from osl_dynamics.utils import plotting
 
-    f, psd, coh, w = spectral.regression_spectra(
+    f, psd, coh, w, sigma = spectral.regression_spectra(
         data=data,  # parcel time courses (before TDE/PCA)
         alpha=alpha,  # state probabilities or mixing coefficients
         sampling_frequency=250,
@@ -111,11 +112,56 @@ For regression spectra, plot the coefficients and coherences directly, without s
         frequency_range=[1, 45],
         return_coef_int=True,
         return_weights=True,
+        return_sigma=True,
     )
-    coefs = psd[:, 0]  # (sessions, modes, parcels, freq)
 
-    # PSDs: group average, averaged over parcels
-    gpsd = np.average(coefs, axis=0, weights=w).mean(axis=1)
+PSDs
+****
+
+There are two options:
+
+#. **Without the static PSD**: the coefficients, :math:`\beta_j`, which show the frequencies where a mode has more (positive) or less (negative) power than the static PSD.
+#. **With the static PSD**: the static PSD, :math:`S`, together with the PSD of each mode. For DyNeMo, use :math:`S + \beta_j`, the PSD when a mode's :code:`alpha` is one standard deviation above its mean. For the HMM, use :math:`P_j = S + \beta_j / \sigma_j`, the PSD of each state (the quantity estimated by the multitaper).
+
+.. code-block:: python
+
+    # Group average, averaged over parcels
+    gpsd = np.average(psd, axis=0, weights=w)  # (2, modes, parcels, freq)
+    coefs = gpsd[0].mean(axis=1)  # (modes, freq)
+    static = gpsd[1, 0].mean(axis=0)  # (freq,)
+    n_modes = coefs.shape[0]
+    labels = [f"Mode {j}" for j in range(n_modes)]
+
+    # Option 1: without the static PSD (change from the static PSD)
+    plotting.plot_line(
+        [f] * n_modes,
+        coefs,
+        labels=labels,
+        x_label="Frequency (Hz)",
+        y_label="PSD (a.u.)",
+        filename="psd_change.png",
+    )
+
+    # Option 2: with the static PSD
+    mode_psd = static + coefs  # DyNeMo
+    # mode_psd = static + coefs / sigma[:, np.newaxis]  # HMM
+    plotting.plot_line(
+        [f] * (n_modes + 1),
+        [static, *mode_psd],
+        labels=["Static"] + labels,
+        x_label="Frequency (Hz)",
+        y_label="PSD (a.u.)",
+        filename="psd_static_and_modes.png",
+    )
+
+For DyNeMo, :math:`S + \beta_j` is close to the static PSD, so the differences between modes are clearer without the static PSD. Use :code:`gpsd[0][:, i]` and :code:`gpsd[1, 0, i]` instead of the mean over parcels to plot parcel :code:`i`. Avoid plotting :math:`P_j` for DyNeMo.
+
+Power maps and coherence networks
+*********************************
+
+.. code-block:: python
+
+    coefs = psd[:, 0]  # (sessions, modes, parcels, freq)
 
     # Power maps
     p = power.variance_from_spectra(f, coefs)
@@ -128,10 +174,5 @@ For regression spectra, plot the coefficients and coherences directly, without s
     c_thres = connectivity.threshold(c, percentile=98, absolute_value=True)
     connectivity.save(c_thres, parcellation_file=parcellation_file, filename="coh_.png")
 
-
-- **PSDs.** The coefficients, which show the frequencies where a mode has more or less power than the static spectrum.
-- **Power maps.** The coefficients integrated over frequency with :func:`~osl_dynamics.analysis.power.variance_from_spectra`: the change in power from the static power, as a fraction of each parcel's variance (with the default :code:`standardize=True`). Red is an increase and blue a decrease. Pass :code:`frequency_range` (e.g. :code:`[8, 12]`) for a frequency band. Divide by the intercept for the relative change in power.
+- **Power maps.** The coefficients integrated over frequency with :func:`~osl_dynamics.analysis.power.variance_from_spectra`: the change in power from the static power, as a fraction of each parcel's variance (with the default :code:`standardize=True`). Red is an increase and blue a decrease. Pass :code:`frequency_range` (e.g. :code:`[8, 12]`) for a frequency band. Divide by the intercept for the relative change in power. Use the coefficients, not :math:`S + \beta_j`, for power maps and to compare modes.
 - **Coherence networks.** The edges with the largest changes in coherence, increases (red) and decreases (blue).
-- **HMM state spectra.** To compare with the multitaper or across window settings, plot :math:`P_j - S = \beta_j / \sigma_j` (:code:`return_sigma=True`).
-- **Static and mode PSDs.** Plot the intercept :math:`S` with :math:`S + \beta_j` (:code:`psd` with :code:`return_coef_int=False`) for DyNeMo, or with :math:`P_j = S + \beta_j / \sigma_j` for the HMM. Use the coefficients, not :math:`S + \beta_j`, for power maps and to compare modes.
-- Avoid plotting :math:`P_j` for DyNeMo.
