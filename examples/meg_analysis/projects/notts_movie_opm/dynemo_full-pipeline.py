@@ -242,19 +242,8 @@ analysis.power.save(
 # Calculate connectivity maps using mode coherences
 coh_map = analysis.connectivity.mean_coherence_from_spectra(f, gcoh)
 
-# Use a GMM to threshold the connectivity maps (increases in coherence only)
-coh_map = analysis.connectivity.gmm_threshold(
-    coh_map,
-    keep_positive_only=True,
-    standardize=True,
-    one_component_percentile=95,
-    n_sigma=2,
-    filename=f"{maps_dir}/gmm_coh_.png",
-    plot_kwargs={
-        "x_label": "Standardized Change in Coherence",
-        "y_label": "Probability",
-    },
-)
+# Keep the 2% of connections with the largest changes (increases or decreases)
+coh_map = analysis.connectivity.threshold(coh_map, percentile=98, absolute_value=True)
 
 # Save coherence networks
 analysis.connectivity.save(

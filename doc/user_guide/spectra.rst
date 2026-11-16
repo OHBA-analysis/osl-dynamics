@@ -122,13 +122,11 @@ For regression spectra, plot the coefficients and coherences directly, without s
     p = np.average(p, axis=0, weights=w)
     power.save(p, parcellation_file=parcellation_file, filename="pow_.png")
 
-    # Coherence networks: top 2% of edges, increases and decreases separately
+    # Coherence networks: the 2% of edges with the largest changes
     c = connectivity.mean_coherence_from_spectra(f, coh)
     c = np.average(c, axis=0, weights=w)
-    c_inc = connectivity.threshold(np.clip(c, 0, None), percentile=98)
-    c_dec = -connectivity.threshold(np.clip(-c, 0, None), percentile=98)
-    connectivity.save(c_inc, parcellation_file=parcellation_file, filename="coh_inc_.png")
-    connectivity.save(c_dec, parcellation_file=parcellation_file, filename="coh_dec_.png")
+    c_thres = connectivity.threshold(c, percentile=98, absolute_value=True)
+    connectivity.save(c_thres, parcellation_file=parcellation_file, filename="coh_.png")
 
     # Coherence maps: mean change in coherence of each parcel's edges
     n_parcels = c.shape[-1]
@@ -137,6 +135,6 @@ For regression spectra, plot the coefficients and coherences directly, without s
 
 - **PSDs.** The coefficients, which show the frequencies where a mode has more or less power than the static spectrum.
 - **Power maps.** The coefficients integrated over frequency with :func:`~osl_dynamics.analysis.power.variance_from_spectra`: the change in power from the static power, as a fraction of each parcel's variance (with the default :code:`standardize=True`). Red is an increase and blue a decrease. Pass :code:`frequency_range` (e.g. :code:`[8, 12]`) for a frequency band. Divide by the intercept for the relative change in power.
-- **Coherence networks.** Threshold the increases and decreases in coherence separately. Networks are usually shown as increases only.
+- **Coherence networks.** The edges with the largest changes in coherence, increases (red) and decreases (blue).
 - **HMM state spectra.** To compare with the multitaper or across window settings, plot :math:`P_j - S = \beta_j / \sigma_j` (:code:`return_sigma=True`).
 - Avoid plotting :code:`psd` with :code:`return_coef_int=False`, which is dominated by the static spectrum, and :math:`P_j` for DyNeMo.

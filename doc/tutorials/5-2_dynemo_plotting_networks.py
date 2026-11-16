@@ -119,13 +119,13 @@ c = connectivity.mean_coherence_from_spectra(f, coh)
 print(c.shape)
 
 #%%
-# We now have a (subjects, modes, channels, channels) array. This is the change in coherence from the static coherence: positive where the coherence increases when a mode is active and negative where it decreases. Next we average over subjects and show the edges with the largest increase in coherence.
+# We now have a (subjects, modes, channels, channels) array. This is the change in coherence from the static coherence: positive where the coherence increases when a mode is active and negative where it decreases. Next we average over subjects and show the edges with the largest changes in coherence.
 
 # Average over subjects
 mean_c = np.average(c, axis=0, weights=w)
 
-# Threshold the top 3% of edges, keeping only increases
-thres_mean_c = connectivity.threshold(np.clip(mean_c, 0, None), percentile=97)
+# Keep the 3% of edges with the largest changes (increases or decreases)
+thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True)
 
 #%%
 # Now we can visualize the networks.
@@ -133,11 +133,10 @@ thres_mean_c = connectivity.threshold(np.clip(mean_c, 0, None), percentile=97)
 connectivity.save(
     thres_mean_c,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
-    plot_kwargs={"edge_vmin": 0, "edge_vmax": np.max(thres_mean_c), "edge_cmap": "Reds"},
 )
 
 #%%
-# We can see the coherence networks show high coherence in the same regions with high power. We expect these networks will improve with more subjects.
+# We can see the increases in coherence (red) are in the same regions as the increases in power. We expect these networks will improve with more subjects.
 #
 # Coherence maps
 # ^^^^^^^^^^^^^^

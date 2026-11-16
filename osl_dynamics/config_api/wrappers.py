@@ -1631,7 +1631,7 @@ def plot_group_tde_dynemo_networks(
         integrate spectra over. Defaults to the full frequency range.
     percentile : float, optional
         Percentile for thresholding the coherence networks. Default is 97, which
-        corresponds to the top 3% of edges (increases in coherence only).
+        corresponds to the 3% of edges with the largest changes in coherence.
     power_save_kwargs : dict, optional
         Keyword arguments to pass to :func:`osl_dynamics.analysis.power.save`.
         Defaults to::
@@ -1643,8 +1643,7 @@ def plot_group_tde_dynemo_networks(
         Keyword arguments to pass to :func:`osl_dynamics.analysis.connectivity.save`. Defaults to::
 
             {'parcellation_file': parcellation_file,
-             'filename': '<output_dir>/networks/coh_.png',
-             'plot_kwargs': {'edge_cmap': 'Reds'}}
+             'filename': '<output_dir>/networks/coh_.png'}
     """
     power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
     conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
@@ -1736,14 +1735,13 @@ def plot_group_tde_dynemo_networks(
         f, gcoh, frequency_range=frequency_range
     )
 
-    # Threshold, keeping only increases in coherence
-    gc = connectivity.threshold(np.clip(gc, 0, None), percentile=percentile)
+    # Keep the edges with the largest changes (increases or decreases)
+    gc = connectivity.threshold(gc, percentile=percentile, absolute_value=True)
 
     # Save coherence networks
     default_conn_save_kwargs = {
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/coh_.png",
-        "plot_kwargs": {"edge_cmap": "Reds"},
     }
     conn_save_kwargs = override_dict_defaults(
         default_conn_save_kwargs, conn_save_kwargs

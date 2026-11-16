@@ -68,8 +68,8 @@ gcoh = np.average(coh, axis=0, weights=w)
 # Calculate the coherence network by averaging over all frequencies
 c = connectivity.mean_coherence_from_spectra(f, gcoh)
 
-# Threshold the top 2% of connections, keeping only increases in coherence
-c = connectivity.threshold(np.clip(c, 0, None), percentile=98)
+# Keep the 2% of connections with the largest changes (increases or decreases)
+c = connectivity.threshold(c, percentile=98, absolute_value=True)
 
 # Plot
 connectivity.save(
