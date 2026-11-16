@@ -133,4 +133,5 @@ For regression spectra, plot the coefficients and coherences directly, without s
 - **Power maps.** The coefficients integrated over frequency with :func:`~osl_dynamics.analysis.power.variance_from_spectra`: the change in power from the static power, as a fraction of each parcel's variance (with the default :code:`standardize=True`). Red is an increase and blue a decrease. Pass :code:`frequency_range` (e.g. :code:`[8, 12]`) for a frequency band. Divide by the intercept for the relative change in power.
 - **Coherence networks.** The edges with the largest changes in coherence, increases (red) and decreases (blue).
 - **HMM state spectra.** To compare with the multitaper or across window settings, plot :math:`P_j - S = \beta_j / \sigma_j` (:code:`return_sigma=True`).
-- Avoid plotting :code:`psd` with :code:`return_coef_int=False`, which is dominated by the static spectrum, and :math:`P_j` for DyNeMo.
+- **Static and mode PSDs.** Plot the intercept :math:`S` with :math:`S + \beta_j` (:code:`psd` with :code:`return_coef_int=False`) for DyNeMo, or with :math:`P_j = S + \beta_j / \sigma_j` for the HMM. Use the coefficients, not :math:`S + \beta_j`, for power maps and to compare modes.
+- Avoid plotting :math:`P_j` for DyNeMo.
