@@ -530,10 +530,21 @@ def regression_spectra(
     keepdims: bool = False,
     n_jobs: int = 1,
 ):
-    """Calculates mode-specific spectra by regressing a spectrogram with alpha.
+    r"""Calculates mode-specific spectra by regressing a spectrogram with alpha.
 
     We use :func:`osl_dynamics.analysis.spectral._welch_spectrogram`
-    to calculate the spectrogram.
+    to calculate the spectrogram. Only windows that do not overlap the start
+    or end of the data are used.
+
+    If :code:`alpha` sums to one at each time point, the spectrogram is
+    modeled as a mixture of mode spectra, :math:`P_t = \sum_j \alpha_{jt}
+    P_j`. The intercept is the static (time-averaged) spectrum and the
+    coefficient for mode :math:`j` is :math:`\sigma_j (P_j - \text{intercept})`,
+    where :math:`\sigma_j` is the standard deviation of the windowed
+    :code:`alpha` for mode :math:`j`. Otherwise, we use a linear regression
+    with standardized regressors and an intercept. In both cases, the
+    coefficients are the change in the spectrum for a one standard deviation
+    increase in a mode's :code:`alpha`.
 
     Parameters
     ----------
@@ -2039,15 +2050,55 @@ def _regress_welch_spectrogram(
 
     # Only use windows that do not overlap the zero padding at the start/end
     keep = _inner_windows(data.shape[0], window_length, step_size)
-    coefs, intercept = linear_regression(
-        a[keep],
-        p[keep],
-        fit_intercept=True,
-        normalize=True,
-        log_message=False,
-        n_jobs=1,
-    )
+    coefs, intercept = _regress_spectrogram(a[keep], p[keep])
     return f, coefs, intercept
+
+
+def _regress_spectrogram(a: np.ndarray, p: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """Regress a spectrogram on windowed mode time courses.
+
+    Parameters
+    ----------
+    a : np.ndarray
+        Windowed mode time courses. Shape must be (n_windows, n_modes).
+    p : np.ndarray
+        Spectrogram. Shape must be (n_windows, ...).
+
+    Returns
+    -------
+    coefs : np.ndarray
+        Regression coefficients. Shape is (n_modes, ...).
+    intercept : np.ndarray
+        Intercept. Shape is (...).
+    """
+    sums = np.sum(a, axis=1)
+    if not np.allclose(sums, sums[0], rtol=1e-4, atol=0):
+        return linear_regression(
+            a,
+            p,
+            fit_intercept=True,
+            normalize=True,
+            log_message=False,
+            n_jobs=1,
+        )
+
+    # The mode time courses sum to a constant: model the spectrogram as a
+    # mixture of mode spectra, P_t = sum_j a_tj P_j
+    n_windows = p.shape[0]
+    y = p.reshape(n_windows, -1).astype(
+        np.complex128 if np.iscomplexobj(p) else np.float64
+    )
+    a = a.astype(np.float64) / sums[0]
+    mode_spectra = np.linalg.lstsq(a, y, rcond=None)[0]
+
+    # Intercept: static spectrum. Coefficients: change in the spectrum for a
+    # one standard deviation increase in a mode's time course
+    intercept = np.mean(y, axis=0)
+    coefs = np.std(a, axis=0)[:, np.newaxis] * (mode_spectra - intercept)
+
+    coefs = coefs.reshape((a.shape[1],) + p.shape[1:]).astype(p.dtype)
+    intercept = intercept.reshape(p.shape[1:]).astype(p.dtype)
+    return coefs, intercept
 
 
 def _inner_windows(n_samples: int, window_length: int, step_size: int) -> np.ndarray:
