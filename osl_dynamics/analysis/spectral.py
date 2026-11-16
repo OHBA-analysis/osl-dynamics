@@ -9,7 +9,6 @@ from scipy.signal._spectral_py import _median_bias
 from sklearn.decomposition import non_negative_factorization
 
 from osl_dynamics.utils import array_ops
-from osl_dynamics.utils.sklearn_wrappers import linear_regression
 from osl_dynamics.utils.misc import nextpow2
 from osl_dynamics.utils.progress import parallel_map
 
@@ -563,7 +562,8 @@ def regression_spectra(
 
     The mode spectrum is :math:`P_j = S + \beta_j / \sigma_j`. If :code:`alpha`
     does not sum to one (e.g. a subset of modes), we use a linear regression
-    with standardized regressors and an intercept.
+    with standardized regressors and an intercept. A mode whose :code:`alpha`
+    is (nearly) constant in a session has NaN coefficients for that session.
 
     Power maps and coherence networks should be calculated from the
     coefficients and coherence without subtracting the mean over modes. See
@@ -681,6 +681,11 @@ def regression_spectra(
     if standardize:
         data = [(d - np.mean(d, axis=0)) / np.std(d, axis=0) for d in data]
 
+    # Does alpha sum to a constant in every session?
+    mixture = all(
+        np.allclose(np.sum(a, axis=1), np.sum(a[0]), rtol=1e-4, atol=0) for a in alpha
+    )
+
     # Create keyword arguments to pass to the main function
     # that calculates spectra
     kwargs = []
@@ -695,6 +700,7 @@ def regression_spectra(
                 "frequency_range": frequency_range,
                 "calc_cpsd": calc_coh,
                 "n_sub_windows": n_sub_windows,
+                "mixture": mixture,
             }
         )
 
@@ -729,7 +735,7 @@ def regression_spectra(
     Pj = []
     for result, s, u in zip(results, sigma, used):
         f, coefs, intercept, _ = result
-        # Modes with a constant alpha in this session have no estimate (NaN)
+        # Modes that were not fitted in this session have no estimate (NaN)
         scale = np.divide(
             group_sigma, s, out=np.full_like(group_sigma, np.nan), where=u
         )
@@ -750,7 +756,10 @@ def regression_spectra(
             # Sum coefficients and intercept
             Pj = np.sum(Pj, axis=1)
 
-        return (f, np.squeeze(Pj), *extra)
+        if not keepdims:
+            Pj = np.squeeze(Pj)
+
+        return (f, Pj, *extra)
 
     # Number of channels and frequency bins
     n_channels = data[0].shape[1]
@@ -1972,7 +1981,8 @@ def _regress_welch_spectrogram(
     n_sub_windows: int,
     frequency_range: List,
     calc_cpsd: bool,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    mixture: bool,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Calculate regression spectra for a single array.
 
     Parameters
@@ -1996,6 +2006,8 @@ def _regress_welch_spectrogram(
         Minimum and maximum frequency to keep.
     calc_cpsd : bool, optional
         Should we calculate the cross spectra?
+    mixture : bool
+        Does alpha sum to a constant? See :func:`_regress_spectrogram`.
 
     Returns
     -------
@@ -2025,12 +2037,18 @@ def _regress_welch_spectrogram(
 
     # Only use windows that do not overlap the zero padding at the start/end
     keep = _inner_windows(data.shape[0], window_length, step_size)
-    coefs, intercept, sigma = _regress_spectrogram(a[keep], p[keep])
+    if len(keep) <= a.shape[1]:
+        raise ValueError(
+            f"Each session must have more than n_modes={a.shape[1]} windows that "
+            f"do not overlap its start or end, got {len(keep)}. Use longer "
+            "sessions or a smaller window_length or step_size."
+        )
+    coefs, intercept, sigma = _regress_spectrogram(a[keep], p[keep], mixture)
     return f, coefs, intercept, sigma
 
 
 def _regress_spectrogram(
-    a: np.ndarray, p: np.ndarray
+    a: np.ndarray, p: np.ndarray, mixture: bool
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Regress a spectrogram on windowed mode time courses.
 
@@ -2040,46 +2058,60 @@ def _regress_spectrogram(
         Windowed mode time courses. Shape must be (n_windows, n_modes).
     p : np.ndarray
         Spectrogram. Shape must be (n_windows, ...).
+    mixture : bool
+        Do the mode time courses sum to a constant? If so, the spectrogram is
+        modeled as a mixture of mode spectra. Otherwise, we use a linear
+        regression with standardized regressors and an intercept.
 
     Returns
     -------
     coefs : np.ndarray
         Change in the spectrum for a one standard deviation increase in each
-        mode time course. Shape is (n_modes, ...).
+        mode time course. NaN for modes whose time course barely varies.
+        Shape is (n_modes, ...).
     intercept : np.ndarray
         Intercept. Shape is (...).
     sigma : np.ndarray
-        Standard deviation of each mode time course. Shape is (n_modes,).
+        Standard deviation of each mode time course (zero for modes that are
+        not fitted). Shape is (n_modes,).
     """
-    sums = np.sum(a, axis=1)
-    if not np.allclose(sums, sums[0], rtol=1e-4, atol=0):
-        sigma = np.std(a, axis=0)
-        coefs, intercept = linear_regression(
-            a.copy(),
-            p,
-            fit_intercept=True,
-            normalize=True,
-            log_message=False,
-            n_jobs=1,
-        )
-        return coefs, intercept, sigma
+    n_windows, n_modes = a.shape
+    dtype = np.complex128 if np.iscomplexobj(p) else np.float64
+    y = p.reshape(n_windows, -1)
 
-    # The mode time courses sum to a constant: model the spectrogram as a
-    # mixture of mode spectra, P_t = sum_j a_tj P_j
-    n_windows = p.shape[0]
-    y = p.reshape(n_windows, -1).astype(
-        np.complex128 if np.iscomplexobj(p) else np.float64
-    )
-    a = a.astype(np.float64) / sums[0]
-    mode_spectra = np.linalg.lstsq(a, y, rcond=None)[0]
-
-    # Intercept: static spectrum. Coefficients: change in the spectrum for a
-    # one standard deviation increase in a mode's time course
-    intercept = np.mean(y, axis=0)
+    a = a.astype(np.float64)
+    if mixture:
+        a /= np.mean(np.sum(a, axis=1))
     sigma = np.std(a, axis=0)
-    coefs = sigma[:, np.newaxis] * (mode_spectra - intercept)
 
-    coefs = coefs.reshape((a.shape[1],) + p.shape[1:]).astype(p.dtype)
+    # Modes whose time course barely varies are not fitted (NaN coefficients)
+    used = sigma > 1e-4 * np.max(sigma)
+    sigma[~used] = 0
+
+    # Intercept: static spectrum
+    intercept = np.mean(y, axis=0, dtype=dtype)
+
+    # Coefficients: change in the spectrum for a one standard deviation
+    # increase in a mode's time course
+    coefs = np.full((n_modes, y.shape[1]), np.nan, dtype=dtype)
+    if np.any(used):
+        if mixture:
+            # Mixture of mode spectra, P_t = sum_j a_tj P_j
+            pinv = np.linalg.pinv(a[:, used])
+        else:
+            # Linear regression with standardized regressors and an intercept
+            z = (a[:, used] - np.mean(a[:, used], axis=0)) / sigma[used]
+            pinv = np.linalg.pinv(z)
+
+        # Apply the pseudo-inverse to chunks of the spectrogram to limit memory
+        chunk = max(1, 2**24 // n_windows)
+        for i in range(0, y.shape[1], chunk):
+            fit = pinv @ y[:, i : i + chunk].astype(dtype)
+            if mixture:
+                fit = sigma[used, np.newaxis] * (fit - intercept[i : i + chunk])
+            coefs[used, i : i + chunk] = fit
+
+    coefs = coefs.reshape((n_modes,) + p.shape[1:]).astype(p.dtype)
     intercept = intercept.reshape(p.shape[1:]).astype(p.dtype)
     return coefs, intercept, sigma
 

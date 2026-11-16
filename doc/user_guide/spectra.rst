@@ -82,7 +82,7 @@ The coefficients of every session are scaled by the same :math:`\sigma_j`, so se
 
 - Calculate the spectra for all the sessions you want to compare in one call. To compare spectra from separate calls or different window settings, divide the coefficients by :math:`\sigma_j` (:code:`return_sigma=True`).
 - Session-specific estimates are noisier for sessions where a mode's :code:`alpha` varies less than :math:`\sigma_j`.
-- A mode with a constant :code:`alpha` in a session (e.g. an HMM state that is never visited) has NaN coefficients. Average over sessions with :code:`np.ma.average(np.ma.masked_invalid(psd), axis=0, weights=w)`.
+- A mode whose :code:`alpha` is (nearly) constant in a session (e.g. an HMM state that is never visited) has NaN coefficients. Average over sessions with :code:`np.ma.average(np.ma.masked_invalid(psd), axis=0, weights=w)`.
 
 Multitaper spectra
 ------------------

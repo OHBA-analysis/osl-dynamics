@@ -1674,9 +1674,9 @@ def plot_group_tde_dynemo_networks(
     # Only keep the regression coefficients
     psd = psd[:, 0]
 
-    # Calculate group average
-    gpsd = np.average(psd, axis=0, weights=w)
-    gcoh = np.average(coh, axis=0, weights=w)
+    # Calculate group average, ignoring sessions without an estimate (NaN)
+    gpsd = np.ma.average(np.ma.masked_invalid(psd), axis=0, weights=w).filled(np.nan)
+    gcoh = np.ma.average(np.ma.masked_invalid(coh), axis=0, weights=w).filled(np.nan)
 
     # Calculate average PSD across channels and the standard error
     p = np.mean(gpsd, axis=-2)
