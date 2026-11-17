@@ -55,10 +55,47 @@ Training
 
 HIVE in osl-dynamics [1] is trained as the :doc:`HMM <hmm>` is: the Baum-Welch algorithm calculates the posterior for the hidden states for each batch, the transition probability matrix is updated with a decaying exponential moving average, and the other parameters (group means and covariances, embeddings and the MLP) take gradient steps. The deviation magnitudes have a posterior distribution (a gamma distribution for each session and state) with a KL divergence term in the cost function, which regularizes the deviations. KL annealing (``do_kl_annealing=True``) helps training. The default initialization is :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_state_time_course_initialization` (``init_method``), and :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs it before ``fit``.
 
+The data need a session ID label, and :meth:`~osl_dynamics.models.hive.Model.set_regularizers` must be called before training. For example::
+
+    import numpy as np
+    from osl_dynamics.models.hive import Config, Model
+
+    data.add_session_labels("session_id", np.arange(data.n_sessions), "categorical")
+
+    config = Config(
+        n_states=8,
+        n_channels=data.n_channels,
+        sequence_length=200,
+        n_sessions=data.n_sessions,
+        embeddings_dim=5,
+        spatial_embeddings_dim=2,
+        dev_n_layers=5,
+        dev_n_units=32,
+        dev_activation="tanh",
+        dev_normalization="layer",
+        dev_regularizer="l1",
+        dev_regularizer_factor=0.01,
+        learn_means=False,
+        learn_covariances=True,
+        do_kl_annealing=True,
+        kl_annealing_curve="tanh",
+        kl_annealing_sharpness=10,
+        n_kl_annealing_epochs=20,
+        batch_size=32,
+        learning_rate=0.001,
+        n_epochs=40,
+    )
+    model = Model(config)
+    model.set_regularizers(data)
+    model.set_dev_parameters_initializer(data)
+    model.train(data)
+
+where ``data`` is a :class:`~osl_dynamics.data.Data` object with one array per session.
+
 Post-hoc Analysis
 -----------------
 
-The post-hoc analyses of the :doc:`HMM <hmm>` apply to HIVE's state time courses (summary statistics and multitaper spectra). In addition:
+The post-hoc analyses of the :doc:`HMM <hmm>` apply to HIVE's state time courses: summary statistics and multitaper spectra (see :doc:`Spectral Analysis </user_guide/spectra>`). In addition:
 
 - :meth:`~osl_dynamics.models.hive.Model.get_summed_embeddings` returns the embedding of each session, and :meth:`~osl_dynamics.models.hive.Model.get_session_embeddings` the embeddings for each session label. The embeddings can be plotted (e.g. after PCA) to see how sessions cluster, or related to variables such as age, sex or scanner.
 - :meth:`~osl_dynamics.models.hive.Model.get_group_means_covariances` returns the group-level state means and covariances, and :meth:`~osl_dynamics.models.hive.Model.get_session_means_covariances` the session-specific ones, which show how each session differs from the group.

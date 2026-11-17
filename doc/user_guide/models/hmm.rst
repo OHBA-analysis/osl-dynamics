@@ -59,12 +59,12 @@ To generate data from an HMM, we sample a state sequence using the transition pr
 
     Simulating data from an HMM with three states. **(a)** The transition probability matrix. **(b)** The state covariances (the means are zero). **(c)** A state sequence sampled using the transition probabilities. **(d)** Data sampled from the observation model of the active state at each time point: e.g. channels 1 and 2 have a high, correlated variance when state 1 is active.
 
-What the states describe depends on how the data are prepared. With **amplitude envelope** (AE) data, the states differ in their means (``learn_means=True``). With **time-delay embedded** (TDE) data, the covariance of each state contains the power spectrum and phase coupling of each region, so the states are spectrally distinct networks and we only learn the covariances (``learn_means=False``). See the :doc:`time-delay embedding tutorial </tutorials_build/1-4_data_time_delay_embedding>` and the :doc:`FAQ </faq>` for more on AE vs TDE data.
+What the states describe depends on how the data are prepared. With **amplitude envelope** (AE) data, the states differ in their means (``learn_means=True``). With **time-delay embedded** (TDE) data, the covariance of each state contains the power spectrum of each region and the coherence between regions, so the states are spectrally distinct networks and we only learn the covariances (``learn_means=False``). See the :doc:`time-delay embedding tutorial </tutorials_build/1-4_data_time_delay_embedding>` and the :doc:`FAQ </faq>` for more on AE vs TDE data.
 
 Training
 --------
 
-Training (or fitting) the model means inferring the hidden states and the model parameters (:math:`\pi`, :math:`A`, :math:`m_k`, :math:`C_k`) from data. osl-dynamics [1] infers a posterior distribution for the hidden states, :math:`q(s_t)`, and learns point estimates for the parameters. The states can be different at every time point, so their uncertainty is useful, whereas the parameters are shared by all time points and are well determined by a large dataset.
+Training (or fitting) the model means inferring the hidden states and the model parameters (:math:`\pi`, :math:`A`, :math:`m_k`, :math:`C_k`) from data. osl-dynamics [1] infers a posterior distribution for the hidden states, :math:`q(s_t)`, and learns point estimates for the parameters.
 
 The data are split into sequences of ``sequence_length`` samples, which are grouped into batches of ``batch_size`` sequences. For each batch:
 
@@ -88,7 +88,7 @@ The data are split into sequences of ``sequence_length`` samples, which are grou
 
     One training step. Each batch updates the parameters, which are then used for the E-step of the next batch.
 
-Training on small batches with stochastic updates lets the HMM scale to large datasets [5]: the noisy updates converge to the parameters that best describe all of the data. The cost function is the **variational free energy**,
+Training on batches scales to large datasets [5]. The cost function is the **variational free energy**,
 
 .. math::
     \mathcal{F} = \mathbb{E}_{q(s_{1:T})} \left[ \log q(s_{1:T}) - \log p(x_{1:T}, s_{1:T}) \right],
@@ -115,12 +115,12 @@ After training, :meth:`model.get_alpha <osl_dynamics.models.inf_mod_base.MarkovS
 Canonical HMM Networks
 ^^^^^^^^^^^^^^^^^^^^^^
 
-Instead of training a new HMM for each study, a pre-trained **canonical HMM** can be used to infer the state time courses for new data [6]. Canonical HMMs with 4-16 states, trained on a large MEG dataset in parcellated source space and in sensor space, are available in the `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ repository. Using the same networks makes results comparable across studies.
+Instead of training a new HMM for each study, a pre-trained **canonical HMM** can be used to infer the state time courses for new data [6]. Canonical HMMs with 4-16 states, trained on a large MEG dataset in parcellated source space and in sensor space, are available in the `Canonical-HMM-Networks <https://github.com/OHBA-analysis/Canonical-HMM-Networks>`_ repository.
 
 Post-hoc Analysis
 -----------------
 
-Post-hoc analysis interprets the inferred state time course: statistics that summarize the dynamics of each state, and the spectral properties (power and coherence) of each state.
+Post-hoc analysis interprets the inferred state time course: statistics that summarize the dynamics of each state, and the spectral properties (power and coherence) of each state. Further analyses (task data, the Fisher kernel and TINDA) are described :ref:`below <hmm-further-analyses>`.
 
 Summary Statistics
 ^^^^^^^^^^^^^^^^^^
@@ -144,25 +144,16 @@ The summary statistics are calculated for each session (or subject) and can be c
 Spectral Analysis
 ^^^^^^^^^^^^^^^^^
 
-With TDE data the states are spectrally distinct, e.g. a state with high alpha (8-12 Hz) power in occipital regions. We calculate the power spectral density (PSD) and coherence of each state from the data before time-delay embedding (and PCA), weighted by the state time course, using a **multitaper** [4]:
-
-#. Multiply the data by the state probability time course, :math:`\alpha_{kt}`, to keep the time points when state :math:`k` is active.
-#. Split the result into non-overlapping windows. A window twice the sampling frequency gives a frequency resolution of 0.5 Hz.
-#. Multiply each window by several tapers (hence the name 'multitaper'), Fourier transform each tapered window and average the squared magnitudes over the tapers to estimate the PSD of the window.
-#. Average the PSDs of the windows.
-
-.. figure:: images/hmm-spectra.svg
-    :class: no-scaled-link
-    :width: 800
-    :align: center
-
-    Multitaper spectra for simulated data with a different oscillation in each state. **(a)** The data before time-delay embedding, and the data multiplied by each state's probability time course. **(b)** The PSD of each state and the static PSD of all the data.
-
-This is done by :func:`~osl_dynamics.analysis.spectral.multitaper_spectra`, which also calculates the coherence between regions. Power maps and coherence networks are calculated from the spectra with :func:`~osl_dynamics.analysis.power.variance_from_spectra` and :func:`~osl_dynamics.analysis.connectivity.mean_coherence_from_spectra`. High-frequency activity can make the coherence networks noisy, so we often separate the spectra into frequency bands ('spectral components') with non-negative matrix factorization (:func:`~osl_dynamics.analysis.spectral.decompose_spectra`). See the :doc:`HMM Multitaper Spectra </tutorials_build/4-1_hmm_multitaper_spectra>` and :doc:`HMM Plotting MEG Networks </tutorials_build/4-2_hmm_plotting_meg_networks>` tutorials.
+With TDE data the states are spectrally distinct, e.g. a state with high alpha (8-12 Hz) power in occipital regions. The power spectrum and coherence of each state are calculated from the data before time-delay embedding (and PCA) with :func:`~osl_dynamics.analysis.spectral.multitaper_spectra`, and power maps and coherence networks are calculated from the spectra. See :doc:`Spectral Analysis </user_guide/spectra>` for the method and how to plot the outputs, and the :doc:`HMM Multitaper Spectra </tutorials_build/4-1_hmm_multitaper_spectra>` and :doc:`HMM Plotting MEG Networks </tutorials_build/4-2_hmm_plotting_meg_networks>` tutorials.
 
 **When calculating power and coherence maps for HMM states the multitaper and NNMF approach is recommended.**
 
 For fMRI data, the state means and covariances of each subject are re-estimated with **dual estimation** (:meth:`~osl_dynamics.models.hmm.Model.dual_estimation`). See the :doc:`HMM fMRI Dual Estimation </tutorials_build/4-4_hmm_fmri_dual_estimation>` and :doc:`HMM Plotting fMRI Networks </tutorials_build/4-5_hmm_plotting_fmri_networks>` tutorials.
+
+.. _hmm-further-analyses:
+
+Further Analyses
+----------------
 
 Task Data
 ^^^^^^^^^
@@ -172,7 +163,7 @@ With task data, the state probability time course can be epoched around events t
 Fisher Kernel
 ^^^^^^^^^^^^^
 
-The Fisher kernel (:class:`~osl_dynamics.analysis.fisher_kernel.FisherKernel`) measures the similarity between subjects from the gradients of the HMM's log-likelihood with respect to its parameters. It can be used to predict subject traits with kernel methods, such as kernel ridge regression or a support vector machine. This uses the whole generative model, rather than handmade features like the summary statistics, and weighs the importance of each parameter for the prediction automatically [7]. A derivation is :download:`here <images/hmm-fisher-kernel.pdf>`. See the `Fisher kernel example <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/hmm_hmm-mvn_fisher-kernel.py>`_.
+The Fisher kernel (:class:`~osl_dynamics.analysis.fisher_kernel.FisherKernel`) measures the similarity between subjects from the gradients of the HMM's log-likelihood with respect to its parameters. It can be used to predict subject traits with kernel methods, such as kernel ridge regression or a support vector machine [7]. A derivation is :download:`here <images/hmm-fisher-kernel.pdf>`. See the `Fisher kernel example <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/hmm_hmm-mvn_fisher-kernel.py>`_.
 
 Temporal Interval Network Density Analysis (TINDA)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

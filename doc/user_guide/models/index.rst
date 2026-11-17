@@ -19,7 +19,7 @@ Where the Models Fit in an Analysis
 #. **Parcellate** (M/EEG only): source reconstruct the sensor data to give a time course for each brain region (parcel). See :doc:`M/EEG Processing </user_guide/meeg>` and the :ref:`available parcellations <parcellations>`.
 #. **Prepare the data** for the model: e.g. time-delay embedding, PCA and standardization for M/EEG, or standardization for fMRI. See the :doc:`MEG </tutorials_build/1-2_data_prepare_meg>`, :doc:`fMRI </tutorials_build/1-3_data_prepare_fmri>` and :doc:`time-delay embedding </tutorials_build/1-4_data_time_delay_embedding>` tutorials.
 #. **Train a model**, described on the pages in this section. See the :doc:`Dynamic Modeling tutorials </tutorial_sections/dynamic_modelling>`.
-#. **Post-hoc analysis** of the inferred state or mode time courses: summary statistics, spectra and power/coherence networks. See the :doc:`HMM </tutorial_sections/hmm_post_hoc>` and :doc:`DyNeMo </tutorial_sections/dynemo_post_hoc>` post-hoc tutorials.
+#. **Post-hoc analysis** of the inferred state or mode time courses: summary statistics, spectra and power/coherence networks. See :doc:`Spectral Analysis </user_guide/spectra>` and the :doc:`HMM </tutorial_sections/hmm_post_hoc>` and :doc:`DyNeMo </tutorial_sections/dynemo_post_hoc>` post-hoc tutorials.
 #. **Statistics**: compare groups or conditions, or relate the dynamics to behavior. See :doc:`Statistical Significance Testing </user_guide/stats>`.
 
 States and Modes

@@ -58,7 +58,7 @@ The **temporal model** for the logits is a normal distribution,
 .. math::
     p(\theta_t | \theta_{1:t-1}) = \mathcal{N}(m_{\theta_t}, \mathrm{diag}(\sigma^2_{\theta_t})),
 
-whose mean and standard deviation are predicted by a recurrent neural network (the **model RNN**) from all of the previous logits, :math:`\theta_{1:t-1}`. This is what lets DyNeMo learn long-range temporal dependencies: each logit can depend on the whole history, not just the previous time point.
+whose mean and standard deviation are predicted by a recurrent neural network (the **model RNN**) from all of the previous logits, :math:`\theta_{1:t-1}`, so each logit can depend on the whole history, not just the previous time point.
 
 .. figure:: images/dynemo-graphical-model.svg
     :class: no-scaled-link
@@ -139,16 +139,7 @@ The (re-weighted) mixing coefficients can be summarized directly, e.g. with thei
 Spectral Analysis
 ^^^^^^^^^^^^^^^^^
 
-The multitaper approach used with the :doc:`HMM <hmm>` relies on time points where only one state is active, which a mixture does not have. Instead, we calculate the spectral properties of each mode with a **GLM-spectrum** [5]: we calculate a spectrogram from the data before time-delay embedding (and PCA) and fit it as a mixture of the mode spectra weighted by the mixing coefficients. The intercept is the static (time-averaged) PSD and the regression coefficients are the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient.
-
-.. figure:: images/dynemo-regression-spectra.svg
-    :class: no-scaled-link
-    :width: 840
-    :align: center
-
-    Regression spectra for simulated data where the power of a different oscillation is proportional to each mode's mixing coefficient. **(a)** The spectrogram of the data and the mixing coefficients. **(b)** The intercept of the regression, the static PSD. **(c)** The regression coefficients for each mode.
-
-This is done by :func:`~osl_dynamics.analysis.spectral.regression_spectra`, which also calculates the change in the cross spectrum between regions normalized by the static power (change in coherence). Pass ``return_coef_int=True`` to get the regression coefficients and intercept separately: we use the coefficients to calculate the power maps and coherence networks of each mode with :func:`~osl_dynamics.analysis.power.variance_from_spectra` and :func:`~osl_dynamics.analysis.connectivity.mean_coherence_from_spectra`, without subtracting the mean over modes. See the :doc:`Spectral Analysis </user_guide/spectra>` page for how to interpret and plot the outputs, and the :doc:`DyNeMo Regression Spectra </tutorials_build/5-1_dynemo_regression_spectra>` and :doc:`DyNeMo Plotting Networks </tutorials_build/5-2_dynemo_plotting_networks>` tutorials.
+With TDE data the modes are spectrally distinct. We calculate the spectral properties of each mode with **regression spectra**, a GLM-spectrum [5]: a spectrogram of the data before time-delay embedding (and PCA) is fitted as a mixture of the mode spectra weighted by the mixing coefficients (:func:`~osl_dynamics.analysis.spectral.regression_spectra`). The intercept is the static (time-averaged) PSD and the regression coefficients are the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient. Power maps and coherence networks are calculated from the coefficients. See :doc:`Spectral Analysis </user_guide/spectra>` for the method and how to interpret and plot the outputs, and the :doc:`DyNeMo Regression Spectra </tutorials_build/5-1_dynemo_regression_spectra>` and :doc:`DyNeMo Plotting Networks </tutorials_build/5-2_dynemo_plotting_networks>` tutorials.
 
 **The regression spectra approach is recommended for calculating spectral properties with DyNeMo.**
 

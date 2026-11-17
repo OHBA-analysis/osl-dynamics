@@ -59,7 +59,7 @@ The cost function is the **variational free energy**, the sum of:
 - the negative **log-likelihood** of the data, :math:`-\sum_t \sum_k q(s_t = k) \log \mathcal{N}(x_t | m_k, C_k)`, which uses the state probabilities directly;
 - the **KL divergence** between the posterior, :math:`q(s_t | x_{1:L})`, and the prior from the model RNN, :math:`p(s_t | s_{1:t-1})`.
 
-The model RNN needs samples of the state sequence. Sampling from a categorical distribution isn't differentiable, so DyNeStE samples from the **Gumbel-Softmax** (or Concrete) distribution [3, 4], a continuous relaxation of the categorical distribution that lets the gradients pass through the sampling. Its temperature, :math:`\tau`, controls how close the samples are to one-hot vectors.
+The model RNN takes samples of the state sequence from the **Gumbel-Softmax** (or Concrete) distribution [3, 4], a continuous relaxation of the categorical distribution with differentiable samples. Its temperature, :math:`\tau`, controls how close the samples are to one-hot vectors.
 
 .. figure:: images/dyneste-training.svg
     :class: no-scaled-link
@@ -80,7 +80,39 @@ The temperature can be annealed during training (``do_gs_annealing=True``), from
 Initialization and Hyperparameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-DyNeStE is initialized with :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_state_time_course_initialization` by default (``init_method``). :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs the initialization and then ``fit``, and with ``best_of`` it keeps the run with the lowest free energy. The main hyperparameters are the number of states (``n_states``), ``sequence_length``, the number of units in the RNNs (``inference_n_units`` and ``model_n_units``), the Gumbel-Softmax temperatures, ``n_kl_annealing_epochs``, ``batch_size``, ``learning_rate`` and ``n_epochs``.
+DyNeStE is initialized with :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_state_time_course_initialization` by default (``init_method``). :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs the initialization and then ``fit``, and with ``best_of`` it keeps the run with the lowest free energy. The main hyperparameters are the number of states (``n_states``), ``sequence_length``, the number of units in the RNNs (``inference_n_units`` and ``model_n_units``), the Gumbel-Softmax temperatures, ``n_kl_annealing_epochs``, ``batch_size``, ``learning_rate`` and ``n_epochs``. For example::
+
+    from osl_dynamics.models.dyneste import Config, Model
+
+    config = Config(
+        n_states=8,
+        n_channels=data.n_channels,
+        sequence_length=200,
+        inference_n_units=64,
+        inference_normalization="layer",
+        model_n_units=64,
+        model_normalization="layer",
+        learn_means=False,
+        learn_covariances=True,
+        do_kl_annealing=True,
+        kl_annealing_curve="tanh",
+        kl_annealing_sharpness=10,
+        n_kl_annealing_epochs=20,
+        do_gs_annealing=True,
+        gs_annealing_curve="exp",
+        initial_gs_temperature=1.0,
+        final_gs_temperature=0.06,
+        gs_annealing_slope=0.04,
+        n_gs_annealing_epochs=40,
+        batch_size=32,
+        learning_rate=0.005,
+        n_epochs=40,
+    )
+    model = Model(config)
+    model.train(data)
+    alpha = model.get_alpha(data)
+
+where ``data`` is a :class:`~osl_dynamics.data.Data` object.
 
 Post-hoc Analysis
 -----------------
@@ -88,7 +120,7 @@ Post-hoc Analysis
 :meth:`model.get_alpha <osl_dynamics.models.inf_mod_base.VariationalInferenceModelBase.get_alpha>` returns the state probabilities, :math:`q(s_t)`. Because DyNeStE infers mutually exclusive states, the post-hoc analysis is the same as for the :doc:`HMM <hmm>`:
 
 - **Summary statistics** of the state time course (from :func:`~osl_dynamics.inference.modes.argmax_time_courses`): fractional occupancy, mean lifetime, mean interval and switching rate. See the :doc:`HMM Summary Statistics tutorial </tutorials_build/4-3_hmm_summary_stats>`.
-- **Spectral analysis** with the multitaper (:func:`~osl_dynamics.analysis.spectral.multitaper_spectra`), and power maps and coherence networks from the spectra. See the :doc:`HMM Multitaper Spectra </tutorials_build/4-1_hmm_multitaper_spectra>` and :doc:`HMM Plotting MEG Networks </tutorials_build/4-2_hmm_plotting_meg_networks>` tutorials.
+- **Spectral analysis** with the multitaper (:func:`~osl_dynamics.analysis.spectral.multitaper_spectra`), and power maps and coherence networks from the spectra. See :doc:`Spectral Analysis </user_guide/spectra>` and the :doc:`HMM Multitaper Spectra </tutorials_build/4-1_hmm_multitaper_spectra>` and :doc:`HMM Plotting MEG Networks </tutorials_build/4-2_hmm_plotting_meg_networks>` tutorials.
 
 The summary statistics can be compared between groups or conditions with the :doc:`statistical significance testing </user_guide/stats>` tools. :meth:`~osl_dynamics.models.dyneste.Model.sample_alpha` samples state time courses from the trained model RNN, which can be used to check the long-range temporal structure the model has learned, e.g. the distribution of state lifetimes.
 

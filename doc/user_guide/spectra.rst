@@ -11,10 +11,10 @@ After training a model on time-delay embedded (TDE) data, we describe each state
      - Models
      - Returns
    * - :func:`~osl_dynamics.analysis.spectral.regression_spectra`
-     - HMM, DyNeMo
+     - All models (states and modes)
      - The static spectrum and the change from the static spectrum for each state/mode
    * - :func:`~osl_dynamics.analysis.spectral.multitaper_spectra`
-     - HMM
+     - Models with states (HMM, DyNeStE, HIVE)
      - The spectrum of each state
 
 For examples with real data, see the :doc:`HMM Multitaper Spectra </tutorials_build/4-1_hmm_multitaper_spectra>` and :doc:`HMM Plotting MEG Networks </tutorials_build/4-2_hmm_plotting_meg_networks>` tutorials (multitaper), and the :doc:`DyNeMo Regression Spectra </tutorials_build/5-1_dynemo_regression_spectra>` and :doc:`DyNeMo Plotting Networks </tutorials_build/5-2_dynemo_plotting_networks>` tutorials (regression).
@@ -28,6 +28,13 @@ The spectrum at time :math:`t` is modeled as a mixture of the spectra of each st
     P_t(f) = \sum_j \alpha_{jt} P_j(f).
 
 :func:`~osl_dynamics.analysis.spectral.regression_spectra` calculates a spectrogram :math:`P_t` (cross spectra in a sliding window of :code:`window_length` samples, each split into :code:`n_sub_windows` Hann-tapered sub-windows), averages :code:`alpha` over the same windows and fits the mixture with least squares, i.e. a `GLM-spectrum <https://doi.org/10.1162/imag_a_00082>`_. The frequency resolution is set by the sub-window length, :code:`window_length / n_sub_windows` samples.
+
+.. figure:: models/images/dynemo-regression-spectra.svg
+    :class: no-scaled-link
+    :width: 840
+    :align: center
+
+    Regression spectra for simulated data where the power of a different oscillation is proportional to each mode's mixing coefficient. **(a)** The spectrogram of the data and the mixing coefficients. **(b)** The intercept of the regression, the static PSD. **(c)** The regression coefficients for each mode.
 
 Definitions
 ***********
@@ -85,7 +92,23 @@ The coefficients of every session are scaled by the same :math:`\sigma_j`, so se
 Multitaper spectra
 ------------------
 
-:func:`~osl_dynamics.analysis.spectral.multitaper_spectra` multiplies the data by each state's probability time course and calculates a multitaper spectrum, which estimates the state spectrum :math:`P_j` directly. It is the recommended method for HMM states (see the :doc:`HMM page </user_guide/models/hmm>`). The multitaper spectra have broader peaks and smaller differences between states than the regression spectra.
+:func:`~osl_dynamics.analysis.spectral.multitaper_spectra` estimates the spectrum of each state, :math:`P_j`, directly:
+
+#. Multiply the data by the state probability time course, :math:`\alpha_{jt}`, to keep the time points when state :math:`j` is active.
+#. Split the result into non-overlapping windows. A window twice the sampling frequency gives a frequency resolution of 0.5 Hz.
+#. Multiply each window by several tapers (hence the name 'multitaper'), Fourier transform each tapered window and average the squared magnitudes over the tapers to estimate the PSD of the window.
+#. Average the PSDs of the windows.
+
+.. figure:: models/images/hmm-spectra.svg
+    :class: no-scaled-link
+    :width: 800
+    :align: center
+
+    Multitaper spectra for simulated data with a different oscillation in each state. **(a)** The data before time-delay embedding, and the data multiplied by each state's probability time course. **(b)** The PSD of each state and the static PSD of all the data.
+
+It also calculates the coherence between regions. Power maps and coherence networks are calculated from the spectra with :func:`~osl_dynamics.analysis.power.variance_from_spectra` and :func:`~osl_dynamics.analysis.connectivity.mean_coherence_from_spectra`. High-frequency activity can make the coherence networks noisy, so the spectra are often separated into frequency bands ('spectral components') with non-negative matrix factorization (:func:`~osl_dynamics.analysis.spectral.decompose_spectra`).
+
+The multitaper is the recommended method for HMM states (see the :doc:`HMM page </user_guide/models/hmm>`). The multitaper spectra have broader peaks and smaller differences between states than the regression spectra.
 
 To compare the two methods, calculate :math:`P_j = S + \beta_j / \sigma_j` from the regression spectra, or the change from the static spectrum, :math:`P_j - S`, from the multitaper spectra, where :math:`S` is the average of the state spectra weighted by the fractional occupancies.
 

@@ -56,7 +56,35 @@ Training
 
 M-DyNeMo in osl-dynamics [1] is trained in the same way as :doc:`DyNeMo <dynemo>`, with **amortized variational inference**: a bidirectional inference RNN predicts the posterior for both sets of logits from the data, and the cost function is the variational free energy, with a KL divergence term for each set of logits. KL annealing (``do_kl_annealing=True``) helps training. The recommended initialization is :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_subset_initialization` (the default ``init_method``), and :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs it before ``fit``.
 
-The standard deviations, correlations and means are learned if ``learn_stds``, ``learn_corrs`` and ``learn_means`` are ``True``. They are returned by :meth:`~osl_dynamics.models.mdynemo.Model.get_means_stds_corrs`.
+The standard deviations, correlations and means are learned if ``learn_stds``, ``learn_corrs`` and ``learn_means`` are ``True``. They are returned by :meth:`~osl_dynamics.models.mdynemo.Model.get_means_stds_corrs`. For example::
+
+    from osl_dynamics.models.mdynemo import Config, Model
+
+    config = Config(
+        n_modes=6,
+        n_corr_modes=6,
+        n_channels=data.n_channels,
+        sequence_length=200,
+        inference_n_units=64,
+        inference_normalization="layer",
+        model_n_units=64,
+        model_normalization="layer",
+        learn_means=False,
+        learn_stds=True,
+        learn_corrs=True,
+        do_kl_annealing=True,
+        kl_annealing_curve="tanh",
+        kl_annealing_sharpness=10,
+        n_kl_annealing_epochs=20,
+        batch_size=32,
+        learning_rate=0.01,
+        n_epochs=40,
+    )
+    model = Model(config)
+    model.train(data)
+    alpha, beta = model.get_alpha(data)
+
+where ``data`` is a :class:`~osl_dynamics.data.Data` object.
 
 Post-hoc Analysis
 -----------------
@@ -65,9 +93,9 @@ Post-hoc Analysis
 
 - **Re-weighting** with :func:`~osl_dynamics.inference.modes.reweight_mtc`, which accounts for the size of each mode's covariance or correlations.
 - **Summary statistics**, e.g. the mean, standard deviation or kurtosis of the mixing coefficients, or the HMM summary statistics after binarizing them with :func:`~osl_dynamics.inference.modes.gmm_time_courses`.
-- **Spectral analysis** with the regression spectra (:func:`~osl_dynamics.analysis.spectral.regression_spectra`).
+- **Spectral analysis** with the regression spectra (:func:`~osl_dynamics.analysis.spectral.regression_spectra`). See :doc:`Spectral Analysis </user_guide/spectra>`.
 
-Comparing the power and FC time courses shows how strongly power and connectivity dynamics are coupled, e.g. with the correlation between :math:`\alpha_{jt}` and :math:`\beta_{jt}`.
+Comparing the power and FC time courses shows how closely power and FC dynamics are related, e.g. with the correlation between :math:`\alpha_{jt}` and :math:`\beta_{jt}`.
 
 References
 ----------
