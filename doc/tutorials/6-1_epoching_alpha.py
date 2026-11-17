@@ -5,8 +5,6 @@ Epoching: Network Response
 In this tutorial we will cover how to epoch the inferred state/mode time courses. We will use the functionality in MNE to do this. This requires us to have the continuous training data in `.fif` format.
 """
 
-# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/6-1_epoching_alpha.png"
-
 #%%
 # Download source data
 # ^^^^^^^^^^^^^^^^^^^^
@@ -110,3 +108,5 @@ print(famous.shape)
 # Statistical significance testing
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # We can average the trials (epochs) for a given subject and do stats to see if there's a significant response. See the :doc:`Network Response <7-3_network_response>` tutorial for how to do group-level stats on the subject-level network responses.
+
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/6-1_epoching_alpha.png"

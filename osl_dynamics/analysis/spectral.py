@@ -1552,9 +1552,7 @@ def _welch(
     if standardize:
         data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 
-    # Rescaling for the PSD to account for how much time each
-    # state was active. Note, we using the same scaling as the
-    # the multitaper calculation in the HMM-MAR toolbox
+    # Rescale the PSD to account for how much time each state was active
     sum_alpha2 = np.sum(alpha**2, axis=0)
     scaling = n_samples / sum_alpha2
 
@@ -1899,9 +1897,7 @@ def _multitaper(
     if standardize:
         data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 
-    # Rescaling for the PSD to account for how much time each
-    # state was active. Note, we using the same scaling as the
-    # the multitaper calculation in the HMM-MAR toolbox
+    # Rescale the PSD to account for how much time each state was active
     sum_alpha2 = np.sum(alpha**2, axis=0)
     scaling = n_samples / sum_alpha2
 

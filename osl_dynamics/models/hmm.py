@@ -10,7 +10,6 @@ References
 - D. Vidaurre, et al., "Discovering dynamic brain networks from big data in
   rest and task". `Neuroimage 180, 646-656 (2018)
   <https://www.sciencedirect.com/science/article/pii/S1053811917305487>`_.
-- `MATLAB HMM-MAR Toolbox <https://github.com/OHBA-analysis/HMM-MAR>`_.
 """
 
 import os

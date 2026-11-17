@@ -5,8 +5,6 @@ DyNeMo: Training
 This tutorial covers how to train a DyNeMo model. We will use MEG data in this tutorial, however, this can easily be substituted with fMRI data.
 """
 
-# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/3-3_dynemo_training.png"
-
 #%%
 # Getting the Data
 # ^^^^^^^^^^^^^^^^
@@ -199,3 +197,5 @@ model.summary()
 # Selecting a Run
 # ^^^^^^^^^^^^^^^^
 # Training DyNeMo multiple times on the same data can give different networks. The run with the lowest variational free energy is a good default choice. For an alternative based on the networks the runs found, see :doc:`DyNeMo: Selecting a Run <../tutorials_build/3-4_dynemo_selecting_a_run>`.
+
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/3-3_dynemo_training.png"

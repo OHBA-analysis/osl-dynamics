@@ -5,8 +5,6 @@ HMM/DyNeMo: Get Inferred Parameters
 In this tutorial we will get the inferred parameters from a dynamic network model (HMM/DyNeMo).
 """
 
-# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/3-5_hmm_dynemo_get_inf_params.png"
-
 #%%
 # Download data and trained model
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -97,3 +95,5 @@ In this tutorial we will get the inferred parameters from a dynamic network mode
 #
 #     np.save("results/inf_params/means.npy", means)
 #     np.save("results/inf_params/covs.npy", covs)
+
+# sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/3-5_hmm_dynemo_get_inf_params.png"

@@ -10,8 +10,6 @@ In this tutorial we will plot networks from a DyNeMo model trained on source rec
 4. Coherence networks
 """
 
-# sphinx_gallery_thumbnail_number = 7
-
 #%%
 # Download post-hoc spectra
 # ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -136,3 +134,5 @@ connectivity.save(
 
 #%%
 # Red edges are increases and blue edges are decreases. The networks are in the same regions as the changes in power. We expect these networks will improve with more subjects.
+
+# sphinx_gallery_thumbnail_number = 7

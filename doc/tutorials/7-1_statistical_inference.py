@@ -15,8 +15,6 @@ The structure follows the excellent `Statistical inference <https://mne.tools/st
 The practical tutorials that follow show the tests on realistic analyses: :doc:`group contrasts <7-2_group_contrast>`, :doc:`network responses <7-3_network_response>` and :doc:`custom designs <7-4_custom_designs>`.
 """
 
-# sphinx_gallery_thumbnail_number = 6
-
 #%%
 # Simulated data
 # ^^^^^^^^^^^^^^
@@ -334,3 +332,5 @@ fig.tight_layout()
 # - Sassenhagen, J. & Draschkow, D. (2019). Cluster-based permutation tests of MEG/EEG data do not establish significance of effect latency or location. *Psychophysiology*, 56(6), e13335.
 # - Smith, S. M. & Nichols, T. E. (2009). Threshold-free cluster enhancement. *NeuroImage*, 44(1), 83-98.
 # - Winkler, A. M. et al. (2014). Permutation inference for the general linear model. *NeuroImage*, 92, 381-397.
+
+# sphinx_gallery_thumbnail_number = 6

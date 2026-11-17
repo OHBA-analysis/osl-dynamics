@@ -12,8 +12,6 @@ In this tutorial we calculate summary statistics for dynamics:
 - Switching rate, which is the average number of state activations.
 """
 
-# sphinx_gallery_thumbnail_number = 3
-
 #%%
 # Download inferred parameters
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -139,3 +137,5 @@ print(np.mean(sr, axis=0))
 
 # Plot distribution across subjects
 fig, ax = plotting.plot_violin(sr.T, x_label="State", y_label="Switching Rate (Hz)")
+
+# sphinx_gallery_thumbnail_number = 3
