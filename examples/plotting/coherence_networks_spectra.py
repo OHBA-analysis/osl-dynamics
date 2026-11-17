@@ -7,13 +7,16 @@ course) or regression (in the case of a mode time course).
 See examples/spectra/hmm_multitaper.py for how to calculate a multitaper
 and examples/spectra/dynemo_regression_spectra.py for how to calculate regression spectra.
 
-In this script we assume this has been done and we have the group-average spectra
-files: f.npy and coh.npy. (The other file: psd.npy is not needed for this script.)
+In this script we assume this has been done and we have the subject-specific spectra
+files: f.npy, coh.npy and w.npy. (The other file: psd.npy is not needed for this script.)
 """
 
 import numpy as np
 
 from osl_dynamics.analysis import connectivity
+
+# Set to False for multitaper spectra
+regression_spectra = True
 
 # Load subject-specific state/mode spectra
 f = np.load("f.npy")
@@ -32,10 +35,14 @@ conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, frequency_range=[1,
 # - Plot the top X % of connections.
 # - Plot the top X % of connections relative to the means across states/modes.
 # - Use a GMM to calculate a threshold (X) for us.
-#
-# Here we will plot the top 5% of connections above/below the mean connectivity
-# across states/modes
-conn_map = connectivity.threshold(conn_map, percentile=95, subtract_mean=True)
+if regression_spectra:
+    # The coherence is a change from the static spectrum: plot the 5% of
+    # connections with the largest changes (increases or decreases)
+    conn_map = connectivity.threshold(conn_map, percentile=95, absolute_value=True)
+else:
+    # Multitaper: plot the top 5% of connections relative to the mean
+    # connectivity across states
+    conn_map = connectivity.threshold(conn_map, percentile=95, subtract_mean=True)
 
 # Plot connectivity maps
 connectivity.save(

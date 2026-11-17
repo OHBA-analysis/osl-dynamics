@@ -20,10 +20,18 @@ import numpy as np
 
 from osl_dynamics.analysis import power
 
+# Set to False for multitaper spectra
+regression_spectra = True
+
 # Load the subject-level spectra
 f = np.load("f.npy")
 psd = np.load("psd.npy")
 w = np.load("w.npy")
+
+if regression_spectra:
+    # Use the regression coefficients (calculated with return_coef_int=True),
+    # which are the change from the static spectrum
+    psd = psd[:, 0]
 
 # Calculate the group average
 gpsd = np.average(psd, axis=0, weights=w)
@@ -36,6 +44,6 @@ power_map = power.variance_from_spectra(f, gpsd, frequency_range=[1, 30])
 power.save(
     power_map,
     parcellation_file="atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz",
-    subtract_mean=True,
+    subtract_mean=not regression_spectra,  # multitaper: subtract the mean over states
     filename="maps_.png",
 )

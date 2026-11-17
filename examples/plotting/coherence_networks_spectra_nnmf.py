@@ -1,10 +1,10 @@
 """Example code for plotting connectivity maps using the coherence
-from state/mode spectra.
+from state spectra and spectral components calculated with NNMF.
 
-The spectra can be calculate with a multitaper (in the case of a state time
-course) or regression (in the case of a mode time course).
-
-See examples/spectra/hmm_multitaper.py for how to calculate a multitaper
+The spectra are calculated with a multitaper, see
+examples/spectra/hmm_multitaper.py. NNMF needs non-negative coherences, so it
+cannot be used with the coherence from regression spectra, which can be
+negative.
 """
 
 import numpy as np
@@ -12,7 +12,7 @@ import numpy as np
 from osl_dynamics.analysis import connectivity, spectral
 from osl_dynamics.utils import plotting
 
-# Load subject-specific state/mode spectra
+# Load subject-specific state spectra
 f = np.load("f.npy")
 coh = np.load("coh.npy")
 w = np.load("w.npy")

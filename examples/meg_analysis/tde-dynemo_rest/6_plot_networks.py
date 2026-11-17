@@ -57,7 +57,6 @@ p = power.variance_from_spectra(f, gpsd_coefs)
 power.save(
     p,
     parcellation_file=parcellation_file,
-    subtract_mean=True,  # just for visualization
     filename=f"{networks_dir}/pow_.png",
 )
 
@@ -69,8 +68,8 @@ gcoh = np.average(coh, axis=0, weights=w)
 # Calculate the coherence network by averaging over all frequencies
 c = connectivity.mean_coherence_from_spectra(f, gcoh)
 
-# Threshold the top 2% of connections
-c = connectivity.threshold(c, percentile=98, subtract_mean=True)
+# Keep the 2% of connections with the largest changes (increases or decreases)
+c = connectivity.threshold(c, percentile=98, absolute_value=True)
 
 # Plot
 connectivity.save(
