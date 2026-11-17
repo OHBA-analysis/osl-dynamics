@@ -49,7 +49,6 @@ config = Config(
 )
 model = Model(config)
 model.summary()
-model.set_regularizers(data)
 
 #%% Training
 
