@@ -1265,25 +1265,42 @@ def dynemo_generative_process(fmt):
 def dynemo_training(fmt):
     """Amortized variational inference in DyNeMo."""
     rng = np.random.default_rng(RNG_SEED + 6)
-    W, H = 7, 3.0
+    W, H = 7, 3.8
     fig = plt.figure(figsize=(W, H))
     ax = canvas(fig, [0, 0, 1, 1], (0, W), (0, H))
 
-    def titled_box(x, y, w, h, title, body):
+    def titled_box(x, y, w, h, title, body, top=False):
+        """Box with a title, and the body centred or (top=True) under the title."""
         box(ax, (x, y), w, h)
         ax.text(x + w / 2, y + h - 0.13, title, ha="center", va="top", fontweight="bold")
         ax.text(
             x + w / 2,
-            y + (h - 0.35) / 2,
+            y + h - 0.42 if top else y + (h - 0.35) / 2,
             body,
             ha="center",
-            va="center",
+            va="top" if top else "center",
             fontsize=9,
             linespacing=1.5,
         )
 
-    y1, h1 = 1.85, 1.1
-    y2, h2 = 0.1, 0.9
+    def mini(x, y, w, h):
+        """Axes for an illustration inside a box, in canvas units."""
+        sub = fig.add_axes([x / W, y / H, w / W, h / H])
+        sub.axis("off")
+        return sub
+
+    def gaussians(sub, means, std):
+        """A normal density for each mode."""
+        z = np.linspace(-4, 4, 200)
+        for j, mean in enumerate(means):
+            density = np.exp(-0.5 * ((z - mean) / std) ** 2)
+            sub.fill_between(z, density, color=STATES[j], alpha=0.25, lw=0)
+            sub.plot(z, density, color=STATES[j], lw=1.0)
+        sub.set_xlim(-4, 4)
+        sub.set_ylim(0, 1.1)
+
+    y1, h1 = 2.25, 1.5
+    y2, h2 = 0.1, 1.3
     xs = {
         "data": (0.03, 0.95),
         "inf": (1.2, 1.25),
@@ -1297,15 +1314,18 @@ def dynemo_training(fmt):
         return x + w / 2
 
     # Top row: from the data to the observation model
-    titled_box(*xs["data"][:1], y1, xs["data"][1], h1, "Data", "")
-    sub = fig.add_axes([0.13 / W, (y1 + 0.12) / H, 0.75 / W, 0.6 / H])
-    sub.axis("off")
+    titled_box(xs["data"][0], y1, xs["data"][1], h1, "Data", "$x_{1:L}$", top=True)
+    sub = mini(xs["data"][0] + 0.1, y1 + 0.12, xs["data"][1] - 0.2, 0.75)
     x = smooth_noise(100, 4, rng, 1.5)
     for c in range(4):
         sub.plot(x[:, c] * 0.2 + c, color=MUTED, lw=0.4)
     titled_box(xs["inf"][0], y1, xs["inf"][1], h1, "Inference RNN", "Bidirectional,\nsees $x_{1:L}$")
-    titled_box(xs["post"][0], y1, xs["post"][1], h1, "Posterior", "$q(\\theta_t \\mid x_{1:L})$,\nsample $\\theta_t$")
-    titled_box(xs["alpha"][0], y1, xs["alpha"][1], h1, "Softmax", r"$\alpha_t = \mathrm{softmax}(\theta_t)$")
+    titled_box(xs["post"][0], y1, xs["post"][1], h1, "Posterior", r"$q(\theta_t \mid x_{1:L})$," "\nsample $\\theta_t$", top=True)
+    gaussians(mini(xs["post"][0] + 0.1, y1 + 0.1, xs["post"][1] - 0.2, 0.5), [-1.8, 0.2, 1.9], 0.45)
+    titled_box(xs["alpha"][0], y1, xs["alpha"][1], h1, "Softmax", r"$\alpha_t = \mathrm{softmax}(\theta_t)$", top=True)
+    sub = mini(xs["alpha"][0] + 0.12, y1 + 0.15, xs["alpha"][1] - 0.24, 0.65)
+    stacked(sub, np.arange(100), softmax(2.5 * smooth_noise(100, 3, rng, 6)), gap=0.4)
+    sub.axis("off")
     titled_box(
         xs["obs"][0],
         y1,
@@ -1313,7 +1333,17 @@ def dynemo_training(fmt):
         h1,
         "Observation model",
         r"$m_t = {\sum}_j \alpha_{jt} \mu_j$" "\n" r"$C_t = {\sum}_j \alpha_{jt} D_j$",
+        top=True,
     )
+    covs = example_covariances()
+    limit = np.abs(covs).max()
+    size = 0.38
+    gap = (xs["obs"][1] - 3 * size) / 4
+    for j in range(3):
+        sub = fig.add_axes([(xs["obs"][0] + gap + j * (size + gap)) / W, (y1 + 0.12) / H, size / W, size / H])
+        covariance_panel(sub, covs[j], limit, STATES[j], "")
+        for spine in sub.spines.values():
+            spine.set_linewidth(1)
     order = ["data", "inf", "post", "alpha", "obs"]
     for a, b in zip(order[:-1], order[1:]):
         xa = xs[a][0] + xs[a][1]
@@ -1321,7 +1351,8 @@ def dynemo_training(fmt):
 
     # Bottom row: the prior, the cost and the log-likelihood
     titled_box(xs["inf"][0], y2, xs["inf"][1], h2, "Model RNN", r"Sees $\theta_{1:t-1}$")
-    titled_box(xs["post"][0], y2, xs["post"][1], h2, "Prior", r"$p(\theta_t \mid \theta_{1:t-1})$")
+    titled_box(xs["post"][0], y2, xs["post"][1], h2, "Prior", r"$p(\theta_t \mid \theta_{1:t-1})$", top=True)
+    gaussians(mini(xs["post"][0] + 0.1, y2 + 0.1, xs["post"][1] - 0.2, 0.5), [-1.3, 0.6, 1.5], 0.8)
     titled_box(xs["alpha"][0], y2, xs["alpha"][1], h2, "Cost", "$-$log-likelihood\n+ KL divergence")
     titled_box(xs["obs"][0], y2, xs["obs"][1], h2, "Log-likelihood", r"$\log \mathcal{N}(x_t \mid m_t, C_t)$")
 

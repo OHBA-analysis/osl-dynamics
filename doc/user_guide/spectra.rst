@@ -108,7 +108,7 @@ Multitaper spectra
 
 It also calculates the coherence between regions. Power maps and coherence networks are calculated from the spectra with :func:`~osl_dynamics.analysis.power.variance_from_spectra` and :func:`~osl_dynamics.analysis.connectivity.mean_coherence_from_spectra`. High-frequency activity can make the coherence networks noisy, so the spectra are often separated into frequency bands ('spectral components') with non-negative matrix factorization (:func:`~osl_dynamics.analysis.spectral.decompose_spectra`).
 
-The multitaper is the recommended method for HMM states (see the :doc:`HMM page </user_guide/models/hmm>`). The multitaper spectra have broader peaks and smaller differences between states than the regression spectra.
+The multitaper is the recommended method for HMM states. The multitaper spectra have broader peaks and smaller differences between states than the regression spectra.
 
 To compare the two methods, calculate :math:`P_j = S + \beta_j / \sigma_j` from the regression spectra, or the change from the static spectrum, :math:`P_j - S`, from the multitaper spectra, where :math:`S` is the average of the state spectra weighted by the fractional occupancies.
 

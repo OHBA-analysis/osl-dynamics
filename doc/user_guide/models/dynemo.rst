@@ -141,8 +141,6 @@ Spectral Analysis
 
 With TDE data the modes are spectrally distinct. We calculate the spectral properties of each mode with **regression spectra**, a GLM-spectrum [5]: a spectrogram of the data before time-delay embedding (and PCA) is fitted as a mixture of the mode spectra weighted by the mixing coefficients (:func:`~osl_dynamics.analysis.spectral.regression_spectra`). The intercept is the static (time-averaged) PSD and the regression coefficients are the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient. Power maps and coherence networks are calculated from the coefficients. See :doc:`Spectral Analysis </user_guide/spectra>` for the method and how to interpret and plot the outputs, and the :doc:`DyNeMo Regression Spectra </tutorials_build/5-1_dynemo_regression_spectra>` and :doc:`DyNeMo Plotting Networks </tutorials_build/5-2_dynemo_plotting_networks>` tutorials.
 
-**The regression spectra approach is recommended for calculating spectral properties with DyNeMo.**
-
 For fMRI data, the mode means and covariances of each subject can be re-estimated with **dual estimation** (:meth:`~osl_dynamics.models.dynemo.Model.dual_estimation`).
 
 Task Data

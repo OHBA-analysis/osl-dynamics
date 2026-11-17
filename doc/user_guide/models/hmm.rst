@@ -110,7 +110,7 @@ We also recommend training several runs and keeping the one with the lowest free
 The State Time Course
 ^^^^^^^^^^^^^^^^^^^^^
 
-After training, :meth:`model.get_alpha <osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelBase.get_alpha>` returns the state probability time course, :math:`\alpha_{kt} = q(s_t = k)`, for each session. For a state time course with one state active at each time point, take the most probable state at each time point with :func:`~osl_dynamics.inference.modes.argmax_time_courses`, or the most probable sequence of states with :meth:`model.get_viterbi_path <osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelBase.get_viterbi_path>`. The learned parameters are returned by :meth:`~osl_dynamics.models.hmm.Model.get_means_covariances`, :meth:`~osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelBase.get_trans_prob` and :meth:`~osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelBase.get_initial_state_probs`. See the :doc:`Getting the Inferred Parameters tutorial </tutorials_build/3-5_hmm_dynemo_get_inf_params>`.
+After training, :meth:`model.get_alpha <osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelBase.get_alpha>` returns the state probability time course, :math:`\alpha_{kt} = q(s_t = k)`, for each session. For a state time course with one state active at each time point, take the most probable state at each time point, the maximum a posteriori (MAP) estimate, with :func:`~osl_dynamics.inference.modes.argmax_time_courses`, or the most probable sequence of states with :meth:`model.get_viterbi_path <osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelBase.get_viterbi_path>`. The learned parameters are returned by :meth:`~osl_dynamics.models.hmm.Model.get_means_covariances`, :meth:`~osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelBase.get_trans_prob` and :meth:`~osl_dynamics.models.inf_mod_base.MarkovStateInferenceModelBase.get_initial_state_probs`. See the :doc:`Getting the Inferred Parameters tutorial </tutorials_build/3-5_hmm_dynemo_get_inf_params>`.
 
 Canonical HMM Networks
 ^^^^^^^^^^^^^^^^^^^^^^
@@ -145,8 +145,6 @@ Spectral Analysis
 ^^^^^^^^^^^^^^^^^
 
 With TDE data the states are spectrally distinct, e.g. a state with high alpha (8-12 Hz) power in occipital regions. The power spectrum and coherence of each state are calculated from the data before time-delay embedding (and PCA) with :func:`~osl_dynamics.analysis.spectral.multitaper_spectra`, and power maps and coherence networks are calculated from the spectra. See :doc:`Spectral Analysis </user_guide/spectra>` for the method and how to plot the outputs, and the :doc:`HMM Multitaper Spectra </tutorials_build/4-1_hmm_multitaper_spectra>` and :doc:`HMM Plotting MEG Networks </tutorials_build/4-2_hmm_plotting_meg_networks>` tutorials.
-
-**When calculating power and coherence maps for HMM states the multitaper and NNMF approach is recommended.**
 
 For fMRI data, the state means and covariances of each subject are re-estimated with **dual estimation** (:meth:`~osl_dynamics.models.hmm.Model.dual_estimation`). See the :doc:`HMM fMRI Dual Estimation </tutorials_build/4-4_hmm_fmri_dual_estimation>` and :doc:`HMM Plotting fMRI Networks </tutorials_build/4-5_hmm_plotting_fmri_networks>` tutorials.
 

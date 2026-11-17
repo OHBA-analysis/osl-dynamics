@@ -119,7 +119,7 @@ Post-hoc Analysis
 
 :meth:`model.get_alpha <osl_dynamics.models.inf_mod_base.VariationalInferenceModelBase.get_alpha>` returns the state probabilities, :math:`q(s_t)`. Because DyNeStE infers mutually exclusive states, the post-hoc analysis is the same as for the :doc:`HMM <hmm>`:
 
-- **Summary statistics** of the state time course (from :func:`~osl_dynamics.inference.modes.argmax_time_courses`): fractional occupancy, mean lifetime, mean interval and switching rate. See the :doc:`HMM Summary Statistics tutorial </tutorials_build/4-3_hmm_summary_stats>`.
+- **Summary statistics** of the state time course, the maximum a posteriori (MAP) estimate of the state at each time point (from :func:`~osl_dynamics.inference.modes.argmax_time_courses`): fractional occupancy, mean lifetime, mean interval and switching rate. See the :doc:`HMM Summary Statistics tutorial </tutorials_build/4-3_hmm_summary_stats>`.
 - **Spectral analysis** with the multitaper (:func:`~osl_dynamics.analysis.spectral.multitaper_spectra`), and power maps and coherence networks from the spectra. See :doc:`Spectral Analysis </user_guide/spectra>` and the :doc:`HMM Multitaper Spectra </tutorials_build/4-1_hmm_multitaper_spectra>` and :doc:`HMM Plotting MEG Networks </tutorials_build/4-2_hmm_plotting_meg_networks>` tutorials.
 
 The summary statistics can be compared between groups or conditions with the :doc:`statistical significance testing </user_guide/stats>` tools. :meth:`~osl_dynamics.models.dyneste.Model.sample_alpha` samples state time courses from the trained model RNN, which can be used to check the long-range temporal structure the model has learned, e.g. the distribution of state lifetimes.
