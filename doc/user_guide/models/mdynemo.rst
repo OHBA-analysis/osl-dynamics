@@ -54,7 +54,7 @@ The number of power modes (``n_modes``) and FC modes (``n_corr_modes``) can be d
 Training
 --------
 
-M-DyNeMo in osl-dynamics [1] is trained in the same way as :doc:`DyNeMo <dynemo>`, with **amortized variational inference**: a bidirectional inference RNN predicts the posterior for both sets of logits from the data, and the cost function is the variational free energy, with a KL divergence term for each set of logits. KL annealing (``do_kl_annealing=True``) helps training. The recommended initialization is :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_subset_initialization` (the default ``init_method``), and :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs it before ``fit``.
+M-DyNeMo in osl-dynamics [1] is trained in the same way as :doc:`DyNeMo <dynemo>`, with **amortized variational inference**: a bidirectional inference RNN predicts the posterior for both sets of logits from the data, and the cost function is the variational free energy, with a KL divergence term for each set of logits. KL annealing (``do_kl_annealing=True``) can be used. The recommended initialization is :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_subset_initialization` (the default ``init_method``), and :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs it before ``fit``.
 
 The standard deviations, correlations and means are learned if ``learn_stds``, ``learn_corrs`` and ``learn_means`` are ``True``. They are returned by :meth:`~osl_dynamics.models.mdynemo.Model.get_means_stds_corrs`. For example::
 

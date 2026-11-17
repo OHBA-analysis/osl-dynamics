@@ -1,7 +1,7 @@
 Dynamic Network States (DyNeStE)
 ================================
 
-DyNeStE [2] combines the **mutually exclusive states** of the :doc:`HMM <hmm>`, which are interpretable and give summary statistics directly, with the **recurrent neural network (RNN) temporal model** of :doc:`DyNeMo <dynemo>`, which can capture long-range temporal dependencies that the HMM's Markovian assumption cannot. On resting-state MEG data, DyNeStE finds plausible network states and captures long-range temporal structure better than the HMM [2].
+DyNeStE [2] combines the **mutually exclusive states** of the :doc:`HMM <hmm>` with the **recurrent neural network (RNN) temporal model** of :doc:`DyNeMo <dynemo>`, which can capture long-range temporal dependencies. On resting-state MEG data, DyNeStE captures long-range temporal structure better than the HMM [2].
 
 .. list-table::
    :widths: 25 75
@@ -34,7 +34,7 @@ The **observation model** is the same as the :doc:`HMM <hmm>`'s, a multivariate 
 .. math::
     p(x_t | s_t = k) = \mathcal{N}(m_k, C_k).
 
-The **temporal model** is where DyNeStE differs from the HMM: the probability of the next state depends on the **whole history** of states, not just the previous state. A recurrent neural network (the **model RNN**) predicts the logits of a categorical distribution from the previous states:
+The **temporal model** differs from the HMM's: the probability of the next state depends on the **whole history** of states, not just the previous state. A recurrent neural network (the **model RNN**) predicts the logits of a categorical distribution from the previous states:
 
 .. math::
     p(s_t | s_{1:t-1}) = \mathrm{Cat}(\mathrm{softmax}(\theta^{\mathrm{mod}}_t)).
@@ -75,12 +75,12 @@ The model RNN takes samples of the state sequence from the **Gumbel-Softmax** (o
 
     Gumbel-Softmax samples from the same posterior (top) at three temperatures. A lower temperature gives samples that are closer to a sequence of one-hot states.
 
-The temperature can be annealed during training (``do_gs_annealing=True``), from ``initial_gs_temperature`` to ``final_gs_temperature`` over ``n_gs_annealing_epochs`` epochs, so that the samples become closer to discrete states. As with DyNeMo, **KL annealing** (``do_kl_annealing=True``) can be used to stabilize training.
+The temperature can be annealed during training (``do_gs_annealing=True``), from ``initial_gs_temperature`` to ``final_gs_temperature`` over ``n_gs_annealing_epochs`` epochs. As with DyNeMo, **KL annealing** (``do_kl_annealing=True``) can be used.
 
 Initialization and Hyperparameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-DyNeStE is initialized with :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_state_time_course_initialization` by default (``init_method``). :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs the initialization and then ``fit``, and with ``best_of`` it keeps the run with the lowest free energy. The main hyperparameters are the number of states (``n_states``), ``sequence_length``, the number of units in the RNNs (``inference_n_units`` and ``model_n_units``), the Gumbel-Softmax temperatures, ``n_kl_annealing_epochs``, ``batch_size``, ``learning_rate`` and ``n_epochs``. For example::
+DyNeStE is initialized with :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_state_time_course_initialization` by default (``init_method``). :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs the initialization and then ``fit``. The main hyperparameters are the number of states (``n_states``), ``sequence_length``, the number of units in the RNNs (``inference_n_units`` and ``model_n_units``), the Gumbel-Softmax temperatures, ``n_kl_annealing_epochs``, ``batch_size``, ``learning_rate`` and ``n_epochs``. For example::
 
     from osl_dynamics.models.dyneste import Config, Model
 

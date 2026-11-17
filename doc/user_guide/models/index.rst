@@ -37,6 +37,8 @@ The models describe the data with a small number of networks, each with its own 
 
     Simulated time courses for three states (top) and three modes (bottom). One state is active at each time point, whereas the mixing coefficients of the modes are positive and sum to one at each time point.
 
+.. _choosing-a-model:
+
 Choosing a Model
 ----------------
 

@@ -91,7 +91,7 @@ The inference RNN, model RNN and observation model are trained together by minim
 .. math::
     \mathcal{F} = -\sum_t \mathbb{E}_{q(\theta_t)} \left[ \log p(x_t | \theta_t) \right] + \sum_t \mathrm{KL} \left[ q(\theta_t | x_{1:L}) \,\|\, p(\theta_t | \theta_{1:t-1}) \right],
 
-where the first term is the negative log-likelihood of the data and the second is the Kullback-Leibler (KL) divergence between the posterior and the prior from the model RNN. The expectation is estimated with samples of the logits from the posterior, using the reparameterization trick [3] so that the gradients can pass through the sampling. The parameters take gradient steps (with the Adam optimizer) on batches of sequences, so DyNeMo scales to large datasets. A derivation of the cost function is :download:`here <images/dynemo-cost-function.pdf>`.
+where the first term is the negative log-likelihood of the data and the second is the Kullback-Leibler (KL) divergence between the posterior and the prior from the model RNN. The expectation is estimated with samples of the logits from the posterior, using the reparameterization trick [3] so that the gradients can pass through the sampling. The parameters take gradient steps (with the Adam optimizer) on batches of sequences. A derivation of the cost function is :download:`here <images/dynemo-cost-function.pdf>`.
 
 .. figure:: images/dynemo-training.svg
     :class: no-scaled-link
@@ -100,19 +100,43 @@ where the first term is the negative log-likelihood of the data and the second i
 
     Amortized variational inference in DyNeMo. The inference RNN predicts the posterior for the logits from the data. Samples of the logits give the mixing coefficients and the log-likelihood of the data, and are passed to the model RNN, which predicts the prior. The cost is the negative log-likelihood plus the KL divergence between the posterior and the prior.
 
-**KL annealing** (``do_kl_annealing=True``) helps training: the KL divergence is multiplied by a factor that increases from 0 to 1 over the first ``n_kl_annealing_epochs`` epochs, so the model first learns to describe the data and then learns the temporal model. The learning rate is constant during KL annealing and decays afterwards (``lr_decay``).
+With **KL annealing** (``do_kl_annealing=True``), the KL divergence is multiplied by a factor that increases from 0 to 1 over the first ``n_kl_annealing_epochs`` epochs. The learning rate is constant during KL annealing and decays afterwards (``lr_decay``).
 
 Initialization and Hyperparameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-We recommend initializing DyNeMo with :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_subset_initialization`, which trains a few short runs on random subsets of the data and keeps the best::
+We recommend initializing DyNeMo with :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_subset_initialization`, which trains a few short runs on random subsets of the data and keeps the best. For example::
 
+    from osl_dynamics.models.dynemo import Config, Model
+
+    config = Config(
+        n_modes=8,
+        n_channels=data.n_channels,
+        sequence_length=200,
+        inference_n_units=64,
+        inference_normalization="layer",
+        model_n_units=64,
+        model_normalization="layer",
+        learn_means=False,
+        learn_covariances=True,
+        do_kl_annealing=True,
+        kl_annealing_curve="tanh",
+        kl_annealing_sharpness=10,
+        n_kl_annealing_epochs=10,
+        batch_size=128,
+        learning_rate=0.01,
+        n_epochs=20,
+    )
+    model = Model(config)
     model.random_subset_initialization(data, n_init=5, n_epochs=2, take=0.25)
     model.fit(data)
+    alpha = model.get_alpha(data)
 
-Alternatively, :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs the initialization set in the config (``init_method``, ``n_init``, ``n_init_epochs`` and ``init_take``) and then ``fit``. With ``best_of``, it trains several runs and keeps the one with the lowest free energy.
+where ``data`` is a :class:`~osl_dynamics.data.Data` object.
 
-:meth:`~osl_dynamics.models.initialization.InitializationMixin.nfindr_initialization` is an alternative that starts the mode covariances from the corners of the simplex the windowed data covariances lie in (N-FINDR). The run-to-run variability of DyNeMo is larger than the HMM's, so we recommend training several runs and keeping the one with the lowest free energy (:meth:`model.free_energy <osl_dynamics.models.inf_mod_base.VariationalInferenceModelBase.free_energy>`), or the most typical run (:func:`~osl_dynamics.inference.modes.select_run`). See the :doc:`Selecting a Run tutorial </tutorials_build/3-4_dynemo_selecting_a_run>`.
+:meth:`~osl_dynamics.models.initialization.InitializationMixin.nfindr_initialization` is an alternative that starts the mode covariances from the corners of the simplex the windowed data covariances lie in (N-FINDR). Alternatively, :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs the initialization set in the config (``init_method``, ``n_init``, ``n_init_epochs`` and ``init_take``) and then ``fit``.
+
+We recommend training several runs and keeping the one with the lowest free energy (:meth:`model.free_energy <osl_dynamics.models.inf_mod_base.VariationalInferenceModelBase.free_energy>`, or ``best_of`` in ``model.train``), or the most typical run (:func:`~osl_dynamics.inference.modes.select_run`). See the :doc:`Selecting a Run tutorial </tutorials_build/3-4_dynemo_selecting_a_run>`.
 
 The main hyperparameters are the number of modes (``n_modes``), ``sequence_length``, the number of units in the RNNs (``inference_n_units`` and ``model_n_units``), ``n_kl_annealing_epochs``, ``batch_size``, ``learning_rate`` and ``n_epochs``. The :doc:`FAQ </faq>` discusses how to choose them and what to do if the loss increases during training.
 

@@ -66,7 +66,7 @@ Training
 
 Training (or fitting) the model means inferring the hidden states and the model parameters (:math:`\pi`, :math:`A`, :math:`m_k`, :math:`C_k`) from data. osl-dynamics [1] infers a posterior distribution for the hidden states, :math:`q(s_t)`, and learns point estimates for the parameters.
 
-The data are split into sequences of ``sequence_length`` samples, which are grouped into batches of ``batch_size`` sequences. For each batch:
+The data are split into sequences of ``sequence_length`` samples, which are grouped into batches of ``batch_size`` sequences. For each batch [5]:
 
 #. **E-step**: the Baum-Welch (forward-backward) algorithm [2, 3] calculates the posterior for the hidden states, :math:`q(s_t)`, and for pairs of consecutive states, :math:`q(s_t, s_{t+1})`, given the current parameters.
 #. **Observation model update**: the state means and covariances take a gradient step (with the Adam optimizer and ``learning_rate``) to minimize the negative log-likelihood of the data, weighted by the posterior,
@@ -79,7 +79,7 @@ The data are split into sequences of ``sequence_length`` samples, which are grou
    .. math::
        A \leftarrow (1 - \rho) A + \rho \hat{A}, \quad \pi \leftarrow (1 - \rho) \pi + \rho \hat{\pi}.
 
-   The step size starts at :math:`\rho = (1 + \delta)^{-\kappa}` and decreases at the end of each epoch :math:`e` to :math:`\rho = (1 + \delta + 100 e / E)^{-\kappa}`, where :math:`E` is ``n_epochs``, :math:`\delta` is ``trans_prob_update_delay`` and :math:`\kappa` is ``trans_prob_update_forget``.
+   The step size decreases during training: after epoch :math:`e` (counting from zero), :math:`\rho = (1 + \delta + 100 e / E)^{-\kappa}`, where :math:`E` is ``n_epochs``, :math:`\delta` is ``trans_prob_update_delay`` and :math:`\kappa` is ``trans_prob_update_forget``.
 
 .. figure:: images/hmm-training.svg
     :class: no-scaled-link
@@ -88,7 +88,7 @@ The data are split into sequences of ``sequence_length`` samples, which are grou
 
     One training step. Each batch updates the parameters, which are then used for the E-step of the next batch.
 
-Training on batches scales to large datasets [5]. The cost function is the **variational free energy**,
+The cost function is the **variational free energy**,
 
 .. math::
     \mathcal{F} = \mathbb{E}_{q(s_{1:T})} \left[ \log q(s_{1:T}) - \log p(x_{1:T}, s_{1:T}) \right],
@@ -98,14 +98,30 @@ which :meth:`model.free_energy <osl_dynamics.models.inf_mod_base.MarkovStateInfe
 Initialization and Hyperparameters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The final fit can depend on the initial parameters, so we recommend initializing the HMM with :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_state_time_course_initialization`, which trains a few short runs from random state time courses and keeps the best::
+We recommend initializing the HMM with :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_state_time_course_initialization`, which trains a few short runs from random state time courses and keeps the best. For example::
 
+    from osl_dynamics.models.hmm import Config, Model
+
+    config = Config(
+        n_states=8,
+        n_channels=data.n_channels,
+        sequence_length=200,
+        learn_means=False,
+        learn_covariances=True,
+        batch_size=256,
+        learning_rate=0.01,
+        n_epochs=20,
+    )
+    model = Model(config)
     model.random_state_time_course_initialization(data, n_init=3, n_epochs=1)
     model.fit(data)
+    alpha = model.get_alpha(data)
 
-Alternatively, :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs the initialization set in the config (``init_method``, ``n_init``, ``n_init_epochs`` and ``init_take``) and then ``fit``. With ``best_of``, it trains several runs and keeps the one with the lowest free energy.
+where ``data`` is a :class:`~osl_dynamics.data.Data` object.
 
-We also recommend training several runs and keeping the one with the lowest free energy, or using :func:`~osl_dynamics.inference.modes.select_run`. The main hyperparameters are the number of states (``n_states``, 6-14 states is typical), ``sequence_length``, ``batch_size``, ``learning_rate`` and ``n_epochs``. The :doc:`FAQ </faq>` discusses how to choose them.
+Alternatively, :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs the initialization set in the config (``init_method``, ``n_init``, ``n_init_epochs`` and ``init_take``) and then ``fit``.
+
+We also recommend training several runs and keeping the one with the lowest free energy (``best_of`` in :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>`), or the most typical run (:func:`~osl_dynamics.inference.modes.select_run`). The main hyperparameters are the number of states (``n_states``, 6-14 states is typical), ``sequence_length``, ``batch_size``, ``learning_rate`` and ``n_epochs``. The :doc:`FAQ </faq>` discusses how to choose them.
 
 The State Time Course
 ^^^^^^^^^^^^^^^^^^^^^

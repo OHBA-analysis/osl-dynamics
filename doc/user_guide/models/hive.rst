@@ -1,7 +1,7 @@
 HMM with Integrated Variability Estimation (HIVE)
 ==================================================
 
-HIVE [2] extends the :doc:`HMM <hmm>` to model **variability between sessions** while inferring dynamic networks across a group. The HMM gives every session the same state means and covariances, although sessions from different subjects, scanners or sites differ systematically. HIVE learns an **embedding vector** for each session, a "fingerprint", that adjusts the group-level state means and covariances to give session-specific ones. This fits the data better, and sessions with similar networks have similar embeddings, so the embeddings capture sources of variation across the population (e.g. demographics, scanner or site) without being told about them [2].
+HIVE [2] extends the :doc:`HMM <hmm>` to model **variability between sessions** while inferring dynamic networks across a group. The HMM gives every session the same state means and covariances, although sessions from different subjects, scanners or sites differ systematically. HIVE learns an **embedding vector** for each session, a "fingerprint", that adjusts the group-level state means and covariances to give session-specific ones. Sessions with similar networks have similar embeddings, so the embeddings capture sources of variation across the population (e.g. demographics, scanner or site) [2].
 
 .. list-table::
    :widths: 25 75
@@ -53,7 +53,7 @@ By default each session has its own embedding. Known information about the sessi
 Training
 --------
 
-HIVE in osl-dynamics [1] is trained as the :doc:`HMM <hmm>` is: the Baum-Welch algorithm calculates the posterior for the hidden states for each batch, the transition probability matrix is updated with a decaying exponential moving average, and the other parameters (group means and covariances, embeddings and the MLP) take gradient steps. The deviation magnitudes have a posterior distribution (a gamma distribution for each session and state) with a KL divergence term in the cost function, which regularizes the deviations. KL annealing (``do_kl_annealing=True``) helps training. The default initialization is :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_state_time_course_initialization` (``init_method``), and :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs it before ``fit``.
+HIVE in osl-dynamics [1] is trained as the :doc:`HMM <hmm>` is: the Baum-Welch algorithm calculates the posterior for the hidden states for each batch, the transition probability matrix is updated with a decaying exponential moving average, and the other parameters (group means and covariances, embeddings and the MLP) take gradient steps. The deviation magnitudes have a posterior distribution (a gamma distribution for each session and state) with a KL divergence term in the cost function, which regularizes the deviations. KL annealing (``do_kl_annealing=True``) can be used. The default initialization is :meth:`~osl_dynamics.models.initialization.InitializationMixin.random_state_time_course_initialization` (``init_method``), and :meth:`model.train <osl_dynamics.models.mod_base.ModelBase.train>` runs it before ``fit``.
 
 The data need a session ID label, and :meth:`~osl_dynamics.models.hive.Model.set_regularizers` must be called before training. For example::
 
