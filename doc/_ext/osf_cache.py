@@ -9,8 +9,12 @@ import json
 import os
 import shutil
 import sys
+import time
 import urllib.request
 from pathlib import Path
+
+# Seconds allowed for downloading a file
+DOWNLOAD_TIME = 600
 
 
 def main(args):
@@ -26,9 +30,13 @@ def main(args):
             sys.exit(f"{remote} not found in OSF project {project}")
         cached.parent.mkdir(parents=True, exist_ok=True)
         partial = cached.with_name(cached.name + ".partial")
+        deadline = time.time() + DOWNLOAD_TIME
         with urllib.request.urlopen(urls[remote], timeout=60) as response:
             with open(partial, "wb") as file:
-                shutil.copyfileobj(response, file)
+                while chunk := response.read(1 << 20):
+                    if time.time() > deadline:
+                        sys.exit(f"Downloading {remote} from OSF took too long")
+                    file.write(chunk)
         partial.rename(cached)
 
     shutil.copyfile(cached, Path(remote).name)
