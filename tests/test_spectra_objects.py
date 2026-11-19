@@ -221,3 +221,99 @@ def test_regression_defaults(sim):
 def test_repr(multitaper):
     assert repr(multitaper).startswith("StateSpectra(method='multitaper', n_sessions=2")
     assert "group average" in repr(multitaper.group_average())
+
+
+def test_power_maps_match_variance_from_spectra(multitaper, regression):
+    from osl_dynamics.analysis import power
+
+    g = multitaper.group_average()
+    f = g.frequencies
+    for kwargs in [{}, {"frequency_range": [8, 14]}]:
+        for method in ["mean", "sum", "integral"]:
+            np.testing.assert_allclose(
+                g.power_maps(values="psd", method=method, **kwargs),
+                power.variance_from_spectra(f, g.psd, method=method, **kwargs),
+                rtol=1e-5,
+            )
+    components = multitaper.decompose(2)
+    np.testing.assert_allclose(
+        g.power_maps(values="psd", bands=components),
+        power.variance_from_spectra(f, g.psd, components=components),
+        rtol=1e-5,
+    )
+
+    # Default values and shapes
+    np.testing.assert_allclose(
+        g.power_maps(),
+        g.power_maps(values="psd") - g.power_maps(values="static_psd"),
+        rtol=1e-4,
+        atol=1e-6,
+    )
+    bands = [[1, 4], [4, 8], [8, 13]]
+    p = multitaper.power_maps(bands=bands)
+    assert p.shape == (2, 3, N_STATES, N_CHANNELS)
+    np.testing.assert_allclose(p[:, 1], multitaper.power_maps(frequency_range=[4, 8]))
+    np.testing.assert_allclose(
+        regression.power_maps(),
+        power.variance_from_spectra(regression.frequencies, regression.psd_coefs),
+        rtol=1e-5,
+    )
+
+
+def test_coherence_networks(multitaper, regression):
+    from osl_dynamics.analysis import connectivity
+
+    g = multitaper.group_average()
+    f = g.frequencies
+    c = g.coherence_networks(values="coherence", frequency_range=[8, 14])
+    np.testing.assert_allclose(
+        c,
+        connectivity.mean_coherence_from_spectra(
+            f, g.coherence, frequency_range=[8, 14]
+        ),
+        rtol=1e-5,
+    )
+
+    # Thresholding keeps the same edges as connectivity.threshold
+    c = g.coherence_networks()
+    t = g.coherence_networks(percentile=90)
+    expected = connectivity.threshold(c.copy(), percentile=90, absolute_value=True)
+    np.testing.assert_allclose(t, expected)
+
+    v = multitaper.coherence_networks(bands=[[1, 8], [8, 30]], vectorize=True)
+    n_edges = N_CHANNELS * (N_CHANNELS - 1) // 2
+    assert v.shape == (2, 2, N_STATES, n_edges)
+    assert regression.coherence_networks().shape == (
+        2,
+        N_STATES,
+        N_CHANNELS,
+        N_CHANNELS,
+    )
+
+
+def test_static_spectra_methods(sim):
+    data, _, _, _ = sim
+    s = static.welch_spectra(data, FS)
+    assert s.power_maps().shape == (2, N_CHANNELS)
+    assert s.power_maps(bands=[[1, 4], [4, 8]]).shape == (2, 2, N_CHANNELS)
+    assert s.group_average().coherence_networks().shape == (N_CHANNELS, N_CHANNELS)
+    with pytest.raises(ValueError, match="values must be one of"):
+        s.power_maps(values="psd_change")
+
+
+def test_plot_psd(multitaper, regression, tmp_path):
+    fig, ax = multitaper.plot_psd(values="psd", static=True)
+    assert len(ax.get_lines()) == N_STATES + 1
+    regression.plot_psd(filename=tmp_path / "psd.png", frequency_range=[8, 12])
+    assert (tmp_path / "psd.png").exists()
+
+
+def test_variance_from_spectra_cross_spectra_argument():
+    from osl_dynamics.analysis import power
+
+    # PSDs with n_modes == n_channels are misread as cross spectra without
+    # the cross_spectra argument
+    rng = np.random.default_rng(0)
+    psd = rng.uniform(size=(2, N_CHANNELS, N_CHANNELS, 10))
+    p = power.variance_from_spectra(None, psd, cross_spectra=False)
+    np.testing.assert_allclose(p, psd.mean(axis=-1))

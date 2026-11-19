@@ -228,6 +228,101 @@ def _to_json(value):
     return value
 
 
+def _frequency_weights(
+    frequencies: np.ndarray,
+    bands: Optional[Union[list, np.ndarray]],
+    frequency_range: Optional[list],
+    method: str = "mean",
+) -> Tuple[np.ndarray, bool]:
+    """Weights for averaging spectra over frequency bands.
+
+    Parameters
+    ----------
+    frequencies : np.ndarray
+        Frequency axis. Shape is (n_freq,).
+    bands : list or np.ndarray
+        Frequency ranges, e.g. :code:`[[1, 4], [4, 8]]`, or spectral
+        components with shape (n_components, n_freq).
+    frequency_range : list
+        A single frequency range. Only one of :code:`bands` and
+        :code:`frequency_range` can be passed.
+    method : str, optional
+        For frequency ranges: take the :code:`'mean'`, :code:`'sum'` or
+        :code:`'integral'` over the range. Spectral components always give
+        a weighted mean.
+
+    Returns
+    -------
+    weights : np.ndarray
+        Weights for each band. Shape is (n_bands, n_freq).
+    single : bool
+        Was a single band requested (no band axis in the output)?
+    """
+    if bands is not None and frequency_range is not None:
+        raise ValueError("Only one of bands and frequency_range can be passed.")
+    if method not in ["mean", "sum", "integral"]:
+        raise ValueError(f"method must be 'mean', 'sum' or 'integral', got {method!r}.")
+
+    n_freq = len(frequencies)
+    single = bands is None
+    if bands is None:
+        if frequency_range is None:
+            frequency_range = [frequencies[0], frequencies[-1]]
+        bands = [frequency_range]
+    bands = np.asarray(bands, dtype=np.float64)
+    if bands.ndim != 2:
+        raise ValueError(
+            "bands must be a list of frequency ranges or an array of spectral "
+            "components with shape (n_components, n_freq)."
+        )
+
+    if bands.shape[1] == n_freq and n_freq != 2:
+        # Spectral components: weighted mean
+        return bands / np.sum(bands, axis=1, keepdims=True), single
+
+    if bands.shape[1] != 2:
+        raise ValueError(
+            f"bands must have shape (n_bands, 2) or (n_components, {n_freq})."
+        )
+    weights = np.zeros([len(bands), n_freq])
+    for i, band in enumerate(bands):
+        min_arg, max_arg = get_frequency_args_range(frequencies, band)
+        weights[i, min_arg : max_arg + 1] = 1
+    if method == "mean":
+        weights /= np.sum(weights, axis=1, keepdims=True)
+    elif method == "integral":
+        weights *= frequencies[1] - frequencies[0]
+    return weights, single
+
+
+def _threshold_networks(c: np.ndarray, percentile: float) -> np.ndarray:
+    """Keep the edges with the largest absolute values.
+
+    Parameters
+    ----------
+    c : np.ndarray
+        Symmetric networks. Shape is (..., n_channels, n_channels).
+    percentile : float
+        Edges with an absolute value above this percentile (of the edges in
+        each network) are kept.
+
+    Returns
+    -------
+    c : np.ndarray
+        Networks with the other edges (and the diagonal) set to zero.
+    """
+    m, n = np.triu_indices(c.shape[-1], k=1)
+    edges = c[..., m, n]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        threshold = np.nanpercentile(np.abs(edges), percentile, axis=-1, keepdims=True)
+    edges = np.where(np.abs(edges) > threshold, edges, 0)
+    out = np.zeros_like(c)
+    out[..., m, n] = edges
+    out[..., n, m] = edges
+    return out
+
+
 class Spectra:
     """Static power spectra and cross spectra.
 
@@ -388,6 +483,246 @@ class Spectra:
             settings=self.settings,
             has_cross_spectra=self.has_cross_spectra,
         )
+
+    # Analysis
+
+    _psd_values = ("psd",)
+    _coherence_values = ("coherence",)
+
+    def _values(self, values: Optional[str], kind: str) -> Tuple[str, np.ndarray]:
+        allowed = self._psd_values if kind == "psd" else self._coherence_values
+        name = allowed[0] if values is None else values
+        if name not in allowed:
+            raise ValueError(f"values must be one of {allowed}, got {name!r}.")
+        return name, getattr(self, name)
+
+    def _move_band_axis(self, x: np.ndarray, single: bool) -> np.ndarray:
+        # Move the band axis (last) to after the session axis
+        axis = 0 if self.is_group else 1
+        x = np.moveaxis(x, -1, axis)
+        return np.squeeze(x, axis=axis) if single else x
+
+    def power_maps(
+        self,
+        values: Optional[str] = None,
+        bands: Optional[Union[list, np.ndarray]] = None,
+        frequency_range: Optional[list] = None,
+        method: str = "mean",
+    ) -> np.ndarray:
+        """Power maps: PSDs averaged over frequency bands.
+
+        Parameters
+        ----------
+        values : str, optional
+            Which PSDs to use. Defaults to the first of: :code:`'psd_coefs'`
+            (regression spectra), :code:`'psd_change'` (state spectra, the
+            change from the static PSD), :code:`'psd'` (static spectra).
+            :code:`'psd'` and :code:`'static_psd'` can also be passed.
+        bands : list or np.ndarray, optional
+            Frequency ranges, e.g. :code:`[[1, 4], [4, 8]]`, or spectral
+            components from :meth:`decompose` with shape (n_components,
+            n_freq).
+        frequency_range : list, optional
+            A single frequency range. Defaults to all frequencies.
+        method : str, optional
+            For frequency ranges: take the :code:`'mean'`, :code:`'sum'` or
+            :code:`'integral'` of the PSD. Use :code:`'integral'` for the
+            variance.
+
+        Returns
+        -------
+        power_maps : np.ndarray
+            Shape is (n_sessions, n_bands, n_states, n_channels). There is no
+            session axis for a group average, no band axis unless
+            :code:`bands` is passed and no state axis for static spectra.
+        """
+        _, psd = self._values(values, "psd")
+        weights, single = _frequency_weights(
+            self.frequencies, bands, frequency_range, method
+        )
+        return self._move_band_axis(psd @ weights.T, single)
+
+    def coherence_networks(
+        self,
+        values: Optional[str] = None,
+        bands: Optional[Union[list, np.ndarray]] = None,
+        frequency_range: Optional[list] = None,
+        percentile: Optional[float] = None,
+        vectorize: bool = False,
+    ) -> np.ndarray:
+        """Coherence networks: coherences averaged over frequency bands.
+
+        Parameters
+        ----------
+        values : str, optional
+            Which coherences to use. Defaults to the first of:
+            :code:`'coherence_coefs'` (regression spectra),
+            :code:`'coherence_change'` (state spectra, the change from the
+            static coherence), :code:`'coherence'` (static spectra).
+            :code:`'coherence'` and :code:`'static_coherence'` can also be
+            passed.
+        bands : list or np.ndarray, optional
+            Frequency ranges, e.g. :code:`[[1, 4], [4, 8]]`, or spectral
+            components from :meth:`decompose` with shape (n_components,
+            n_freq).
+        frequency_range : list, optional
+            A single frequency range. Defaults to all frequencies.
+        percentile : float, optional
+            Only keep the edges with an absolute value above this percentile
+            of each network, e.g. :code:`97` keeps the 3% of edges with the
+            largest (absolute) values. Other edges and the diagonal are set to
+            zero. Defaults to keeping all edges.
+        vectorize : bool, optional
+            Return the upper triangle (excluding the diagonal) of each
+            network, e.g. for statistical tests.
+
+        Returns
+        -------
+        networks : np.ndarray
+            Shape is (n_sessions, n_bands, n_states, n_channels, n_channels),
+            or (..., n_channels * (n_channels - 1) / 2) if
+            :code:`vectorize=True`. There is no session axis for a group
+            average, no band axis unless :code:`bands` is passed and no state
+            axis for static spectra.
+        """
+        _, coh = self._values(values, "coherence")
+        weights, _ = _frequency_weights(self.frequencies, bands, frequency_range)
+        c = self._move_band_axis(coh @ weights.T, single=False)
+        if percentile is not None:
+            c = _threshold_networks(c, percentile)
+        if vectorize:
+            m, n = np.triu_indices(self.n_channels, k=1)
+            c = c[..., m, n]
+        if bands is None:
+            c = np.squeeze(c, axis=0 if self.is_group else 1)
+        return c
+
+    def decompose(
+        self, n_components: int, values: str = "coherence", **kwargs
+    ) -> np.ndarray:
+        """Spectral components from non-negative matrix factorization.
+
+        See :func:`decompose_spectra`.
+
+        Parameters
+        ----------
+        n_components : int
+            Number of spectral components.
+        values : str, optional
+            Which (non-negative) coherences to decompose.
+        **kwargs
+            Keyword arguments for :func:`decompose_spectra`.
+
+        Returns
+        -------
+        components : np.ndarray
+            Spectral components, which can be passed as :code:`bands` to
+            :meth:`power_maps` and :meth:`coherence_networks`. Shape is
+            (n_components, n_freq).
+        """
+        _, coh = self._values(values, "coherence")
+        return decompose_spectra(coh, n_components=n_components, **kwargs)
+
+    def plot_psd(
+        self,
+        values: Optional[str] = None,
+        states: Optional[List[int]] = None,
+        channels: Optional[List[int]] = None,
+        static: bool = False,
+        labels: Optional[List[str]] = None,
+        frequency_range: Optional[list] = None,
+        filename: Optional[str] = None,
+        ax: Optional["matplotlib.axes.Axes"] = None,
+    ):
+        """Plot the group-average PSDs, averaged over channels.
+
+        The shaded area is the standard error over channels.
+
+        Parameters
+        ----------
+        values : str, optional
+            Which PSDs to plot. See :meth:`power_maps`.
+        states : list of int, optional
+            States to plot. Defaults to all states.
+        channels : list of int, optional
+            Channels to average over. Defaults to all channels.
+        static : bool, optional
+            Also plot the static PSD (dashed black line).
+        labels : list of str, optional
+            Legend label for each state.
+        frequency_range : list, optional
+            Shade this frequency range.
+        filename : str, optional
+            Output filename. If :code:`None`, the figure is returned.
+        ax : matplotlib.axes.Axes, optional
+            Axis to plot on.
+
+        Returns
+        -------
+        fig : matplotlib.figure.Figure
+            Figure. Only returned if :code:`filename` and :code:`ax` are
+            :code:`None`.
+        ax : matplotlib.axes.Axes
+            Axis. Only returned if :code:`filename` and :code:`ax` are
+            :code:`None`.
+        """
+        from osl_dynamics.utils import plotting
+
+        spectra = self if self.is_group else self.group_average()
+        name, psd = spectra._values(values, "psd")
+        channels = slice(None) if channels is None else list(channels)
+
+        def _mean_and_error(p):
+            p = p[..., channels, :]
+            n = p.shape[-2]
+            return np.mean(p, axis=-2), np.std(p, axis=-2) / np.sqrt(n)
+
+        mean, error = _mean_and_error(psd)
+        mean, error = np.atleast_2d(mean), np.atleast_2d(error)
+        states = range(mean.shape[0]) if states is None else states
+        if labels is None:
+            if mean.shape[0] == 1:
+                labels = ["Static"]
+            else:
+                kind = "Mode" if isinstance(self, RegressionSpectra) else "State"
+                labels = [f"{kind} {i + 1}" for i in states]
+
+        create_fig = ax is None
+        if create_fig:
+            fig, ax = plotting.create_figure(figsize=(7, 4))
+
+        f = self.frequencies
+        for state, label in zip(states, labels):
+            (line,) = ax.plot(f, mean[state], label=label)
+            ax.fill_between(
+                f,
+                mean[state] - error[state],
+                mean[state] + error[state],
+                color=line.get_color(),
+                alpha=0.3,
+                linewidth=0,
+            )
+        if static:
+            static_mean, _ = _mean_and_error(spectra.static_psd)
+            ax.plot(f, static_mean, color="black", linestyle="--", label="Static")
+        if name in ("psd_change", "psd_coefs"):
+            ax.axhline(0, color="gray", linewidth=0.5)
+        if frequency_range is not None:
+            ax.axvspan(*frequency_range, color="gray", alpha=0.25, linewidth=0)
+
+        ax.set_xlim(f[0], f[-1])
+        ax.set_xlabel("Frequency (Hz)")
+        ax.set_ylabel(
+            "Change in PSD (a.u.)"
+            if name in ("psd_change", "psd_coefs")
+            else "PSD (a.u.)"
+        )
+        ax.legend()
+
+        if filename is not None:
+            plotting.save(fig if create_fig else ax.figure, filename, tight_layout=True)
+        elif create_fig:
+            return fig, ax
 
     # Saving and loading
 
@@ -553,6 +888,9 @@ class StateSpectra(Spectra):
 
     _session_arrays = ("spectra", "fractional_occupancies")
 
+    _psd_values = ("psd_change", "psd", "static_psd")
+    _coherence_values = ("coherence_change", "coherence", "static_coherence")
+
     @property
     def n_states(self) -> int:
         """Number of states."""
@@ -615,6 +953,22 @@ class StateSpectra(Spectra):
         """
         return self._coherence(self._static_spectra())
 
+    @property
+    def psd_change(self) -> np.ndarray:
+        """Change in PSD from the static PSD, :math:`P_j - S`.
+
+        Shape is (n_sessions, n_states, n_channels, n_freq).
+        """
+        return self.psd - self.static_psd[..., np.newaxis, :, :]
+
+    @property
+    def coherence_change(self) -> np.ndarray:
+        """Change in coherence from the static coherence.
+
+        Shape is (n_sessions, n_states, n_channels, n_channels, n_freq).
+        """
+        return self.coherence - self.static_coherence[..., np.newaxis, :, :, :]
+
     def _shape_summary(self) -> List[str]:
         summary = super()._shape_summary()
         return summary[:1] + [f"n_states={self.n_states}"] + summary[1:]
@@ -635,6 +989,13 @@ class RegressionSpectra(StateSpectra):
     """
 
     _session_arrays = ("coefs", "intercept")
+    _psd_values = ("psd_coefs", "psd_change", "psd", "static_psd")
+    _coherence_values = (
+        "coherence_coefs",
+        "coherence_change",
+        "coherence",
+        "static_coherence",
+    )
 
     @property
     def n_states(self) -> int:
