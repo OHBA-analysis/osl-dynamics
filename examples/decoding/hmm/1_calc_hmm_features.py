@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from glob import glob
 
-from osl_dynamics.analysis import power, connectivity
+from osl_dynamics.analysis import spectral
 from osl_dynamics.inference import modes
 
 #%% Calculate HMM features summarizing dynamics
@@ -35,17 +35,13 @@ np.save("data/hmm_features/sr.npy", sr)
 #%% Calculate multitaper power maps and coherence networks
 
 # Load multitaper spectra
-f = np.load("data/spectra/f.npy")
-psd = np.load("data/spectra/psd.npy")
-coh = np.load("data/spectra/coh.npy")
+spectra = spectral.Spectra.load("data/spectra/multitaper.npz")
 
 # Calculate power maps
-power_maps = power.variance_from_spectra(f, psd)
+power_maps = spectra.power_maps(values="psd")
 
 # Calculate coherence networks (only keeping the upper triangle)
-coherence_networks = connectivity.mean_coherence_from_spectra(f, coh)
-m, n = np.triu_indices(coherence_networks.shape[-1], k=1)
-coherence_networks = coherence_networks[..., m, n]
+coherence_networks = spectra.coherence_networks(values="coherence", vectorize=True)
 
 # Save
 np.save("data/hmm_features/power_maps.npy", power_maps)

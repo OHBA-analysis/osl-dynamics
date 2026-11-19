@@ -66,35 +66,38 @@ ts = data.time_series()
 #
 # We can also specify an optional argument:
 #
-# - `standardize`. This will z-score the data (for each subejct separately) before calculate the power spectra. This can be helpful if you want to examine power the fraction of power in a frequency band relative to the total power (across all frequencies) of the subject.
+# - `standardize`. This will z-score the data (for each subject separately) before calculate the power spectra. This can be helpful if you want to examine power the fraction of power in a frequency band relative to the total power (across all frequencies) of the subject.
 
 from osl_dynamics.analysis import static
 
-f, psd = static.welch_spectra(
+spectra = static.welch_spectra(
     data=ts,
     sampling_frequency=250,
     window_length=500,
     standardize=True,
 )
+print(spectra)
 
 #%%
-# We have two numpy arrays: `f`, which is the frequency axis of the power spectra in Hz, and `p`, which contains the power spectra.
+# `spectra` is a :class:`StaticSpectra <osl_dynamics.analysis.spectral.StaticSpectra>` object. `spectra.frequencies` is the frequency axis of the power spectra in Hz and `spectra.psd` contains the power spectra. It also contains the coherence between channels (`spectra.coherence`).
 #
-# Calculating power spectra can be time consuming. We will want to use the power spectra many times to make different plots. We don't want to have to calculate them repeatedly, so often it is convenient to save the `f` and `p` numpy arrays so we can load them later (instead of calculating them again). Let's save the spectra.
-
-import numpy as np
+# Calculating power spectra can be time consuming. We will want to use the power spectra many times to make different plots. We don't want to have to calculate them repeatedly, so often it is convenient to save the spectra so we can load them later (instead of calculating them again). Let's save the spectra.
 
 os.makedirs("spectra", exist_ok=True)
-np.save("spectra/f.npy", f)
-np.save("spectra/psd.npy", psd)
+spectra.save("spectra/static.npz")
 
 #%%
 # Plot the power spectra
 # **********************
 # Let's first load the power spectra we previously calculated.
 
-f = np.load("spectra/f.npy")
-psd = np.load("spectra/psd.npy")
+import numpy as np
+
+from osl_dynamics.analysis import spectral
+
+spectra = spectral.Spectra.load("spectra/static.npz")
+f = spectra.frequencies
+psd = spectra.psd
 
 #%%
 # To understand these arrays it's useful to print their shape:

@@ -13,9 +13,7 @@ run = int(argv[2])
 #%% Import packages
 
 import os
-import numpy as np
-from osl_dynamics.analysis import power, connectivity
-from osl_dynamics.utils import plotting
+from osl_dynamics.analysis import spectral, power, connectivity
 
 #%% Setup directories and files
 
@@ -28,48 +26,34 @@ parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
 
 #%% Load spectra
 
-f = np.load(f"{spectra_dir}/f.npy")  # (n_freq,)
-psd = np.load(f"{spectra_dir}/psd.npy")  # (n_subjects, 2, n_modes, n_parcels, n_freq)
-coh = np.load(f"{spectra_dir}/coh.npy")  # (n_subjects, n_modes, n_parcels, n_parcels, n_freq)
-w = np.load(f"{spectra_dir}/w.npy")  # (n_subjects,)
+spectra = spectral.Spectra.load(f"{spectra_dir}/regression.npz")
+
+# Group average
+group = spectra.group_average()
 
 #%% Plot power spectra
 
-gpsd = np.average(psd, axis=0, weights=w)
-gpsd_coefs = gpsd[0]
-for i in range(gpsd_coefs.shape[0]):
-    p = np.mean(gpsd_coefs[i], axis=0)  # mean over parcels
-    plotting.plot_line(
-        [f],
-        [p],
-        x_label="Frequency (Hz)",
-        y_label="PSD (a.u.)",
-        x_range=[f[0], f[-1]],
-        filename=f"{networks_dir}/psd_{i}.png",
-    )
+# Regression coefficients for each mode (averaged over parcels)
+for i in range(group.n_states):
+    group.plot_psd(states=[i], filename=f"{networks_dir}/psd_{i}.png")
 
 #%% Plot power maps
 
-# Calculate the power map by integrating the power spectra over all frequencies
-p = power.variance_from_spectra(f, gpsd_coefs)
+# Calculate the power map by averaging the coefficients over all frequencies
+p = group.power_maps()  # (n_modes, n_parcels)
 
 # Plot
 power.save(
     p,
     parcellation_file=parcellation_file,
+    plot_kwargs={"symmetric_cbar": True},
     filename=f"{networks_dir}/pow_.png",
 )
 
 #%% Plot coherence networks
 
-# Calculate the group average
-gcoh = np.average(coh, axis=0, weights=w)
-
-# Calculate the coherence network by averaging over all frequencies
-c = connectivity.mean_coherence_from_spectra(f, gcoh)
-
-# Keep the 2% of connections with the largest changes (increases or decreases)
-c = connectivity.threshold(c, percentile=98, absolute_value=True)
+# Keep the 3% of edges with the largest changes (increases or decreases)
+c = group.coherence_networks(percentile=97)  # (n_modes, n_parcels, n_parcels)
 
 # Plot
 connectivity.save(

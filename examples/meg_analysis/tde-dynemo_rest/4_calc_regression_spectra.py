@@ -14,7 +14,6 @@ run = int(argv[2])
 
 import os
 import pickle
-import numpy as np
 from osl_dynamics.analysis import spectral
 from osl_dynamics.data import Data
 
@@ -49,20 +48,11 @@ alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
 
 #%% Calculate spectra
 
-f, psd, coh, w = spectral.regression_spectra(
-    data=data_,
+spectra = spectral.regression_spectra(
+    data_,
     alpha=alpha,
     sampling_frequency=250,
     frequency_range=[1, 45],
-    window_length=1000,
-    step_size=20,
-    n_sub_windows=8,
-    return_coef_int=True,  # return the coefficients and intercept separately
-    return_weights=True,  # weighting for each subject when we average the spectra
     n_jobs=8,
 )
-
-np.save(f"{spectra_dir}/f.npy", f)
-np.save(f"{spectra_dir}/psd.npy", psd)
-np.save(f"{spectra_dir}/coh.npy", coh)
-np.save(f"{spectra_dir}/w.npy", w)
+spectra.save(f"{spectra_dir}/regression.npz")

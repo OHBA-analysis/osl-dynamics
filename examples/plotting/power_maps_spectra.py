@@ -7,43 +7,27 @@ course) or regression (in the case of a mode time course).
 See examples/spectra/hmm_multitaper.py for how to calculate a multitaper
 and examples/spectra/dynemo_regression_spectra.py for how to calculate regression spectra.
 
-In this script we assume this has been done and we have the subject-specific spectra
-files:
-- f.npy, the frequency axis.
-- psd.npy, the subject-specific power spectra.
-- w.npy, the weight for each subject (used for calculating the group average).
-
-The other file: coh.npy is not needed for this script.
+In this script we assume this has been done and the subject-specific spectra
+have been saved with spectra.save("multitaper.npz") or spectra.save("regression.npz").
 """
 
-import numpy as np
+from osl_dynamics.analysis import power, spectral
 
-from osl_dynamics.analysis import power
-
-# Set to False for multitaper spectra
-regression_spectra = True
-
-# Load the subject-level spectra
-f = np.load("f.npy")
-psd = np.load("psd.npy")
-w = np.load("w.npy")
-
-if regression_spectra:
-    # Use the regression coefficients (calculated with return_coef_int=True),
-    # which are the change from the static spectrum
-    psd = psd[:, 0]
+# Load the subject-specific spectra
+spectra = spectral.Spectra.load("multitaper.npz")  # or "regression.npz"
 
 # Calculate the group average
-gpsd = np.average(psd, axis=0, weights=w)
+group = spectra.group_average()
 
-# Calculate power maps from the spectra
+# Calculate power maps from the spectra: the change from the static power
+# (regression coefficients or state PSD minus the static PSD)
 # (frequency_range is an optional argument)
-power_map = power.variance_from_spectra(f, gpsd, frequency_range=[1, 30])
+power_map = group.power_maps(frequency_range=[1, 30])
 
 # Save the power maps as images
 power.save(
     power_map,
     parcellation_file="atlas-Giles_nparc-42_space-MNI_res-8x8x8.nii.gz",
-    subtract_mean=not regression_spectra,  # multitaper: subtract the mean over states
     filename="maps_.png",
+    plot_kwargs={"symmetric_cbar": True},
 )

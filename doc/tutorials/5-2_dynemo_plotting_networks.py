@@ -4,98 +4,100 @@ DyNeMo: Plotting Networks
 
 In this tutorial we will plot networks from a DyNeMo model trained on source reconstructed MEG data. This tutorial covers:
 
-1. Load regression spectra
+1. Calculate regression spectra
 2. PSDs
 3. Power maps
 4. Coherence networks
 """
 
 #%%
-# Download post-hoc spectra
-# ^^^^^^^^^^^^^^^^^^^^^^^^^
+# Download source data and inferred parameters
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # In this tutorial, we'll download example data from `OSF <https://osf.io/by2tc/>`_.
 
 import os
 
-def get_spectra(name, rename):
-    os.system(f"osf -p by2tc fetch spectra/{name}.zip")
+def get_data(name, rename):
+    os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 7 MB)
-get_spectra("tde_dynemo_notts_meguk_giles_5_subjects", rename="results/spectra")
+def get_inf_params(name, rename):
+    os.system(f"osf -p by2tc fetch inf_params/{name}.zip")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {rename}"
+
+# Download the source data (approximately 52 MB)
+get_data("notts_meguk_giles_5_subjects", rename="source_data")
+
+# Download the inferred mixing coefficients (approximately 11 MB)
+get_inf_params("tde_dynemo_notts_meguk_giles_5_subjects", rename="results/inf_params")
 
 #%%
-# Load regression spectra
-# ^^^^^^^^^^^^^^^^^^^^^^^
-# We calculate the networks based on the regression spectra. Let's load these.
+# Calculate regression spectra
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# We calculate the networks based on the regression spectra. See the :doc:`DyNeMo Regression Spectra tutorial <../tutorials_build/5-1_dynemo_regression_spectra>` for details.
 
-import numpy as np
+import pickle
 
-f = np.load("results/spectra/f.npy")
-psd = np.load("results/spectra/psd.npy")
-coh = np.load("results/spectra/coh.npy")
-w = np.load("results/spectra/w.npy")
+from osl_dynamics.data import Data
+from osl_dynamics.analysis import spectral
+
+# Source data trimmed to match the mixing coefficients
+data = Data("source_data")
+trimmed_data = data.trim_time_series(n_embeddings=15, sequence_length=200)
+
+# Mixing coefficients
+alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
+
+# Regression spectra for each subject and mode
+spectra = spectral.regression_spectra(
+    data=trimmed_data,
+    alpha=alpha,
+    sampling_frequency=250,
+    frequency_range=[1, 45],
+)
+print(spectra)
 
 #%%
+# If you saved the spectra with `spectra.save`, you can load them with `spectral.Spectra.load`.
+#
 # PSDs
 # ^^^^
-# We can plot the power spectra to see what oscillations typically occur when a particular mode is active. Let's first print the shape of the regression spectra to understand the format of the data.
+# We can plot the power spectra to see what oscillations typically occur when a particular mode is active. We plot the regression coefficients (`psd_coefs`): the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient. See the :doc:`Spectral Analysis </user_guide/spectra>` page of the User Guide for more details.
+#
+# First, we average over subjects. The group average is weighted by the number of samples in each subject.
 
-print(f.shape)
-print(psd.shape)
-
-#%%
-# We can see: `f` is the frequency axis and `psd` is a (subjects, 2, modes, channels, frequencies) array. The second axis in `psd` corresponds to the regression coefficients and intercept when we calculated the mode spectra using :func:`analysis.spectral.regression_spectra <osl_dynamics.analysis.spectral.regression_spectra>`. The intercept is the time-averaged (static) PSD. The regression coefficients are the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient. We plot the regression coefficients. See the :doc:`Spectral Analysis </user_guide/spectra>` page of the User Guide for more details.
-
-psd_coefs = psd[:, 0]
-print(psd_coefs.shape)
+group = spectra.group_average()
+print(group.psd_coefs.shape)
 
 #%%
-# Now let's plot the group-average PSD for each mode.
+# `group.psd_coefs` is a (modes, channels, frequencies) array. Now let's plot the group-average PSD for each mode, averaged over channels. The shaded area is the standard error over channels.
 
-from osl_dynamics.utils import plotting
-
-# Average over subjects and channels
-psd_coefs_mean = np.mean(psd_coefs, axis=(0,2))
-print(psd_coefs_mean.shape)
-
-# Plot
-n_modes = psd_coefs_mean.shape[0]
-fig, ax = plotting.plot_line(
-    [f] * n_modes,
-    psd_coefs_mean,
-    labels=[f"Mode {i}" for i in range(1, n_modes + 1)],
-    x_label="Frequency (Hz)",
-    y_label="PSD (a.u.)",
-    x_range=[f[0], f[-1]],
-)
+fig, ax = group.plot_psd()
 
 #%%
 # Power maps
 # ^^^^^^^^^^
-# Now let's integrate the power spectra to calculate the power.
+# Now let's average the power spectra over frequency to calculate the power.
 
 from osl_dynamics.analysis import power
 
-p = power.variance_from_spectra(f, psd_coefs)
+p = group.power_maps()
 print(p.shape)
 
 #%%
-# We can see `p` is a (subjects, modes, channels) array. Let's average over subjects.
-
-mean_p = np.average(p, axis=0, weights=w)
-print(mean_p.shape)
-
-#%%
-# Now we can plot the power map for each mode. The power maps are the change in power from the static power: red regions have more power when a mode is active and blue regions have less.
+# We can see `p` is a (modes, channels) array. The power maps are the change in power from the static power: red regions have more power when a mode is active and blue regions have less.
 
 # Display the power maps (takes a few seconds to appear)
 fig, ax = power.save(
-    mean_p,
+    p,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
+    plot_kwargs={"symmetric_cbar": True},
 )
 
 #%%
@@ -103,32 +105,20 @@ fig, ax = power.save(
 #
 # Coherence networks
 # ^^^^^^^^^^^^^^^^^^
-# Next, let's visualize the coherence networks. First, we need to calculate the networks from the coherence spectra.
+# Next, let's visualize the coherence networks. The `coherence_networks` method averages the change in coherence (`coherence_coefs`) over frequency.
 
-print(coh.shape)
-
-#%%
-# We can see the coherence spectra is a (subjects, modes, channels, channels, frequencies) array. Let's calculate the mean coherence over all frequencies.
-
-from osl_dynamics.analysis import connectivity
-
-c = connectivity.mean_coherence_from_spectra(f, coh)
+c = group.coherence_networks()
 print(c.shape)
 
 #%%
-# We now have a (subjects, modes, channels, channels) array. This is the change in the cross spectrum, normalized by the static power (change in coherence), when a mode is active: it includes changes in both coherence and power. Next we average over subjects and show the edges with the largest changes.
+# We now have a (modes, channels, channels) array. This is the change in the cross spectrum, normalized by the static power (change in coherence), when a mode is active: it includes changes in both coherence and power. Let's show the 3% of edges with the largest changes (increases or decreases).
 
-# Average over subjects
-mean_c = np.average(c, axis=0, weights=w)
+from osl_dynamics.analysis import connectivity
 
-# Keep the 3% of edges with the largest changes (increases or decreases)
-thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True)
-
-#%%
-# Now we can visualize the networks.
+c = group.coherence_networks(percentile=97)
 
 connectivity.save(
-    thres_mean_c,
+    c,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
 

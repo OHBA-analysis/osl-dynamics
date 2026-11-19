@@ -86,46 +86,53 @@ for a, x in zip(alpha, trimmed_data):
 # ****************************
 # We want to calculate the power spectrum and coherence of each mode. We calculate a spectrogram (time-varying spectra) and fit it as a mixture of the mode spectra weighted by the mixing coefficients. We do this with the :func:`analysis.spectral.regression_spectra <osl_dynamics.analysis.spectral.regression_spectra>` function in osl-dynamics. Let's first run this function, then we'll discuss its output.
 
-import numpy as np
 from osl_dynamics.analysis import spectral
 
-# Calculate regression spectra for each mode and subject (will take a few minutes)
-f, psd, coh, w = spectral.regression_spectra(
+# Calculate regression spectra for each mode and subject
+spectra = spectral.regression_spectra(
     data=trimmed_data,
     alpha=alpha,
     sampling_frequency=250,
     frequency_range=[1, 45],
-    window_length=1000,
-    step_size=20,
-    n_sub_windows=8,
-    return_coef_int=True,
-    return_weights=True,
 )
+print(spectra)
 
 #%%
-# To understand the `f`, `psd` and `coh` numpy arrays it is useful to print their shape.
+# We used the default settings: a 4 second window split into 8 sub-windows (2 Hz frequency resolution), moved in 80 ms steps.
+#
+# `spectra` is a :class:`RegressionSpectra <osl_dynamics.analysis.spectral.RegressionSpectra>` object. Its attributes contain the spectra. Let's print the shape of a few of them.
 
-print(f.shape)
-print(psd.shape)
-print(coh.shape)
-print(w.shape)
+print(spectra.frequencies.shape)
+print(spectra.static_psd.shape)
+print(spectra.psd_coefs.shape)
+print(spectra.coherence_coefs.shape)
+print(spectra.session_weights.shape)
 
 #%%
 # We can see:
 #
-# - `f` is 1D and is the frequency axis.
-# - `psd` is (subjects, 2, modes, channels, frequencies). The second dimension contains the regression coefficients (index 0) and intercept (index 1) for each subject. The intercept is the static (time-averaged) PSD. The coefficients are the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient: positive where a mode has more power than the static PSD and negative where it has less.
-# - `coh` is (subjects, modes, channels, channels, frequencies). It is the change in the cross spectrum, normalized by the static power (change in coherence), for a one standard deviation increase in a mode's mixing coefficient. It includes changes in both coherence and power.
-# - `w` contains the weight for each subject when calculating a group average.
+# - `frequencies` is the frequency axis.
+# - `static_psd` is (subjects, channels, frequencies). It is the static (time-averaged) PSD, the intercept of the regression.
+# - `psd_coefs` is (subjects, modes, channels, frequencies). These are the regression coefficients: the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient. They are positive where a mode has more power than the static PSD and negative where it has less.
+# - `coherence_coefs` is (subjects, modes, channels, channels, frequencies). It is the change in the cross spectrum, normalized by the static power (change in coherence), for a one standard deviation increase in a mode's mixing coefficient. It includes changes in both coherence and power.
+# - `session_weights` contains the weight of each subject in a group average.
 #
 # The coefficients of every subject are scaled by the same standard deviation, so the subject-specific spectra can be averaged and compared. See the :doc:`Spectral Analysis </user_guide/spectra>` page of the User Guide for how to interpret these outputs and what to plot.
 #
-# Calculating the spectrum can be time consuming so it is useful to save it as a numpy file, which can be loaded very quickly.
+# If the Data object was prepared as it was for training, we can pass it directly instead of the trimmed data::
+#
+#     spectra = spectral.regression_spectra(data, alpha=alpha, frequency_range=[1, 45])
+#
+# Saving the spectra
+# ******************
+# Calculating the spectra can be time consuming so it is useful to save them.
 
 os.makedirs("results/spectra", exist_ok=True)
-np.save("results/spectra/f.npy", f)
-np.save("results/spectra/psd.npy", psd)
-np.save("results/spectra/coh.npy", coh)
-np.save("results/spectra/w.npy", w)
+spectra.save("results/spectra/regression.npz")
+
+#%%
+# We can load them with::
+#
+#     spectra = spectral.Spectra.load("results/spectra/regression.npz")
 
 # sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/5-1_dynemo_regression_spectra.png"

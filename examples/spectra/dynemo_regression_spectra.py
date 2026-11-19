@@ -27,19 +27,17 @@ data = data.trim_time_series(n_embeddings=15, sequence_length=200)
 
 alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
 
-f, psd, coh, w = spectral.regression_spectra(
-    data=data,
+spectra = spectral.regression_spectra(
+    data,
     alpha=alpha,
     sampling_frequency=250,
     frequency_range=[1, 45],
-    window_length=1000,
-    step_size=20,
-    n_sub_windows=8,
-    return_coef_int=True,
-    return_weights=True,
     n_jobs=5,
 )
-print("f.shape =", f.shape)
-print("psd.shape =", psd.shape)
-print("coh.shape =", coh.shape)
-print("w.shape =", w.shape)
+print(spectra)
+print("frequencies.shape =", spectra.frequencies.shape)
+print("static_psd.shape =", spectra.static_psd.shape)
+print("psd_coefs.shape =", spectra.psd_coefs.shape)
+print("coherence_coefs.shape =", spectra.coherence_coefs.shape)
+print("session_weights.shape =", spectra.session_weights.shape)
+spectra.save("regression.npz")

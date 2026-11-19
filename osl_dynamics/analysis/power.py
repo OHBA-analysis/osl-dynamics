@@ -106,8 +106,12 @@ def variance_from_spectra(
     components: Optional[np.ndarray] = None,
     frequency_range: Optional[List[float]] = None,
     method: str = "mean",
+    cross_spectra: Optional[bool] = None,
 ) -> np.ndarray:
     """Calculates variance from power spectra.
+
+    For spectra calculated with :mod:`osl_dynamics.analysis.spectral`, the
+    :code:`power_maps` method of the returned object can be used instead.
 
     Parameters
     ----------
@@ -128,6 +132,10 @@ def variance_from_spectra(
         Should take the sum of the PSD over the frequency range
         (:code:`method="sum"`), the integral of the PSD (:code:`"integral"`),
         or take the average value of the PSD (:code:`method="mean"`).
+    cross_spectra : bool, optional
+        Are :code:`power_spectra` cross spectra with shape (..., n_channels,
+        n_channels, n_freq)? If :code:`None`, cross spectra are assumed if
+        the last three axes have shape (n, n, n_freq).
 
     Returns
     -------
@@ -143,12 +151,18 @@ def variance_from_spectra(
     """
 
     # Validation
+    if cross_spectra is None:
+        cross_spectra = (
+            power_spectra.ndim > 2
+            and power_spectra.shape[-2] == power_spectra.shape[-3]
+        )
+
     if power_spectra.ndim == 2:
         # PSDs were passed
         power_spectra = power_spectra[np.newaxis, np.newaxis, ...]
         n_sessions, n_modes, n_channels, n_freq = power_spectra.shape
 
-    elif power_spectra.shape[-2] != power_spectra.shape[-3]:
+    elif not cross_spectra:
         # PSDs were passed, check dimensionality
         error_message = (
             "A (n_channels, n_freq), (n_modes, n_channels, n_freq) or "
@@ -201,7 +215,7 @@ def variance_from_spectra(
     var = []
     for i in range(n_sessions):
         # Get PSDs
-        if power_spectra.shape[-2] == power_spectra.shape[-3]:
+        if cross_spectra:
             # Cross-spectra densities were passed
             psd = power_spectra[i, :, range(n_channels), range(n_channels)]
             psd = np.swapaxes(psd, 0, 1)

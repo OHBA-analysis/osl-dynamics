@@ -1039,24 +1039,24 @@ def hmm_spectra(fmt):
         seed=RNG_SEED + 4,
     )
 
-    f, psd = spectral.multitaper_spectra(
+    state_spectra = spectral.multitaper_spectra(
         x[:, None],
         fs,
         alpha=stc,
         window_length=2 * fs,
         frequency_range=[1, 35],
-        calc_coh=False,
+        cross_spectra=False,
     )
-    _, static_psd = spectral.multitaper_spectra(
+    static_spectra = spectral.multitaper_spectra(
         x[:, None],
         fs,
-        alpha=np.ones((n_samples, 1)),
         window_length=2 * fs,
         frequency_range=[1, 35],
-        calc_coh=False,
+        cross_spectra=False,
     )
-    psd = np.squeeze(psd)
-    static_psd = np.squeeze(static_psd)
+    f = state_spectra.frequencies
+    psd = state_spectra.psd[0, :, 0]  # (n_states, n_freq)
+    static_psd = static_spectra.psd[0, 0]
 
     fig = plt.figure(figsize=(7, 2.6))
     gs = fig.add_gridspec(
@@ -1401,19 +1401,19 @@ def dynemo_regression_spectra(fmt):
         seed=RNG_SEED + 7,
     )
 
-    f, psd = spectral.regression_spectra(
+    spectra = spectral.regression_spectra(
         x[:, None],
         alpha,
         fs,
         window_length=fs,
         step_size=fs // 10,
+        n_sub_windows=1,
         frequency_range=[1, 30],
-        calc_coh=False,
-        return_coef_int=True,
+        cross_spectra=False,
     )
-    psd = np.squeeze(psd)  # (2, n_modes, n_freq): coefficients and intercept
-    coefs = psd[0]
-    static_psd = psd[1][0]
+    f = spectra.frequencies
+    coefs = spectra.psd_coefs[0, :, 0]  # (n_modes, n_freq)
+    static_psd = spectra.static_psd[0, 0]
 
     # Spectrogram of an excerpt
     start = 100 * fs

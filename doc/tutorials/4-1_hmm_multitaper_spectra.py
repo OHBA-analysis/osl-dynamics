@@ -75,7 +75,7 @@ for a, x in zip(alpha, trimmed_data):
     print(a.shape, x.shape)
 
 #%%
-# If the first dimension of these arrays don't match then the wrong value for `n_embeddings` or `sequence_length` was used when we trimemd the data.
+# If the first dimension of these arrays don't match then the wrong value for `n_embeddings` or `sequence_length` was used when we trimmed the data.
 #
 # Calculating Subjects/State Spectra
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -86,34 +86,42 @@ for a, x in zip(alpha, trimmed_data):
 
 from osl_dynamics.analysis import spectral
 
-# Calculate multitaper spectra for each state and subject (will take a few minutes)
-f, psd, coh, w = spectral.multitaper_spectra(
+# Calculate multitaper spectra for each state and subject
+spectra = spectral.multitaper_spectra(
     data=trimmed_data,
     alpha=alpha,
     sampling_frequency=250,
     frequency_range=[1, 45],
-    return_weights=True,
 )
+print(spectra)
 
 #%%
-# To understand the `f`, `psd` and `coh` numpy arrays it is useful to print their shape.
+# `spectra` is a :class:`StateSpectra <osl_dynamics.analysis.spectral.StateSpectra>` object. Its attributes contain the spectra. Let's print the shape of a few of them.
 
-print(f.shape)
-print(psd.shape)
-print(coh.shape)
-print(w.shape)
+print(spectra.frequencies.shape)
+print(spectra.psd.shape)
+print(spectra.coherence.shape)
+print(spectra.session_weights.shape)
 
 #%%
-# We can see the `f` array is 1D, it corresponds to the frequency axis for each spectra. The `psd` array corresponds to the PSDs and is (subjects, states, channels, frequencies) and the `coh` array corresponds to the pairwise coherences and is (subjects, states, channels, channels, frequencies). `w` is an array containing weights for each subject when calculating a group average.
+# `frequencies` is the frequency axis. `psd` contains the PSDs and is (subjects, states, channels, frequencies) and `coherence` contains the pairwise coherences and is (subjects, states, channels, channels, frequencies). `session_weights` contains the weight of each subject in a group average (the number of samples in each subject divided by the total).
 #
-# Calculating the spectrum can be time consuming so it is useful to save it as a numpy file, which can be loaded very quickly.
-
-import numpy as np
+# The static PSD (`static_psd`) is the average of the state PSDs weighted by the fractional occupancy of each state, and `psd_change` is the change in each state's PSD from the static PSD. See the :doc:`Spectral Analysis user guide </user_guide/spectra>` for the other attributes.
+#
+# If the Data object was prepared as it was for training, we can pass it directly instead of the trimmed data::
+#
+#     spectra = spectral.multitaper_spectra(data, alpha=alpha, frequency_range=[1, 45])
+#
+# Saving the spectra
+# ******************
+# Calculating the spectra can be time consuming so it is useful to save them.
 
 os.makedirs("results/spectra", exist_ok=True)
-np.save("results/spectra/f.npy", f)
-np.save("results/spectra/psd.npy", psd)
-np.save("results/spectra/coh.npy", coh)
-np.save("results/spectra/w.npy", w)
+spectra.save("results/spectra/multitaper.npz")
+
+#%%
+# We can load them with::
+#
+#     spectra = spectral.Spectra.load("results/spectra/multitaper.npz")
 
 # sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/4-1_hmm_multitaper_spectra.png"

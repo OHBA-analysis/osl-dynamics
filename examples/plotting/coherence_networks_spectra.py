@@ -7,42 +7,24 @@ course) or regression (in the case of a mode time course).
 See examples/spectra/hmm_multitaper.py for how to calculate a multitaper
 and examples/spectra/dynemo_regression_spectra.py for how to calculate regression spectra.
 
-In this script we assume this has been done and we have the subject-specific spectra
-files: f.npy, coh.npy and w.npy. (The other file: psd.npy is not needed for this script.)
+In this script we assume this has been done and the subject-specific spectra
+have been saved with spectra.save("multitaper.npz") or spectra.save("regression.npz").
 """
 
-import numpy as np
-
-from osl_dynamics.analysis import connectivity
-
-# Set to False for multitaper spectra
-regression_spectra = True
+from osl_dynamics.analysis import connectivity, spectral
 
 # Load subject-specific state/mode spectra
-f = np.load("f.npy")
-coh = np.load("coh.npy")
-w = np.load("w.npy")
+spectra = spectral.Spectra.load("multitaper.npz")  # or "regression.npz"
 
 # Calculate group average
-gcoh = np.average(coh, axis=0, weights=w)
+group = spectra.group_average()
 
-# Calculate connectivity maps from coherence spectra
-# The frequency_range argument is optional. It can be replaced with a
-# spectral component calculate with NNMF, see connectivity-maps_spectra-nnmf.py
-conn_map = connectivity.mean_coherence_from_spectra(f, gcoh, frequency_range=[1, 25])
-
-# We have many options for how to threshold the maps:
-# - Plot the top X % of connections.
-# - Plot the top X % of connections relative to the means across states/modes.
-# - Use a GMM to calculate a threshold (X) for us.
-if regression_spectra:
-    # The coherence is a change from the static spectrum: plot the 5% of
-    # connections with the largest changes (increases or decreases)
-    conn_map = connectivity.threshold(conn_map, percentile=95, absolute_value=True)
-else:
-    # Multitaper: plot the top 5% of connections relative to the mean
-    # connectivity across states
-    conn_map = connectivity.threshold(conn_map, percentile=95, subtract_mean=True)
+# Calculate connectivity maps from the change in coherence from the static
+# spectrum and keep the 3% of connections with the largest changes
+# (increases or decreases)
+# The frequency_range argument is optional. It can be replaced with
+# spectral components calculated with NNMF, see coherence_networks_spectra_nnmf.py
+conn_map = group.coherence_networks(frequency_range=[1, 25], percentile=97)
 
 # Plot connectivity maps
 connectivity.save(

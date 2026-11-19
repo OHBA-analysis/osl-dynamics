@@ -4,7 +4,6 @@
 
 print("Setting up")
 import os
-import numpy as np
 from osl_dynamics.analysis import static
 from osl_dynamics.data import Data
 
@@ -21,15 +20,11 @@ data = Data(
 ts = data.time_series()
 
 # Calculate static power/coherence spectra
-f, psd, coh = static.welch_spectra(
-    data=ts,
-    window_length=500,
+spectra = static.welch_spectra(
+    ts,
     sampling_frequency=250,
-    standardize=True,
-    calc_coh=True,
+    window_length=500,
 )
 
 # Save to plot power/coherence maps: see static/plot_*_maps.py
-np.save("spectra/f.npy", f)
-np.save("spectra/psd.npy", psd)
-np.save("spectra/coh.npy", coh)
+spectra.save("spectra/static.npz")

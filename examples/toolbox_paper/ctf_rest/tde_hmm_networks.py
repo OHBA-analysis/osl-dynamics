@@ -23,9 +23,10 @@ import pandas as pd
 
 from osl_dynamics import run_pipeline
 from osl_dynamics import stats
-from osl_dynamics.analysis import power, connectivity
+from osl_dynamics.analysis import spectral, power, connectivity
 from osl_dynamics.inference import modes
 from osl_dynamics.utils import plotting
+from osl_dynamics.utils.array_ops import vec2mat
 
 
 def load_group_assignments():
@@ -93,12 +94,11 @@ def compare_power_maps(data, output_dir, n_perm, significance_level, n_jobs):
     assignments = load_group_assignments()
 
     # Load spectra
-    f = np.load(f"{output_dir}/spectra/f.npy")
-    psd = np.load(f"{output_dir}/spectra/psd.npy")
+    spectra = spectral.Spectra.load(f"{output_dir}/spectra/multitaper.npz")
     nnmf = np.load(f"{output_dir}/spectra/nnmf_2.npy")
 
-    # Calculate power maps
-    power_maps = power.variance_from_spectra(f, psd, nnmf)[:, 0]
+    # Calculate power maps for the first NNMF component
+    power_maps = spectra.power_maps(values="psd", bands=nnmf)[:, 0]
 
     # Do statistical significance testing
     result = stats.group_diff(
@@ -130,18 +130,14 @@ def compare_coherence_networks(data, output_dir, n_perm, significance_level, n_j
     assignments = load_group_assignments()
 
     # Load spectra
-    f = np.load(f"{output_dir}/spectra/f.npy")
-    coh = np.load(f"{output_dir}/spectra/coh.npy")
+    spectra = spectral.Spectra.load(f"{output_dir}/spectra/multitaper.npz")
     nnmf = np.load(f"{output_dir}/spectra/nnmf_2.npy")
 
-    # Calculate coherences networks
-    c = connectivity.mean_coherence_from_spectra(f, coh, nnmf)[:, 0]
-    n_states = c.shape[1]
-    n_channels = c.shape[2]
-
-    # Just keep the upper triangle
-    m, n = np.triu_indices(c.shape[-1], k=1)
-    c = c[:, :, m, n]
+    # Calculate coherence networks for the first NNMF component (only
+    # keeping the upper triangle)
+    c = spectra.coherence_networks(
+        values="coherence", bands=nnmf, vectorize=True
+    )[:, 0]
 
     # Do statistical significance testing
     result = stats.group_diff(
@@ -157,10 +153,7 @@ def compare_coherence_networks(data, output_dir, n_perm, significance_level, n_j
     c_diff[~significant] = 0
 
     # Convert back into a full matrix
-    coh_diff = np.zeros([n_states, n_channels, n_channels])
-    for i in range(n_states):
-        coh_diff[i, m, n] = c_diff[i]
-        coh_diff[i, n, m] = c_diff[i]
+    coh_diff = vec2mat(c_diff)
 
     # Plot
     os.makedirs(f"{output_dir}/young_vs_old", exist_ok=True)

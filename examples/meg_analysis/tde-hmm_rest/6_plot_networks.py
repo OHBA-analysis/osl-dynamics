@@ -14,8 +14,7 @@ run = int(argv[2])
 
 import os
 import numpy as np
-from osl_dynamics.analysis import power, connectivity
-from osl_dynamics.utils import plotting
+from osl_dynamics.analysis import spectral, power, connectivity
 
 #%% Setup directories and files
 
@@ -28,53 +27,41 @@ parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
 
 #%% Load spectra
 
-f = np.load(f"{spectra_dir}/f.npy")  # (n_freq,)
-psd = np.load(f"{spectra_dir}/psd.npy")  # (n_subjects, n_states, n_parcels, n_freq)
-coh = np.load(f"{spectra_dir}/coh.npy")  # (n_subjects, n_states, n_parcels, n_parcels, n_freq)
-w = np.load(f"{spectra_dir}/w.npy")  # (n_subjects,)
+spectra = spectral.Spectra.load(f"{spectra_dir}/multitaper.npz")
 wb_comp = np.load(f"{spectra_dir}/nnmf_2.npy")  # (n_components, n_freq)
+
+# Group average
+group = spectra.group_average()
 
 #%% Plot power spectra
 
-# Calculate the group average power spectrum for each state
-gpsd = np.average(psd, axis=0, weights=w)
-
-# Plot
-for i in range(gpsd.shape[0]):
-    p = np.mean(gpsd[i], axis=0)  # mean over parcels
-    plotting.plot_line(
-        [f],
-        [p],
-        x_label="Frequency (Hz)",
-        y_label="PSD (a.u.)",
-        x_range=[f[0], f[-1]],
+# PSD of each state (averaged over parcels) with the static PSD
+for i in range(group.n_states):
+    group.plot_psd(
+        values="psd",
+        states=[i],
+        static=True,
         filename=f"{networks_dir}/psd_{i:02d}.png",
     )
 
 #%% Plot power maps
 
-# Calculate the power map by integrating the power spectra over a frequency range
-p = power.variance_from_spectra(f, gpsd, wb_comp)
+# Change in power from the static power for each nnmf component
+p = group.power_maps(bands=wb_comp)  # (n_components, n_states, n_parcels)
 
 # Plot
 power.save(
     p,
     parcellation_file=parcellation_file,
-    subtract_mean=True,
     component=0,  # nnmf component
+    plot_kwargs={"symmetric_cbar": True},
     filename=f"{networks_dir}/pow_.png",
 )
 
 #%% Plot coherence networks
 
-# Calculate the group average
-gcoh = np.average(coh, axis=0, weights=w)
-
-# Calculate the coherence network by averaging over a frequency range
-c = connectivity.mean_coherence_from_spectra(f, gcoh, wb_comp)
-
-# Threshold the top 2% of connections
-c = connectivity.threshold(c, percentile=98, subtract_mean=True)
+# Change in coherence from the static coherence, keeping the top 3% of edges
+c = group.coherence_networks(bands=wb_comp, percentile=97)
 
 # Plot
 connectivity.save(

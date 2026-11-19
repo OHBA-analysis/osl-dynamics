@@ -18,19 +18,19 @@ data = Data(
 ts = data.time_series()
 
 # Calculate static power spectra
-f, p = static.welch_spectra(
-    data=ts,
-    window_length=500,
+spectra = static.welch_spectra(
+    ts,
     sampling_frequency=250,
-    standardize=True,
+    window_length=500,
+    cross_spectra=False,
 )
 
 # Average over channels
-p = np.mean(p, axis=1)
+p = np.mean(spectra.psd, axis=1)
 
 # Plot
 plotting.plot_line(
-    [f] * p.shape[0],
+    [spectra.frequencies] * p.shape[0],
     p,
     labels=[f"Subject {i + 1}" for i in range(p.shape[0])],
     filename="psd.png",

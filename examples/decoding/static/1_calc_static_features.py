@@ -10,7 +10,7 @@ import pandas as pd
 from glob import glob
 
 from osl_dynamics.data import Data
-from osl_dynamics.analysis import static, power
+from osl_dynamics.analysis import static
 
 #%% Load data
 
@@ -29,13 +29,13 @@ data = Data(
 bands = [[1, 4], [4, 8], [8, 13], [13, 30]]
 
 x = data.time_series()
-f, psd = static.welch_spectra(
-    data=x,
-    window_length=500,
+spectra = static.welch_spectra(
+    x,
     sampling_frequency=250,
+    window_length=500,
     n_jobs=8,
 )
-p = [power.variance_from_spectra(f, psd, frequency_range=b) for b in bands]
+p = spectra.power_maps(bands=bands)  # (subjects, frequency_bands, channels)
 
 #%% Calculate AEC in canonical frequency bands
 
@@ -63,7 +63,6 @@ tde_cov = static.functional_connectivity(x, conn_type="cov")
 #%% Save
 
 # Reshape: (frequency_bands, subjects, ...) -> (subjects, frequency_bands, ...)
-p = np.swapaxes(p, 0, 1)
 aec = np.swapaxes(aec, 0, 1)
 
 os.makedirs("data/static_features", exist_ok=True)
