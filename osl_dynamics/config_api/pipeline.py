@@ -9,7 +9,6 @@ import pprint
 from pathlib import Path
 from typing import Callable, List, Optional, Union
 
-import numpy as np
 import yaml
 
 from osl_dynamics.config_api import wrappers
@@ -62,26 +61,17 @@ def find_function(
     Returns
     -------
     func : function
-        Function to execute.
+        Function to execute. :code:`None` if the function is not found.
     """
-    func = None
+    # Custom functions take precedence over osl_dynamics.config_api.wrappers
+    for func in reversed(extra_funcs or []):
+        if func.__name__ == name:
+            return func
 
-    # Check if the requested function is one of the custom functions
-    if extra_funcs is not None:
-        func_ind = [
-            idx if (f.__name__ == name) else -1 for idx, f in enumerate(extra_funcs)
-        ]
-        if np.max(func_ind) > -1:
-            func = extra_funcs[np.argmax(func_ind)]
-
-    # Check osl_dynamics.config_api.wrappers
-    if func is None and hasattr(wrappers, name):
-        func = getattr(wrappers, name)
-
-    if func is None:
-        _logger.warn(f"{name} not found.")
-
-    return func
+    if name.startswith("_"):
+        return None
+    func = getattr(wrappers, name, None)
+    return func if callable(func) else None
 
 
 def run_pipeline(
@@ -106,6 +96,8 @@ def run_pipeline(
         Data object.
     extra_funcs : list of functions, optional
         User-defined functions referenced in the config.
+
+    The pipeline stops at the first function that raises an error.
     """
     if restrict is not None:
         from osl_dynamics.inference import tf_ops
@@ -122,8 +114,14 @@ def run_pipeline(
         )
     )
 
-    # Load data via the config
+    # Check every function exists before running any
     load_data_kwargs = config.pop("load_data", None)
+    funcs = {name: find_function(name, extra_funcs) for name in config}
+    missing = [name for name, func in funcs.items() if func is None]
+    if missing:
+        raise ValueError(f"Functions not found: {', '.join(missing)}.")
+
+    # Load data via the config
     if load_data_kwargs is not None:
         # Make sure the Data class uses a unique temporary directory
         kwargs = load_data_kwargs.pop("kwargs", {})
@@ -135,19 +133,15 @@ def run_pipeline(
         _logger.info(f"load_data: {load_data_kwargs}")
         data = wrappers.load_data(**load_data_kwargs)
 
-    # Loop through each item in the config
-    for name, kwargs in config.items():
-        func = find_function(name, extra_funcs)
-        if func is not None:
-            try:
-                _logger.info(f"{name}: {kwargs}")
-                func(data=data, output_dir=output_dir, **kwargs)
-            except Exception as e:
-                _logger.exception(e)
-
-    # Delete the temporary directory created by the Data class
-    if data is not None:
-        data.delete_dir()
+    # Run each function in the config
+    try:
+        for name, kwargs in config.items():
+            _logger.info(f"{name}: {kwargs}")
+            funcs[name](data=data, output_dir=output_dir, **kwargs)
+    finally:
+        # Delete the temporary directory created by the Data class
+        if data is not None:
+            data.delete_dir()
 
 
 def run_pipeline_from_file(

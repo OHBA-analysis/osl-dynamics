@@ -6,7 +6,7 @@ import os
 from sys import argv
 
 if len(argv) != 2:
-    print("Please pass the number of states and run id, e.g. python 5_calc_post_hoc.py 8")
+    print("Please pass the number of states, e.g. python 5_calc_post_hoc.py 8")
     exit()
 
 n_states = int(argv[1])
