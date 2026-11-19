@@ -146,26 +146,35 @@ def functional_connectivity(
     return np.squeeze(results)
 
 
+_LEGACY_STATIC_DEFAULTS = {
+    "calc_cpsd": False,
+    "calc_coh": False,
+    "return_weights": False,
+    "keepdims": False,
+}
+
+
+@spectral._deprecate_positional(2)
 def welch_spectra(
     data: Union[np.ndarray, list],
     sampling_frequency: float,
+    *,
     window_length: Optional[int] = None,
     step_size: Optional[int] = None,
     frequency_range: Optional[List[float]] = None,
     standardize: bool = True,
     averaging: str = "mean",
-    calc_cpsd: bool = False,
-    calc_coh: bool = False,
-    return_weights: bool = False,
-    keepdims: bool = False,
+    calc_cpsd: Optional[bool] = None,
+    calc_coh: Optional[bool] = None,
+    return_weights: Optional[bool] = None,
+    keepdims: Optional[bool] = None,
     n_jobs: int = 1,
-):
-    """Calculate spectra using Welch's method.
+    cross_spectra: Optional[bool] = None,
+) -> spectral.Spectra:
+    """Calculate static spectra using Welch's method.
 
-    Wrapper for `spectral.welch_spectra <https://osl-dynamics.readthedocs\
-    .io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html\
-    #osl_dynamics.analysis.spectral.welch_spectra>`_ assuming only one
-    state is active for all time points.
+    The scaling for the power spectra matches SciPy
+    (:code:`scipy.signal.welch`).
 
     Parameters
     ----------
@@ -188,74 +197,80 @@ def welch_spectra(
         Method used to average periodograms.
         Must be :code:`'mean'` or :code:`'median'`.
     calc_cpsd : bool, optional
-        Should we return the cross spectra for :code:`psd`?
-        If True, we force :code:`calc_coh` to False.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     calc_coh : bool, optional
-        Should we also return the coherence spectra?
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     return_weights : bool, optional
-        Should we return the weights for session-specific spectra?
-        This is useful for calculating a group average.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     keepdims : bool, optional
-        Should we enforce a (n_sessions, ...) array is returned
-        for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
-        dimension of length 1.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     n_jobs : int, optional
         Number of parallel jobs.
+    cross_spectra : bool, optional
+        Should we calculate the cross spectra (needed for the coherence)?
+        Defaults to :code:`True`.
 
     Returns
     -------
-    f : np.ndarray
-        Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    psd : np.ndarray
-        Power spectra for each session. Shape is (n_sessions, n_channels,
-        n_freq) if :code:`calc_cpsd=False`, otherwise the shape is (n_sessions,
-        n_channels, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
-    coh : np.ndarray
-        Coherences. Shape is (n_sessions, n_channels, n_channels, n_freq).
-        Any axis of length 1 is removed if :code:`keepdims=False`.
-        Only returned is :code:`calc_coh=True`.
-    w : np.ndarray
-        Weighting for session-specific spectra. Only returned if
-        :code:`return_weights=True`. Shape is (n_sessions,).
+    spectra : osl_dynamics.analysis.spectral.Spectra
+        Spectra for each session.
     """
-    return spectral.welch_spectra(
+    if window_length is None:
+        window_length = 2 * sampling_frequency
+    if step_size is None:
+        step_size = int(window_length) // 2
+
+    legacy, cross_spectra = spectral._legacy_flags(
+        "welch_spectra",
+        cross_spectra,
+        dict(
+            calc_cpsd=calc_cpsd,
+            calc_coh=calc_coh,
+            return_weights=return_weights,
+            keepdims=keepdims,
+        ),
+        _LEGACY_STATIC_DEFAULTS,
+    )
+    return spectral._state_spectra(
+        method="welch",
         data=data,
         sampling_frequency=sampling_frequency,
+        alpha=None,
         window_length=window_length,
         step_size=step_size,
         frequency_range=frequency_range,
         standardize=standardize,
         averaging=averaging,
-        calc_cpsd=calc_cpsd,
-        calc_coh=calc_coh,
-        return_weights=return_weights,
-        keepdims=keepdims,
+        cross_spectra=cross_spectra,
         n_jobs=n_jobs,
+        legacy=legacy,
     )
 
 
+@spectral._deprecate_positional(2)
 def multitaper_spectra(
     data: Union[np.ndarray, list],
     sampling_frequency: float,
+    *,
     window_length: Optional[int] = None,
     time_half_bandwidth: float = 4,
     n_tapers: int = 7,
     frequency_range: Optional[List[float]] = None,
     standardize: bool = True,
     averaging: str = "mean",
-    calc_cpsd: bool = False,
-    calc_coh: bool = False,
-    return_weights: bool = False,
-    keepdims: bool = False,
+    calc_cpsd: Optional[bool] = None,
+    calc_coh: Optional[bool] = None,
+    return_weights: Optional[bool] = None,
+    keepdims: Optional[bool] = None,
     n_jobs: int = 1,
-):
-    """Calculate multitaper spectra.
-
-    Wrapper for `spectral.multitaper_spectra <https://osl-dynamics.readthedocs\
-    .io/en/latest/autoapi/osl_dynamics/analysis/spectral/index.html\
-    #osl_dynamics.analysis.spectral.multitaper_spectra>`_ assuming only one
-    state is active for all time points.
+    step_size: Optional[int] = None,
+    cross_spectra: Optional[bool] = None,
+) -> spectral.Spectra:
+    """Calculate static spectra using a multitaper.
 
     Parameters
     ----------
@@ -266,6 +281,7 @@ def multitaper_spectra(
         Sampling frequency in Hz.
     window_length : int, optional
         Length of the data segment to use to calculate the multitaper.
+        If None, we use :code:`2 * sampling_frequency`.
     time_half_bandwidth : float, optional
         Parameter to control the resolution of the spectra.
     n_tapers : int, optional
@@ -273,54 +289,65 @@ def multitaper_spectra(
     frequency_range : list, optional
         Minimum and maximum frequency to keep.
     standardize : bool, optional
-        Should we standardize the data before calculating the multitaper?
+        Should we standardize the data before calculating the spectra?
     averaging : str, optional
         Method used to average periodograms.
         Must be :code:`'mean'` or :code:`'median'`.
     calc_cpsd : bool, optional
-        Should we return the cross spectra for :code:`psd`?
-        If True, we force :code:`calc_coh` to False.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     calc_coh : bool, optional
-        Should we also return the coherence spectra?
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     return_weights : bool, optional
-        Should we return the weights for session-specific PSDs?
-        Useful for calculating the group average PSD.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     keepdims : bool, optional
-        Should we enforce a (n_sessions, ...) array is returned for
-        :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimension
-        of length 1.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     n_jobs : int, optional
         Number of parallel jobs.
+    step_size : int, optional
+        Step size for shifting the window. If None, we use
+        :code:`window_length` (no overlap).
+    cross_spectra : bool, optional
+        Should we calculate the cross spectra (needed for the coherence)?
+        Defaults to :code:`True`.
 
     Returns
     -------
-    f : np.ndarray
-        Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    psd : np.ndarray
-        Power spectra for each session. Shape is (n_sessions, n_channels,
-        n_freq) if :code:`calc_cpsd=False`, otherwise the shape is (n_sessions,
-        n_channels, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
-    coh : np.ndarray
-        Coherences. Shape is (n_sessions, n_channels, n_channels, n_freq).
-        Any axis of length 1 is removed if :code:`keepdims=False`.
-        Only returned is :code:`calc_coh=True`.
-    w : np.ndarray
-        Weighting for session-specific spectra. Only returned if
-        :code:`return_weights=True`. Shape is (n_sessions,).
+    spectra : osl_dynamics.analysis.spectral.Spectra
+        Spectra for each session.
     """
-    return spectral.multitaper_spectra(
+    if window_length is None:
+        window_length = 2 * sampling_frequency
+    if step_size is None:
+        step_size = int(window_length)
+
+    legacy, cross_spectra = spectral._legacy_flags(
+        "multitaper_spectra",
+        cross_spectra,
+        dict(
+            calc_cpsd=calc_cpsd,
+            calc_coh=calc_coh,
+            return_weights=return_weights,
+            keepdims=keepdims,
+        ),
+        _LEGACY_STATIC_DEFAULTS,
+    )
+    return spectral._state_spectra(
+        method="multitaper",
         data=data,
         sampling_frequency=sampling_frequency,
+        alpha=None,
         window_length=window_length,
-        time_half_bandwidth=time_half_bandwidth,
-        n_tapers=n_tapers,
+        step_size=step_size,
         frequency_range=frequency_range,
         standardize=standardize,
         averaging=averaging,
-        calc_cpsd=calc_cpsd,
-        calc_coh=calc_coh,
-        return_weights=return_weights,
-        keepdims=keepdims,
+        cross_spectra=cross_spectra,
         n_jobs=n_jobs,
+        legacy=legacy,
+        time_half_bandwidth=time_half_bandwidth,
+        n_tapers=n_tapers,
     )

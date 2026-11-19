@@ -1,8 +1,12 @@
 """Functions to perform spectral analysis."""
 
+import functools
+import inspect
+import json
 import logging
+import warnings
 from dataclasses import dataclass
-from typing import Iterable, Iterator, List, Optional, Tuple, Union
+from typing import Callable, Iterable, Iterator, List, Optional, Tuple, Union
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
@@ -15,6 +19,715 @@ from osl_dynamics.utils.misc import nextpow2
 from osl_dynamics.utils.progress import parallel_map
 
 _logger = logging.getLogger("osl-dynamics")
+
+
+_SPECTRA_FORMAT_VERSION = 1
+
+
+def _deprecate_positional(n_positional: int) -> Callable:
+    """Allow arguments after the first :code:`n_positional` to be passed
+    positionally, with a deprecation warning.
+
+    Parameters
+    ----------
+    n_positional : int
+        Number of arguments that can be passed positionally.
+
+    Returns
+    -------
+    decorator : callable
+        Function decorator.
+    """
+
+    def decorator(fn):
+        names = list(inspect.signature(fn).parameters)
+
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            if len(args) > n_positional:
+                extra = names[n_positional : len(args)]
+                warnings.warn(
+                    f"Passing {', '.join(extra)} to {fn.__name__} positionally is "
+                    "deprecated. Pass them as keyword arguments.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+                kwargs.update(zip(extra, args[n_positional:]))
+                args = args[:n_positional]
+            return fn(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def _legacy_flags(
+    function: str,
+    cross_spectra: Optional[bool],
+    flags: dict,
+    defaults: dict,
+) -> Tuple[dict, bool]:
+    """Handle the deprecated arguments that set the legacy output tuple.
+
+    Parameters
+    ----------
+    function : str
+        Name of the function the arguments were passed to.
+    cross_spectra : bool
+        Value of the :code:`cross_spectra` argument (:code:`None` if it was
+        not passed).
+    flags : dict
+        Deprecated arguments (:code:`None` if not passed).
+    defaults : dict
+        Previous defaults of the deprecated arguments.
+
+    Returns
+    -------
+    legacy : dict
+        Values of the deprecated arguments used to build the legacy tuple.
+    cross_spectra : bool
+        Should the cross spectra be calculated?
+    """
+    passed = [name for name, value in flags.items() if value is not None]
+    if passed:
+        single = len(passed) == 1
+        warnings.warn(
+            f"{', '.join(passed)} {'is' if single else 'are'} deprecated in "
+            f"{function}: {'it only changes' if single else 'they only change'} "
+            "the tuple returned when the result is unpacked. Use the attributes "
+            "of the returned object instead (and cross_spectra=False to skip the "
+            "cross spectra).",
+            DeprecationWarning,
+            stacklevel=4,
+        )
+    legacy = {
+        name: defaults[name] if value is None else value
+        for name, value in flags.items()
+    }
+    legacy["function"] = function
+
+    needs_cross = legacy.get("calc_cpsd", False) or legacy.get("calc_coh", False)
+    if cross_spectra is None:
+        cross_spectra = not (flags.get("calc_coh") is False and not needs_cross)
+    elif not cross_spectra:
+        if flags.get("calc_cpsd") or flags.get("calc_coh"):
+            raise ValueError("calc_coh and calc_cpsd require cross_spectra=True.")
+        legacy["calc_coh"] = False
+        legacy["calc_cpsd"] = False
+    return legacy, cross_spectra
+
+
+def _triu(n_channels: int) -> Tuple[np.ndarray, np.ndarray]:
+    """Indices of the upper triangle (including the diagonal)."""
+    return np.triu_indices(n_channels)
+
+
+def _psd_from_cross(x: np.ndarray, n_channels: int) -> np.ndarray:
+    """PSDs (..., n_channels, n_freq) from upper-triangle cross spectra."""
+    m, n = _triu(n_channels)
+    return x[..., np.flatnonzero(m == n), :].real
+
+
+def _full_from_triu(x: np.ndarray, n_channels: int) -> np.ndarray:
+    """Hermitian (..., n_channels, n_channels, n_freq) from an upper triangle."""
+    m, n = _triu(n_channels)
+    full = np.empty(x.shape[:-2] + (n_channels, n_channels, x.shape[-1]), x.dtype)
+    full[..., m, n, :] = x
+    full[..., n, m, :] = np.conj(x)
+    return full
+
+
+def _symmetric_from_triu(x: np.ndarray, n_channels: int) -> np.ndarray:
+    """Symmetric (..., n_channels, n_channels, n_freq) from an upper triangle."""
+    m, n = _triu(n_channels)
+    full = np.empty(x.shape[:-2] + (n_channels, n_channels, x.shape[-1]), x.dtype)
+    full[..., m, n, :] = x
+    full[..., n, m, :] = x
+    return full
+
+
+def _coherence_from_cross(x: np.ndarray, n_channels: int) -> np.ndarray:
+    """Coherence (..., n_channels, n_channels, n_freq) from cross spectra."""
+    m, n = _triu(n_channels)
+    pxx = _psd_from_cross(x, n_channels)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        coh = np.abs(x) / np.sqrt(pxx[..., m, :] * pxx[..., n, :])
+    return _symmetric_from_triu(coh.astype(np.float32), n_channels)
+
+
+def _coherence_change(
+    coefs: np.ndarray, static: np.ndarray, n_channels: int
+) -> np.ndarray:
+    """Change in coherence for regression coefficients of the cross spectra.
+
+    The change in the cross spectrum in the direction (phase) of the static
+    cross spectrum, normalized by the static power.
+
+    Parameters
+    ----------
+    coefs : np.ndarray
+        Regression coefficients. Shape is (..., n_modes, n_pairs, n_freq).
+    static : np.ndarray
+        Static cross spectra. Shape is (..., n_pairs, n_freq).
+    n_channels : int
+        Number of channels.
+
+    Returns
+    -------
+    coh : np.ndarray
+        Change in coherence. Shape is (..., n_modes, n_channels, n_channels,
+        n_freq).
+    """
+    m, n = _triu(n_channels)
+    static = static[..., np.newaxis, :, :]
+    pxx = _psd_from_cross(static, n_channels)
+    norm = np.sqrt(pxx[..., m, :] * pxx[..., n, :])
+    abs_static = np.abs(static)
+    phase = np.divide(
+        static,
+        abs_static,
+        out=np.zeros_like(static),
+        where=abs_static > 0,
+    )
+    with np.errstate(divide="ignore", invalid="ignore"):
+        coh = np.real(coefs * np.conj(phase)) / norm
+    return _symmetric_from_triu(coh.astype(np.float32), n_channels)
+
+
+def _weighted_nanmean(x: np.ndarray, weights: np.ndarray) -> np.ndarray:
+    """Weighted mean over the first axis, ignoring NaN values.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Array to average. Shape is (n_sessions, ...).
+    weights : np.ndarray
+        Weight for each session. Shape is (n_sessions,).
+
+    Returns
+    -------
+    mean : np.ndarray
+        Weighted mean. NaN where all sessions are NaN. Shape is (...).
+    """
+    w = weights.reshape((-1,) + (1,) * (x.ndim - 1))
+    valid = ~np.isnan(x)
+    total_weight = np.sum(w * valid, axis=0)
+    total = np.sum(np.where(valid, x, 0) * w, axis=0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        mean = np.where(total_weight > 0, total / total_weight, np.nan)
+    return mean.astype(x.dtype)
+
+
+def _to_json(value):
+    if isinstance(value, dict):
+        return {k: _to_json(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, np.ndarray)):
+        return [_to_json(v) for v in value]
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
+
+
+class Spectra:
+    """Static power spectra and cross spectra.
+
+    Returned by :func:`osl_dynamics.analysis.static.welch_spectra`,
+    :func:`osl_dynamics.analysis.static.multitaper_spectra`, and by
+    :func:`welch_spectra` and :func:`multitaper_spectra` without
+    :code:`alpha`.
+
+    The cross spectra are stored (as the upper triangle) and the PSDs and
+    coherences are calculated from them. The first axis of each array is the
+    session, except for a group average (see :meth:`group_average`).
+    Cross spectra are :math:`\\langle \\bar{X}_i X_j \\rangle`, where
+    :math:`X_i` is the Fourier transform of channel :math:`i`.
+
+    Attributes
+    ----------
+    frequencies : np.ndarray
+        Frequency axis. Shape is (n_freq,).
+    weights : np.ndarray
+        Weight of each session in a group average (the number of samples in
+        a session divided by the total). Shape is (n_sessions,). :code:`None`
+        for a group average.
+    n_channels : int
+        Number of channels.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    method : str
+        Method used to calculate the spectra.
+    settings : dict
+        Settings used to calculate the spectra.
+    """
+
+    _session_arrays = ("spectra",)
+
+    def __init__(
+        self,
+        frequencies: np.ndarray,
+        arrays: dict,
+        n_channels: int,
+        weights: Optional[np.ndarray],
+        sampling_frequency: float,
+        method: str,
+        settings: dict,
+        has_cross_spectra: bool,
+        legacy: Optional[dict] = None,
+    ):
+        self.frequencies = np.asarray(frequencies)
+        self._data = dict(arrays)
+        self.n_channels = int(n_channels)
+        self.weights = None if weights is None else np.asarray(weights)
+        self.sampling_frequency = sampling_frequency
+        self.method = method
+        self.settings = dict(settings)
+        self.has_cross_spectra = bool(has_cross_spectra)
+        self._legacy = legacy
+
+    # Shapes
+
+    @property
+    def is_group(self) -> bool:
+        """Is this a group average (no session axis)?"""
+        return self.weights is None
+
+    @property
+    def n_sessions(self) -> Optional[int]:
+        """Number of sessions. :code:`None` for a group average."""
+        return None if self.is_group else len(self.weights)
+
+    @property
+    def n_freq(self) -> int:
+        """Number of frequency bins."""
+        return len(self.frequencies)
+
+    # Derived quantities
+
+    def _require_cross_spectra(self):
+        if not self.has_cross_spectra:
+            raise ValueError(
+                "Only PSDs were calculated. Pass cross_spectra=True to calculate "
+                "the cross spectra and coherence."
+            )
+
+    def _psd(self, x: np.ndarray) -> np.ndarray:
+        if self.has_cross_spectra:
+            return _psd_from_cross(x, self.n_channels)
+        return x
+
+    def _cross(self, x: np.ndarray) -> np.ndarray:
+        self._require_cross_spectra()
+        return _full_from_triu(x, self.n_channels)
+
+    def _coherence(self, x: np.ndarray) -> np.ndarray:
+        self._require_cross_spectra()
+        return _coherence_from_cross(x, self.n_channels)
+
+    def _spectra(self) -> np.ndarray:
+        return self._data["spectra"]
+
+    @property
+    def psd(self) -> np.ndarray:
+        """Power spectral density.
+
+        Shape is (n_sessions, n_channels, n_freq).
+        """
+        return self._psd(self._spectra())
+
+    @property
+    def cross_spectra(self) -> np.ndarray:
+        """Cross spectral density.
+
+        Shape is (n_sessions, n_channels, n_channels, n_freq).
+        """
+        return self._cross(self._spectra())
+
+    @property
+    def coherence(self) -> np.ndarray:
+        """Coherence.
+
+        Shape is (n_sessions, n_channels, n_channels, n_freq).
+        """
+        return self._coherence(self._spectra())
+
+    # Group average
+
+    def group_average(self) -> "Spectra":
+        """Group average of the spectra.
+
+        The cross spectra (or PSDs) are averaged over sessions with
+        :code:`weights`, ignoring NaN values. Coherences are calculated from
+        the group-averaged cross spectra.
+
+        Returns
+        -------
+        spectra : Spectra
+            Group-averaged spectra, an object of the same class without a
+            session axis.
+        """
+        if self.is_group:
+            raise ValueError("The spectra are already a group average.")
+        arrays = {
+            name: (
+                _weighted_nanmean(value, self.weights)
+                if name in self._session_arrays
+                else value
+            )
+            for name, value in self._data.items()
+        }
+        return self._new(arrays, weights=None)
+
+    def _new(self, arrays: dict, weights: Optional[np.ndarray]) -> "Spectra":
+        return type(self)(
+            frequencies=self.frequencies,
+            arrays=arrays,
+            n_channels=self.n_channels,
+            weights=weights,
+            sampling_frequency=self.sampling_frequency,
+            method=self.method,
+            settings=self.settings,
+            has_cross_spectra=self.has_cross_spectra,
+        )
+
+    # Saving and loading
+
+    def save(self, filename: str) -> None:
+        """Save the spectra to a :code:`.npz` file.
+
+        Parameters
+        ----------
+        filename : str
+            Output filename. :code:`.npz` is appended if it is missing.
+        """
+        metadata = {
+            "class": type(self).__name__,
+            "format_version": _SPECTRA_FORMAT_VERSION,
+            "n_channels": self.n_channels,
+            "sampling_frequency": self.sampling_frequency,
+            "method": self.method,
+            "settings": self.settings,
+            "has_cross_spectra": self.has_cross_spectra,
+        }
+        arrays = {f"data_{name}": value for name, value in self._data.items()}
+        if self.weights is not None:
+            arrays["weights"] = self.weights
+        np.savez(
+            filename,
+            metadata=json.dumps(_to_json(metadata)),
+            frequencies=self.frequencies,
+            **arrays,
+        )
+
+    @classmethod
+    def load(cls, filename: str) -> "Spectra":
+        """Load spectra saved with :meth:`save`.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the :code:`.npz` file.
+
+        Returns
+        -------
+        spectra : Spectra
+            The spectra, with the class they were saved with.
+        """
+        with np.load(filename, allow_pickle=False) as f:
+            metadata = json.loads(str(f["metadata"]))
+            arrays = {
+                key[len("data_") :]: f[key]
+                for key in f.files
+                if key.startswith("data_")
+            }
+            frequencies = f["frequencies"]
+            weights = f["weights"] if "weights" in f.files else None
+
+        if metadata["format_version"] > _SPECTRA_FORMAT_VERSION:
+            raise ValueError(
+                f"{filename} was saved with a newer version of osl-dynamics."
+            )
+        classes = {c.__name__: c for c in (Spectra, StateSpectra, RegressionSpectra)}
+        spectra_cls = classes[metadata["class"]]
+        if not issubclass(spectra_cls, cls):
+            raise TypeError(
+                f"{filename} contains {spectra_cls.__name__}, not {cls.__name__}."
+            )
+        return spectra_cls(
+            frequencies=frequencies,
+            arrays=arrays,
+            n_channels=metadata["n_channels"],
+            weights=weights,
+            sampling_frequency=metadata["sampling_frequency"],
+            method=metadata["method"],
+            settings=metadata["settings"],
+            has_cross_spectra=metadata["has_cross_spectra"],
+        )
+
+    # Display
+
+    def _shape_summary(self) -> List[str]:
+        sessions = "group average" if self.is_group else f"n_sessions={self.n_sessions}"
+        return [sessions, f"n_channels={self.n_channels}"]
+
+    def __repr__(self) -> str:
+        f = self.frequencies
+        parts = [f"method={self.method!r}"] + self._shape_summary()
+        parts.append(f"frequencies={f[0]:g}-{f[-1]:g} Hz ({len(f)})")
+        parts.append(f"cross_spectra={self.has_cross_spectra}")
+        return f"{type(self).__name__}({', '.join(parts)})"
+
+    # Compatibility with the tuples returned previously
+
+    def _legacy_tuple(self) -> tuple:
+        lg = self._legacy
+        x = self._spectra()
+        if not isinstance(self, StateSpectra):
+            x = x[:, np.newaxis]
+        calc_cpsd = lg["calc_cpsd"]
+        calc_coh = lg["calc_coh"] and not calc_cpsd
+
+        if calc_cpsd or calc_coh:
+            cpsd = _full_from_triu(x, self.n_channels)
+            if self.method == "welch":
+                # Previous convention for Welch's method
+                cpsd = np.conj(cpsd)
+        if calc_coh:
+            psd = cpsd[..., range(self.n_channels), range(self.n_channels), :].real
+            coh = coherence_spectra(cpsd, keepdims=True)
+        elif calc_cpsd:
+            psd = cpsd
+        else:
+            psd = self._psd(x)
+        psd = np.nan_to_num(psd)
+
+        if not lg["keepdims"]:
+            psd = np.squeeze(psd)
+            if calc_coh:
+                coh = np.squeeze(coh)
+
+        outputs = [self.frequencies, psd]
+        if calc_coh:
+            outputs.append(coh)
+        if lg["return_weights"]:
+            outputs.append(self.weights)
+        return tuple(outputs)
+
+    def _legacy_outputs(self) -> tuple:
+        if self._legacy is None:
+            raise TypeError(
+                f"{type(self).__name__} cannot be unpacked. Use its attributes, "
+                "e.g. .frequencies and .psd."
+            )
+        warnings.warn(
+            f"Unpacking the result of {self._legacy['function']} is deprecated "
+            "and will be removed in a future release. Use the attributes of the "
+            f"returned {type(self).__name__} instead, e.g. .frequencies and .psd.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        return self._legacy_tuple()
+
+    def __iter__(self):
+        return iter(self._legacy_outputs())
+
+    def __getitem__(self, index: int):
+        return self._legacy_outputs()[index]
+
+
+class StateSpectra(Spectra):
+    """Spectra for each state, from Welch's method or a multitaper.
+
+    Returned by :func:`welch_spectra` and :func:`multitaper_spectra` with
+    :code:`alpha`. See :class:`Spectra` for the attributes shared by all
+    spectra.
+
+    The static spectrum is the average of the state spectra weighted by the
+    fractional occupancies.
+
+    Attributes
+    ----------
+    fractional_occupancies : np.ndarray
+        Mean of :code:`alpha` for each state, normalized to sum to one.
+        Shape is (n_sessions, n_states).
+    """
+
+    _session_arrays = ("spectra", "fractional_occupancies")
+
+    @property
+    def n_states(self) -> int:
+        """Number of states."""
+        return self._spectra().shape[-3]
+
+    @property
+    def fractional_occupancies(self) -> np.ndarray:
+        return self._data["fractional_occupancies"]
+
+    def _static_spectra(self) -> np.ndarray:
+        x = self._spectra()
+        fo = self.fractional_occupancies[..., np.newaxis, np.newaxis]
+        return np.sum(np.where(fo > 0, x * fo, 0), axis=-3).astype(x.dtype)
+
+    @property
+    def psd(self) -> np.ndarray:
+        """Power spectral density of each state, :math:`P_j`.
+
+        Shape is (n_sessions, n_states, n_channels, n_freq).
+        """
+        return self._psd(self._spectra())
+
+    @property
+    def cross_spectra(self) -> np.ndarray:
+        """Cross spectral density of each state.
+
+        Shape is (n_sessions, n_states, n_channels, n_channels, n_freq).
+        """
+        return self._cross(self._spectra())
+
+    @property
+    def coherence(self) -> np.ndarray:
+        """Coherence of each state.
+
+        Shape is (n_sessions, n_states, n_channels, n_channels, n_freq).
+        """
+        return self._coherence(self._spectra())
+
+    @property
+    def static_psd(self) -> np.ndarray:
+        """Static power spectral density, :math:`S`.
+
+        Shape is (n_sessions, n_channels, n_freq).
+        """
+        return self._psd(self._static_spectra())
+
+    @property
+    def static_cross_spectra(self) -> np.ndarray:
+        """Static cross spectral density.
+
+        Shape is (n_sessions, n_channels, n_channels, n_freq).
+        """
+        return self._cross(self._static_spectra())
+
+    @property
+    def static_coherence(self) -> np.ndarray:
+        """Static coherence.
+
+        Shape is (n_sessions, n_channels, n_channels, n_freq).
+        """
+        return self._coherence(self._static_spectra())
+
+    def _shape_summary(self) -> List[str]:
+        summary = super()._shape_summary()
+        return summary[:1] + [f"n_states={self.n_states}"] + summary[1:]
+
+
+class RegressionSpectra(StateSpectra):
+    """Spectra for each state/mode from regressing a spectrogram on alpha.
+
+    Returned by :func:`regression_spectra`. See :class:`Spectra` and
+    :class:`StateSpectra` for the attributes shared by all spectra and the
+    :doc:`User Guide </user_guide/spectra>` for the definitions.
+
+    Attributes
+    ----------
+    sigma : np.ndarray
+        Group-level standard deviation of the windowed :code:`alpha`,
+        :math:`\\sigma_j`. Shape is (n_modes,).
+    """
+
+    _session_arrays = ("coefs", "intercept")
+
+    @property
+    def n_states(self) -> int:
+        """Number of states/modes."""
+        return self._data["coefs"].shape[-3]
+
+    @property
+    def sigma(self) -> np.ndarray:
+        return self._data["sigma"]
+
+    @property
+    def fractional_occupancies(self) -> np.ndarray:
+        raise AttributeError("RegressionSpectra has no fractional_occupancies.")
+
+    def _spectra(self) -> np.ndarray:
+        coefs = self._data["coefs"]
+        sigma = self.sigma.reshape((-1, 1, 1))
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return (
+                self._static_spectra()[..., np.newaxis, :, :] + coefs / sigma
+            ).astype(coefs.dtype)
+
+    def _static_spectra(self) -> np.ndarray:
+        return self._data["intercept"]
+
+    @property
+    def psd(self) -> np.ndarray:
+        """Power spectral density of each state/mode, :math:`P_j = S +
+        \\beta_j / \\sigma_j`.
+
+        Shape is (n_sessions, n_modes, n_channels, n_freq).
+        """
+        return self._psd(self._spectra())
+
+    @property
+    def psd_coefs(self) -> np.ndarray:
+        """Regression coefficients of the PSD, :math:`\\beta_j = \\sigma_j (P_j -
+        S)`: the change in the PSD for a one standard deviation increase in
+        a mode's :code:`alpha`.
+
+        Shape is (n_sessions, n_modes, n_channels, n_freq).
+        """
+        return self._psd(self._data["coefs"])
+
+    @property
+    def cross_spectra_coefs(self) -> np.ndarray:
+        """Regression coefficients of the cross spectra.
+
+        Shape is (n_sessions, n_modes, n_channels, n_channels, n_freq).
+        """
+        return self._cross(self._data["coefs"])
+
+    @property
+    def coherence_coefs(self) -> np.ndarray:
+        """Change in coherence for a one standard deviation increase in a
+        mode's :code:`alpha`.
+
+        The change in the cross spectrum in the direction (phase) of the
+        static cross spectrum, normalized by the static power. The diagonal
+        is the relative change in power.
+
+        Shape is (n_sessions, n_modes, n_channels, n_channels, n_freq).
+        """
+        self._require_cross_spectra()
+        return _coherence_change(
+            self._data["coefs"], self._data["intercept"], self.n_channels
+        )
+
+    def _legacy_tuple(self) -> tuple:
+        lg = self._legacy
+        coefs = self._psd(self._data["coefs"])
+        intercept = self._psd(self._data["intercept"])
+        intercept = np.broadcast_to(intercept[:, np.newaxis], coefs.shape)
+        psd = np.stack([coefs, intercept], axis=1)
+        if not lg["return_coef_int"]:
+            psd = np.sum(psd, axis=1)
+
+        extra = []
+        if lg["return_weights"]:
+            extra.append(self.weights)
+        if lg["return_sigma"]:
+            extra.append(self.sigma)
+
+        if not lg["calc_coh"]:
+            if not lg["keepdims"]:
+                psd = np.squeeze(psd)
+            return (self.frequencies, psd, *extra)
+
+        coh = self.coherence_coefs
+        if not lg["keepdims"]:
+            psd = np.squeeze(psd)
+            coh = np.squeeze(coh)
+        return (self.frequencies, psd, coh, *extra)
 
 
 def wavelet(
@@ -118,21 +831,32 @@ def wavelet(
     return t, f, wt
 
 
+_LEGACY_STATE_DEFAULTS = {
+    "calc_cpsd": False,
+    "calc_coh": True,
+    "return_weights": False,
+    "keepdims": False,
+}
+
+
+@_deprecate_positional(3)
 def welch_spectra(
     data: Union[np.ndarray, list],
     sampling_frequency: float,
     alpha: Optional[Union[np.ndarray, list]] = None,
+    *,
     window_length: Optional[int] = None,
     step_size: Optional[int] = None,
     frequency_range: Optional[List] = None,
     standardize: bool = True,
     averaging: str = "mean",
-    calc_cpsd: bool = False,
-    calc_coh: bool = True,
-    return_weights: bool = False,
-    keepdims: bool = False,
+    calc_cpsd: Optional[bool] = None,
+    calc_coh: Optional[bool] = None,
+    return_weights: Optional[bool] = None,
+    keepdims: Optional[bool] = None,
     n_jobs: int = 1,
-):
+    cross_spectra: Optional[bool] = None,
+) -> Union["Spectra", "StateSpectra"]:
     """Calculates spectra for inferred states using Welch's method.
 
     The scaling for the power spectra calculated by this function
@@ -148,6 +872,7 @@ def welch_spectra(
     alpha : np.ndarray or list, optional
         Inferred state probability time course. Must have shape
         (n_sessions, n_samples, n_states) or (n_samples, n_states).
+        If not passed, the static spectra are calculated.
     window_length : int, optional
         Length of the data segment to use to calculate spectra.
         If None, we use :code:`2 * sampling_frequency`.
@@ -162,43 +887,45 @@ def welch_spectra(
         Method used to average periodograms.
         Must be :code:`'mean'` or :code:`'median'`.
     calc_cpsd : bool, optional
-        Should we return the cross spectra for :code:`psd`?
-        If True, we force :code:`calc_coh` to False.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     calc_coh : bool, optional
-        Should we also return the coherence spectra?
+        Deprecated. :code:`calc_coh=False` is the same as
+        :code:`cross_spectra=False`.
     return_weights : bool, optional
-        Should we return the weights for session-specific spectra?
-        This is useful for calculating a group average.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     keepdims : bool, optional
-        Should we enforce a (n_sessions, n_states, ...) array is returned
-        for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
-        dimension of length 1.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     n_jobs : int, optional
         Number of parallel jobs.
+    cross_spectra : bool, optional
+        Should we calculate the cross spectra (needed for the coherence)?
+        Defaults to :code:`True`.
 
     Returns
     -------
-    f : np.ndarray
-        Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    psd : np.ndarray
-        Power spectra for each session and state. Shape is (n_sessions,
-        n_states, n_channels, n_freq) if :code:`calc_cpsd=False`, otherwise
-        the shape is (n_sessions, n_states, n_channels, n_channels, n_freq).
-        Any axis of length 1 is removed if :code:`keepdims=False`.
-    coh : np.ndarray
-        Coherences for each session and state. Shape is (n_sessions, n_states,
-        n_channels, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
-    w : np.ndarray
-        Weighting for session-specific spectra. Only returned if
-        :code:`return_weights=True`. Shape is (n_sessions,).
+    spectra : StateSpectra or Spectra
+        Spectra for each session and state. :class:`Spectra` if
+        :code:`alpha` is not passed.
     """
-
     if window_length is None:
         window_length = 2 * sampling_frequency
     if step_size is None:
         step_size = int(window_length) // 2
 
+    legacy, cross_spectra = _legacy_flags(
+        "welch_spectra",
+        cross_spectra,
+        dict(
+            calc_cpsd=calc_cpsd,
+            calc_coh=calc_coh,
+            return_weights=return_weights,
+            keepdims=keepdims,
+        ),
+        _LEGACY_STATE_DEFAULTS,
+    )
     return _state_spectra(
         method="welch",
         data=data,
@@ -209,18 +936,18 @@ def welch_spectra(
         frequency_range=frequency_range,
         standardize=standardize,
         averaging=averaging,
-        calc_cpsd=calc_cpsd,
-        calc_coh=calc_coh,
-        return_weights=return_weights,
-        keepdims=keepdims,
+        cross_spectra=cross_spectra,
         n_jobs=n_jobs,
+        legacy=legacy,
     )
 
 
+@_deprecate_positional(3)
 def multitaper_spectra(
     data: Union[np.ndarray, list],
     sampling_frequency: float,
     alpha: Optional[Union[np.ndarray, list]] = None,
+    *,
     window_length: Optional[int] = None,
     step_size: Optional[int] = None,
     time_half_bandwidth: float = 4,
@@ -228,12 +955,13 @@ def multitaper_spectra(
     frequency_range: Optional[List] = None,
     standardize: bool = True,
     averaging: str = "mean",
-    calc_cpsd: bool = False,
-    calc_coh: bool = True,
-    return_weights: bool = False,
-    keepdims: bool = False,
+    calc_cpsd: Optional[bool] = None,
+    calc_coh: Optional[bool] = None,
+    return_weights: Optional[bool] = None,
+    keepdims: Optional[bool] = None,
     n_jobs: int = 1,
-):
+    cross_spectra: Optional[bool] = None,
+) -> Union["Spectra", "StateSpectra"]:
     """Calculates spectra for inferred states using a multitaper.
 
     Parameters
@@ -246,8 +974,10 @@ def multitaper_spectra(
     alpha : np.ndarray or list, optional
         Inferred state probability time course. Must have shape
         (n_sessions, n_samples, n_states) or (n_samples, n_states).
+        If not passed, the static spectra are calculated.
     window_length : int, optional
         Length of the data segment to use to calculate spectra.
+        If None, we use :code:`2 * sampling_frequency`.
     step_size : int, optional
         Step size for shifting the window.
         Defaults to :code:`window_length` (no overlap).
@@ -263,43 +993,45 @@ def multitaper_spectra(
         Method used to average periodograms.
         Must be :code:`'mean'` or :code:`'median'`.
     calc_cpsd : bool, optional
-        Should we return the cross spectra for :code:`psd`?
-        If True, we force :code:`calc_coh` to False.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     calc_coh : bool, optional
-        Should we also return the coherence spectra?
+        Deprecated. :code:`calc_coh=False` is the same as
+        :code:`cross_spectra=False`.
     return_weights : bool, optional
-        Should we return the weights for session-specific spectra?
-        This is useful for calculating a group average.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     keepdims : bool, optional
-        Should we enforce a (n_sessions, n_states, ...) array is returned
-        for :code:`psd` and :code:`coh`? If :code:`False`, we remove any
-        dimension of length 1.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     n_jobs : int, optional
         Number of parallel jobs.
+    cross_spectra : bool, optional
+        Should we calculate the cross spectra (needed for the coherence)?
+        Defaults to :code:`True`.
 
     Returns
     -------
-    f : np.ndarray
-        Frequencies of the power spectra and coherences. Shape is (n_freq,).
-    psd : np.ndarray
-        Power spectra for each session and state. Shape is (n_sessions,
-        n_states, n_channels, n_freq) if :code:`calc_cpsd=False`, otherwise
-        the shape is (n_sessions, n_states, n_channels, n_channels, n_freq).
-        Any axis of length 1 is removed if :code:`keepdims=False`.
-    coh : np.ndarray
-        Coherences for each session and state. Shape is (n_sessions, n_states,
-        n_channels, n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`. Only returned is :code:`calc_coh=True`.
-    w : np.ndarray
-        Weighting for session-specific spectra. Only returned if
-        :code:`return_weights=True`. Shape is (n_sessions,).
+    spectra : StateSpectra or Spectra
+        Spectra for each session and state. :class:`Spectra` if
+        :code:`alpha` is not passed.
     """
-
     if window_length is None:
         window_length = 2 * sampling_frequency
     if step_size is None:
         step_size = int(window_length)
 
+    legacy, cross_spectra = _legacy_flags(
+        "multitaper_spectra",
+        cross_spectra,
+        dict(
+            calc_cpsd=calc_cpsd,
+            calc_coh=calc_coh,
+            return_weights=return_weights,
+            keepdims=keepdims,
+        ),
+        _LEGACY_STATE_DEFAULTS,
+    )
     return _state_spectra(
         method="multitaper",
         data=data,
@@ -310,52 +1042,53 @@ def multitaper_spectra(
         frequency_range=frequency_range,
         standardize=standardize,
         averaging=averaging,
-        calc_cpsd=calc_cpsd,
-        calc_coh=calc_coh,
-        return_weights=return_weights,
-        keepdims=keepdims,
+        cross_spectra=cross_spectra,
         n_jobs=n_jobs,
+        legacy=legacy,
         time_half_bandwidth=time_half_bandwidth,
         n_tapers=n_tapers,
     )
 
 
+@_deprecate_positional(3)
 def regression_spectra(
     data: Union[np.ndarray, list],
     alpha: Union[np.ndarray, list],
     sampling_frequency: float,
-    window_length: int,
-    step_size: int,
-    n_sub_windows: int = 1,
+    *,
+    window_length: Optional[int] = None,
+    step_size: Optional[int] = None,
+    n_sub_windows: int = 8,
     frequency_range: Optional[List] = None,
     standardize: bool = True,
-    calc_coh: bool = True,
-    return_weights: bool = False,
-    return_coef_int: bool = False,
-    return_sigma: bool = False,
-    keepdims: bool = False,
+    calc_coh: Optional[bool] = None,
+    return_weights: Optional[bool] = None,
+    return_coef_int: Optional[bool] = None,
+    return_sigma: Optional[bool] = None,
+    keepdims: Optional[bool] = None,
     n_jobs: int = 1,
-):
+    cross_spectra: Optional[bool] = None,
+) -> "RegressionSpectra":
     r"""Calculates mode-specific spectra by regressing a spectrogram with alpha.
 
     We calculate a spectrogram :math:`P_t` with Welch's method (Hann-tapered
-    sub-windows) and average :code:`alpha` over the same windows. Only windows that do not overlap the
-    start or end of the data are used.
+    sub-windows) and average :code:`alpha` over the same windows. Only windows
+    that do not overlap the start or end of the data are used.
 
     If :code:`alpha` sums to one at each time point, the spectrogram is
     modeled as a mixture of mode spectra, :math:`P_t = \sum_j \alpha_{jt}
     P_j`, where :math:`P_j` is the spectrum when only mode :math:`j` is
-    active. We return:
+    active. The result contains:
 
-    - The **intercept**: the static (time-averaged) spectrum,
+    - The **static spectrum** (intercept): the time-averaged spectrum,
       :math:`S = \sum_j \bar{\alpha}_j P_j`.
     - The **coefficients**: :math:`\beta_j = \sigma_j (P_j - S)`, the change
       in the spectrum from the static spectrum for a one standard deviation
       increase in mode :math:`j`'s :code:`alpha`. :math:`\sigma_j` is the
       standard deviation of the windowed :code:`alpha`, averaged over
       sessions.
-    - The **coherence**: the change in the cross spectrum normalized by the
-      static power (change in coherence),
+    - The **change in coherence**: the change in the cross spectrum normalized
+      by the static power,
 
       .. math::
           C_{jxy} = \frac{\text{Re}(\beta_{jxy} e^{-i\phi_{xy}})}{\sqrt{S_{xx}
@@ -370,10 +1103,8 @@ def regression_spectra(
     with standardized regressors and an intercept. A mode whose :code:`alpha`
     is (nearly) constant in a session has NaN coefficients for that session.
 
-    Power maps and coherence networks should be calculated from the
-    coefficients and coherence without subtracting the mean over modes. See
-    the :doc:`User Guide </user_guide/spectra>` for how to interpret and plot
-    the outputs.
+    See the :doc:`User Guide </user_guide/spectra>` for how to interpret and
+    plot the outputs.
 
     Parameters
     ----------
@@ -385,10 +1116,12 @@ def regression_spectra(
         (n_sessions, n_samples, n_modes) or (n_samples, n_modes).
     sampling_frequency : float
         Sampling_frequency in Hz.
-    window_length : int
+    window_length : int, optional
         Number samples to use in the window to calculate a spectrum.
-    step_size : int
-        Step size for shifting the window.
+        Defaults to 4 seconds (rounded to a multiple of
+        :code:`n_sub_windows`).
+    step_size : int, optional
+        Step size for shifting the window. Defaults to 80 ms.
     n_sub_windows : int, optional
         We split the window into a number of sub-windows and average the
         spectra for each sub-window. window_length must be divisible by
@@ -398,44 +1131,30 @@ def regression_spectra(
     standardize : bool, optional
         Should we standardize the data before calculating the spectrogram?
     calc_coh : bool, optional
-        Should we also return the coherence spectra?
+        Deprecated. :code:`calc_coh=False` is the same as
+        :code:`cross_spectra=False`.
     return_weights : bool, optional
-        Should we return the weights for session-specific spectra?
-        Useful for calculating the group average spectra.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     return_coef_int : bool, optional
-        Should we return the regression coefficients and intercept
-        separately for the mode PSDs?
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     return_sigma : bool, optional
-        Should we return the group-level standard deviation of the windowed
-        :code:`alpha` used to scale the coefficients?
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     keepdims : bool, optional
-        Should we enforce a (n_sessions, n_states, ...) array is returned for
-        :code:`psd` and :code:`coh`? If :code:`False`, we remove any dimension
-        of length 1.
+        Deprecated. Only changes the tuple returned when the result is
+        unpacked.
     n_jobs : int, optional
         Number of parallel jobs.
+    cross_spectra : bool, optional
+        Should we calculate the cross spectra (needed for the coherence)?
+        Defaults to :code:`True`.
 
     Returns
     -------
-    f : np.ndarray
-        Frequency axis. Shape is (n_freq).
-    psd : np.ndarray
-        Mode PSDs. A numpy array with shape (n_sessions, 2, n_modes, n_channels,
-        n_freq) where :code:`axis=1` is the coefficients/intercept if
-        :code:`return_coef_int=True`, otherwise shape is (n_sessions, n_modes,
-        n_channels, n_freq). Any axis of length 1 is removed if
-        :code:`keepdims=False`.
-    coh : np.ndarray
-        Change in the cross spectrum normalized by the static power (change
-        in coherence) for each mode. Shape is (n_sessions,
-        n_modes, n_channels, n_channels, n_freq). Any axis of length 1 is
-        removed if :code:`keepdims=False`.
-    w : np.ndarray
-        Weight for each session-specific PSD. Shape is (n_sessions,).
-        Only returned if :code:`return_weights=True`.
-    sigma : np.ndarray
-        Group-level standard deviation of the windowed :code:`alpha` for each
-        mode. Shape is (n_modes,). Only returned if :code:`return_sigma=True`.
+    spectra : RegressionSpectra
+        Spectra for each session and mode.
 
     References
     ----------
@@ -443,10 +1162,33 @@ def regression_spectra(
     spectrum analysis with covariate and confound modelling. Imaging
     Neuroscience, 2. https://doi.org/10.1162/imag_a_00082
     """
-
     if alpha is None:
         raise ValueError("alpha must be passed.")
     data, alpha = _validate_data_alpha(data, alpha)
+
+    legacy, cross_spectra = _legacy_flags(
+        "regression_spectra",
+        cross_spectra,
+        dict(
+            calc_coh=calc_coh,
+            return_weights=return_weights,
+            return_coef_int=return_coef_int,
+            return_sigma=return_sigma,
+            keepdims=keepdims,
+        ),
+        {
+            "calc_coh": True,
+            "return_weights": False,
+            "return_coef_int": False,
+            "return_sigma": False,
+            "keepdims": False,
+        },
+    )
+
+    if window_length is None:
+        window_length = n_sub_windows * round(4 * sampling_frequency / n_sub_windows)
+    if step_size is None:
+        step_size = max(1, round(0.08 * sampling_frequency))
 
     # Ensure data and alpha are float32
     data = [d.astype(np.float32) for d in data]
@@ -461,7 +1203,7 @@ def regression_spectra(
         window_length=window_length,
         step_size=step_size,
         frequency_range=frequency_range,
-        calc_cpsd=calc_coh,
+        calc_cpsd=cross_spectra,
         n_sub_windows=n_sub_windows,
     )
 
@@ -487,7 +1229,6 @@ def regression_spectra(
         argument_type="kwargs",
         label="session",
     )
-    f = spectrogram.frequencies
 
     # Weights for calculating a group-average spectrum
     w = _session_weights(data)
@@ -504,96 +1245,43 @@ def regression_spectra(
         where=total_weight > 0,
     )
 
-    # Unpack results, rescaling the coefficients to the change in the spectrum
-    # for a one group-level standard deviation increase in a mode's alpha
-    Pj = []
+    # Rescale the coefficients to the change in the spectrum for a one
+    # group-level standard deviation increase in a mode's alpha
+    coefs = []
+    intercept = []
     for result, s, u in zip(results, sigma, used):
-        coefs, intercept, _ = result
+        c, i, _ = result
         # Modes that were not fitted in this session have no estimate (NaN)
         scale = np.divide(
             group_sigma, s, out=np.full_like(group_sigma, np.nan), where=u
         )
-        scale = scale.reshape((-1,) + (1,) * (coefs.ndim - 1))
-        coefs = (coefs * scale).astype(coefs.dtype)
-        Pj.append([coefs, [intercept] * coefs.shape[0]])
-    Pj = np.array(Pj)
+        scale = scale.reshape((-1,) + (1,) * (c.ndim - 1))
+        coefs.append((c * scale).astype(c.dtype))
+        intercept.append(i)
 
-    # Optional outputs
-    extra = []
-    if return_weights:
-        extra.append(w)
-    if return_sigma:
-        extra.append(group_sigma)
-
-    if not calc_coh:
-        if not return_coef_int:
-            # Sum coefficients and intercept
-            Pj = np.sum(Pj, axis=1)
-
-        if not keepdims:
-            Pj = np.squeeze(Pj)
-
-        return (f, Pj, *extra)
-
-    # Number of channels and frequency bins
-    n_channels = data[0].shape[1]
-    n_modes = alpha[0].shape[1]
-    n_freq = Pj.shape[-1]
-
-    # Indices of the upper triangle of an n_channels by n_channels array
-    m, n = np.triu_indices(n_channels)
-
-    # Number of arrays
-    n_sessions = len(data)
-
-    # Create a n_channels by n_channels array
-    P = np.empty(
-        [n_sessions, 2, n_modes, n_channels, n_channels, n_freq],
-        dtype=np.complex64,
+    settings = {
+        "window_length": spectrogram.window_length,
+        "step_size": spectrogram.step_size,
+        "n_sub_windows": n_sub_windows,
+        "frequency_range": frequency_range,
+        "standardize": standardize,
+        "mixture": mixture,
+    }
+    return RegressionSpectra(
+        frequencies=spectrogram.frequencies,
+        arrays={
+            "coefs": np.array(coefs),
+            "intercept": np.array(intercept),
+            "sigma": group_sigma,
+        },
+        n_channels=data[0].shape[1],
+        weights=w,
+        sampling_frequency=sampling_frequency,
+        method="regression",
+        settings=settings,
+        has_cross_spectra=cross_spectra,
+        legacy=legacy,
     )
-    for i in range(n_sessions):
-        for j in range(2):  # j=0 is the coefficients and j=1 is the intercepts
-            P[i, j][:, m, n] = Pj[i, j]
-            P[i, j][:, n, m] = np.conj(Pj[i, j])
-
-    # PSDs and coherences for each mode
-    psd = np.empty(
-        [n_sessions, 2, n_modes, n_channels, n_freq],
-        dtype=np.float32,
-    )
-    coh = np.empty(
-        [n_sessions, n_modes, n_channels, n_channels, n_freq],
-        dtype=np.float32,
-    )
-    for i in range(n_sessions):
-        # PSDs
-        p = P[i, :, :, range(n_channels), range(n_channels)].real
-        psd[i] = np.rollaxis(p, axis=0, start=3)
-
-        # Coherence: change in the cross spectrum in the direction (phase) of
-        # the static cross spectrum, normalized by the static power
-        coefs, intercept = P[i, 0], P[i, 1]
-        pxx = intercept[:, range(n_channels), range(n_channels)].real
-        norm = np.sqrt(pxx[:, :, np.newaxis] * pxx[:, np.newaxis, :])
-        abs_intercept = np.abs(intercept)
-        phase = np.divide(
-            intercept,
-            abs_intercept,
-            out=np.zeros_like(intercept),
-            where=abs_intercept > 0,
-        )
-        coh[i] = np.real(coefs * np.conj(phase)) / norm
-
-    if not return_coef_int:
-        # Sum coefficients and intercept
-        psd = np.sum(psd, axis=1)
-
-    if not keepdims:
-        # Remove any axes that are of length 1
-        psd = np.squeeze(psd)
-        coh = np.squeeze(coh)
-
-    return (f, psd, coh, *extra)
 
 
 def coherence_spectra(cpsd: np.ndarray, keepdims: bool = False) -> np.ndarray:
@@ -1176,9 +1864,6 @@ class _Spectrogram:
         Minimum and maximum frequency to keep.
     calc_cpsd : bool
         Should we calculate cross spectra?
-    conj_first : bool
-        Cross spectra are :code:`conj(X_i) X_j` if :code:`True`, otherwise
-        :code:`X_i conj(X_j)`.
     """
 
     sampling_frequency: float
@@ -1190,7 +1875,6 @@ class _Spectrogram:
     scale: float
     frequency_range: List
     calc_cpsd: bool
-    conj_first: bool
 
     @classmethod
     def create(
@@ -1243,7 +1927,6 @@ class _Spectrogram:
             tapers = signal.get_window("hann", sub_length)[np.newaxis]
             nfft = max(256, sub_length)
             scale = 2 / (sampling_frequency * np.sum(tapers**2))
-            conj_first = False
         elif method == "multitaper":
             tapers = signal.windows.dpss(
                 sub_length, NW=time_half_bandwidth, Kmax=n_tapers
@@ -1251,7 +1934,6 @@ class _Spectrogram:
             tapers = np.atleast_2d(tapers)
             nfft = sub_length
             scale = 2 / sampling_frequency
-            conj_first = True
         else:
             raise ValueError(f"method must be 'welch' or 'multitaper', got '{method}'.")
 
@@ -1265,7 +1947,6 @@ class _Spectrogram:
             scale=scale,
             frequency_range=frequency_range,
             calc_cpsd=calc_cpsd,
-            conj_first=conj_first,
         )
 
     @property
@@ -1381,11 +2062,9 @@ class _Spectrogram:
             n_segments = X.shape[2]
             if self.calc_cpsd:
                 # Cross spectra averaged over sub-windows and tapers,
-                # G[c, d] = mean_s X_c conj(X_d)
+                # G[c, d] = mean_s conj(X_c) X_d
                 X = np.moveaxis(X, -1, 1)
-                G = X @ np.conj(np.swapaxes(X, -1, -2))
-                if self.conj_first:
-                    G = np.conj(G)
+                G = np.conj(X) @ np.swapaxes(X, -1, -2)
                 P = np.moveaxis(G[..., m, n], 1, -1) / n_segments
                 yield (P * self.scale).astype(np.complex64)
             else:
@@ -1423,9 +2102,8 @@ class _Spectrogram:
                 total = total + np.sum(X.real**2 + X.imag**2, axis=(0, 2))
 
         if self.calc_cpsd:
-            # total[f] = X^H X, i.e. total[f, c, d] = sum conj(X_c) X_d
-            G = total if self.conj_first else np.conj(total)
-            P = np.moveaxis(G[:, m, n], 0, -1)
+            # total[f, c, d] = sum conj(X_c) X_d
+            P = np.moveaxis(total[:, m, n], 0, -1)
         else:
             P = total
         return P * self.scale / n_terms
@@ -1498,30 +2176,26 @@ def _state_spectra(
     data: Union[np.ndarray, list],
     sampling_frequency: float,
     alpha: Optional[Union[np.ndarray, list]],
-    window_length: Optional[int],
+    window_length: int,
     step_size: int,
     frequency_range: Optional[List],
     standardize: bool,
     averaging: str,
-    calc_cpsd: bool,
-    calc_coh: bool,
-    return_weights: bool,
-    keepdims: bool,
+    cross_spectra: bool,
     n_jobs: int,
+    legacy: Optional[dict] = None,
     time_half_bandwidth: float = 4,
     n_tapers: int = 7,
-):
+) -> Union["Spectra", "StateSpectra"]:
     """Calculate spectra for each state with Welch's method or a multitaper.
 
     See :func:`welch_spectra` and :func:`multitaper_spectra`.
     """
     data, alpha = _validate_data_alpha(data, alpha)
+    static = alpha[0] is None
 
     if frequency_range is None:
         frequency_range = [0, sampling_frequency / 2]
-
-    if calc_cpsd:
-        calc_coh = False
 
     spectrogram = _Spectrogram.create(
         method=method,
@@ -1529,7 +2203,7 @@ def _state_spectra(
         window_length=window_length,
         step_size=step_size,
         frequency_range=frequency_range,
-        calc_cpsd=calc_cpsd or calc_coh,
+        calc_cpsd=cross_spectra,
         time_half_bandwidth=time_half_bandwidth,
         n_tapers=n_tapers,
     )
@@ -1541,8 +2215,6 @@ def _state_spectra(
             "spectrogram": spectrogram,
             "standardize": standardize,
             "averaging": averaging,
-            "calc_cpsd": calc_cpsd,
-            "calc_coh": calc_coh,
         }
         for d, a in zip(data, alpha)
     ]
@@ -1554,24 +2226,46 @@ def _state_spectra(
         argument_type="kwargs",
         label="session",
     )
+    spectra = np.array([result[0] for result in results])
+    fractional_occupancies = np.array([result[1] for result in results])
 
-    f = spectrogram.frequencies
-    psd = [result[0] for result in results]
-    if calc_coh:
-        coh = [result[1] for result in results]
+    inactive = np.argwhere(fractional_occupancies == 0)
+    if len(inactive) > 0:
+        _logger.warning(
+            "Some states are never active, their spectra are NaN "
+            f"(session, state): {inactive.tolist()}."
+        )
 
-    if not keepdims:
-        # Remove any axes that are of length 1
-        psd = np.squeeze(psd)
-        if calc_coh:
-            coh = np.squeeze(coh)
+    settings = {
+        "window_length": spectrogram.window_length,
+        "step_size": spectrogram.step_size,
+        "frequency_range": frequency_range,
+        "standardize": standardize,
+        "averaging": averaging,
+    }
+    if method == "multitaper":
+        settings["time_half_bandwidth"] = time_half_bandwidth
+        settings["n_tapers"] = n_tapers
 
-    outputs = [f, psd]
-    if calc_coh:
-        outputs.append(coh)
-    if return_weights:
-        outputs.append(_session_weights(data))
-    return tuple(outputs)
+    common = dict(
+        frequencies=spectrogram.frequencies,
+        n_channels=data[0].shape[1],
+        weights=_session_weights(data),
+        sampling_frequency=sampling_frequency,
+        method=method,
+        settings=settings,
+        has_cross_spectra=cross_spectra,
+        legacy=legacy,
+    )
+    if static:
+        return Spectra(arrays={"spectra": spectra[:, 0]}, **common)
+    return StateSpectra(
+        arrays={
+            "spectra": spectra,
+            "fractional_occupancies": fractional_occupancies,
+        },
+        **common,
+    )
 
 
 def _state_spectra_session(
@@ -1580,9 +2274,7 @@ def _state_spectra_session(
     spectrogram: _Spectrogram,
     standardize: bool,
     averaging: str,
-    calc_cpsd: bool,
-    calc_coh: bool,
-):
+) -> Tuple[np.ndarray, np.ndarray]:
     """Calculate spectra for each state for a single session.
 
     Parameters
@@ -1599,44 +2291,41 @@ def _state_spectra_session(
     averaging : str
         Method used to average periodograms: :code:`'mean'` or
         :code:`'median'`.
-    calc_cpsd : bool
-        Should we return the cross spectra for :code:`psd`?
-    calc_coh : bool
-        Should we calculate the coherence between channels?
 
     Returns
     -------
-    psd : np.ndarray
-        Power spectra. Shape is (n_states, n_channels, n_freq) if
-        :code:`calc_cpsd=False`, otherwise (n_states, n_channels, n_channels,
-        n_freq).
-    coh : np.ndarray
-        Coherence. Shape is (n_states, n_channels, n_channels, n_freq).
-        Only returned if :code:`calc_coh=True`.
+    spectra : np.ndarray
+        Cross spectra (upper triangle) or PSDs for each state. NaN for states
+        that are never active. Shape is (n_states, n_channels * (n_channels +
+        1) / 2, n_freq) if :code:`spectrogram.calc_cpsd=True`, otherwise
+        (n_states, n_channels, n_freq).
+    fractional_occupancies : np.ndarray
+        Mean of alpha for each state, normalized to sum to one.
+        Shape is (n_states,).
     """
     if averaging not in ["mean", "median"]:
         raise ValueError(f"averaging must be 'mean' or 'median', got '{averaging}'.")
 
-    n_samples, n_channels = data.shape
-
+    n_samples = data.shape[0]
     if alpha is None:
         alpha = np.ones([n_samples, 1], dtype=np.float32)
-    n_states = alpha.shape[-1]
-
-    # Indices for the upper triangle of a channels by channels matrix
-    m, n = np.triu_indices(n_channels)
 
     # Standardize before calculating spectra
     if standardize:
         data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 
-    # Rescale the PSD to account for how much time each state was active
+    # Rescale the spectra to account for how much time each state was active
     sum_alpha2 = np.sum(alpha**2, axis=0)
-    scaling = n_samples / sum_alpha2
+    scaling = np.divide(
+        n_samples,
+        sum_alpha2,
+        out=np.full_like(sum_alpha2, np.nan),
+        where=sum_alpha2 > 0,
+    )
+    dtype = np.complex64 if spectrogram.calc_cpsd else np.float32
 
-    psd = []
-    coh = []
-    for i in range(n_states):
+    spectra = []
+    for i in range(alpha.shape[1]):
         # Spectrogram of this state's data averaged over windows
         x = data * alpha[:, i][..., np.newaxis]
         if averaging == "median":
@@ -1649,33 +2338,11 @@ def _state_spectra_session(
             p /= bias
         else:
             p = spectrogram.mean(x)
-        p = (p * scaling[i]).astype(
-            np.complex64 if spectrogram.calc_cpsd else np.float32
-        )
-        n_freq = p.shape[-1]
+        spectra.append((p * scaling[i]).astype(dtype))
 
-        if calc_coh or calc_cpsd:
-            # Create a channels by channels matrix for the cross spectra
-            cpsd = np.empty([n_channels, n_channels, n_freq], dtype=np.complex64)
-            cpsd[m, n] = p
-            cpsd[n, m] = np.conj(p)
-
-        if calc_coh:
-            psd.append(cpsd[range(n_channels), range(n_channels)].real)
-            coh.append(coherence_spectra(cpsd))
-        elif calc_cpsd:
-            psd.append(cpsd)
-        else:
-            psd.append(p)
-
-    psd = np.array(psd)
-    if np.isnan(psd).any():
-        _logger.warning("PSD contains NaN values.")
-        psd = np.nan_to_num(psd)  # zero out nan values
-
-    if calc_coh:
-        return psd, np.array(coh)
-    return (psd,)
+    fractional_occupancies = np.mean(alpha, axis=0)
+    fractional_occupancies /= np.sum(fractional_occupancies)
+    return np.array(spectra), fractional_occupancies
 
 
 def _regression_spectra_session(

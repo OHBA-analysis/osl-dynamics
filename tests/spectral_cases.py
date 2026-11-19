@@ -155,7 +155,7 @@ def _regression_cases():
             **common,
         ),
         "regression/mixture_defaults": lambda: spectral.regression_spectra(
-            data, alpha_mix, fs, window_length=200, step_size=20
+            data, alpha_mix, fs, window_length=200, step_size=20, n_sub_windows=1
         ),
         "regression/not_mixture": lambda: spectral.regression_spectra(
             data,

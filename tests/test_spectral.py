@@ -24,6 +24,7 @@ def _reference_outputs(references, name):
     return outputs
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 @pytest.mark.parametrize("name", list(CASES))
 def test_matches_reference(name, references):
     expected = _reference_outputs(references, name)
