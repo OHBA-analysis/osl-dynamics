@@ -376,3 +376,50 @@ def test_plot_psd_labels(sim):
     assert [t.get_text() for t in ax.get_legend().get_texts()] == ["State 1"]
     _, ax = s.plot_psd(values="static_psd")
     assert [t.get_text() for t in ax.get_legend().get_texts()] == ["Static"]
+
+
+def test_decompose_with_inactive_states_and_regression(sim, regression):
+    data, _, _, alpha_missing = sim
+    s = spectral.multitaper_spectra(data, FS, alpha=alpha_missing)
+    assert s.decompose(2).shape == (2, len(s.frequencies))
+    assert s.group_average().decompose(2).shape == (2, len(s.frequencies))
+    assert regression.decompose(2).shape == (2, len(regression.frequencies))
+
+
+def test_downsampled_data_object(sim):
+    from osl_dynamics.data import Data
+
+    data, _, alpha_hmm, _ = sim
+    d = Data([x.copy() for x in data], sampling_frequency=FS)
+    d.downsample(freq=50)
+    alpha = [a[: len(x)] for a, x in zip(alpha_hmm, d.arrays)]
+    with pytest.raises(ValueError, match="downsampling"):
+        spectral.multitaper_spectra(d, alpha=alpha)
+
+
+def test_errors(sim):
+    data, _, alpha_hmm, _ = sim
+    with pytest.raises(ValueError, match="state spectra"):
+        static.welch_spectra(data, FS).plot_psd(static=True)
+    with pytest.raises(TypeError, match="multiple values"):
+        spectral.welch_spectra(data, FS, alpha_hmm, 400, window_length=100)
+    with pytest.raises(ValueError, match="No frequencies"):
+        static.welch_spectra(data, FS).power_maps(bands=[[1, 4], [60, 70]])
+
+
+def test_single_bin_band(sim):
+    data, _, _, _ = sim
+    s = static.welch_spectra(data, FS)
+    f = s.frequencies
+    p = s.power_maps(frequency_range=[f[10], f[10]])
+    np.testing.assert_allclose(p, s.psd[..., 10])
+
+
+def test_regression_constant_session(sim):
+    data, alpha_mix, _, _ = sim
+    alpha = [alpha_mix[0], np.full_like(alpha_mix[1], 1 / N_STATES)]
+    s = spectral.regression_spectra(
+        data, alpha, FS, window_length=200, step_size=10, n_sub_windows=4
+    )
+    assert np.all(np.isnan(s.psd_coefs[1]))
+    assert not np.any(np.isnan(s.psd_coefs[0]))

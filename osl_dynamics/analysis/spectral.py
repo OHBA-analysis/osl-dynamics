@@ -60,6 +60,12 @@ def _deprecate_positional(n_positional: int) -> Callable:
         def wrapper(*args, **kwargs):
             if len(args) > n_positional:
                 extra = names[n_positional : len(args)]
+                for name in extra:
+                    if name in kwargs:
+                        raise TypeError(
+                            f"{fn.__name__}() got multiple values for argument "
+                            f"'{name}'"
+                        )
                 warnings.warn(
                     f"Passing {', '.join(extra)} to {fn.__name__} positionally is "
                     "deprecated. Pass them as keyword arguments.",
@@ -107,10 +113,10 @@ def _legacy_flags(
         single = len(passed) == 1
         warnings.warn(
             f"{', '.join(passed)} {'is' if single else 'are'} deprecated in "
-            f"{function}: {'it only changes' if single else 'they only change'} "
-            "the tuple returned when the result is unpacked. Use the attributes "
-            "of the returned object instead (and cross_spectra=False to skip the "
-            "cross spectra).",
+            f"{function}: {'it sets' if single else 'they set'} the tuple "
+            "returned when the result is unpacked. Use the attributes of the "
+            "returned object instead, and cross_spectra=False to only calculate "
+            "the PSDs.",
             DeprecationWarning,
             stacklevel=4,
         )
@@ -301,10 +307,17 @@ def _frequency_weights(
         raise ValueError(
             f"bands must have shape (n_bands, 2) or (n_components, {n_freq})."
         )
-    weights = np.zeros([len(bands), n_freq])
-    for i, band in enumerate(bands):
-        min_arg, max_arg = get_frequency_args_range(frequencies, band)
-        weights[i, min_arg : max_arg + 1] = 1
+    weights = np.array(
+        [(frequencies >= low) & (frequencies <= high) for low, high in bands],
+        dtype=np.float64,
+    )
+    empty = np.flatnonzero(np.sum(weights, axis=1) == 0)
+    if len(empty) > 0:
+        raise ValueError(
+            f"No frequencies in band(s) {bands[empty].tolist()}. The frequencies "
+            f"are {frequencies[0]:g}-{frequencies[-1]:g} Hz in steps of "
+            f"{frequencies[1] - frequencies[0]:g} Hz."
+        )
     if method == "mean":
         weights /= np.sum(weights, axis=1, keepdims=True)
     elif method == "integral":
@@ -533,7 +546,8 @@ class Spectra:
             Which PSDs to use. Defaults to the first of: :code:`'psd_coefs'`
             (regression spectra), :code:`'psd_change'` (state spectra, the
             change from the static PSD), :code:`'psd'` (static spectra).
-            :code:`'psd'` and :code:`'static_psd'` can also be passed.
+            State and regression spectra also accept :code:`'psd'` and
+            :code:`'static_psd'`.
         bands : list or np.ndarray, optional
             Frequency ranges, e.g. :code:`[[1, 4], [4, 8]]`, or spectral
             components from :meth:`decompose` with shape (n_components,
@@ -576,8 +590,8 @@ class Spectra:
             :code:`'coherence_coefs'` (regression spectra),
             :code:`'coherence_change'` (state spectra, the change from the
             static coherence), :code:`'coherence'` (static spectra).
-            :code:`'coherence'` and :code:`'static_coherence'` can also be
-            passed.
+            State and regression spectra also accept :code:`'coherence'` and
+            :code:`'static_coherence'`.
         bands : list or np.ndarray, optional
             Frequency ranges, e.g. :code:`[[1, 4], [4, 8]]`, or spectral
             components from :meth:`decompose` with shape (n_components,
@@ -612,8 +626,10 @@ class Spectra:
             c = c[..., m, n]
         return np.squeeze(c, axis=self._band_axis) if single else c
 
+    _decompose_values = "coherence"
+
     def decompose(
-        self, n_components: int, values: str = "coherence", **kwargs
+        self, n_components: int, values: Optional[str] = None, **kwargs
     ) -> np.ndarray:
         """Spectral components from non-negative matrix factorization.
 
@@ -624,7 +640,9 @@ class Spectra:
         n_components : int
             Number of spectral components.
         values : str, optional
-            Which (non-negative) coherences to decompose.
+            Which (non-negative) coherences to decompose. Defaults to
+            :code:`'coherence'`, or :code:`'static_coherence'` for regression
+            spectra.
         **kwargs
             Keyword arguments for :func:`decompose_spectra`.
 
@@ -635,6 +653,7 @@ class Spectra:
             :meth:`power_maps` and :meth:`coherence_networks`. Shape is
             (n_components, n_freq).
         """
+        values = self._decompose_values if values is None else values
         _, coh = self._values(values, "coherence")
         return decompose_spectra(coh, n_components=n_components, **kwargs)
 
@@ -682,6 +701,9 @@ class Spectra:
             :code:`None`.
         """
         from osl_dynamics.utils import plotting
+
+        if static and not isinstance(self, StateSpectra):
+            raise ValueError("static=True can only be used for state spectra.")
 
         spectra = self if self.is_group else self.group_average()
         name, psd = spectra._values(values, "psd")
@@ -1005,6 +1027,7 @@ class RegressionSpectra(StateSpectra):
     """
 
     _session_arrays = ("coefs", "intercept", "fractional_occupancies")
+    _decompose_values = "static_coherence"
     _psd_values = ("psd_coefs", "psd_change", "psd", "static_psd")
     _coherence_values = (
         "coherence_coefs",
@@ -1936,6 +1959,9 @@ def decompose_spectra(
     # and only keep the upper triangle
     coherences = coherences[:, :, i, j].reshape(-1, n_freq)
 
+    # Remove spectra with NaN values (e.g. states that are never active)
+    coherences = coherences[~np.any(np.isnan(coherences), axis=1)]
+
     # Perform non-negative matrix factorization
     _, components, _ = non_negative_factorization(
         coherences,
@@ -2212,6 +2238,14 @@ def _resolve_data(
         )
 
     offset = getattr(data, "n_embeddings", 1) // 2 + getattr(data, "n_window", 1) // 2
+    if any(abs(len(x) - len(y) - 2 * offset) > 2 for x, y in zip(arrays, data.arrays)):
+        raise ValueError(
+            "The Data object was prepared with a method that changes the number "
+            "of samples other than time-delay embedding or a sliding window "
+            "(e.g. downsampling), so it cannot be aligned to alpha. Pass the "
+            "time series aligned to alpha instead."
+        )
+
     time_series = []
     for i, (x, a) in enumerate(zip(arrays, alpha)):
         if offset + len(a) > len(x):
@@ -2915,7 +2949,7 @@ def _regress_spectrogram(
     sigma = np.std(a, axis=0)
 
     # Modes whose time course barely varies are not fitted (NaN coefficients)
-    used = sigma > 1e-4 * np.max(sigma)
+    used = sigma > max(1e-4 * np.max(sigma), 1e-8)
     sigma[~used] = 0
 
     if mixture:

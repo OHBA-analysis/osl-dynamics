@@ -183,7 +183,7 @@ Power maps and coherence networks
     c = group.coherence_networks(percentile=97)  # (states, parcels, parcels)
     connectivity.save(c, parcellation_file=parcellation_file, filename="coh_.png")
 
-- **Power maps.** The change in power from the static power averaged over frequency, as a fraction of each parcel's variance (with the default :code:`standardize=True`). Red is an increase and blue a decrease. Use the change from the static power, not :math:`P_j`, to compare states/modes.
+- **Power maps.** The change in power from the static power, averaged over frequency (:code:`method="integral"` gives the change in variance). Red is an increase and blue a decrease. Use the change from the static power, not :math:`P_j`, to compare states/modes.
 - **Coherence networks.** The edges with the largest changes in coherence, increases (red) and decreases (blue).
 
 Pass :code:`values` to use another quantity, e.g. :code:`values="psd"` or :code:`values="coherence"`.
