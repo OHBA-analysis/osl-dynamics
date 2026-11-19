@@ -7,7 +7,7 @@ cortical surface, either with HCP Workbench (see
 triangles returned by :py:func:`get_surf`.
 
 These files are downloaded on first use, see
-:py:mod:`osl_dynamics.files._fetch`.
+:py:func:`~osl_dynamics.files.fetch_file`.
 """
 
 import nibabel as nib

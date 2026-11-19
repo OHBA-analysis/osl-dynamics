@@ -1,7 +1,7 @@
 """Volumetric parcellations.
 
 These files are downloaded on first use, see
-:py:mod:`osl_dynamics.files._fetch`. For more information see
+:py:func:`~osl_dynamics.files.fetch_file`. For more information see
 :ref:`parcellations`.
 """
 

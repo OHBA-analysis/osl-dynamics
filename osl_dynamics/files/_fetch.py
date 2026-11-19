@@ -144,7 +144,15 @@ def _pooch(refresh: bool = False):
 
 
 def fetch_file(path: str) -> Path:
-    """Local path to one data file, downloading it if it isn't cached.
+    """Local path to a file in osl-files, downloading it if it isn't cached.
+
+    Any file listed in the osl-files `registry
+    <https://github.com/OHBA-analysis/osl-files/blob/main/registry.txt>`_ can
+    be fetched, including ones osl-dynamics does not use itself.
+
+    Files are cached in :code:`~/Library/Caches/osl-files` on macOS and
+    :code:`~/.cache/osl-files` on Linux. Set the :code:`OSL_DATA` environment
+    variable to cache them somewhere else.
 
     Parameters
     ----------
@@ -160,16 +168,22 @@ def fetch_file(path: str) -> Path:
     Raises
     ------
     FileNotFoundError
-        If osl-dynamics does not provide a file with that name.
+        If osl-files has no file at that path.
     DownloadError
         If the file is not cached and could not be downloaded.
+
+    Examples
+    --------
+    >>> from osl_dynamics.files import fetch_file
+    >>> fetch_file("parcellation/atlas-AAL_nparc-78_space-MNI_res-8x8x8.nii.gz")
     """
     path = str(path)
     for refresh in (False, True):
         pup = _pooch(refresh)
         if path not in pup.registry:
             raise FileNotFoundError(
-                f"'{path}' is not a data file provided by osl-dynamics."
+                f"'{path}' is not a file in osl-files. The files are listed in "
+                f"{REGISTRY_URL}."
             )
         try:
             # pooch creates the directory without exist_ok, which fails when
@@ -202,7 +216,7 @@ def fetch_file(path: str) -> Path:
 
 
 def fetch_directory(subdirectory: str) -> Path:
-    """Local path to a directory of data files, downloading any not cached.
+    """Local path to a directory in osl-files, downloading any files not cached.
 
     Parameters
     ----------
@@ -213,12 +227,25 @@ def fetch_directory(subdirectory: str) -> Path:
     -------
     path : pathlib.Path
         Full path to the cached directory.
+
+    Raises
+    ------
+    FileNotFoundError
+        If osl-files has no files in that directory.
+    DownloadError
+        If a file is not cached and could not be downloaded.
+
+    Examples
+    --------
+    >>> from osl_dynamics.files import fetch_directory
+    >>> fetch_directory("parcellation")
     """
     prefix = f"{subdirectory}/"
     paths = [path for path in _pooch().registry if path.startswith(prefix)]
     if not paths:
         raise FileNotFoundError(
-            f"'{subdirectory}' is not a data directory provided by osl-dynamics."
+            f"'{subdirectory}' is not a directory in osl-files. The files are "
+            f"listed in {REGISTRY_URL}."
         )
     for path in paths:
         fetch_file(path)
@@ -226,12 +253,20 @@ def fetch_directory(subdirectory: str) -> Path:
 
 
 def fetch_all() -> Path:
-    """Downloads every data file, so they are available offline later.
+    """Downloads every file in osl-files, so they are available offline later.
+
+    Prints each file as it is fetched. The same as running
+    :code:`osl-dynamics-download-data` on the command line.
 
     Returns
     -------
     path : pathlib.Path
         The cache directory the files were downloaded to.
+
+    Raises
+    ------
+    DownloadError
+        If a file is not cached and could not be downloaded.
     """
     # Start from the current registry, not a cached copy up to an hour old
     paths = sorted(_pooch(refresh=True).registry)

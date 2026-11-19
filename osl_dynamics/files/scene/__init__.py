@@ -1,7 +1,7 @@
 """HCP Workbench scene files.
 
 These files are downloaded on first use, see
-:py:mod:`osl_dynamics.files._fetch`.
+:py:func:`~osl_dynamics.files.fetch_file`.
 """
 
 from osl_dynamics.files import _fetch

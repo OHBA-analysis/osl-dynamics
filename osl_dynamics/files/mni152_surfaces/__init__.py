@@ -1,7 +1,7 @@
 """MNI152 standard brain surfaces.
 
 Pre-extracted surfaces from the MNI152 T1 1mm brain using FSL BET. These files
-are downloaded on first use, see :py:mod:`osl_dynamics.files._fetch`.
+are downloaded on first use, see :py:func:`~osl_dynamics.files.fetch_file`.
 
 Files
 -----

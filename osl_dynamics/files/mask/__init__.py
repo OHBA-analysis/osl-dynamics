@@ -6,7 +6,7 @@
 - MNI152_T1_8mm_brain.nii.gz
 
 These files are downloaded on first use, see
-:py:mod:`osl_dynamics.files._fetch`.
+:py:func:`~osl_dynamics.files.fetch_file`.
 
 The masks define the MNI voxel grid :func:`osl_dynamics.meeg.source_recon.apply_lcmv_beamformer` outputs voxel data on. Masks are not needed to plot brain maps, parcel values are plotted on the voxel grid of the parcellation file.
 """
