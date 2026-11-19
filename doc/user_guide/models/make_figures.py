@@ -23,6 +23,7 @@ from matplotlib.patches import Circle, FancyArrowPatch, Rectangle
 from matplotlib.path import Path as MplPath
 
 from osl_dynamics.analysis import post_hoc, spectral
+from osl_dynamics.simulation import OscillatoryMVN
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "images"
 
@@ -338,15 +339,20 @@ def softmax(x):
     return e / e.sum(axis=1, keepdims=True)
 
 
-def oscillation(n_samples, frequency, fs, rng, damping=0.99):
-    """AR(2) process with a spectral peak at the given frequency."""
-    a1 = 2 * damping * np.cos(2 * np.pi * frequency / fs)
-    a2 = -(damping**2)
-    x = np.zeros(n_samples)
-    e = rng.standard_normal(n_samples)
-    for i in range(2, n_samples):
-        x[i] = a1 * x[i - 1] + a2 * x[i - 2] + e[i]
-    return x / x.std()
+def oscillations(weights, frequencies, amplitudes, peak_widths, fs, seed):
+    """One channel with an oscillation for each column of weights.
+
+    The power of each oscillation is proportional to its weight (see
+    OscillatoryMVN).
+    """
+    np.random.seed(seed)
+    obs_model = OscillatoryMVN(
+        frequencies=frequencies,
+        sampling_frequency=fs,
+        covariances=np.square(amplitudes)[:, None, None],
+        peak_width=peak_widths,
+    )
+    return obs_model.simulate_data(weights)[:, 0].astype(np.float64)
 
 
 def example_covariances():
@@ -1022,13 +1028,16 @@ def hmm_spectra(fmt):
     n_samples = 300 * fs
     trans_prob = np.full((3, 3), 0.0075) + np.eye(3) * 0.9775
     stc = markov_chain(trans_prob, n_samples, rng)
-    states = stc.argmax(axis=1)
 
-    peaks = [10, 20, 5]
-    background = oscillation(n_samples, 1, fs, rng, damping=0.9)
-    x = 0.6 * background
-    for k, f0 in enumerate(peaks):
-        x = x + (states == k) * 1.2 * oscillation(n_samples, f0, fs, rng, damping=0.985)
+    # An oscillation in each state and a broad background (always on)
+    x = oscillations(
+        np.column_stack([stc, np.ones(n_samples)]),
+        frequencies=[10, 20, 5, 1],
+        amplitudes=[1.2, 1.2, 1.2, 0.6],
+        peak_widths=[1.2, 1.2, 1.2, 8.4],
+        fs=fs,
+        seed=RNG_SEED + 4,
+    )
 
     f, psd = spectral.multitaper_spectra(
         x[:, None],
@@ -1381,11 +1390,16 @@ def dynemo_regression_spectra(fmt):
     fs = 250
     n_samples = 300 * fs
     alpha = softmax(3 * smooth_noise(n_samples, 3, rng, int(0.4 * fs)))
-    peaks = [10, 20, 5]
-    x = 0.5 * oscillation(n_samples, 1, fs, rng, damping=0.9)
-    for j, f0 in enumerate(peaks):
-        # The power of each oscillation is proportional to the mixing coefficient
-        x = x + 1.5 * np.sqrt(alpha[:, j]) * oscillation(n_samples, f0, fs, rng, damping=0.985)
+    # The power of each oscillation is proportional to the mixing coefficient,
+    # plus a broad background (always on)
+    x = oscillations(
+        np.column_stack([alpha, np.ones(n_samples)]),
+        frequencies=[10, 20, 5, 1],
+        amplitudes=[1.5, 1.5, 1.5, 0.5],
+        peak_widths=[1.2, 1.2, 1.2, 8.4],
+        fs=fs,
+        seed=RNG_SEED + 7,
+    )
 
     f, psd = spectral.regression_spectra(
         x[:, None],
