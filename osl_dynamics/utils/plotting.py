@@ -2526,9 +2526,8 @@ def plot_wavelet(
     sampling_frequency : float
         Sampling frequency in Hz.
     w : float, optional
-        :code:`w` parameter to pass to `scipy.signal.morlet2 
-        <https://docs.scipy.org/doc/scipy/reference/generated\
-        /scipy.signal.morlet2.html>`_.
+        Number of oscillations in the Gaussian envelope of the Morlet
+        wavelet. See :func:`osl_dynamics.analysis.spectral.wavelet`.
     standardize : bool, optional
         Should we standardize the data before calculating the wavelet?
     time_range : list, optional
