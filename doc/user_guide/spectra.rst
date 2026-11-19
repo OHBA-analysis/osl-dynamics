@@ -18,7 +18,7 @@ After training a model on time-delay embedded (TDE) data, we describe each state
      - :class:`~osl_dynamics.analysis.spectral.StateSpectra`: the spectrum of each state
    * - :func:`~osl_dynamics.analysis.static.welch_spectra`, :func:`~osl_dynamics.analysis.static.multitaper_spectra`
      - No model (static analysis)
-     - :class:`~osl_dynamics.analysis.spectral.Spectra`: the spectrum of each session
+     - :class:`~osl_dynamics.analysis.spectral.StaticSpectra`: the spectrum of each session
 
 For examples with real data, see the :doc:`HMM Multitaper Spectra </tutorials_build/4-1_hmm_multitaper_spectra>` and :doc:`HMM Plotting MEG Networks </tutorials_build/4-2_hmm_plotting_meg_networks>` tutorials (multitaper), and the :doc:`DyNeMo Regression Spectra </tutorials_build/5-1_dynemo_regression_spectra>` and :doc:`DyNeMo Plotting Networks </tutorials_build/5-2_dynemo_plotting_networks>` tutorials (regression).
 
@@ -73,7 +73,7 @@ Each quantity is an attribute of the result. The first axis is the session.
      - :code:`sigma`
      - (modes,)
 
-The frequency axis is :code:`frequencies` and the weight of each session in a group average is :code:`weights`. :code:`cross_spectra` gives the complex cross spectra, :math:`\langle \bar{X}_x X_y \rangle`.
+The frequency axis is :code:`frequencies` and the weight of each session in a group average is :code:`session_weights`. :code:`cross_spectra` gives the complex cross spectra, :math:`\langle \bar{X}_x X_y \rangle`.
 
 Regression spectra
 ------------------
@@ -151,7 +151,7 @@ Plot the change from the static spectrum: the coefficients for regression spectr
 
     group = spectra.group_average()
 
-:meth:`~osl_dynamics.analysis.spectral.Spectra.group_average` averages the cross spectra over sessions with :code:`weights` (the number of samples in each session), ignoring NaN values. The coherences are calculated from the group-averaged cross spectra.
+:meth:`~osl_dynamics.analysis.spectral.Spectra.group_average` averages the cross spectra over sessions with :code:`session_weights` (the number of samples in each session), ignoring NaN values. The coherences are calculated from the group-averaged cross spectra.
 
 PSDs
 ****

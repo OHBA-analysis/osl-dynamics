@@ -160,7 +160,7 @@ def welch_spectra(
     averaging: str = "mean",
     n_jobs: int = 1,
     cross_spectra: bool = True,
-) -> spectral.Spectra:
+) -> spectral.StaticSpectra:
     """Calculate static spectra using Welch's method.
 
     The scaling for the power spectra matches SciPy
@@ -195,7 +195,7 @@ def welch_spectra(
 
     Returns
     -------
-    spectra : osl_dynamics.analysis.spectral.Spectra
+    spectra : osl_dynamics.analysis.spectral.StaticSpectra
         Spectra for each session.
     """
     data, _, sampling_frequency = spectral._resolve_data(data, None, sampling_frequency)
@@ -232,7 +232,7 @@ def multitaper_spectra(
     n_jobs: int = 1,
     step_size: Optional[int] = None,
     cross_spectra: bool = True,
-) -> spectral.Spectra:
+) -> spectral.StaticSpectra:
     """Calculate static spectra using a multitaper.
 
     Parameters
@@ -268,7 +268,7 @@ def multitaper_spectra(
 
     Returns
     -------
-    spectra : osl_dynamics.analysis.spectral.Spectra
+    spectra : osl_dynamics.analysis.spectral.StaticSpectra
         Spectra for each session.
     """
     data, _, sampling_frequency = spectral._resolve_data(data, None, sampling_frequency)

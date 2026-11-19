@@ -101,10 +101,10 @@ print(spectra)
 print(spectra.frequencies.shape)
 print(spectra.psd.shape)
 print(spectra.coherence.shape)
-print(spectra.weights.shape)
+print(spectra.session_weights.shape)
 
 #%%
-# `frequencies` is the frequency axis. `psd` contains the PSDs and is (subjects, states, channels, frequencies) and `coherence` contains the pairwise coherences and is (subjects, states, channels, channels, frequencies). `weights` contains the weight of each subject in a group average (the number of samples in each subject divided by the total).
+# `frequencies` is the frequency axis. `psd` contains the PSDs and is (subjects, states, channels, frequencies) and `coherence` contains the pairwise coherences and is (subjects, states, channels, channels, frequencies). `session_weights` contains the weight of each subject in a group average (the number of samples in each subject divided by the total).
 #
 # The static PSD (`static_psd`) is the average of the state PSDs weighted by the fractional occupancy of each state, and `psd_change` is the change in each state's PSD from the static PSD. See the :doc:`Spectral Analysis user guide </user_guide/spectra>` for the other attributes.
 #

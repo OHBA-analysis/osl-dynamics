@@ -250,12 +250,10 @@ def _threshold_networks(c: np.ndarray, percentile: float) -> np.ndarray:
 
 
 class Spectra:
-    """Static power spectra and cross spectra.
+    """Power spectra and cross spectra.
 
-    Returned by :func:`osl_dynamics.analysis.static.welch_spectra`,
-    :func:`osl_dynamics.analysis.static.multitaper_spectra`, and by
-    :func:`welch_spectra` and :func:`multitaper_spectra` without
-    :code:`alpha`.
+    Base class of :class:`StaticSpectra`, :class:`StateSpectra` and
+    :class:`RegressionSpectra`. :meth:`load` loads any of them.
 
     The cross spectra are stored (as the upper triangle) and the PSDs and
     coherences are calculated from them. The first axis of each array is the
@@ -267,7 +265,7 @@ class Spectra:
     ----------
     frequencies : np.ndarray
         Frequency axis. Shape is (n_freq,).
-    weights : np.ndarray
+    session_weights : np.ndarray
         Weight of each session in a group average (the number of samples in
         a session divided by the total). Shape is (n_sessions,). :code:`None`
         for a group average.
@@ -288,7 +286,7 @@ class Spectra:
         frequencies: np.ndarray,
         arrays: dict,
         n_channels: int,
-        weights: Optional[np.ndarray],
+        session_weights: Optional[np.ndarray],
         sampling_frequency: float,
         method: str,
         settings: dict,
@@ -297,7 +295,9 @@ class Spectra:
         self.frequencies = np.asarray(frequencies)
         self._data = dict(arrays)
         self.n_channels = int(n_channels)
-        self.weights = None if weights is None else np.asarray(weights)
+        self.session_weights = (
+            None if session_weights is None else np.asarray(session_weights)
+        )
         self.sampling_frequency = sampling_frequency
         self.method = method
         self.settings = dict(settings)
@@ -308,12 +308,12 @@ class Spectra:
     @property
     def is_group(self) -> bool:
         """Is this a group average (no session axis)?"""
-        return self.weights is None
+        return self.session_weights is None
 
     @property
     def n_sessions(self) -> Optional[int]:
         """Number of sessions. :code:`None` for a group average."""
-        return None if self.is_group else len(self.weights)
+        return None if self.is_group else len(self.session_weights)
 
     @property
     def n_freq(self) -> int:
@@ -375,7 +375,7 @@ class Spectra:
         """Group average of the spectra.
 
         The cross spectra (or PSDs) are averaged over sessions with
-        :code:`weights`, ignoring NaN values. Coherences are calculated from
+        :code:`session_weights`, ignoring NaN values. Coherences are calculated from
         the group-averaged cross spectra.
 
         Returns
@@ -388,20 +388,20 @@ class Spectra:
             raise ValueError("The spectra are already a group average.")
         arrays = {
             name: (
-                _weighted_nanmean(value, self.weights)
+                _weighted_nanmean(value, self.session_weights)
                 if name in self._session_arrays
                 else value
             )
             for name, value in self._data.items()
         }
-        return self._new(arrays, weights=None)
+        return self._new(arrays, session_weights=None)
 
-    def _new(self, arrays: dict, weights: Optional[np.ndarray]) -> "Spectra":
+    def _new(self, arrays: dict, session_weights: Optional[np.ndarray]) -> "Spectra":
         return type(self)(
             frequencies=self.frequencies,
             arrays=arrays,
             n_channels=self.n_channels,
-            weights=weights,
+            session_weights=session_weights,
             sampling_frequency=self.sampling_frequency,
             method=self.method,
             settings=self.settings,
@@ -676,8 +676,8 @@ class Spectra:
             "has_cross_spectra": self.has_cross_spectra,
         }
         arrays = {f"data_{name}": value for name, value in self._data.items()}
-        if self.weights is not None:
-            arrays["weights"] = self.weights
+        if self.session_weights is not None:
+            arrays["session_weights"] = self.session_weights
         np.savez(
             filename,
             metadata=json.dumps(_to_json(metadata)),
@@ -707,13 +707,17 @@ class Spectra:
                 if key.startswith("data_")
             }
             frequencies = f["frequencies"]
-            weights = f["weights"] if "weights" in f.files else None
+            session_weights = (
+                f["session_weights"] if "session_weights" in f.files else None
+            )
 
         if metadata["format_version"] > _SPECTRA_FORMAT_VERSION:
             raise ValueError(
                 f"{filename} was saved with a newer version of osl-dynamics."
             )
-        classes = {c.__name__: c for c in (Spectra, StateSpectra, RegressionSpectra)}
+        classes = {
+            c.__name__: c for c in (StaticSpectra, StateSpectra, RegressionSpectra)
+        }
         spectra_cls = classes[metadata["class"]]
         if not issubclass(spectra_cls, cls):
             raise TypeError(
@@ -723,7 +727,7 @@ class Spectra:
             frequencies=frequencies,
             arrays=arrays,
             n_channels=metadata["n_channels"],
-            weights=weights,
+            session_weights=session_weights,
             sampling_frequency=metadata["sampling_frequency"],
             method=metadata["method"],
             settings=metadata["settings"],
@@ -742,6 +746,16 @@ class Spectra:
         parts.append(f"frequencies={f[0]:g}-{f[-1]:g} Hz ({len(f)})")
         parts.append(f"cross_spectra={self.has_cross_spectra}")
         return f"{type(self).__name__}({', '.join(parts)})"
+
+
+class StaticSpectra(Spectra):
+    """Static spectra of each session.
+
+    Returned by :func:`osl_dynamics.analysis.static.welch_spectra`,
+    :func:`osl_dynamics.analysis.static.multitaper_spectra`, and by
+    :func:`welch_spectra` and :func:`multitaper_spectra` without
+    :code:`alpha`. See :class:`Spectra` for the attributes.
+    """
 
 
 class StateSpectra(Spectra):
@@ -1050,7 +1064,7 @@ def welch_spectra(
     averaging: str = "mean",
     n_jobs: int = 1,
     cross_spectra: bool = True,
-) -> Union["Spectra", "StateSpectra"]:
+) -> Union["StaticSpectra", "StateSpectra"]:
     """Calculates spectra for inferred states using Welch's method.
 
     The scaling for the power spectra calculated by this function
@@ -1090,8 +1104,8 @@ def welch_spectra(
 
     Returns
     -------
-    spectra : StateSpectra or Spectra
-        Spectra for each session and state. :class:`Spectra` if
+    spectra : StateSpectra or StaticSpectra
+        Spectra for each session and state. :class:`StaticSpectra` if
         :code:`alpha` is not passed.
     """
     data, alpha, sampling_frequency = _resolve_data(data, alpha, sampling_frequency)
@@ -1129,7 +1143,7 @@ def multitaper_spectra(
     averaging: str = "mean",
     n_jobs: int = 1,
     cross_spectra: bool = True,
-) -> Union["Spectra", "StateSpectra"]:
+) -> Union["StaticSpectra", "StateSpectra"]:
     """Calculates spectra for inferred states using a multitaper.
 
     Parameters
@@ -1170,8 +1184,8 @@ def multitaper_spectra(
 
     Returns
     -------
-    spectra : StateSpectra or Spectra
-        Spectra for each session and state. :class:`Spectra` if
+    spectra : StateSpectra or StaticSpectra
+        Spectra for each session and state. :class:`StaticSpectra` if
         :code:`alpha` is not passed.
     """
     data, alpha, sampling_frequency = _resolve_data(data, alpha, sampling_frequency)
@@ -1387,7 +1401,7 @@ def regression_spectra(
             "fractional_occupancies": fractional_occupancies,
         },
         n_channels=data[0].shape[1],
-        weights=w,
+        session_weights=w,
         sampling_frequency=sampling_frequency,
         method="regression",
         settings=settings,
@@ -2385,7 +2399,7 @@ def _state_spectra(
     n_jobs: int,
     time_half_bandwidth: float = 4,
     n_tapers: int = 7,
-) -> Union["Spectra", "StateSpectra"]:
+) -> Union["StaticSpectra", "StateSpectra"]:
     """Calculate spectra for each state with Welch's method or a multitaper.
 
     See :func:`welch_spectra` and :func:`multitaper_spectra`.
@@ -2449,14 +2463,14 @@ def _state_spectra(
     common = dict(
         frequencies=spectrogram.frequencies,
         n_channels=data[0].shape[1],
-        weights=_session_weights(data),
+        session_weights=_session_weights(data),
         sampling_frequency=sampling_frequency,
         method=method,
         settings=settings,
         has_cross_spectra=cross_spectra,
     )
     if static:
-        return Spectra(arrays={"spectra": spectra[:, 0]}, **common)
+        return StaticSpectra(arrays={"spectra": spectra[:, 0]}, **common)
     return StateSpectra(
         arrays={
             "spectra": spectra,

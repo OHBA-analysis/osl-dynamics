@@ -33,7 +33,7 @@ print("frequencies.shape =", spectra.frequencies.shape)
 print("psd.shape =", spectra.psd.shape)
 print("coherence.shape =", spectra.coherence.shape)
 print("cross_spectra.shape =", spectra.cross_spectra.shape)
-print("weights.shape =", spectra.weights.shape)
+print("session_weights.shape =", spectra.session_weights.shape)
 print()
 
 # Static PSDs only

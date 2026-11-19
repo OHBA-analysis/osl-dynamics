@@ -79,7 +79,7 @@ spectra = static.welch_spectra(
 print(spectra)
 
 #%%
-# `spectra` is a :class:`Spectra <osl_dynamics.analysis.spectral.Spectra>` object. `spectra.frequencies` is the frequency axis of the power spectra in Hz and `spectra.psd` contains the power spectra. It also contains the coherence between channels (`spectra.coherence`).
+# `spectra` is a :class:`StaticSpectra <osl_dynamics.analysis.spectral.StaticSpectra>` object. `spectra.frequencies` is the frequency axis of the power spectra in Hz and `spectra.psd` contains the power spectra. It also contains the coherence between channels (`spectra.coherence`).
 #
 # Calculating power spectra can be time consuming. We will want to use the power spectra many times to make different plots. We don't want to have to calculate them repeatedly, so often it is convenient to save the spectra so we can load them later (instead of calculating them again). Let's save the spectra.
 

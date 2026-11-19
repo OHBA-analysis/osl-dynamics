@@ -106,7 +106,7 @@ print(spectra.frequencies.shape)
 print(spectra.static_psd.shape)
 print(spectra.psd_coefs.shape)
 print(spectra.coherence_coefs.shape)
-print(spectra.weights.shape)
+print(spectra.session_weights.shape)
 
 #%%
 # We can see:
@@ -115,7 +115,7 @@ print(spectra.weights.shape)
 # - `static_psd` is (subjects, channels, frequencies). It is the static (time-averaged) PSD, the intercept of the regression.
 # - `psd_coefs` is (subjects, modes, channels, frequencies). These are the regression coefficients: the change in the PSD from the static PSD for a one standard deviation increase in a mode's mixing coefficient. They are positive where a mode has more power than the static PSD and negative where it has less.
 # - `coherence_coefs` is (subjects, modes, channels, channels, frequencies). It is the change in the cross spectrum, normalized by the static power (change in coherence), for a one standard deviation increase in a mode's mixing coefficient. It includes changes in both coherence and power.
-# - `weights` contains the weight of each subject in a group average.
+# - `session_weights` contains the weight of each subject in a group average.
 #
 # The coefficients of every subject are scaled by the same standard deviation, so the subject-specific spectra can be averaged and compared. See the :doc:`Spectral Analysis </user_guide/spectra>` page of the User Guide for how to interpret these outputs and what to plot.
 #
