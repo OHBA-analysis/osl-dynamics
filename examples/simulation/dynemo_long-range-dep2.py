@@ -74,7 +74,7 @@ bottom_level_trans_probs = [
 
 sim = HierarchicalHMM_MVN(
     n_samples=25600,
-    n_modes=config.n_modes,
+    n_states=config.n_modes,
     n_channels=config.n_channels,
     top_level_hmm_type="hsmm",
     top_level_gamma_shape=1024,
@@ -122,7 +122,7 @@ print(f"Free energy: {free_energy}")
 # Inferred mode mixing factors and mode time course
 inf_alp = model.get_alpha(prediction_dataset)
 inf_stc = modes.argmax_time_courses(inf_alp)
-sim_bot_stc = sim.mode_time_course
+sim_bot_stc = sim.state_time_course
 sim_top_stc = sim.top_level_stc
 
 orders = modes.match_modes(sim_bot_stc, inf_stc, return_order=True)

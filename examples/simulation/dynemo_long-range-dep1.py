@@ -44,7 +44,7 @@ print("Simulating data")
 sim = simulation.HSMM_MVN(
     n_samples=25600,
     n_channels=config.n_channels,
-    n_modes=config.n_modes,
+    n_states=config.n_modes,
     means="zero",
     covariances="random",
     observation_error=0.0,
@@ -73,7 +73,7 @@ model.summary()
 
 # Callbacks
 dice_callback = callbacks.DiceCoefficientCallback(
-    prediction_dataset, sim.mode_time_course
+    prediction_dataset, sim.state_time_course
 )
 
 print("Training model")
@@ -93,7 +93,7 @@ print(f"Free energy: {free_energy}")
 inf_alp = model.get_alpha(prediction_dataset)
 
 # Mode time courses
-sim_stc = sim.mode_time_course
+sim_stc = sim.state_time_course
 inf_stc = modes.argmax_time_courses(inf_alp)
 
 # Calculate the dice coefficient between mode time courses

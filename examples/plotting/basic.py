@@ -71,7 +71,7 @@ plotting.plot_connections(
 
 # Simulate data
 hmm = simulation.HMM_MVN(
-    n_modes=5,
+    n_states=5,
     n_channels=11,
     n_samples=12800,
     trans_prob="sequence",

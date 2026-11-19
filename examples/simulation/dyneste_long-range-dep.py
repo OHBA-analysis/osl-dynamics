@@ -92,7 +92,7 @@ print(f"Free energy: {free_energy}")
 inf_alp = model.get_alpha(prediction_dataset)
 
 # State time courses
-sim_stc = sim.mode_time_course
+sim_stc = sim.state_time_course
 inf_stc = modes.argmax_time_courses(inf_alp)
 
 # Calculate the dice coefficient between state time courses

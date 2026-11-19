@@ -43,7 +43,7 @@ config = Config(
 print("Simulating data")
 sim = simulation.MDyn_HMM_MVN(
     n_samples=25600,
-    n_modes=config.n_modes,
+    n_states=config.n_modes,
     n_channels=config.n_channels,
     trans_prob="sequence",
     stay_prob=0.9,
@@ -77,7 +77,7 @@ inf_alpha = modes.argmax_time_courses(inf_alpha)
 inf_beta = modes.argmax_time_courses(inf_beta)
 
 # Simulated mode mixing factors
-sim_alpha, sim_beta = sim.mode_time_course
+sim_alpha, sim_beta = sim.state_time_course
 
 # Inferred means, stds, corrs
 inf_means, inf_stds, inf_corrs = model.get_means_stds_corrs()
