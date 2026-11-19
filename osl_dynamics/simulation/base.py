@@ -4,8 +4,6 @@ from typing import Optional
 
 import numpy as np
 
-# Attributes that depend on whether the simulation generates states or modes,
-# never looked up in the state or observation model
 _COUNT_AND_TIME_COURSE = {
     "n_states",
     "n_modes",
