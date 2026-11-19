@@ -1,14 +1,11 @@
 """Functions to perform spectral analysis."""
 
-import functools
-import inspect
 import json
 import logging
 import warnings
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
-    Callable,
     Iterable,
     Iterator,
     List,
@@ -36,107 +33,6 @@ _logger = logging.getLogger("osl-dynamics")
 
 
 _SPECTRA_FORMAT_VERSION = 1
-
-
-def _deprecate_positional(n_positional: int) -> Callable:
-    """Allow arguments after the first :code:`n_positional` to be passed
-    positionally, with a deprecation warning.
-
-    Parameters
-    ----------
-    n_positional : int
-        Number of arguments that can be passed positionally.
-
-    Returns
-    -------
-    decorator : callable
-        Function decorator.
-    """
-
-    def decorator(fn):
-        names = list(inspect.signature(fn).parameters)
-
-        @functools.wraps(fn)
-        def wrapper(*args, **kwargs):
-            if len(args) > n_positional:
-                extra = names[n_positional : len(args)]
-                for name in extra:
-                    if name in kwargs:
-                        raise TypeError(
-                            f"{fn.__name__}() got multiple values for argument "
-                            f"'{name}'"
-                        )
-                warnings.warn(
-                    f"Passing {', '.join(extra)} to {fn.__name__} positionally is "
-                    "deprecated. Pass them as keyword arguments.",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                kwargs.update(zip(extra, args[n_positional:]))
-                args = args[:n_positional]
-            return fn(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
-
-
-def _legacy_flags(
-    function: str,
-    cross_spectra: Optional[bool],
-    flags: dict,
-    defaults: dict,
-) -> Tuple[dict, bool]:
-    """Handle the deprecated arguments that set the legacy output tuple.
-
-    Parameters
-    ----------
-    function : str
-        Name of the function the arguments were passed to.
-    cross_spectra : bool
-        Value of the :code:`cross_spectra` argument (:code:`None` if it was
-        not passed).
-    flags : dict
-        Deprecated arguments (:code:`None` if not passed).
-    defaults : dict
-        Previous defaults of the deprecated arguments.
-
-    Returns
-    -------
-    legacy : dict
-        Values of the deprecated arguments used to build the legacy tuple.
-    cross_spectra : bool
-        Should the cross spectra be calculated?
-    """
-    passed = [name for name, value in flags.items() if value is not None]
-    if passed:
-        single = len(passed) == 1
-        warnings.warn(
-            f"{', '.join(passed)} {'is' if single else 'are'} deprecated in "
-            f"{function}: {'it sets' if single else 'they set'} the tuple "
-            "returned when the result is unpacked. Use the attributes of the "
-            "returned object instead, and cross_spectra=False to only calculate "
-            "the PSDs.",
-            DeprecationWarning,
-            stacklevel=4,
-        )
-    legacy = {
-        name: defaults[name] if value is None else value
-        for name, value in flags.items()
-    }
-    legacy["function"] = function
-
-    if cross_spectra is None:
-        # calc_coh=False (without calc_cpsd=True) only needs the PSDs
-        cross_spectra = flags.get("calc_coh") is not False or bool(
-            legacy.get("calc_cpsd")
-        )
-    elif not cross_spectra:
-        if flags.get("calc_cpsd") or flags.get("calc_coh"):
-            raise ValueError("calc_coh and calc_cpsd require cross_spectra=True.")
-        legacy["calc_coh"] = False
-        legacy["calc_cpsd"] = False
-    return legacy, cross_spectra
 
 
 def _triu(n_channels: int) -> Tuple[np.ndarray, np.ndarray]:
@@ -397,7 +293,6 @@ class Spectra:
         method: str,
         settings: dict,
         has_cross_spectra: bool,
-        legacy: Optional[dict] = None,
     ):
         self.frequencies = np.asarray(frequencies)
         self._data = dict(arrays)
@@ -407,7 +302,6 @@ class Spectra:
         self.method = method
         self.settings = dict(settings)
         self.has_cross_spectra = bool(has_cross_spectra)
-        self._legacy = legacy
 
     # Shapes
 
@@ -849,63 +743,6 @@ class Spectra:
         parts.append(f"cross_spectra={self.has_cross_spectra}")
         return f"{type(self).__name__}({', '.join(parts)})"
 
-    # Compatibility with the tuples returned previously
-
-    def _legacy_tuple(self) -> tuple:
-        lg = self._legacy
-        x = self._spectra()
-        if not isinstance(self, StateSpectra):
-            x = x[:, np.newaxis]
-        calc_cpsd = lg["calc_cpsd"]
-        calc_coh = lg["calc_coh"] and not calc_cpsd
-
-        if calc_cpsd or calc_coh:
-            cpsd = _full_from_triu(x, self.n_channels)
-            if self.method == "welch":
-                # The tuple for Welch's method has X_i conj(X_j)
-                cpsd = np.conj(cpsd)
-        if calc_coh:
-            psd = cpsd[..., range(self.n_channels), range(self.n_channels), :].real
-            coh = coherence_spectra(cpsd, keepdims=True)
-        elif calc_cpsd:
-            psd = cpsd
-        else:
-            psd = self._psd(x)
-        psd = np.nan_to_num(psd)
-
-        if not lg["keepdims"]:
-            psd = np.squeeze(psd)
-            if calc_coh:
-                coh = np.squeeze(coh)
-
-        outputs = [self.frequencies, psd]
-        if calc_coh:
-            outputs.append(coh)
-        if lg["return_weights"]:
-            outputs.append(self.weights)
-        return tuple(outputs)
-
-    def _legacy_outputs(self) -> tuple:
-        if self._legacy is None:
-            raise TypeError(
-                f"{type(self).__name__} cannot be unpacked. Use its attributes, "
-                "e.g. .frequencies and .psd."
-            )
-        warnings.warn(
-            f"Unpacking the result of {self._legacy['function']} is deprecated "
-            "and will be removed in a future release. Use the attributes of the "
-            f"returned {type(self).__name__} instead, e.g. .frequencies and .psd.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        return self._legacy_tuple()
-
-    def __iter__(self):
-        return iter(self._legacy_outputs())
-
-    def __getitem__(self, index: int):
-        return self._legacy_outputs()[index]
-
 
 class StateSpectra(Spectra):
     """Spectra for each state, from Welch's method or a multitaper.
@@ -1099,32 +936,6 @@ class RegressionSpectra(StateSpectra):
             self._data["coefs"], self._data["intercept"], self.n_channels
         )
 
-    def _legacy_tuple(self) -> tuple:
-        lg = self._legacy
-        coefs = self._psd(self._data["coefs"])
-        intercept = self._psd(self._data["intercept"])
-        intercept = np.broadcast_to(intercept[:, np.newaxis], coefs.shape)
-        psd = np.stack([coefs, intercept], axis=1)
-        if not lg["return_coef_int"]:
-            psd = np.sum(psd, axis=1)
-
-        extra = []
-        if lg["return_weights"]:
-            extra.append(self.weights)
-        if lg["return_sigma"]:
-            extra.append(self.sigma)
-
-        if not lg["calc_coh"]:
-            if not lg["keepdims"]:
-                psd = np.squeeze(psd)
-            return (self.frequencies, psd, *extra)
-
-        coh = self.coherence_coefs
-        if not lg["keepdims"]:
-            psd = np.squeeze(psd)
-            coh = np.squeeze(coh)
-        return (self.frequencies, psd, coh, *extra)
-
 
 def wavelet(
     data: np.ndarray,
@@ -1227,15 +1038,6 @@ def wavelet(
     return t, f, wt
 
 
-_LEGACY_STATE_DEFAULTS = {
-    "calc_cpsd": False,
-    "calc_coh": True,
-    "return_weights": False,
-    "keepdims": False,
-}
-
-
-@_deprecate_positional(3)
 def welch_spectra(
     data: Union[np.ndarray, list, "Data"],
     sampling_frequency: Optional[float] = None,
@@ -1246,12 +1048,8 @@ def welch_spectra(
     frequency_range: Optional[List] = None,
     standardize: bool = True,
     averaging: str = "mean",
-    calc_cpsd: Optional[bool] = None,
-    calc_coh: Optional[bool] = None,
-    return_weights: Optional[bool] = None,
-    keepdims: Optional[bool] = None,
     n_jobs: int = 1,
-    cross_spectra: Optional[bool] = None,
+    cross_spectra: bool = True,
 ) -> Union["Spectra", "StateSpectra"]:
     """Calculates spectra for inferred states using Welch's method.
 
@@ -1285,23 +1083,10 @@ def welch_spectra(
     averaging : str, optional
         Method used to average periodograms.
         Must be :code:`'mean'` or :code:`'median'`.
-    calc_cpsd : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    calc_coh : bool, optional
-        Deprecated. :code:`calc_coh=False` is the same as
-        :code:`cross_spectra=False`.
-    return_weights : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    keepdims : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
     n_jobs : int, optional
         Number of parallel jobs.
     cross_spectra : bool, optional
         Should we calculate the cross spectra (needed for the coherence)?
-        Defaults to :code:`True`.
 
     Returns
     -------
@@ -1315,17 +1100,6 @@ def welch_spectra(
     if step_size is None:
         step_size = int(window_length) // 2
 
-    legacy, cross_spectra = _legacy_flags(
-        "welch_spectra",
-        cross_spectra,
-        dict(
-            calc_cpsd=calc_cpsd,
-            calc_coh=calc_coh,
-            return_weights=return_weights,
-            keepdims=keepdims,
-        ),
-        _LEGACY_STATE_DEFAULTS,
-    )
     return _state_spectra(
         method="welch",
         data=data,
@@ -1338,11 +1112,9 @@ def welch_spectra(
         averaging=averaging,
         cross_spectra=cross_spectra,
         n_jobs=n_jobs,
-        legacy=legacy,
     )
 
 
-@_deprecate_positional(3)
 def multitaper_spectra(
     data: Union[np.ndarray, list, "Data"],
     sampling_frequency: Optional[float] = None,
@@ -1355,12 +1127,8 @@ def multitaper_spectra(
     frequency_range: Optional[List] = None,
     standardize: bool = True,
     averaging: str = "mean",
-    calc_cpsd: Optional[bool] = None,
-    calc_coh: Optional[bool] = None,
-    return_weights: Optional[bool] = None,
-    keepdims: Optional[bool] = None,
     n_jobs: int = 1,
-    cross_spectra: Optional[bool] = None,
+    cross_spectra: bool = True,
 ) -> Union["Spectra", "StateSpectra"]:
     """Calculates spectra for inferred states using a multitaper.
 
@@ -1395,23 +1163,10 @@ def multitaper_spectra(
     averaging : str, optional
         Method used to average periodograms.
         Must be :code:`'mean'` or :code:`'median'`.
-    calc_cpsd : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    calc_coh : bool, optional
-        Deprecated. :code:`calc_coh=False` is the same as
-        :code:`cross_spectra=False`.
-    return_weights : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    keepdims : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
     n_jobs : int, optional
         Number of parallel jobs.
     cross_spectra : bool, optional
         Should we calculate the cross spectra (needed for the coherence)?
-        Defaults to :code:`True`.
 
     Returns
     -------
@@ -1425,17 +1180,6 @@ def multitaper_spectra(
     if step_size is None:
         step_size = int(window_length)
 
-    legacy, cross_spectra = _legacy_flags(
-        "multitaper_spectra",
-        cross_spectra,
-        dict(
-            calc_cpsd=calc_cpsd,
-            calc_coh=calc_coh,
-            return_weights=return_weights,
-            keepdims=keepdims,
-        ),
-        _LEGACY_STATE_DEFAULTS,
-    )
     return _state_spectra(
         method="multitaper",
         data=data,
@@ -1448,13 +1192,11 @@ def multitaper_spectra(
         averaging=averaging,
         cross_spectra=cross_spectra,
         n_jobs=n_jobs,
-        legacy=legacy,
         time_half_bandwidth=time_half_bandwidth,
         n_tapers=n_tapers,
     )
 
 
-@_deprecate_positional(3)
 def regression_spectra(
     data: Union[np.ndarray, list, "Data"],
     alpha: Union[np.ndarray, list],
@@ -1465,13 +1207,8 @@ def regression_spectra(
     n_sub_windows: int = 8,
     frequency_range: Optional[List] = None,
     standardize: bool = True,
-    calc_coh: Optional[bool] = None,
-    return_weights: Optional[bool] = None,
-    return_coef_int: Optional[bool] = None,
-    return_sigma: Optional[bool] = None,
-    keepdims: Optional[bool] = None,
     n_jobs: int = 1,
-    cross_spectra: Optional[bool] = None,
+    cross_spectra: bool = True,
 ) -> "RegressionSpectra":
     r"""Calculates mode-specific spectra by regressing a spectrogram with alpha.
 
@@ -1537,26 +1274,10 @@ def regression_spectra(
         Minimum and maximum frequency to keep.
     standardize : bool, optional
         Should we standardize the data before calculating the spectrogram?
-    calc_coh : bool, optional
-        Deprecated. :code:`calc_coh=False` is the same as
-        :code:`cross_spectra=False`.
-    return_weights : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    return_coef_int : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    return_sigma : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    keepdims : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
     n_jobs : int, optional
         Number of parallel jobs.
     cross_spectra : bool, optional
         Should we calculate the cross spectra (needed for the coherence)?
-        Defaults to :code:`True`.
 
     Returns
     -------
@@ -1573,25 +1294,6 @@ def regression_spectra(
         raise ValueError("alpha must be passed.")
     data, alpha, sampling_frequency = _resolve_data(data, alpha, sampling_frequency)
     data, alpha = _validate_data_alpha(data, alpha)
-
-    legacy, cross_spectra = _legacy_flags(
-        "regression_spectra",
-        cross_spectra,
-        dict(
-            calc_coh=calc_coh,
-            return_weights=return_weights,
-            return_coef_int=return_coef_int,
-            return_sigma=return_sigma,
-            keepdims=keepdims,
-        ),
-        {
-            "calc_coh": True,
-            "return_weights": False,
-            "return_coef_int": False,
-            "return_sigma": False,
-            "keepdims": False,
-        },
-    )
 
     if window_length is None:
         window_length = n_sub_windows * round(4 * sampling_frequency / n_sub_windows)
@@ -1611,7 +1313,7 @@ def regression_spectra(
         window_length=window_length,
         step_size=step_size,
         frequency_range=frequency_range,
-        calc_cpsd=cross_spectra,
+        cross_spectra=cross_spectra,
         n_sub_windows=n_sub_windows,
     )
 
@@ -1690,7 +1392,6 @@ def regression_spectra(
         method="regression",
         settings=settings,
         has_cross_spectra=cross_spectra,
-        legacy=legacy,
     )
 
 
@@ -2361,8 +2062,8 @@ class _Spectrogram:
         Scaling applied to the periodograms.
     frequency_range : list
         Minimum and maximum frequency to keep.
-    calc_cpsd : bool
-        Should we calculate cross spectra?
+    cross_spectra : bool
+        Should we calculate the cross spectra?
     """
 
     sampling_frequency: float
@@ -2373,7 +2074,7 @@ class _Spectrogram:
     nfft: int
     scale: float
     frequency_range: List
-    calc_cpsd: bool
+    cross_spectra: bool
 
     @classmethod
     def create(
@@ -2383,7 +2084,7 @@ class _Spectrogram:
         window_length: int,
         step_size: int,
         frequency_range: List,
-        calc_cpsd: bool,
+        cross_spectra: bool,
         n_sub_windows: int = 1,
         time_half_bandwidth: float = 4,
         n_tapers: int = 7,
@@ -2403,8 +2104,8 @@ class _Spectrogram:
             Number of samples to shift the window by.
         frequency_range : list
             Minimum and maximum frequency to keep.
-        calc_cpsd : bool
-            Should we calculate cross spectra?
+        cross_spectra : bool
+            Should we calculate the cross spectra?
         n_sub_windows : int, optional
             Number of sub-windows to split a window into.
         time_half_bandwidth : float, optional
@@ -2445,7 +2146,7 @@ class _Spectrogram:
             nfft=nfft,
             scale=scale,
             frequency_range=frequency_range,
-            calc_cpsd=calc_cpsd,
+            cross_spectra=cross_spectra,
         )
 
     @property
@@ -2551,17 +2252,17 @@ class _Spectrogram:
         P : np.ndarray
             Spectrogram for a chunk of windows. Shape is (n_windows_in_chunk,
             n_channels * (n_channels + 1) / 2, n_freq) if
-            :code:`calc_cpsd=True`, otherwise (n_windows_in_chunk, n_channels,
+            :code:`cross_spectra=True`, otherwise (n_windows_in_chunk, n_channels,
             n_freq).
         """
         n_channels = x.shape[1]
         m, n = np.triu_indices(n_channels)
         n_freq = len(self.frequencies)
-        extra_bytes = 16 * n_channels**2 * n_freq if self.calc_cpsd else 0
+        extra_bytes = 16 * n_channels**2 * n_freq if self.cross_spectra else 0
 
         for X in self._fourier_chunks(x, window_indices, extra_bytes):
             n_segments = X.shape[2]
-            if self.calc_cpsd:
+            if self.cross_spectra:
                 # G[w, f, c, d] = sum_s conj(X_c) X_d over sub-windows and tapers
                 X = np.moveaxis(X, -1, 1)
                 G = np.conj(X) @ np.swapaxes(X, -1, -2)
@@ -2583,7 +2284,7 @@ class _Spectrogram:
         -------
         P : np.ndarray
             Mean spectrum. Shape is (n_channels * (n_channels + 1) / 2,
-            n_freq) if :code:`calc_cpsd=True`, otherwise (n_channels, n_freq).
+            n_freq) if :code:`cross_spectra=True`, otherwise (n_channels, n_freq).
         """
         n_channels = x.shape[1]
         m, n = np.triu_indices(n_channels)
@@ -2593,7 +2294,7 @@ class _Spectrogram:
         n_terms = 0
         for X in self._fourier_chunks(x, None, 0):
             n_terms += X.shape[0] * X.shape[2]
-            if self.calc_cpsd:
+            if self.cross_spectra:
                 # total[f, c, d] += sum_{w,s} conj(X_c) X_d
                 Y = np.ascontiguousarray(np.transpose(X, (3, 0, 2, 1)))
                 Y = Y.reshape(X.shape[-1], -1, n_channels)
@@ -2601,7 +2302,7 @@ class _Spectrogram:
             else:
                 total = total + np.sum(X.real**2 + X.imag**2, axis=(0, 2))
 
-        if self.calc_cpsd:
+        if self.cross_spectra:
             P = np.moveaxis(total[:, m, n], 0, -1)
         else:
             P = total
@@ -2623,7 +2324,7 @@ class _Spectrogram:
         -------
         P : np.ndarray
             Spectrogram. Shape is (n_windows, n_channels * (n_channels + 1) /
-            2, n_freq) if :code:`calc_cpsd=True`, otherwise (n_windows,
+            2, n_freq) if :code:`cross_spectra=True`, otherwise (n_windows,
             n_channels, n_freq).
         """
         return np.concatenate(list(self.chunks(x, window_indices)))
@@ -2682,7 +2383,6 @@ def _state_spectra(
     averaging: str,
     cross_spectra: bool,
     n_jobs: int,
-    legacy: Optional[dict] = None,
     time_half_bandwidth: float = 4,
     n_tapers: int = 7,
 ) -> Union["Spectra", "StateSpectra"]:
@@ -2702,7 +2402,7 @@ def _state_spectra(
         window_length=window_length,
         step_size=step_size,
         frequency_range=frequency_range,
-        calc_cpsd=cross_spectra,
+        cross_spectra=cross_spectra,
         time_half_bandwidth=time_half_bandwidth,
         n_tapers=n_tapers,
     )
@@ -2754,7 +2454,6 @@ def _state_spectra(
         method=method,
         settings=settings,
         has_cross_spectra=cross_spectra,
-        legacy=legacy,
     )
     if static:
         return Spectra(arrays={"spectra": spectra[:, 0]}, **common)
@@ -2796,7 +2495,7 @@ def _state_spectra_session(
     spectra : np.ndarray
         Cross spectra (upper triangle) or PSDs for each state. NaN for states
         that are never active. Shape is (n_states, n_channels * (n_channels +
-        1) / 2, n_freq) if :code:`spectrogram.calc_cpsd=True`, otherwise
+        1) / 2, n_freq) if :code:`spectrogram.cross_spectra=True`, otherwise
         (n_states, n_channels, n_freq).
     fractional_occupancies : np.ndarray
         Mean of alpha for each state, normalized to sum to one.
@@ -2821,7 +2520,7 @@ def _state_spectra_session(
         out=np.full_like(sum_alpha2, np.nan),
         where=sum_alpha2 > 0,
     )
-    dtype = np.complex64 if spectrogram.calc_cpsd else np.float32
+    dtype = np.complex64 if spectrogram.cross_spectra else np.float32
 
     spectra = []
     for i in range(alpha.shape[1]):
@@ -2884,10 +2583,10 @@ def _regression_spectra_session(
     coefs : np.ndarray
         Regression coefficients. Shape is
         (n_modes, n_channels * (n_channels + 1) / 2, n_freq) if
-        :code:`calc_cpsd=True`, otherwise it is (n_modes, n_channels, n_freq).
+        :code:`cross_spectra=True`, otherwise it is (n_modes, n_channels, n_freq).
     intercept : np.ndarray
         Intercept. Shape is (n_channels * (n_channels + 1) / 2, n_freq)
-        if :code:`calc_cpsd=True`, otherwise it is (n_channels, n_freq).
+        if :code:`cross_spectra=True`, otherwise it is (n_channels, n_freq).
     sigma : np.ndarray
         Standard deviation of the windowed alpha for each mode.
         Shape is (n_modes,).

@@ -149,15 +149,6 @@ def functional_connectivity(
     return np.squeeze(results)
 
 
-_LEGACY_STATIC_DEFAULTS = {
-    "calc_cpsd": False,
-    "calc_coh": False,
-    "return_weights": False,
-    "keepdims": False,
-}
-
-
-@spectral._deprecate_positional(2)
 def welch_spectra(
     data: Union[np.ndarray, list, "Data"],
     sampling_frequency: Optional[float] = None,
@@ -167,12 +158,8 @@ def welch_spectra(
     frequency_range: Optional[List[float]] = None,
     standardize: bool = True,
     averaging: str = "mean",
-    calc_cpsd: Optional[bool] = None,
-    calc_coh: Optional[bool] = None,
-    return_weights: Optional[bool] = None,
-    keepdims: Optional[bool] = None,
     n_jobs: int = 1,
-    cross_spectra: Optional[bool] = None,
+    cross_spectra: bool = True,
 ) -> spectral.Spectra:
     """Calculate static spectra using Welch's method.
 
@@ -201,23 +188,10 @@ def welch_spectra(
     averaging : str, optional
         Method used to average periodograms.
         Must be :code:`'mean'` or :code:`'median'`.
-    calc_cpsd : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    calc_coh : bool, optional
-        Deprecated. :code:`calc_coh=False` is the same as
-        :code:`cross_spectra=False`.
-    return_weights : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    keepdims : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
     n_jobs : int, optional
         Number of parallel jobs.
     cross_spectra : bool, optional
         Should we calculate the cross spectra (needed for the coherence)?
-        Defaults to :code:`True`.
 
     Returns
     -------
@@ -230,17 +204,6 @@ def welch_spectra(
     if step_size is None:
         step_size = int(window_length) // 2
 
-    legacy, cross_spectra = spectral._legacy_flags(
-        "welch_spectra",
-        cross_spectra,
-        dict(
-            calc_cpsd=calc_cpsd,
-            calc_coh=calc_coh,
-            return_weights=return_weights,
-            keepdims=keepdims,
-        ),
-        _LEGACY_STATIC_DEFAULTS,
-    )
     return spectral._state_spectra(
         method="welch",
         data=data,
@@ -253,11 +216,9 @@ def welch_spectra(
         averaging=averaging,
         cross_spectra=cross_spectra,
         n_jobs=n_jobs,
-        legacy=legacy,
     )
 
 
-@spectral._deprecate_positional(2)
 def multitaper_spectra(
     data: Union[np.ndarray, list, "Data"],
     sampling_frequency: Optional[float] = None,
@@ -268,13 +229,9 @@ def multitaper_spectra(
     frequency_range: Optional[List[float]] = None,
     standardize: bool = True,
     averaging: str = "mean",
-    calc_cpsd: Optional[bool] = None,
-    calc_coh: Optional[bool] = None,
-    return_weights: Optional[bool] = None,
-    keepdims: Optional[bool] = None,
     n_jobs: int = 1,
     step_size: Optional[int] = None,
-    cross_spectra: Optional[bool] = None,
+    cross_spectra: bool = True,
 ) -> spectral.Spectra:
     """Calculate static spectra using a multitaper.
 
@@ -301,18 +258,6 @@ def multitaper_spectra(
     averaging : str, optional
         Method used to average periodograms.
         Must be :code:`'mean'` or :code:`'median'`.
-    calc_cpsd : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    calc_coh : bool, optional
-        Deprecated. :code:`calc_coh=False` is the same as
-        :code:`cross_spectra=False`.
-    return_weights : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
-    keepdims : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
     n_jobs : int, optional
         Number of parallel jobs.
     step_size : int, optional
@@ -320,7 +265,6 @@ def multitaper_spectra(
         :code:`window_length` (no overlap).
     cross_spectra : bool, optional
         Should we calculate the cross spectra (needed for the coherence)?
-        Defaults to :code:`True`.
 
     Returns
     -------
@@ -333,17 +277,6 @@ def multitaper_spectra(
     if step_size is None:
         step_size = int(window_length)
 
-    legacy, cross_spectra = spectral._legacy_flags(
-        "multitaper_spectra",
-        cross_spectra,
-        dict(
-            calc_cpsd=calc_cpsd,
-            calc_coh=calc_coh,
-            return_weights=return_weights,
-            keepdims=keepdims,
-        ),
-        _LEGACY_STATIC_DEFAULTS,
-    )
     return spectral._state_spectra(
         method="multitaper",
         data=data,
@@ -356,7 +289,6 @@ def multitaper_spectra(
         averaging=averaging,
         cross_spectra=cross_spectra,
         n_jobs=n_jobs,
-        legacy=legacy,
         time_half_bandwidth=time_half_bandwidth,
         n_tapers=n_tapers,
     )
