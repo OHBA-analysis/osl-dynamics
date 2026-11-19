@@ -55,11 +55,10 @@ ts = data.time_series()
 # ^^^^^^^^^^^^^^^^^
 # First, we calculate the subject-specific power spectra. See the Static Power Spectra Analysis tutorial for more comprehensive description of power spectra analysis.
 
-import numpy as np
 from osl_dynamics.analysis import static
 
 # Calculate power spectra
-f, psd = static.welch_spectra(
+spectra = static.welch_spectra(
     data=ts,
     sampling_frequency=250,
     window_length=500,
@@ -68,57 +67,57 @@ f, psd = static.welch_spectra(
 
 # Save
 os.makedirs("spectra", exist_ok=True)
-np.save("spectra/f.npy", f)
-np.save("spectra/psd.npy", psd)
+spectra.save("spectra/spectra.npz")
 
 #%%
 # Calculate power
 # ^^^^^^^^^^^^^^^
 # Let's first load the power spectra we previously calculated.
 
-f = np.load("spectra/f.npy")
-psd = np.load("spectra/psd.npy")
+from osl_dynamics.analysis import spectral
+
+spectra = spectral.Spectra.load("spectra/spectra.npz")
 
 #%%
-# To understand these arrays it's useful to print their shape:
+# To understand the spectra it's useful to print the shape of the frequency axis and the power spectra:
 
-print(f.shape)
-print(psd.shape)
+print(spectra.frequencies.shape)
+print(spectra.psd.shape)
 
 #%%
-# We can see `f` is a 1D numpy array of length 256. This is the frequency axis of the power spectra. We can see `psd` is a subjects by channels (ROIs) by frequency array. E.g. `psd[0]` is a `(38, 256)` shaped array containing the power spectra for each of the 38 ROIs.
+# We can see `spectra.frequencies` is a 1D numpy array of length 256. This is the frequency axis of the power spectra. We can see `spectra.psd` is a subjects by channels (ROIs) by frequency array. E.g. `spectra.psd[0]` is a `(38, 256)` shaped array containing the power spectra for each of the 38 ROIs.
 #
 # A useful property of a power spectrum is that the integral over a frequency range gives the power (or equivalently the variance of activity over the frequency range). osl-dynamics has a :mod:`osl_dynamics.analysis.power` module for performing power analyses.
 #
-# Let's say we are interested in alpha (10 Hz) power. We can calculate alpha power by integrating a power spectrum over a frequency range near 10 Hz. Typically, 7-13 Hz power is referred to as the 'alpha band'. Other common frequency bands are:
+# Let's say we are interested in alpha (10 Hz) power. We can calculate alpha power by averaging a power spectrum over a frequency range near 10 Hz. Typically, 8-13 Hz power is referred to as the 'alpha band'. Other common frequency bands are:
 #
 # - Delta: 1-4 Hz.
-# - Theta: 4-7 Hz.
+# - Theta: 4-8 Hz.
 # - Beta: 13-30 Hz.
 # - Gamma: 30+ Hz.
 #
-# osl-dynamics has a :func:`analysis.power.variance_from_spectra <osl_dynamics.analysis.power.variance_from_spectra>` function to calculate power from a spectrum. Let's use this function to calculate power for the alpha band.
+# The `power_maps` method calculates power from the spectra. Let's use it to calculate power for the alpha band.
 
-from osl_dynamics.analysis import power
-
-# Calculate power in the alpha band (8-12 Hz) from the spectra
-p = power.variance_from_spectra(f, psd, frequency_range=[7, 13])
+# Calculate power in the alpha band (8-13 Hz) from the spectra
+p = spectra.power_maps(frequency_range=[8, 13])
 
 #%%
-# Note, if `frequency_range` is not passed, :func:`power.variance_from_spectra <osl_dynamics.analysis.power.variance_from_spectra>` will integrate the power spectrum over all frequencies.
+# Note, if `frequency_range` is not passed, `power_maps` will average the power spectrum over all frequencies. Pass `method="integral"` to integrate the power spectrum (the variance), or `bands=[[1, 4], [4, 8], [8, 13], [13, 30]]` to calculate several bands at once.
 #
 # We can print the shape of the `p` array to help understand what is contained within it.
 
 print(p.shape)
 
 #%%
-# From this, we can see it is a subjects by ROIs array. It has integrated the power spectrum for each ROI separately. If we wanted the alpha power at each ROI for the first subject, we would use `p[0]`, which would be a `(38,)` shaped array.
+# From this, we can see it is a subjects by ROIs array. It has averaged the power spectrum for each ROI separately. If we wanted the alpha power at each ROI for the first subject, we would use `p[0]`, which would be a `(38,)` shaped array.
 #
 # Plot power maps
 # ^^^^^^^^^^^^^^^
 # We can use :func:`power.save <osl_dynamics.analysis.power.save>` to visualize the power maps. Let's plot the group average.
 
-group_p = np.mean(p, axis=0)
+from osl_dynamics.analysis import power
+
+group_p = spectra.group_average().power_maps(frequency_range=[8, 13])
 
 fig, ax = power.save(
     group_p,

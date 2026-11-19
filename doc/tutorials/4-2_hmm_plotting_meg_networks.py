@@ -4,7 +4,7 @@ HMM: Plotting MEG Networks
 
 In this tutorial we will plot networks from an HMM trained on source reconstructed MEG data. This tutorial covers:
 
-1. Load multitaper spectra
+1. Calculate multitaper spectra
 2. PSDs
 3. Power maps
 4. Coherence networks
@@ -13,159 +13,149 @@ In this tutorial we will plot networks from an HMM trained on source reconstruct
 """
 
 #%%
-# Download post-hoc spectra
-# ^^^^^^^^^^^^^^^^^^^^^^^^^
+# Download source data and inferred parameters
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # In this tutorial, we'll download example data from `OSF <https://osf.io/by2tc/>`_.
 
 import os
 
-def get_spectra(name, rename):
-    os.system(f"osf -p by2tc fetch spectra/{name}.zip")
+def get_data(name, rename):
+    os.system(f"osf -p by2tc fetch data/{name}.zip")
     os.makedirs(rename, exist_ok=True)
     os.system(f"unzip -o {name}.zip -d {rename}")
     os.remove(f"{name}.zip")
     return f"Data downloaded to: {rename}"
 
-# Download the dataset (approximately 21 MB)
-get_spectra("tde_hmm_notts_meguk_giles_5_subjects", rename="results/spectra")
+def get_inf_params(name, rename):
+    os.system(f"osf -p by2tc fetch inf_params/{name}.zip")
+    os.makedirs(rename, exist_ok=True)
+    os.system(f"unzip -o {name}.zip -d {rename}")
+    os.remove(f"{name}.zip")
+    return f"Data downloaded to: {rename}"
+
+# Download the source data (approximately 52 MB)
+get_data("notts_meguk_giles_5_subjects", rename="source_data")
+
+# Download the inferred state probabilities (approximately 11 MB)
+get_inf_params("tde_hmm_notts_meguk_giles_5_subjects", rename="results/inf_params")
 
 #%%
-# Load multitaper spectra
-# ^^^^^^^^^^^^^^^^^^^^^^^
-# We calculate networks based on multitaper spectra. Let's load these.
+# Calculate multitaper spectra
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# We calculate networks based on multitaper spectra. See the :doc:`HMM Multitaper Spectra tutorial <../tutorials_build/4-1_hmm_multitaper_spectra>` for details.
+
+import pickle
 
 import numpy as np
 
-f = np.load("results/spectra/f.npy")
-psd = np.load("results/spectra/psd.npy")
-coh = np.load("results/spectra/coh.npy")
-w = np.load("results/spectra/w.npy")
+from osl_dynamics.data import Data
+from osl_dynamics.analysis import spectral
+
+# Source data trimmed to match the state probabilities
+data = Data("source_data")
+trimmed_data = data.trim_time_series(n_embeddings=15, sequence_length=2000)
+
+# State probabilities
+alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
+
+# Multitaper spectra for each subject and state
+spectra = spectral.multitaper_spectra(
+    data=trimmed_data,
+    alpha=alpha,
+    sampling_frequency=250,
+    frequency_range=[1, 45],
+)
+print(spectra)
 
 #%%
+# If you saved the spectra with `spectra.save`, you can load them with `spectral.Spectra.load`.
+#
 # PSDs
 # ^^^^
-# We can plot the power spectra to see what oscillations typically occur when a particular state is on. Let's first print the shape of the multitaper spectra to understand the format of the data.
+# We can plot the power spectra to see what oscillations typically occur when a particular state is on. To help us visualize this, we first average over subjects.
 
-print(f.shape)
-print(psd.shape)
+group = spectra.group_average()
+print(group.psd.shape)
 
 #%%
-# From the shape of each array we can see `f` is a 1D numpy array which contains the frequency axis of the spectra and `psd` is a (subjects, states, channels, frequencies) array.
-#
-# To help us visualize this we can average over the subjects and channels. This gives us a (states, frequencies) array.
+# The group average is weighted by the number of samples in each subject. `group.psd` is a (states, channels, frequencies) array. The `plot_psd` method plots the PSD of each state averaged over channels. The shaded area is the standard error over channels.
 
-from osl_dynamics.utils import plotting
+fig, ax = group.plot_psd(values="psd")
 
-# Average over subjects and channels
-gpsd = np.average(psd, axis=0, weights=w)
-psd_mean = np.mean(gpsd, axis=1)
-print(psd_mean.shape)
+#%%
+# The states have similar PSDs. To highlight the differences, we can plot the change in the PSD from the static PSD (the average of the state PSDs weighted by the fractional occupancies). This is the default.
 
-# Plot
-n_states = psd_mean.shape[0]
-fig, ax = plotting.plot_line(
-    [f] * n_states,
-    psd_mean,
-    labels=[f"State {i}" for i in range(1, n_states + 1)],
-    x_label="Frequency (Hz)",
-    y_label="PSD (a.u.)",
-    x_range=[f[0], f[-1]],
-)
+fig, ax = group.plot_psd()
 
 #%%
 # Power maps
 # ^^^^^^^^^^
-# The `psd` array contains the spectrum for each channel (for each subject/state). This is a function of frequency. To calculate power we need to integrate over a frequency range. osl-dynamics has the :func:`analysis.power.variance_from_spectra <osl_dynamics.analysis.power.variance_from_spectra>` function to help us do this. Let's look at the power across all frequencies for a given state.
+# The PSD is a function of frequency. To calculate power we need to average over a frequency range. The `power_maps` method does this. Let's look at the power across all frequencies for each state.
 
 from osl_dynamics.analysis import power
 
-p = power.variance_from_spectra(f, psd)
+p = group.power_maps(values="psd")
 print(p.shape)
 
 #%%
-# We have a power map for each state and subject. Let's calculate the group average.
-
-p_mean = np.average(p, axis=0, weights=w)
-print(p_mean.shape)
-
-#%%
-# Now we have a (states, channels) array. Let's see what the power map for each state looks like. 
+# We have a (states, channels) array. Let's see what the power map for each state looks like.
 
 # Takes a few seconds for the power maps to appear
 fig, ax = power.save(
-    p_mean,
+    p,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
 
 #%%
-# Because the power is always positive and a lot of the state have power in similar regions all the power maps look similar. To highlight differences we can display the power maps relative to something. Typically we use the average across states - taking the average across states approximates the static power of the entire training dataset. We can do this by passing the `subtract_mean` argument.
+# Because the power is always positive and a lot of the states have power in similar regions, all the power maps look similar. To highlight differences we display the change in power from the static power. This is the default.
+
+p = group.power_maps()
 
 # Takes a few seconds for the power maps to appear
 fig, ax = power.save(
-    p_mean,
+    p,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
-    subtract_mean=True,
+    plot_kwargs={"symmetric_cbar": True},
 )
 
 #%%
+# If we were interested in a particular frequency band we could use the `frequency_range` argument, e.g. `frequency_range=[8, 13]`, or calculate several bands at once with `bands=[[1, 4], [4, 8], [8, 13], [13, 30]]`.
+#
 # Coherence networks
 # ^^^^^^^^^^^^^^^^^^
-# Next, let's visualize the coherence networks. First, we need to calculate the networks from the coherence spectra.
-
-print(coh.shape)
-
-#%%
-# We can see `coh` is a (subjects, states, channels, channels, frequencies) array. Let's calculate the mean coherence over all frequencies.
+# Next, let's visualize the coherence networks. The `coherence_networks` method averages the coherence over frequency. By default, it gives the change in coherence from the static coherence.
 
 from osl_dynamics.analysis import connectivity
 
-c = connectivity.mean_coherence_from_spectra(f, coh)
+c = group.coherence_networks()
 print(c.shape)
 
 #%%
-# Note, if we were interested in a particular frequency band we could use the `frequency_range` argument to specify the range.
+# We can see `c` is a (states, channels, channels) array. Coherence networks are often noisy so averaging over a large number of subjects (20+) is typically needed to get clean coherence networks.
 #
-# We can see from the shape of `c` it is a (subjects, states, channels, channels) array. The `c[0][0]` element corresponds to the `(n_channels, n_channels)` coherence network for the first subject and state.
-#
-# Coherence networks are often noisy so averaging over a large number of subjects (20+) is typically needed to get clean coherence networks. Let's average the coherence networks over all subjects.
+# Let's have a look at the coherence networks. The :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>` function can be used to display a connectivity matrix (or set of connectivity matrices).
 
-mean_c = np.average(c, axis=0, weights=w)
-print(mean_c.shape)
-
-#%%
-# We now see `c_mean` is a (states, channels, channels) array.
-#
-# Let's have a look at the coherence networks. The :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>` function can be used to display a connectivity matrix (or set of connectivity matrices). Note, we display them relative to the mean across states.
-
-mean_c -= np.mean(mean_c, axis=0)
 connectivity.save(
-    mean_c,
+    c,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
 
 #%%
-# We can see there are a lot of connections. We want to select the most extreme edeges. osl-dynamics has a function called :func:`connectivity.threshold <osl_dynamics.analysis.connectivity.threshold>` that makes this easy.
+# We can see there are a lot of connections. We want to select the most extreme edges. The `percentile` argument keeps the edges with the largest changes (increases or decreases). Let's keep the top 3%.
 
-thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True)
-print(thres_mean_c.shape)
-
-#%%
-# Now let's visualize the thresholded networks.
+c = group.coherence_networks(percentile=97)
 
 connectivity.save(
-    thres_mean_c,
+    c,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
 )
 
 #%%
 # Non-negative matrix factorization (NNMF)
 # ****************************************
-# In the above code, we integrated over all frequencies to calculate the power maps and coherence networks. We expect brain activity to occur with phase-locking networks with oscillations at different frequencies. A data-driven approach for finding the frequency bands (referred to as 'spectral components') for phase-locked networks is to apply non-negative matrix factorization (NNMF) to the coherence spectra for each subject. osl-dynamics has a function that can do this: :func:`analysis.spectral.decompose_spectra <osl_dynamics.analysis.spectral.decompose_spectra>`. Let's use this function to separate our coherence spectra (`coh`) into two frequency bands.
+# In the above code, we averaged over all frequencies to calculate the power maps and coherence networks. We expect brain activity to occur with phase-locking networks with oscillations at different frequencies. A data-driven approach for finding the frequency bands (referred to as 'spectral components') for phase-locked networks is to apply non-negative matrix factorization (NNMF) to the coherence spectra for each subject. The `decompose` method does this (see :func:`analysis.spectral.decompose_spectra <osl_dynamics.analysis.spectral.decompose_spectra>`). Let's use it to separate the coherence spectra into two frequency bands.
 
-from osl_dynamics.analysis import spectral
-
-# Perform NNMF on the coherence spectra of each subject (we concatenate each matrix)
-wb_comp = spectral.decompose_spectra(coh, n_components=2)
+wb_comp = spectra.decompose(n_components=2)
 print(wb_comp.shape)
 
 #%%
@@ -173,8 +163,9 @@ print(wb_comp.shape)
 
 from osl_dynamics.utils import plotting
 
+f = spectra.frequencies
 plotting.plot_line(
-    [f, f],  # we need to repeat twice because we fitted two components
+    [f, f],  # we need to repeat twice because we fitted two components
     wb_comp,
     x_label="Frequency (Hz)",
     y_label="Spectral Component",
@@ -183,26 +174,16 @@ plotting.plot_line(
 #%%
 # The blue line is the first spectral component and the orange line is the second component. We can see the NNMF has separated the coherence spectra into two bands, one with a lot of coherence activity below ~22 Hz (blue line) and one above (orange line). In other words, the first spectral component contains coherent activity below 22 Hz and the second contains coherent activity mainly above 22 Hz.
 #
-# Now, instead of averaging the coherence spectra across all frequencies, let's just look at the first spectral component (we calculate the coherence network by weighting each frequency in the coherence spectra using the spectral component).
+# Now, instead of averaging the coherence spectra across all frequencies, let's look at the first spectral component. We pass the spectral components as the `bands` argument, which weights each frequency using the spectral component.
 
-# Calculate the coherence network for each state by weighting with the spectral components
-c = connectivity.mean_coherence_from_spectra(f, coh, wb_comp)
+c = group.coherence_networks(bands=wb_comp, percentile=97)
 print(c.shape)
 
-# Average over subjects
-mean_c = np.average(c, axis=0, weights=w)
-print(mean_c.shape)
-
-# Threshold each network and look for the top 3% of connections relative to the mean
-mean_c -= np.mean(mean_c, axis=1, keepdims=True)  # subtract mean across states
-thres_mean_c = connectivity.threshold(mean_c, percentile=97, absolute_value=True)
-print(thres_mean_c.shape)
-
 #%%
-# We can see the `c_mean` and `c_mean_thres` array here is (components, states, channels, channels). We're only interested in the first spectral component. We can plot this by passing a `component=0` argument to :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>`.
+# We can see `c` is (components, states, channels, channels) array. We're only interested in the first spectral component. We can plot this by passing a `component=0` argument to :func:`connectivity.save <osl_dynamics.analysis.connectivity.save>`.
 
 connectivity.save(
-    thres_mean_c,
+    c,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
     component=0,
 )
@@ -212,57 +193,38 @@ connectivity.save(
 # ^^^^^^^^^^^^^^
 # We can display the coherence as a spatial map rather than a graphical network by averaging the edges for each parcel.
 
-mean_c_map = connectivity.mean_connections(mean_c)
+c = group.coherence_networks(bands=wb_comp)
+c_map = connectivity.mean_connections(c)
 
 fig, ax = power.save(
-    mean_c_map,
+    c_map,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
+    plot_kwargs={"symmetric_cbar": True},
 )
 
 #%%
 # Coherence vs Power
 # ^^^^^^^^^^^^^^^^^^
 # We may be interested in how the coherence relates to power for each state. We can do this by producing scatter plots of coherence vs power. Let's see how to do this.
+#
+# Let's first look at the group average for the first spectral component.
 
 # Calculate power
-p = power.variance_from_spectra(f, psd, wb_comp)
-print(p.shape)
+mean_p = group.power_maps(values="psd", bands=wb_comp)[0]
+print(mean_p.shape)
 
 # Calculate coherence
-c = connectivity.mean_coherence_from_spectra(f, coh, wb_comp)
-print(c.shape)
-
-#%%
-# Now we want to summarize the power and coherence for each state. We could do this by:
-#
-# - Averaging over subjects to get the power/coherence for each parcel.
-# - Averaging over parcels to get the power/coherence for each subject.
-#
-# Let's first average the power and coherence over subjects and select the first spectral component.
-
-# Average power over subjects
-mean_p = np.mean(p, axis=0)
-print(mean_p.shape)
-
-# Average coherence over subjects
-mean_c = np.mean(c, axis=0)
-print(mean_c.shape)
-
-# Keep the first spectral component
-mean_p = mean_p[0]
-mean_c = mean_c[0]
-print(mean_p.shape)
+mean_c = group.coherence_networks(values="coherence", bands=wb_comp)[0]
 print(mean_c.shape)
 
 #%%
-# We have a `(n_channels,)` array for each state for the power, but a `(n_channels, n_channels)` array for each state for the coherence. To reduce the coherence down to a 1D array for each state, we can calculate the average pairwise coherence for each channels. We can do this with the :func:`connectivity.mean_connections <osl_dynamics.analysis.connectivity.mean_connections>` function.
+# We have a `(n_channels,)` array for each state for the power, but a `(n_channels, n_channels)` array for each state for the coherence. To reduce the coherence down to a 1D array for each state, we can calculate the average pairwise coherence for each channel. We can do this with the :func:`connectivity.mean_connections <osl_dynamics.analysis.connectivity.mean_connections>` function.
 
 mean_c = connectivity.mean_connections(mean_c)
 print(mean_c.shape)
 
 #%%
 # Now we can make a scatter plot of coherence vs power for each state.
-
 
 fig, ax = plotting.plot_scatter(
     mean_p,
@@ -273,20 +235,16 @@ fig, ax = plotting.plot_scatter(
 )
 
 #%%
-# We can see the different states have different power/coherence properties. E.g. some states typically have more power/coherence at all parcels. If we average over subjects we get the following.
+# We can see the different states have different power/coherence properties. E.g. some states typically have more power/coherence at all parcels. Calling the methods on `spectra` instead of `group` gives the power and coherence for each subject. If we average over parcels we get the following.
 
-# Average power over parcels
-mean_p = np.mean(p, axis=-1)
+# Power for each subject, averaged over parcels
+p = spectra.power_maps(values="psd", bands=wb_comp)
+mean_p = np.mean(p[:, 0], axis=-1)
 print(mean_p.shape)
 
-# Average coherence over subjects
-mean_c = np.mean(c, axis=(-2, -1))
-print(mean_c.shape)
-
-# Keep the first spectral component
-mean_p = mean_p[:, 0]
-mean_c = mean_c[:, 0]
-print(mean_p.shape)
+# Coherence for each subject, averaged over parcels
+c = spectra.coherence_networks(values="coherence", bands=wb_comp)
+mean_c = np.mean(c[:, 0], axis=(-2, -1))
 print(mean_c.shape)
 
 # Plot
@@ -300,4 +258,4 @@ fig, ax = plotting.plot_scatter(
 #%%
 # Each scatter point is a subject here. We also see different subjects have different power/coherence characteristics.
 
-# sphinx_gallery_thumbnail_number = 17
+# sphinx_gallery_thumbnail_number = 18

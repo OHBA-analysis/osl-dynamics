@@ -337,13 +337,14 @@ def calc_psds(n_time_embeddings, n_pca_components, fs):
                 "standardize": {},
             }
             data.prepare(methods)
-            f, psd = spectral.welch_spectra(
+            spectra = spectral.welch_spectra(
                 data.time_series(concatenate=True),
                 sampling_frequency=fs,
                 frequency_range=[1, 45],
-                calc_coh=False,
+                cross_spectra=False,
             )
-            p = np.mean(psd, axis=0)  # average over channels
+            f = spectra.frequencies
+            p = np.mean(spectra.psd[0], axis=0)  # average over channels
             psds[-1].append(p)
     return f, psds
 
