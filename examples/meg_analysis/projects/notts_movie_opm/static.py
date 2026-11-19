@@ -5,7 +5,7 @@
 print("Setting up")
 import os
 import numpy as np
-from osl_dynamics.analysis import static
+from osl_dynamics.analysis import static, spectral
 from osl_dynamics.data import Data
 from osl_dynamics.utils import plotting
 from osl_dynamics.analysis import power, connectivity
@@ -76,20 +76,19 @@ data = Data(sf_files)
 ts = data.time_series()
 
 # Calculate spectra
-f, psd = static.welch_spectra(
-    data=ts,
-    window_length=500,
+spectra = static.welch_spectra(
+    ts,
     sampling_frequency=sampling_frequency,
-    standardize=True,
+    window_length=500,
 )
-np.save(f"{static_dir}/f.npy", f)
-np.save(f"{static_dir}/psd.npy", psd)
+spectra.save(f"{static_dir}/spectra.npz")
 
 #%% Plot PSDs
 
-# Load spectra (calculated with static/calc_spectra.py)
-f = np.load(f"{static_dir}/f.npy")
-psd = np.load(f"{static_dir}/psd.npy")
+# Load spectra
+spectra = spectral.Spectra.load(f"{static_dir}/spectra.npz")
+f = spectra.frequencies
+psd = spectra.psd  # (n_subjects, n_channels, n_freq)
 
 # Average over channels
 p = np.mean(psd, axis=1)
@@ -101,7 +100,7 @@ plotting.plot_line(
 )
 
 # Subject specific power maps
-varmap = power.variance_from_spectra(f, psd)
+varmap = spectra.power_maps()  # (n_subjects, n_channels)
 power.save(
     power_map=varmap,
     filename=f"{static_dir}/power_subj_.png",
@@ -110,7 +109,8 @@ power.save(
 )
 
 # Group level power map
-group_varmap = np.mean(varmap, axis=0)
+group = spectra.group_average()
+group_varmap = group.power_maps()  # (n_channels,)
 power.save(
     power_map=group_varmap,
     filename=f"{static_dir}/power_group_.png",
@@ -118,10 +118,8 @@ power.save(
 )
 
 # Plot group level power map for different freq bands
-psd = np.load(f"{static_dir}/psd.npy")
 for frequency_range in [[7, 13], [13, 30]]:
-    varmap = power.variance_from_spectra(f, psd, frequency_range=frequency_range)
-    group_varmap = np.mean(varmap, axis=0)
+    group_varmap = group.power_maps(frequency_range=frequency_range)
     power.save(
         power_map=group_varmap,
         filename=f"{static_dir}/power_group_{frequency_range[0]}_{frequency_range[1]}_.png",

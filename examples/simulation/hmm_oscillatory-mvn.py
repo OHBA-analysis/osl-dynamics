@@ -87,13 +87,15 @@ print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))
 
 # State spectra estimated with the inferred state time course
 x = data.trim_time_series(sequence_length=sequence_length, prepared=False)
-f, psd, coh = spectral.multitaper_spectra(
+spectra = spectral.multitaper_spectra(
     x,
-    sampling_frequency,
     alpha=alp,
+    sampling_frequency=sampling_frequency,
     frequency_range=[1, 45],
     standardize=False,
 )
+f = spectra.frequencies
+psd = spectra.psd[0]
 
 # Ground truth spectra
 true_psd = np.einsum("kfii->kif", sim.power_spectra(f)).real

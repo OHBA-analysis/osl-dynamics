@@ -30,24 +30,17 @@ x = data.trim_time_series(n_embeddings=15, sequence_length=400)
 alp = pickle.load(open(f"{output_dir}/alp.pkl", "rb"))
 
 # Calculate multitaper spectra
-f, psd, coh, w = spectral.multitaper_spectra(
-    data=x,
+spectra = spectral.multitaper_spectra(
+    x,
     alpha=alp,
     sampling_frequency=250,
-    time_half_bandwidth=4,
-    n_tapers=7,
     frequency_range=[1, 45],
-    standardize=True,
-    return_weights=True,
     n_jobs=16,
 )
-np.save(f"{output_dir}/f.npy", f)
-np.save(f"{output_dir}/psd.npy", psd)
-np.save(f"{output_dir}/coh.npy", coh)
-np.save(f"{output_dir}/w.npy", w)
+spectra.save(f"{output_dir}/spectra.npz")
 
 # Calculate non-negative matrix factorization on the stacked coherences
-nnmf = spectral.decompose_spectra(coh, n_components=2)
+nnmf = spectra.decompose(n_components=2)
 np.save(f"{output_dir}/nnmf_2.npy", nnmf)
 
 # Convert probabilities to a state time course

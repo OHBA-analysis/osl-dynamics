@@ -51,25 +51,18 @@ alpha = pickle.load(open(f"{inf_params_dir}/alp.pkl", "rb"))
 
 #%% Calculate multitaper
 
-f, psd, coh, w = spectral.multitaper_spectra(
-    data=data_,
+spectra = spectral.multitaper_spectra(
+    data_,
     alpha=alpha,
     sampling_frequency=250,
-    time_half_bandwidth=4,
-    n_tapers=7,
     frequency_range=[1, 45],
-    return_weights=True,  # weighting for each subject when we average the spectra
     n_jobs=8,
 )
-
-np.save(f"{spectra_dir}/f.npy", f)
-np.save(f"{spectra_dir}/psd.npy", psd)
-np.save(f"{spectra_dir}/coh.npy", coh)
-np.save(f"{spectra_dir}/w.npy", w)
+spectra.save(f"{spectra_dir}/spectra.npz")
 
 #%% Calculate non-negative matrix factorization (NNMF)
 
 # We fit 2 'wideband' components
-wb_comp = spectral.decompose_spectra(coh, n_components=2)
+wb_comp = spectra.decompose(n_components=2)
 
 np.save(f"{spectra_dir}/nnmf_2.npy", wb_comp)

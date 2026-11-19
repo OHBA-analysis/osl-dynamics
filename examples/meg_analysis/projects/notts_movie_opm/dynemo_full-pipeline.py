@@ -182,48 +182,20 @@ print("mean_a_NW:", mean_a_NW)
 
 #%% Spectral analysis
 
-# Source reconstructed data
-src_rec_data = training_data.trim_time_series(
-    sequence_length=config.sequence_length,
-    n_embeddings=training_data.n_embeddings,
-    prepared=False,
-)
-
 # Calculate subject-specific mode PSDs and coherences
-f, psd, coh, w = analysis.spectral.regression_spectra(
-    data=src_rec_data,
+spectra = analysis.spectral.regression_spectra(
+    training_data,
     alpha=a,
     sampling_frequency=250,
-    window_length=1000,
     frequency_range=[1, 45],
-    step_size=20,
-    n_sub_windows=8,
-    return_weights=True,
-    return_coef_int=True,
 )
 
-# Average subject-specific PSDs to get the group-level mode PSDs
-gpsd = np.average(psd, axis=0, weights=w)
+# Average subject-specific spectra to get the group-level mode spectra
+group = spectra.group_average()
 
 # Plot the regression coefficients (change from the static PSD) averaged
 # over channels
-P = gpsd[0]
-p = np.mean(P, axis=1)
-e = np.std(P, axis=1) / np.sqrt(P.shape[1])
-
-plotting.plot_line(
-    [f] * p.shape[0],
-    p,
-    labels=[f"Mode {i}" for i in range(1, p.shape[0] + 1)],
-    errors=[p - e, p + e],
-    x_range=[0, 45],
-    x_label="Frequency (Hz)",
-    y_label="PSD (a.u.)",
-    filename=f"{analysis_dir}/psd.png",
-)
-
-# Average subject-specific coherences to get the group-level mode coherences
-gcoh = np.average(coh, axis=0, weights=w)
+group.plot_psd(filename=f"{analysis_dir}/psd.png")
 
 #%% Power and connectivity maps
 
@@ -232,18 +204,17 @@ parcellation_file = "atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz"
 
 # Calculate power maps (change from the static power) using the regression
 # coefficients
-power_map = analysis.power.variance_from_spectra(f, gpsd[0])
+power_map = group.power_maps()
 analysis.power.save(
     power_map,
     parcellation_file=parcellation_file,
+    plot_kwargs={"symmetric_cbar": True},
     filename=f"{maps_dir}/pow_.png",
 )
 
-# Calculate connectivity maps using mode coherences
-coh_map = analysis.connectivity.mean_coherence_from_spectra(f, gcoh)
-
-# Keep the 2% of connections with the largest changes (increases or decreases)
-coh_map = analysis.connectivity.threshold(coh_map, percentile=98, absolute_value=True)
+# Calculate coherence networks, keeping the 3% of edges with the largest
+# changes (increases or decreases)
+coh_map = group.coherence_networks(percentile=97)
 
 # Save coherence networks
 analysis.connectivity.save(

@@ -40,26 +40,17 @@ data = Data(
 )
 
 # Calculate static power spectra
-f, psd, coh = static.welch_spectra(
-    data=data.time_series(),
-    window_length=data.sampling_frequency * 2,
-    sampling_frequency=data.sampling_frequency,
-    standardize=True,
-    calc_coh=True,
-    n_jobs=4,
-)
+spectra = static.welch_spectra(data, n_jobs=4)
+group = spectra.group_average()
+
+# Frequency bands: delta, theta, alpha, beta
+bands = [[1, 4], [4, 7], [7, 13], [13, 30]]
 
 # Calculate power maps for different frequency bands
-pow_map = [
-    power.variance_from_spectra(f, psd, frequency_range=[1, 4]),  # delta
-    power.variance_from_spectra(f, psd, frequency_range=[4, 7]),  # theta
-    power.variance_from_spectra(f, psd, frequency_range=[7, 13]),  # alpha
-    power.variance_from_spectra(f, psd, frequency_range=[13, 30]),  # beta
-]
-pow_map = np.swapaxes(pow_map, 0, 1)  # (freq_bands, subjects, ...) -> (subjects, freq_bands, ...)
+pow_map = spectra.power_maps(bands=bands)  # (subjects, freq_bands, parcels)
 
 # Plot static networks
-mean_pow_map = np.mean(pow_map, axis=0)  # average over subjects
+mean_pow_map = group.power_maps(bands=bands)  # average over subjects
 power.save(
     mean_pow_map,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
@@ -71,23 +62,14 @@ power.save(
     filename=f"{output_dir}/pow_.png",
 )
 
-# Calculate coherence networks for different frequency bands
-coh_net = np.array([
-    connectivity.mean_coherence_from_spectra(f, coh, frequency_range=[1, 4]),  # delta
-    connectivity.mean_coherence_from_spectra(f, coh, frequency_range=[4, 7]),  # theta
-    connectivity.mean_coherence_from_spectra(f, coh, frequency_range=[7, 13]),  # alpha
-    connectivity.mean_coherence_from_spectra(f, coh, frequency_range=[13, 30]),  # beta
-])
-coh_net = np.swapaxes(coh_net, 0, 1)  # (freq_bands, subjects, ...) -> (subjects, freq_bands, ...)
+# Calculate coherence networks for different frequency bands, keeping the
+# top 5% of edges
+mean_coh_net = group.coherence_networks(bands=bands, percentile=95)
 
 # Plot coherence networks
-mean_coh_net = np.mean(coh_net, axis=0)  # average over subjects
-for c in mean_coh_net:
-    np.fill_diagonal(c, 0)
 connectivity.save(
     mean_coh_net,
     parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz",
-    threshold=0.95,
     plot_kwargs={
         "edge_cmap": "Reds",
         "edge_vmin": 0,

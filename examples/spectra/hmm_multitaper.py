@@ -27,16 +27,16 @@ data = data.trim_time_series(n_embeddings=15, sequence_length=2000)
 
 alpha = pickle.load(open("results/inf_params/alp.pkl", "rb"))
 
-f, psd, coh, w = spectral.multitaper_spectra(
-    data=data,
+spectra = spectral.multitaper_spectra(
+    data,
     alpha=alpha,
     sampling_frequency=250,
     frequency_range=[1, 45],
-    return_weights=True,
-    calc_coh=True,
     n_jobs=5,
 )
-print("f.shape =", f.shape)
-print("psd.shape =", psd.shape)
-print("coh.shape =", coh.shape)
-print("w.shape =", w.shape)
+print(spectra)
+print("frequencies.shape =", spectra.frequencies.shape)
+print("psd.shape =", spectra.psd.shape)
+print("coherence.shape =", spectra.coherence.shape)
+print("weights.shape =", spectra.weights.shape)
+spectra.save("spectra.npz")

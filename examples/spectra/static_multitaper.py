@@ -20,44 +20,29 @@ get_data("notts_meguk_giles_5_subjects", rename="source_data")
 data = Data("source_data", n_jobs=5)
 data = data.time_series()
 
+# Static PSDs, coherences and cross spectra
+spectra = static.multitaper_spectra(
+    data,
+    sampling_frequency=250,
+    frequency_range=[1, 45],
+    n_jobs=5,
+)
+print()
+print(spectra)
+print("frequencies.shape =", spectra.frequencies.shape)
+print("psd.shape =", spectra.psd.shape)
+print("coherence.shape =", spectra.coherence.shape)
+print("cross_spectra.shape =", spectra.cross_spectra.shape)
+print("weights.shape =", spectra.weights.shape)
+print()
+
 # Static PSDs only
-f, psd, w = static.multitaper_spectra(
+spectra = static.multitaper_spectra(
     data,
     sampling_frequency=250,
     frequency_range=[1, 45],
-    return_weights=True,
+    cross_spectra=False,
     n_jobs=5,
 )
-print()
-print("f.shape =", f.shape)
-print("psd.shape =", psd.shape)
-print("w.shape =", w.shape)
-print()
-
-# Static PSDs and coherences
-f, psd, coh, w = static.multitaper_spectra(
-    data,
-    sampling_frequency=250,
-    frequency_range=[1, 45],
-    return_weights=True,
-    calc_coh=True,
-    n_jobs=5,
-)
-print("f.shape =", f.shape)
-print("psd.shape =", psd.shape)
-print("coh.shape =", coh.shape)
-print("w.shape =", w.shape)
-print()
-
-# Static cross PSDs
-f, cpsd, w = static.multitaper_spectra(
-    data,
-    sampling_frequency=250,
-    frequency_range=[1, 45],
-    return_weights=True,
-    calc_cpsd=True,
-    n_jobs=5,
-)
-print("f.shape =", f.shape)
-print("cpsd.shape =", cpsd.shape)
-print("w.shape", w.shape)
+print(spectra)
+print("psd.shape =", spectra.psd.shape)
