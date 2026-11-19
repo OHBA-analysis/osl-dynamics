@@ -4,6 +4,8 @@ from typing import Optional
 
 import numpy as np
 
+# Attributes that depend on whether the simulation generates states or modes,
+# never looked up in the state or observation model
 _COUNT_AND_TIME_COURSE = {
     "n_states",
     "n_modes",
@@ -69,7 +71,9 @@ class Simulation:
         self.obs_model = obs_model
         self.n_samples = n_samples
 
-        models = self._state_models(n_sessions=None)
+        models = (
+            state_model if isinstance(state_model, (list, tuple)) else [state_model]
+        )
         kinds = {_outputs_states(model) for model in models}
         if len(kinds) != 1:
             raise ValueError("All state models must generate either states or modes.")
@@ -101,10 +105,10 @@ class Simulation:
 
         self._time_course, self.time_series = self._simulate()
 
-    def _state_models(self, n_sessions: Optional[int]) -> list:
+    def _session_state_models(self) -> list:
         if isinstance(self.state_model, (list, tuple)):
             return list(self.state_model)
-        return [self.state_model] * (n_sessions or 1)
+        return [self.state_model] * self.n_sessions
 
     def _generate_time_course(self, state_model) -> np.ndarray:
         if self._generates_states:
@@ -121,7 +125,7 @@ class Simulation:
             time_course = self._generate_time_course(self.state_model)
             return time_course, self.obs_model.simulate_data(time_course)
 
-        models = self._state_models(self.n_sessions)
+        models = self._session_state_models()
         if self._time_courses_first:
             time_courses = [self._generate_time_course(model) for model in models]
             data = [

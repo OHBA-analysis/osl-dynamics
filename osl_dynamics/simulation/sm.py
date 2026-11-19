@@ -68,7 +68,7 @@ class MixedSine:
         # Simulate a random initial phase for each sinusoid
         self.phases = np.random.uniform(0, 2 * np.pi, self.n_modes)
 
-        # Generator mode time courses
+        # Logits of the mode time courses
         self.logits = np.empty([n_samples, self.n_modes], dtype=np.float32)
         t = np.arange(n_samples) / self.sampling_frequency
         for i in range(self.n_modes):

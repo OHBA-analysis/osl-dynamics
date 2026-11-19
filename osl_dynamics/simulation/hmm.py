@@ -31,7 +31,7 @@ class HMM:
         (:code:`'sequence'` or :code:`'uniform'`) to generate a transition
         probability matrix.
     stay_prob : float, optional
-        Used to generate the transition probability matrix is :code:`trans_prob`
+        Used to generate the transition probability matrix if :code:`trans_prob`
         is a :code:`str`. Must be between 0 and 1.
     n_states : int, optional
         Number of states. Needed when :code:`trans_prob` is a :code:`str` to
@@ -57,7 +57,6 @@ class HMM:
                 raise ValueError("trans_prob must be a square matrix.")
 
             # Check the rows of the transition probability matrix sum to one
-            # We allow a small error (1e-12) because of rounding errors
             row_sums = trans_prob.sum(axis=1)
             col_sums = trans_prob.sum(axis=0)
             if not all(np.isclose(row_sums, 1)):
@@ -75,7 +74,6 @@ class HMM:
         elif isinstance(trans_prob, str):
             # We generate the transition probability matrix
 
-            # Validation
             if trans_prob not in ["sequence", "uniform"]:
                 raise ValueError(
                     "trans_prob must be a np.array, 'sequence' or 'uniform'."
@@ -728,7 +726,7 @@ class MSess_HMM_MVN(Simulation):
                 scale=tc_std,
                 size=n_sessions,
             )
-            # truncate stay_prob at 0 and 1
+            # Truncate stay_prob at 0 and 1
             session_stay_prob = np.minimum(session_stay_prob, 1)
             session_stay_prob = np.maximum(session_stay_prob, 0)
         else:

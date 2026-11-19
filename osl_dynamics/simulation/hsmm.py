@@ -39,7 +39,6 @@ class HSMM:
         full_trans_prob: Optional[np.ndarray] = None,
         n_states: Optional[int] = None,
     ) -> None:
-        # Validation
         if off_diagonal_trans_prob is not None and full_trans_prob is not None:
             raise ValueError(
                 "Exactly one of off_diagonal_trans_prob and full_trans_prob "

@@ -20,7 +20,10 @@ class ObservationModel:
     Subclasses set :code:`self._n` (the number of states or modes) when it
     can be inferred from the parameters, and implement
     :code:`_create_parameters` (generate any random parameters) and
-    :code:`simulate_data`.
+    :code:`simulate_data`. A model with session-specific parameters also sets
+    :code:`self.n_sessions` and implements :code:`simulate_session_data`.
+    :code:`rescale` updates the ground truth parameters after the data are
+    standardized.
     """
 
     _n = None
@@ -189,7 +192,6 @@ class MVN(ObservationModel):
             # invertible
             eps = np.tile(np.eye(self.n_channels), [self._n, 1, 1]) * eps
 
-            # Calculate the covariances
             covariances = W @ W.transpose([0, 2, 1]) + eps
 
         else:
@@ -212,7 +214,6 @@ class MVN(ObservationModel):
         """
         n_samples = time_course.shape[0]
 
-        # Initialize array to hold data
         data = np.zeros((n_samples, self.n_channels))
 
         # Loop through all unique combinations of states or modes
@@ -251,7 +252,6 @@ class MVN(ObservationModel):
             Instantaneous covariances.
             Shape is (n_samples, n_channels, n_channels).
         """
-        # Initialize an array to hold the data
         n_samples = time_course.shape[0]
         inst_covs = np.empty([n_samples, self.n_channels, self.n_channels])
 
@@ -268,7 +268,6 @@ class MVN(ObservationModel):
     def rescale(self, mu: np.ndarray, sigma: np.ndarray) -> None:
         self.means = (self.means - mu[np.newaxis, ...]) / sigma[np.newaxis, ...]
         self.covariances = self.covariances / np.outer(sigma, sigma)[np.newaxis, ...]
-        self.observation_error = self.observation_error / sigma
 
 
 class OscillatoryMVN(MVN):
@@ -363,6 +362,11 @@ class OscillatoryMVN(MVN):
         )
         if frequencies.ndim == 2 and frequencies.shape[1] != self.n_channels:
             raise ValueError("frequencies has a different number of channels.")
+        if self._n is not None and self._n != len(frequencies):
+            raise ValueError(
+                "frequencies has a different number of states or modes to the "
+                "means or covariances."
+            )
         self.initialize(len(frequencies))
 
     def _ar2_coefficients(self) -> tuple:
@@ -476,6 +480,10 @@ class OscillatoryMVN(MVN):
         cpsd += np.diag(noise**2 * 2 / fs)
         return cpsd
 
+    def rescale(self, mu: np.ndarray, sigma: np.ndarray) -> None:
+        super().rescale(mu, sigma)
+        self.observation_error = self.observation_error / sigma
+
 
 class MDyn_MVN(MVN):
     """Multivariate normal observation model with multi-time-scale dynamics.
@@ -503,7 +511,6 @@ class MDyn_MVN(MVN):
     def _create_parameters(self) -> None:
         super()._create_parameters()
 
-        # Get the stds and corrs from self.covariance
         self.stds = array_ops.cov2std(self.covariances)
         self.corrs = array_ops.cov2corr(self.covariances)
 
@@ -525,15 +532,12 @@ class MDyn_MVN(MVN):
         # Reshape time_courses so that the multi-time-scale dimension is last
         time_courses = np.rollaxis(time_courses, 0, 3)
 
-        # Number of samples to simulate
         n_samples = time_courses.shape[0]
 
-        # Initialize array to hold data
         data = np.zeros([n_samples, self.n_channels])
 
         # Loop through all unique combinations of states or modes
         for tc in np.unique(time_courses, axis=0):
-            # Extract the different time courses
             alpha = tc[:, 0]
             beta = tc[:, 1]
 
@@ -575,15 +579,12 @@ class MDyn_MVN(MVN):
         # Reshape time_courses so that the multi-time-scale dimension is last
         time_courses = np.rollaxis(time_courses, 0, 3)
 
-        # Number of samples to simulate
         n_samples = time_courses.shape[0]
 
-        # Initialize an array to hold data
         inst_covs = np.empty([n_samples, self.n_channels, self.n_channels])
 
         # Loop through all unique combinations of states or modes
         for tc in np.unique(time_courses, axis=0):
-            # Extract the different time courses
             alpha = tc[:, 0]
             beta = tc[:, 1]
 
@@ -744,7 +745,7 @@ class MSess_MVN(MVN):
         # Only the session covariances were passed as a numpy array
         elif covs_is_array:
             option = self.session_means
-            if not option == "zero":
+            if option != "zero":
                 self.validate_embedding_parameters(self.embedding_vectors)
                 self.create_embeddings(self.embedding_vectors)
             self.group_means = super().create_means(option)
@@ -949,7 +950,6 @@ class MSess_MVN(MVN):
         data : np.ndarray
             Simulated data. Shape is (n_samples, n_channels).
         """
-        # Initialize array to hold data
         n_samples = time_course.shape[0]
         data = np.zeros((n_samples, self.n_channels))
 
@@ -1049,7 +1049,6 @@ class MSess_MVN(MVN):
         self.session_covariances = self.session_covariances / np.expand_dims(
             sigma[:, :, None] @ sigma[:, None, :], 1
         )
-        self.observation_error = self.observation_error / sigma
 
 
 class MAR(ObservationModel):
@@ -1079,7 +1078,6 @@ class MAR(ObservationModel):
     """
 
     def __init__(self, coeffs: np.ndarray, covs: np.ndarray) -> None:
-        # Validation
         if coeffs.ndim != 4:
             raise ValueError(
                 "coeffs must be a (n_states, n_lags, n_channels, n_channels) array."
@@ -1094,7 +1092,6 @@ class MAR(ObservationModel):
         if coeffs.shape[-1] != covs.shape[-1]:
             raise ValueError("Different number of channels in coeffs and covs passed.")
 
-        # Model parameters
         self.coeffs = coeffs
         self.covs = covs
         self.order = coeffs.shape[1]
@@ -1246,7 +1243,8 @@ class OscillatoryBursts(ObservationModel):
         Parameters
         ----------
         session : int
-            Session number.
+            Session number. :code:`None` if the frequencies are not
+            session-specific.
         time_course : np.ndarray
             State time course. Shape: (n_samples, n_states).
 
@@ -1413,7 +1411,7 @@ class Poisson(ObservationModel):
                 shape=1.0, scale=1.1, size=(self._n, self.n_channels)
             )
 
-            #  Add a large rate to a small number of the channels at random
+            # Add a large rate to a small number of the channels at random
             n_active_channels = max(1, self.n_channels // self._n)
             for i in range(self._n):
                 active_channels = np.unique(
@@ -1487,7 +1485,7 @@ class Dirichlet(ObservationModel):
                 shape=1.0, scale=1.1, size=(self._n, self.n_channels)
             )
 
-            #  Add a large concentration to a small number of the channels at random
+            # Add a large concentration to a small number of the channels at random
             n_active_channels = max(1, self.n_channels // self._n)
             for i in range(self._n):
                 active_channels = np.unique(
