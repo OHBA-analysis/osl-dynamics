@@ -347,3 +347,16 @@ def test_data_object_input(sim):
         spectral.multitaper_spectra(d, alpha=np.concatenate(alpha))
     with pytest.raises(ValueError, match="samples"):
         spectral.multitaper_spectra(d, alpha=[np.ones((5000, 3))] * 2)
+
+
+def test_unprepared_data_object(sim):
+    from osl_dynamics.data import Data
+
+    data, _, alpha_hmm, _ = sim
+    d = Data([x.copy() for x in data], sampling_frequency=FS)
+    s = spectral.multitaper_spectra(d, alpha=alpha_hmm)
+    np.testing.assert_array_equal(
+        s.psd, spectral.multitaper_spectra(data, FS, alpha=alpha_hmm).psd
+    )
+    with pytest.raises(ValueError, match="not been prepared"):
+        spectral.multitaper_spectra(d, alpha=[a[7:-7] for a in alpha_hmm])

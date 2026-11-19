@@ -2157,7 +2157,8 @@ def _resolve_data(
     time series before it was prepared. Each session starts after the samples
     lost to time-delay embedding or a sliding window (as in
     :code:`Data.trim_time_series`) and has the same number of samples as
-    :code:`alpha`.
+    :code:`alpha`. The Data object must be prepared as it was for training,
+    unless it has the same number of samples as :code:`alpha`.
 
     Parameters
     ----------
@@ -2200,6 +2201,14 @@ def _resolve_data(
         raise ValueError(
             f"The Data object has {len(arrays)} sessions, but alpha has "
             f"{len(alpha)}. Pass alpha for each session (concatenate=False)."
+        )
+
+    if data.arrays is arrays and any(len(x) != len(a) for x, a in zip(arrays, alpha)):
+        raise ValueError(
+            "The Data object has not been prepared and has a different number "
+            "of samples to alpha, so it cannot be aligned to alpha. Prepare the "
+            "Data object as it was for training, or pass "
+            "data.trim_time_series(..., prepared=False)."
         )
 
     offset = getattr(data, "n_embeddings", 1) // 2 + getattr(data, "n_window", 1) // 2
