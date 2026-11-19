@@ -998,6 +998,13 @@ def multitaper_spectra(
     kwargs = override_dict_defaults(default_kwargs, kwargs)
     _logger.info(f"Using kwargs: {kwargs}")
 
+    calc_coh = kwargs.get("calc_coh", True) and not kwargs.get("calc_cpsd", False)
+    if nnmf_components is not None and not calc_coh:
+        raise ValueError(
+            "nnmf_components requires the coherence: "
+            "pass calc_coh=True and calc_cpsd=False."
+        )
+
     # Directories
     model_dir = output_dir + "/model"
     inf_params_dir = output_dir + "/inf_params"
@@ -1025,20 +1032,17 @@ def multitaper_spectra(
     spectra = spectral.multitaper_spectra(data=data, alpha=alpha, **kwargs)
 
     # Unpack spectra and save
-    return_weights = kwargs.pop("return_weights", False)
-    if return_weights:
-        f, psd, coh, w = spectra
-        save(f"{spectra_dir}/f.npy", f)
-        save(f"{spectra_dir}/psd.npy", psd)
-        save(f"{spectra_dir}/coh.npy", coh)
-        save(f"{spectra_dir}/w.npy", w)
-    else:
-        f, psd, coh = spectra
-        save(f"{spectra_dir}/f.npy", f)
-        save(f"{spectra_dir}/psd.npy", psd)
-        save(f"{spectra_dir}/coh.npy", coh)
+    names = ["f", "psd"]
+    if calc_coh:
+        names.append("coh")
+    if kwargs.get("return_weights", False):
+        names.append("w")
+    outputs = dict(zip(names, spectra))
+    for name, value in outputs.items():
+        save(f"{spectra_dir}/{name}.npy", value)
 
     if nnmf_components is not None:
+        coh = outputs["coh"]
         # Calculate NNMF and save
         nnmf = spectral.decompose_spectra(coh, n_components=nnmf_components)
         save(f"{spectra_dir}/nnmf_{nnmf_components}.npy", nnmf)
@@ -1573,7 +1577,7 @@ def plot_group_nnmf_tde_hmm_networks(
 
     # Calculate group coherence relative to the average across states
     gc = connectivity.mean_coherence_from_spectra(f, gcoh, nnmf)
-    gc -= np.mean(gc, axis=0, keepdims=True)
+    gc -= np.mean(gc, axis=-3, keepdims=True)
 
     # Threshold
     gc = connectivity.threshold(gc, percentile=percentile, absolute_value=True)

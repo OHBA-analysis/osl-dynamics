@@ -9,14 +9,15 @@ Modules
   analysis (coherence, imaginary coherence, correlation).
 - :py:mod:`~osl_dynamics.analysis.fisher_kernel` — Fisher kernel for
   comparing HMM dynamics across sessions.
-- :py:mod:`~osl_dynamics.analysis.post_hoc` — Post-hoc spectral estimation
-  of state/mode spectra using multitaper or regression methods.
+- :py:mod:`~osl_dynamics.analysis.post_hoc` — Summary statistics of
+  state/mode time courses (lifetimes, intervals, fractional occupancies,
+  switching rates) and dual estimation.
 - :py:mod:`~osl_dynamics.analysis.power` — Power analysis (variance from
   spectra, band-limited power).
 - :py:mod:`~osl_dynamics.analysis.prediction` — Decoding/prediction using
   inferred dynamics.
-- :py:mod:`~osl_dynamics.analysis.spectral` — Spectral decomposition of
-  state/mode covariances into power maps and coherence networks.
+- :py:mod:`~osl_dynamics.analysis.spectral` — State/mode spectra (Welch,
+  multitaper and regression), coherence and spectral decomposition.
 - :py:mod:`~osl_dynamics.analysis.static` — Static (time-averaged) power
   and functional connectivity.
 

@@ -123,3 +123,6 @@ skip = '.git*,*.pdf,*.gii,*.scene,*.svg'
 check-hidden = true
 # ignore-regex = ''
 ignore-words-list = 'fo,fro,commun'
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
