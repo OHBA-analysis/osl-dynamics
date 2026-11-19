@@ -21,7 +21,7 @@ subjects_to_do = np.arange(0, 10)
 sessions_to_do = np.arange(0, 2)
 subj_sess_2exclude = np.zeros([10, 2]).astype(bool)
 
-sampling_frequency = 150  # Hz
+sampling_frequency = 250  # Hz
 
 # Source reconstruction files used to create the source space data
 parcellation_file="atlas-Giles_nparc-38_space-MNI_res-8x8x8.nii.gz"
