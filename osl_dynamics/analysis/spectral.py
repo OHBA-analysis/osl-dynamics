@@ -120,9 +120,11 @@ def _legacy_flags(
     }
     legacy["function"] = function
 
-    needs_cross = legacy.get("calc_cpsd", False) or legacy.get("calc_coh", False)
     if cross_spectra is None:
-        cross_spectra = not (flags.get("calc_coh") is False and not needs_cross)
+        # calc_coh=False (without calc_cpsd=True) only needs the PSDs
+        cross_spectra = flags.get("calc_coh") is not False or bool(
+            legacy.get("calc_cpsd")
+        )
     elif not cross_spectra:
         if flags.get("calc_cpsd") or flags.get("calc_coh"):
             raise ValueError("calc_coh and calc_cpsd require cross_spectra=True.")
@@ -233,6 +235,7 @@ def _weighted_nanmean(x: np.ndarray, weights: np.ndarray) -> np.ndarray:
 
 
 def _to_json(value):
+    """Convert numpy types in nested dicts/lists to JSON types."""
     if isinstance(value, dict):
         return {k: _to_json(v) for k, v in value.items()}
     if isinstance(value, (list, tuple, np.ndarray)):
@@ -510,11 +513,10 @@ class Spectra:
             raise ValueError(f"values must be one of {allowed}, got {name!r}.")
         return name, getattr(self, name)
 
-    def _move_band_axis(self, x: np.ndarray, single: bool) -> np.ndarray:
-        # Move the band axis (last) to after the session axis
-        axis = 0 if self.is_group else 1
-        x = np.moveaxis(x, -1, axis)
-        return np.squeeze(x, axis=axis) if single else x
+    @property
+    def _band_axis(self) -> int:
+        # Position of the band axis: after the session axis
+        return 0 if self.is_group else 1
 
     def power_maps(
         self,
@@ -554,7 +556,8 @@ class Spectra:
         weights, single = _frequency_weights(
             self.frequencies, bands, frequency_range, method
         )
-        return self._move_band_axis(psd @ weights.T, single)
+        p = np.moveaxis(psd @ weights.T, -1, self._band_axis)
+        return np.squeeze(p, axis=self._band_axis) if single else p
 
     def coherence_networks(
         self,
@@ -600,16 +603,14 @@ class Spectra:
             axis for static spectra.
         """
         _, coh = self._values(values, "coherence")
-        weights, _ = _frequency_weights(self.frequencies, bands, frequency_range)
-        c = self._move_band_axis(coh @ weights.T, single=False)
+        weights, single = _frequency_weights(self.frequencies, bands, frequency_range)
+        c = np.moveaxis(coh @ weights.T, -1, self._band_axis)
         if percentile is not None:
             c = _threshold_networks(c, percentile)
         if vectorize:
             m, n = np.triu_indices(self.n_channels, k=1)
             c = c[..., m, n]
-        if bands is None:
-            c = np.squeeze(c, axis=0 if self.is_group else 1)
-        return c
+        return np.squeeze(c, axis=self._band_axis) if single else c
 
     def decompose(
         self, n_components: int, values: str = "coherence", **kwargs
@@ -692,14 +693,15 @@ class Spectra:
             return np.mean(p, axis=-2), np.std(p, axis=-2) / np.sqrt(n)
 
         mean, error = _mean_and_error(psd)
+        has_states = mean.ndim == 2
         mean, error = np.atleast_2d(mean), np.atleast_2d(error)
         states = range(mean.shape[0]) if states is None else states
         if labels is None:
-            if mean.shape[0] == 1:
-                labels = ["Static"]
-            else:
+            if has_states:
                 kind = "Mode" if isinstance(self, RegressionSpectra) else "State"
                 labels = [f"{kind} {i + 1}" for i in states]
+            else:
+                labels = ["Static"]
 
         create_fig = ax is None
         if create_fig:
@@ -838,7 +840,7 @@ class Spectra:
         if calc_cpsd or calc_coh:
             cpsd = _full_from_triu(x, self.n_channels)
             if self.method == "welch":
-                # Previous convention for Welch's method
+                # The tuple for Welch's method has X_i conj(X_j)
                 cpsd = np.conj(cpsd)
         if calc_coh:
             psd = cpsd[..., range(self.n_channels), range(self.n_channels), :].real
@@ -1002,7 +1004,7 @@ class RegressionSpectra(StateSpectra):
         :math:`\\sigma_j`. Shape is (n_modes,).
     """
 
-    _session_arrays = ("coefs", "intercept")
+    _session_arrays = ("coefs", "intercept", "fractional_occupancies")
     _psd_values = ("psd_coefs", "psd_change", "psd", "static_psd")
     _coherence_values = (
         "coherence_coefs",
@@ -1019,10 +1021,6 @@ class RegressionSpectra(StateSpectra):
     @property
     def sigma(self) -> np.ndarray:
         return self._data["sigma"]
-
-    @property
-    def fractional_occupancies(self) -> np.ndarray:
-        raise AttributeError("RegressionSpectra has no fractional_occupancies.")
 
     def _spectra(self) -> np.ndarray:
         coefs = self._data["coefs"]
@@ -1623,6 +1621,7 @@ def regression_spectra(
     # Group-level standard deviation of the windowed alpha for each mode,
     # averaged over the sessions where the mode's alpha varies
     sigma = np.array([result[2] for result in results])
+    fractional_occupancies = np.array([result[3] for result in results])
     used = sigma > 0
     total_weight = np.sum(w[:, np.newaxis] * used, axis=0)
     group_sigma = np.divide(
@@ -1637,7 +1636,7 @@ def regression_spectra(
     coefs = []
     intercept = []
     for result, s, u in zip(results, sigma, used):
-        c, i, _ = result
+        c, i, _, _ = result
         # Modes that were not fitted in this session have no estimate (NaN)
         scale = np.divide(
             group_sigma, s, out=np.full_like(group_sigma, np.nan), where=u
@@ -1660,6 +1659,7 @@ def regression_spectra(
             "coefs": np.array(coefs),
             "intercept": np.array(intercept),
             "sigma": group_sigma,
+            "fractional_occupancies": fractional_occupancies,
         },
         n_channels=data[0].shape[1],
         weights=w,
@@ -2417,13 +2417,15 @@ class _Spectrogram:
     @property
     def frequencies(self) -> np.ndarray:
         """Frequency axis. Shape is (n_freq,)."""
-        f = np.arange(self.nfft // 2 + 1) * self.sampling_frequency / self.nfft
-        min_arg, max_arg = get_frequency_args_range(f, self.frequency_range)
-        return f[min_arg : max_arg + 1]
+        return self._fft_frequencies()[self._frequency_slice()]
+
+    def _fft_frequencies(self) -> np.ndarray:
+        return np.arange(self.nfft // 2 + 1) * self.sampling_frequency / self.nfft
 
     def _frequency_slice(self) -> slice:
-        f = np.arange(self.nfft // 2 + 1) * self.sampling_frequency / self.nfft
-        min_arg, max_arg = get_frequency_args_range(f, self.frequency_range)
+        min_arg, max_arg = get_frequency_args_range(
+            self._fft_frequencies(), self.frequency_range
+        )
         return slice(min_arg, max_arg + 1)
 
     def n_windows(self, n_samples: int) -> int:
@@ -2526,8 +2528,7 @@ class _Spectrogram:
         for X in self._fourier_chunks(x, window_indices, extra_bytes):
             n_segments = X.shape[2]
             if self.calc_cpsd:
-                # Cross spectra averaged over sub-windows and tapers,
-                # G[c, d] = mean_s conj(X_c) X_d
+                # G[w, f, c, d] = sum_s conj(X_c) X_d over sub-windows and tapers
                 X = np.moveaxis(X, -1, 1)
                 G = np.conj(X) @ np.swapaxes(X, -1, -2)
                 P = np.moveaxis(G[..., m, n], 1, -1) / n_segments
@@ -2559,7 +2560,7 @@ class _Spectrogram:
         for X in self._fourier_chunks(x, None, 0):
             n_terms += X.shape[0] * X.shape[2]
             if self.calc_cpsd:
-                # G[f, c, d] = sum_{w,s} X_c conj(X_d)
+                # total[f, c, d] += sum_{w,s} conj(X_c) X_d
                 Y = np.ascontiguousarray(np.transpose(X, (3, 0, 2, 1)))
                 Y = Y.reshape(X.shape[-1], -1, n_channels)
                 total = total + np.conj(np.swapaxes(Y, -1, -2)) @ Y
@@ -2567,7 +2568,6 @@ class _Spectrogram:
                 total = total + np.sum(X.real**2 + X.imag**2, axis=(0, 2))
 
         if self.calc_cpsd:
-            # total[f, c, d] = sum conj(X_c) X_d
             P = np.moveaxis(total[:, m, n], 0, -1)
         else:
             P = total
@@ -2780,7 +2780,7 @@ def _state_spectra_session(
         data = (data - np.mean(data, axis=0)) / np.std(data, axis=0)
 
     # Rescale the spectra to account for how much time each state was active
-    sum_alpha2 = np.sum(alpha**2, axis=0)
+    sum_alpha2 = np.sum(alpha**2, axis=0, dtype=np.float64)
     scaling = np.divide(
         n_samples,
         sum_alpha2,
@@ -2805,9 +2805,24 @@ def _state_spectra_session(
             p = spectrogram.mean(x)
         spectra.append((p * scaling[i]).astype(dtype))
 
-    fractional_occupancies = np.mean(alpha, axis=0)
-    fractional_occupancies /= np.sum(fractional_occupancies)
-    return np.array(spectra), fractional_occupancies
+    return np.array(spectra), _fractional_occupancies(alpha)
+
+
+def _fractional_occupancies(alpha: np.ndarray) -> np.ndarray:
+    """Mean of alpha for each state, normalized to sum to one.
+
+    Parameters
+    ----------
+    alpha : np.ndarray
+        State/mode time courses. Shape must be (n_samples, n_states).
+
+    Returns
+    -------
+    fractional_occupancies : np.ndarray
+        Shape is (n_states,).
+    """
+    mean = np.mean(alpha, axis=0, dtype=np.float64)
+    return mean / np.sum(mean)
 
 
 def _regression_spectra_session(
@@ -2815,7 +2830,7 @@ def _regression_spectra_session(
     alpha: np.ndarray,
     spectrogram: _Spectrogram,
     mixture: bool,
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Calculate regression spectra for a single session.
 
     Parameters
@@ -2842,6 +2857,9 @@ def _regression_spectra_session(
     sigma : np.ndarray
         Standard deviation of the windowed alpha for each mode.
         Shape is (n_modes,).
+    fractional_occupancies : np.ndarray
+        Mean of alpha for each mode, normalized to sum to one.
+        Shape is (n_modes,).
     """
     # Only use windows that do not overlap the zero padding at the start/end
     keep = _inner_windows(
@@ -2854,7 +2872,10 @@ def _regression_spectra_session(
             f"do not overlap its start or end, got {len(keep)}. Use longer "
             "sessions or a smaller window_length or step_size."
         )
-    return _regress_spectrogram(a, spectrogram.chunks(data, keep), mixture)
+    coefs, intercept, sigma = _regress_spectrogram(
+        a, spectrogram.chunks(data, keep), mixture
+    )
+    return coefs, intercept, sigma, _fractional_occupancies(alpha)
 
 
 def _regress_spectrogram(

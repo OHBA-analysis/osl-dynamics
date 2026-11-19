@@ -156,13 +156,6 @@ def variance_from_spectra(
             power_spectra.ndim > 2
             and power_spectra.shape[-2] == power_spectra.shape[-3]
         )
-        if cross_spectra and power_spectra.ndim == 4:
-            _logger.warning(
-                "Assuming power_spectra are cross spectra with shape (n_modes, "
-                "n_channels, n_channels, n_freq). Pass cross_spectra=False if "
-                "they are PSDs with shape (n_sessions, n_modes, n_channels, "
-                "n_freq)."
-            )
 
     if power_spectra.ndim == 2:
         # PSDs were passed

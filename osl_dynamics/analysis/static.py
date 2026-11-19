@@ -1,7 +1,7 @@
 """Functions to calculate static properties of time series data."""
 
 import logging
-from typing import Callable, List, Optional, Union
+from typing import TYPE_CHECKING, Callable, List, Optional, Union
 
 import numpy as np
 from sklearn.covariance import LedoitWolf
@@ -9,6 +9,9 @@ from sklearn.covariance import LedoitWolf
 from osl_dynamics.analysis import spectral
 from osl_dynamics.utils import array_ops
 from osl_dynamics.utils.progress import parallel_map
+
+if TYPE_CHECKING:
+    from osl_dynamics.data import Data
 
 _logger = logging.getLogger("osl-dynamics")
 
@@ -156,7 +159,7 @@ _LEGACY_STATIC_DEFAULTS = {
 
 @spectral._deprecate_positional(2)
 def welch_spectra(
-    data: Union[np.ndarray, list],
+    data: Union[np.ndarray, list, "Data"],
     sampling_frequency: Optional[float] = None,
     *,
     window_length: Optional[int] = None,
@@ -202,8 +205,8 @@ def welch_spectra(
         Deprecated. Only changes the tuple returned when the result is
         unpacked.
     calc_coh : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
+        Deprecated. :code:`calc_coh=False` is the same as
+        :code:`cross_spectra=False`.
     return_weights : bool, optional
         Deprecated. Only changes the tuple returned when the result is
         unpacked.
@@ -256,7 +259,7 @@ def welch_spectra(
 
 @spectral._deprecate_positional(2)
 def multitaper_spectra(
-    data: Union[np.ndarray, list],
+    data: Union[np.ndarray, list, "Data"],
     sampling_frequency: Optional[float] = None,
     *,
     window_length: Optional[int] = None,
@@ -302,8 +305,8 @@ def multitaper_spectra(
         Deprecated. Only changes the tuple returned when the result is
         unpacked.
     calc_coh : bool, optional
-        Deprecated. Only changes the tuple returned when the result is
-        unpacked.
+        Deprecated. :code:`calc_coh=False` is the same as
+        :code:`cross_spectra=False`.
     return_weights : bool, optional
         Deprecated. Only changes the tuple returned when the result is
         unpacked.

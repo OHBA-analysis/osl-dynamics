@@ -955,9 +955,6 @@ def _save_networks(
     """
     from osl_dynamics.analysis import connectivity, power
 
-    power_save_kwargs = {} if power_save_kwargs is None else power_save_kwargs
-    conn_save_kwargs = {} if conn_save_kwargs is None else conn_save_kwargs
-
     default_power_save_kwargs = {
         "parcellation_file": parcellation_file,
         "filename": f"{networks_dir}/pow_.png",
@@ -973,20 +970,17 @@ def _save_networks(
         default_power_save_kwargs["component"] = component
         default_conn_save_kwargs["component"] = component
 
-    for kwargs, defaults in [
-        (power_save_kwargs, default_power_save_kwargs),
-        (conn_save_kwargs, default_conn_save_kwargs),
-    ]:
+    def _merge(defaults, kwargs):
+        # kwargs override the defaults, including individual plot_kwargs
+        kwargs = dict(kwargs or {})
         if "plot_kwargs" in kwargs:
             kwargs["plot_kwargs"] = override_dict_defaults(
                 defaults.get("plot_kwargs", {}), kwargs["plot_kwargs"]
             )
-    power_save_kwargs = override_dict_defaults(
-        default_power_save_kwargs, power_save_kwargs
-    )
-    conn_save_kwargs = override_dict_defaults(
-        default_conn_save_kwargs, conn_save_kwargs
-    )
+        return override_dict_defaults(defaults, kwargs)
+
+    power_save_kwargs = _merge(default_power_save_kwargs, power_save_kwargs)
+    conn_save_kwargs = _merge(default_conn_save_kwargs, conn_save_kwargs)
 
     _logger.info(f"Using power_save_kwargs: {power_save_kwargs}")
     power.save(power_maps, **power_save_kwargs)

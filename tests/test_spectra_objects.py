@@ -87,7 +87,7 @@ def test_regression_quantities(regression):
         N_CHANNELS,
         len(s.frequencies),
     )
-    assert not hasattr(s, "fractional_occupancies")
+    np.testing.assert_allclose(s.fractional_occupancies.sum(axis=1), 1)
 
     # Each mode's coefficients peak at the frequency of its oscillation
     peaks = s.frequencies[s.psd_coefs.mean(axis=(0, 2)).argmax(axis=-1)]
@@ -360,3 +360,19 @@ def test_unprepared_data_object(sim):
     )
     with pytest.raises(ValueError, match="not been prepared"):
         spectral.multitaper_spectra(d, alpha=[a[7:-7] for a in alpha_hmm])
+
+
+def test_integer_alpha(sim):
+    data, _, alpha_hmm, _ = sim
+    s = spectral.multitaper_spectra(data, FS, alpha=alpha_hmm)
+    t = spectral.multitaper_spectra(data, FS, alpha=[a.astype(int) for a in alpha_hmm])
+    np.testing.assert_allclose(t.psd, s.psd, rtol=1e-6)
+
+
+def test_plot_psd_labels(sim):
+    data, _, alpha_hmm, _ = sim
+    s = spectral.multitaper_spectra(data, FS, alpha=[a[:, :1] for a in alpha_hmm])
+    _, ax = s.plot_psd(values="psd")
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["State 1"]
+    _, ax = s.plot_psd(values="static_psd")
+    assert [t.get_text() for t in ax.get_legend().get_texts()] == ["Static"]
