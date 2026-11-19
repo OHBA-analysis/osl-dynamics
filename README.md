@@ -69,6 +69,13 @@ conda activate osld
 
 See the [installation page](https://osl-dynamics.readthedocs.io/en/latest/install/index.html) for more information.
 
+## AI assistants
+
+To install the osl-dynamics skill in Claude Code:
+```
+/plugin install osl-dynamics --marketplace OHBA-analysis/osl-dynamics
+```
+
 ## Documentation
 
 The read the docs page should be automatically updated whenever there's a new commit on the `main` branch.

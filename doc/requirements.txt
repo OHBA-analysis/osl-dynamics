@@ -9,5 +9,6 @@ sphinx-sitemap
 pydata-sphinx-theme
 myst-parser
 sphinx-reredirects
+sphinx-llm
 
 -e .[tf]

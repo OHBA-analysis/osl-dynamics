@@ -21,6 +21,7 @@ import tempfile
 import urllib.request
 from pathlib import Path
 
+from docutils import nodes
 from sphinx.util import logging
 from sphinx_gallery.sorting import FileNameSortKey
 
@@ -30,6 +31,10 @@ logger = logging.getLogger(__name__)
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# sphinx-llm builds the Markdown pages with a second sphinx-build after the HTML
+# build. It uses the parcellation pages and tutorial outputs of the HTML build.
+MARKDOWN_BUILD = tags.has("sphinx_llm_markdown")
 
 # -- Parcellation pages --------------------------------------------------------
 
@@ -90,7 +95,8 @@ def fetch_parcellation_docs():
         page.write_text(text)
 
 
-fetch_parcellation_docs()
+if not MARKDOWN_BUILD:
+    fetch_parcellation_docs()
 
 # -- General configuration -----------------------------------------------------
 
@@ -117,7 +123,18 @@ extensions = [
     "myst_parser",
     "sphinx_design",
     "sphinx_reredirects",
+    "sphinx_llm.txt",
 ]
+
+# Markdown version of each page, llms.txt (from llms-txt.md) and llms-full.txt
+llms_txt_override_source = "llms-txt"
+llms_txt_full_build = True
+# Pages left out of llms-full.txt
+llms_txt_exclude = ["autoapi/**"]
+# Build the Markdown pages after the HTML pages
+llms_txt_build_parallel = False
+# No warnings for nodes the Markdown builder does not support
+llms_txt_suppress_unknown_node_warnings = True
 
 # The types are in the numpydoc docstrings
 autodoc_typehints = "none"
@@ -174,8 +191,27 @@ def skip_reexported(app, what, name, obj, skip, options):
     return skip
 
 
+def prepare_markdown(app, doctree, docname):
+    """Prepare the Markdown pages.
+
+    Removes raw HTML (e.g. interactive plots) and moves parameter types into
+    the parameter names, e.g. "data (np.ndarray)".
+    """
+    if app.builder.name != "llms-markdown":
+        return
+    for node in list(doctree.findall(nodes.raw)):
+        if "html" in node.get("format", "").split():
+            node.parent.remove(node)
+    for node in list(doctree.findall(nodes.classifier)):
+        term = node.parent.next_node(nodes.term)
+        if term is not None:
+            term += nodes.Text(f" ({node.astext()})")
+        node.parent.remove(node)
+
+
 def setup(app):
     app.connect("autoapi-skip-member", skip_reexported)
+    app.connect("doctree-resolved", prepare_markdown)
 
 # The suffix of source filenames.
 source_suffix = {".rst": "restructuredtext", ".md": "markdown"}
@@ -272,8 +308,9 @@ def setup_osf_downloads():
 sphinx_gallery_conf = {
     "examples_dirs": "tutorials",        # Contains source .py files
     "gallery_dirs": "tutorials_build",   # Where to output rendered gallery
-    "filename_pattern": setup_osf_downloads(),  # Tutorials to execute, e.g. r"1-.*\.py" for 1-*.py tutorials
-    "run_stale_examples": True,          # Force re-run when building
+    # Tutorials to execute, e.g. r"1-.*\.py" for 1-*.py tutorials
+    "filename_pattern": "^$" if MARKDOWN_BUILD else setup_osf_downloads(),
+    "run_stale_examples": not MARKDOWN_BUILD,  # Re-run the tutorials in the HTML build
     "within_subsection_order": FileNameSortKey,  # Build in alphabetical order of the filenames
     "backreferences_dir": "tutorials_build/backreferences",  # Lets minigallery find the tutorials
     "remove_config_comments": True,  # e.g. sphinx_gallery_thumbnail_path in the tutorials
@@ -293,9 +330,6 @@ htmlhelp_basename = "osl-dynamics-doc"
 # Base URL for the sitemap (used by sphinx_sitemap)
 html_baseurl = "https://osl-dynamics.readthedocs.io/en/latest/"
 sitemap_url_scheme = "{link}"
-
-# Extra files to copy to the root of the documentation site
-html_extra_path = ["llms.txt"]
 
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]

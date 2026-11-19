@@ -118,6 +118,19 @@ To check if your GPUs are working:
 
 This should print a list of the GPUs you have available (or an empty list :code:`[]` if there are none).
 
+AI assistants (optional)
+------------------------
+
+osl-dynamics has a skill for AI assistants. To install it in Claude Code:
+
+.. code::
+
+    /plugin install osl-dynamics --marketplace OHBA-analysis/osl-dynamics
+
+Claude Code loads the skill automatically when you ask it to write, run or debug osl-dynamics code.
+
+For other AI assistants, point them to `llms.txt <https://osl-dynamics.readthedocs.io/en/latest/llms.txt>`_.
+
 Removing osl-dynamics
 ---------------------
 

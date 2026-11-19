@@ -1,0 +1,16 @@
+{
+  "name": "osl-dynamics",
+  "description": "Plugins for the osl-dynamics toolbox.",
+  "owner": {
+    "name": "OHBA Analysis Group"
+  },
+  "plugins": [
+    {
+      "name": "osl-dynamics",
+      "source": "./skills",
+      "description": "Skill for analyzing MEG, EEG and fMRI brain dynamics with osl-dynamics.",
+      "strict": false,
+      "skills": ["./osl-dynamics"]
+    }
+  ]
+}
