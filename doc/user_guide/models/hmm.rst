@@ -19,7 +19,7 @@ The HMM describes a time series as a sequence of visits to a small number of **h
    * - Tutorials
      - :doc:`HMM Training </tutorials_build/3-2_hmm_training>`, :doc:`Getting the Inferred Parameters </tutorials_build/3-5_hmm_dynemo_get_inf_params>`, :doc:`HMM post-hoc analysis </tutorial_sections/hmm_post_hoc>`
    * - Examples
-     - `Simulation <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/hmm_hmm-mvn.py>`_, `MEG (TDE-HMM, rest) <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_analysis/tde-hmm_rest>`_, `MEG (TDE-HMM, task) <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_analysis/tde-hmm_task>`_, `MEG (AE-HMM, rest) <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_analysis/ae-hmm_rest>`_, `fMRI <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/fmri>`_
+     - `Simulation <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/hmm_hmm-mvn.py>`_, `Simulation (oscillatory, TDE-HMM) <https://github.com/OHBA-analysis/osl-dynamics/blob/main/examples/simulation/hmm_oscillatory-mvn.py>`_, `MEG (TDE-HMM, rest) <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_analysis/tde-hmm_rest>`_, `MEG (TDE-HMM, task) <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_analysis/tde-hmm_task>`_, `MEG (AE-HMM, rest) <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/meg_analysis/ae-hmm_rest>`_, `fMRI <https://github.com/OHBA-analysis/osl-dynamics/tree/main/examples/fmri>`_
 
 Generative Model
 ----------------
