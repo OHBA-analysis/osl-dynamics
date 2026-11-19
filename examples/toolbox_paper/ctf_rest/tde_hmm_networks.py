@@ -94,7 +94,7 @@ def compare_power_maps(data, output_dir, n_perm, significance_level, n_jobs):
     assignments = load_group_assignments()
 
     # Load spectra
-    spectra = spectral.Spectra.load(f"{output_dir}/spectra/spectra.npz")
+    spectra = spectral.Spectra.load(f"{output_dir}/spectra/multitaper.npz")
     nnmf = np.load(f"{output_dir}/spectra/nnmf_2.npy")
 
     # Calculate power maps for the first NNMF component
@@ -130,7 +130,7 @@ def compare_coherence_networks(data, output_dir, n_perm, significance_level, n_j
     assignments = load_group_assignments()
 
     # Load spectra
-    spectra = spectral.Spectra.load(f"{output_dir}/spectra/spectra.npz")
+    spectra = spectral.Spectra.load(f"{output_dir}/spectra/multitaper.npz")
     nnmf = np.load(f"{output_dir}/spectra/nnmf_2.npy")
 
     # Calculate coherence networks for the first NNMF component (only

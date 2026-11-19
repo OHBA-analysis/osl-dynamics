@@ -10,7 +10,7 @@ from osl_dynamics.analysis import power, spectral
 os.makedirs("figures", exist_ok=True)
 
 # Load spectra (calculated with static/calc_spectra.py)
-spectra = spectral.Spectra.load("spectra/spectra.npz")
+spectra = spectral.Spectra.load("spectra/static.npz")
 
 # Source reconstruction files used to create the source space data
 parcellation_file = (

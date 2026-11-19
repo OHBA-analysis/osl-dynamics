@@ -117,11 +117,11 @@ print(spectra.weights.shape)
 # Calculating the spectra can be time consuming so it is useful to save them.
 
 os.makedirs("results/spectra", exist_ok=True)
-spectra.save("results/spectra/spectra.npz")
+spectra.save("results/spectra/multitaper.npz")
 
 #%%
 # We can load them with::
 #
-#     spectra = spectral.Spectra.load("results/spectra/spectra.npz")
+#     spectra = spectral.Spectra.load("results/spectra/multitaper.npz")
 
 # sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/4-1_hmm_multitaper_spectra.png"

@@ -84,7 +84,7 @@ print(spectra)
 # Calculating power spectra can be time consuming. We will want to use the power spectra many times to make different plots. We don't want to have to calculate them repeatedly, so often it is convenient to save the spectra so we can load them later (instead of calculating them again). Let's save the spectra.
 
 os.makedirs("spectra", exist_ok=True)
-spectra.save("spectra/spectra.npz")
+spectra.save("spectra/static.npz")
 
 #%%
 # Plot the power spectra
@@ -95,7 +95,7 @@ import numpy as np
 
 from osl_dynamics.analysis import spectral
 
-spectra = spectral.Spectra.load("spectra/spectra.npz")
+spectra = spectral.Spectra.load("spectra/static.npz")
 f = spectra.frequencies
 psd = spectra.psd
 

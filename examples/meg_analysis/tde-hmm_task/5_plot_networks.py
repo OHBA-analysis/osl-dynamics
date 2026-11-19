@@ -27,7 +27,7 @@ parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
 
 #%% Load spectra
 
-spectra = spectral.Spectra.load(f"{spectra_dir}/spectra.npz")
+spectra = spectral.Spectra.load(f"{spectra_dir}/multitaper.npz")
 wb_comp = np.load(f"{spectra_dir}/nnmf_2.npy")  # (n_components, n_freq)
 
 # Group average

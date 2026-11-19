@@ -10,7 +10,7 @@ from osl_dynamics.analysis import connectivity, spectral
 os.makedirs("figures", exist_ok=True)
 
 # Load spectra (calculated with static/calc_spectra.py)
-spectra = spectral.Spectra.load("spectra/spectra.npz")
+spectra = spectral.Spectra.load("spectra/static.npz")
 
 # Plot subject specific coherence maps
 # Here, we just look at alpha activity (i.e. the 10 Hz activity)

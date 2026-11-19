@@ -2,14 +2,14 @@
 from state spectra and spectral components calculated with NNMF.
 
 The spectra are calculated with a multitaper, see
-examples/spectra/hmm_multitaper.py, and saved with spectra.save("spectra.npz").
+examples/spectra/hmm_multitaper.py, and saved with spectra.save("multitaper.npz").
 """
 
 from osl_dynamics.analysis import connectivity, spectral
 from osl_dynamics.utils import plotting
 
 # Load subject-specific state spectra
-spectra = spectral.Spectra.load("spectra.npz")
+spectra = spectral.Spectra.load("multitaper.npz")
 
 # Calculate spectral components using subject-specific coherences
 wb_comp = spectra.decompose(n_components=2)

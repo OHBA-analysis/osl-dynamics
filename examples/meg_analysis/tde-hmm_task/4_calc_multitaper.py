@@ -58,7 +58,7 @@ spectra = spectral.multitaper_spectra(
     frequency_range=[1, 45],
     n_jobs=8,
 )
-spectra.save(f"{spectra_dir}/spectra.npz")
+spectra.save(f"{spectra_dir}/multitaper.npz")
 
 #%% Calculate non-negative matrix factorization (NNMF)
 

@@ -26,7 +26,7 @@ parcellation_file = "atlas-Glasser_nparc-52_space-MNI_res-8x8x8.nii.gz"
 
 #%% Load spectra
 
-spectra = spectral.Spectra.load(f"{spectra_dir}/spectra.npz")
+spectra = spectral.Spectra.load(f"{spectra_dir}/regression.npz")
 
 # Group average
 group = spectra.group_average()

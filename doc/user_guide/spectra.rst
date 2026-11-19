@@ -40,8 +40,8 @@ The result stores the cross spectra of each session, which can be saved and load
 
 .. code-block:: python
 
-    spectra.save("spectra.npz")
-    spectra = spectral.Spectra.load("spectra.npz")
+    spectra.save("multitaper.npz")
+    spectra = spectral.Spectra.load("multitaper.npz")
 
 Pass :code:`cross_spectra=False` to only calculate the PSDs (no coherence), e.g. for a large number of channels.
 

@@ -862,13 +862,15 @@ def plot_tde_covariances(data, output_dir: str) -> None:
     plotting.plot_matrices(covs, filename=f"{inf_params_dir}/tde_covs.png")
 
 
-def plot_state_psds(data, output_dir: str) -> None:
+def plot_state_psds(
+    data, output_dir: str, spectra_file: str = "spectra/multitaper.npz"
+) -> None:
     """Plot state PSDs.
 
     This function expects multitaper spectra to have already been calculated
     and are in:
 
-    - :code:`<output_dir>/spectra/spectra.npz`.
+    - :code:`<output_dir>/spectra/multitaper.npz`.
 
     This function will output a file called :code:`psds.png` which contains
     a plot of the group-average PSD of each state.
@@ -879,20 +881,24 @@ def plot_state_psds(data, output_dir: str) -> None:
         Data object.
     output_dir : str
         Path to output directory.
+    spectra_file : str, optional
+        Path relative to :code:`output_dir` of the spectra saved by
+        :func:`multitaper_spectra`.
     """
-    spectra_dir = f"{output_dir}/spectra"
-    spectra = _load_spectra(spectra_dir)
-    spectra.plot_psd(values="psd", filename=f"{spectra_dir}/psds.png")
+    spectra = _load_spectra(output_dir, spectra_file)
+    spectra.plot_psd(values="psd", filename=f"{output_dir}/spectra/psds.png")
 
 
-def _load_spectra(spectra_dir: str):
+def _load_spectra(output_dir: str, spectra_file: str):
     """Load the spectra saved by :func:`multitaper_spectra` or
     :func:`regression_spectra`.
 
     Parameters
     ----------
-    spectra_dir : str
-        Path to the spectra directory.
+    output_dir : str
+        Path to output directory.
+    spectra_file : str
+        Path relative to :code:`output_dir` of the spectra.
 
     Returns
     -------
@@ -901,7 +907,7 @@ def _load_spectra(spectra_dir: str):
     """
     from osl_dynamics.analysis import spectral
 
-    filename = f"{spectra_dir}/spectra.npz"
+    filename = f"{output_dir}/{spectra_file}"
     if not Path(filename).exists():
         raise FileNotFoundError(
             f"{filename} not found. Calculate the spectra with "
@@ -1048,7 +1054,7 @@ def multitaper_spectra(
     This function will create the following directory:
 
     - :code:`<output_dir>/spectra`, which contains the post-hoc spectra
-      (:code:`spectra.npz`, see
+      (:code:`multitaper.npz`, see
       :class:`osl_dynamics.analysis.spectral.StateSpectra`).
 
     Parameters
@@ -1111,16 +1117,21 @@ def _calc_spectra(data, output_dir: str, function: str, kwargs: dict):
     from osl_dynamics.analysis import spectral
 
     spectra = getattr(spectral, function)(data=data, alpha=alpha, **kwargs)
-    spectra.save(f"{spectra_dir}/spectra.npz")
+    spectra.save(f"{spectra_dir}/{function.removesuffix('_spectra')}.npz")
     return spectra
 
 
-def nnmf(data, output_dir: str, n_components: int) -> None:
+def nnmf(
+    data,
+    output_dir: str,
+    n_components: int,
+    spectra_file: str = "spectra/multitaper.npz",
+) -> None:
     """Calculate non-negative matrix factorization (NNMF).
 
     This function expects spectra have already been calculated and are in:
 
-    - :code:`<output_dir>/spectra/spectra.npz`, which contains multitaper
+    - :code:`<output_dir>/spectra/multitaper.npz`, which contains multitaper
       spectra.
 
     Parameters
@@ -1131,11 +1142,13 @@ def nnmf(data, output_dir: str, n_components: int) -> None:
         Path to output directory.
     n_components : int
         Number of components to fit.
+    spectra_file : str, optional
+        Path relative to :code:`output_dir` of the spectra saved by
+        :func:`multitaper_spectra`.
     """
-    spectra_dir = output_dir + "/spectra"
-    spectra = _load_spectra(spectra_dir)
+    spectra = _load_spectra(output_dir, spectra_file)
     nnmf = spectra.decompose(n_components)
-    save(f"{spectra_dir}/nnmf_{n_components}.npy", nnmf)
+    save(f"{output_dir}/spectra/nnmf_{n_components}.npy", nnmf)
 
 
 def regression_spectra(data, output_dir: str, kwargs: dict) -> None:
@@ -1147,7 +1160,7 @@ def regression_spectra(data, output_dir: str, kwargs: dict) -> None:
     This function will create the following directory:
 
     - :code:`<output_dir>/spectra`, which contains the post-hoc spectra
-      (:code:`spectra.npz`, see
+      (:code:`regression.npz`, see
       :class:`osl_dynamics.analysis.spectral.RegressionSpectra`).
 
     Parameters
@@ -1276,6 +1289,7 @@ def plot_group_tde_hmm_networks(
     percentile: float = 97,
     power_save_kwargs: Optional[dict] = None,
     conn_save_kwargs: Optional[dict] = None,
+    spectra_file: str = "spectra/multitaper.npz",
 ) -> None:
     """Plot group-level TDE-HMM networks for a specified frequency band.
 
@@ -1287,7 +1301,7 @@ def plot_group_tde_hmm_networks(
 
     This function expects spectra have already been calculated and are in:
 
-    - :code:`<output_dir>/spectra/spectra.npz`, which contains multitaper
+    - :code:`<output_dir>/spectra/multitaper.npz`, which contains multitaper
       spectra.
 
     This function will create:
@@ -1324,16 +1338,18 @@ def plot_group_tde_hmm_networks(
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'display_mode': "xz", 'annotate': False}}
+    spectra_file : str, optional
+        Path relative to :code:`output_dir` of the spectra saved by
+        :func:`multitaper_spectra`.
     """
     parcellation_file = _get_parcellation_file(data, parcellation_file)
 
     # Directories
-    spectra_dir = output_dir + "/spectra"
     networks_dir = output_dir + "/networks"
     os.makedirs(networks_dir, exist_ok=True)
 
     # Group-average spectra
-    spectra = _load_spectra(spectra_dir).group_average()
+    spectra = _load_spectra(output_dir, spectra_file).group_average()
 
     # Plot PSDs
     for i in range(spectra.n_states):
@@ -1368,6 +1384,7 @@ def plot_group_nnmf_tde_hmm_networks(
     percentile: float = 97,
     power_save_kwargs: Optional[dict] = None,
     conn_save_kwargs: Optional[dict] = None,
+    spectra_file: str = "spectra/multitaper.npz",
 ) -> None:
     """Plot group-level TDE-HMM networks using a NNMF component to integrate the spectra.
 
@@ -1380,7 +1397,7 @@ def plot_group_nnmf_tde_hmm_networks(
 
     This function expects spectra have already been calculated and are in:
 
-    - :code:`<output_dir>/spectra/spectra.npz`, which contains multitaper
+    - :code:`<output_dir>/spectra/multitaper.npz`, which contains multitaper
       spectra.
 
     This function will create:
@@ -1422,11 +1439,13 @@ def plot_group_nnmf_tde_hmm_networks(
              'component': component,
              'filename': '<output_dir>/networks/coh_.png',
              'plot_kwargs': {'display_mode': "xz", 'annotate': False}}
+    spectra_file : str, optional
+        Path relative to :code:`output_dir` of the spectra saved by
+        :func:`multitaper_spectra`.
     """
     parcellation_file = _get_parcellation_file(data, parcellation_file)
 
     # Directories
-    spectra_dir = output_dir + "/spectra"
     networks_dir = output_dir + "/networks"
     os.makedirs(networks_dir, exist_ok=True)
 
@@ -1438,7 +1457,7 @@ def plot_group_nnmf_tde_hmm_networks(
         raise ValueError(f"{nnmf_file} not found.")
 
     # Group-average spectra
-    spectra = _load_spectra(spectra_dir).group_average()
+    spectra = _load_spectra(output_dir, spectra_file).group_average()
     f = spectra.frequencies
 
     # Plot the NNMF components
@@ -1484,6 +1503,7 @@ def plot_group_tde_dynemo_networks(
     percentile: float = 97,
     power_save_kwargs: Optional[dict] = None,
     conn_save_kwargs: Optional[dict] = None,
+    spectra_file: str = "spectra/regression.npz",
 ) -> None:
     """Plot group-level TDE-DyNeMo networks for a specified frequency band.
 
@@ -1495,7 +1515,7 @@ def plot_group_tde_dynemo_networks(
 
     This function expects spectra have already been calculated and are in:
 
-    - :code:`<output_dir>/spectra/spectra.npz`, which contains regression
+    - :code:`<output_dir>/spectra/regression.npz`, which contains regression
       spectra.
 
     This function will create:
@@ -1531,16 +1551,18 @@ def plot_group_tde_dynemo_networks(
 
             {'parcellation_file': parcellation_file,
              'filename': '<output_dir>/networks/coh_.png'}
+    spectra_file : str, optional
+        Path relative to :code:`output_dir` of the spectra saved by
+        :func:`regression_spectra`.
     """
     parcellation_file = _get_parcellation_file(data, parcellation_file)
 
     # Directories
-    spectra_dir = output_dir + "/spectra"
     networks_dir = output_dir + "/networks"
     os.makedirs(networks_dir, exist_ok=True)
 
     # Group-average spectra
-    spectra = _load_spectra(spectra_dir).group_average()
+    spectra = _load_spectra(output_dir, spectra_file).group_average()
 
     # Plot PSDs
     for i in range(spectra.n_states):

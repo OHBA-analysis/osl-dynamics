@@ -8,13 +8,13 @@ See examples/spectra/hmm_multitaper.py for how to calculate a multitaper
 and examples/spectra/dynemo_regression_spectra.py for how to calculate regression spectra.
 
 In this script we assume this has been done and the subject-specific spectra
-have been saved with spectra.save("spectra.npz").
+have been saved with spectra.save("multitaper.npz") or spectra.save("regression.npz").
 """
 
 from osl_dynamics.analysis import power, spectral
 
 # Load the subject-specific spectra
-spectra = spectral.Spectra.load("spectra.npz")
+spectra = spectral.Spectra.load("multitaper.npz")  # or "regression.npz"
 
 # Calculate the group average
 group = spectra.group_average()

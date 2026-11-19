@@ -35,7 +35,7 @@ np.save("data/hmm_features/sr.npy", sr)
 #%% Calculate multitaper power maps and coherence networks
 
 # Load multitaper spectra
-spectra = spectral.Spectra.load("data/spectra/spectra.npz")
+spectra = spectral.Spectra.load("data/spectra/multitaper.npz")
 
 # Calculate power maps
 power_maps = spectra.power_maps(values="psd")

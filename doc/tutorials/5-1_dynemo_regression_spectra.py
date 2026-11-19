@@ -128,11 +128,11 @@ print(spectra.weights.shape)
 # Calculating the spectra can be time consuming so it is useful to save them.
 
 os.makedirs("results/spectra", exist_ok=True)
-spectra.save("results/spectra/spectra.npz")
+spectra.save("results/spectra/regression.npz")
 
 #%%
 # We can load them with::
 #
-#     spectra = spectral.Spectra.load("results/spectra/spectra.npz")
+#     spectra = spectral.Spectra.load("results/spectra/regression.npz")
 
 # sphinx_gallery_thumbnail_path = "_static/tutorial_thumbs/5-1_dynemo_regression_spectra.png"

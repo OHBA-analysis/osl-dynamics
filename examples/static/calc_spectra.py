@@ -27,4 +27,4 @@ spectra = static.welch_spectra(
 )
 
 # Save to plot power/coherence maps: see static/plot_*_maps.py
-spectra.save("spectra/spectra.npz")
+spectra.save("spectra/static.npz")

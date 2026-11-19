@@ -67,7 +67,7 @@ spectra = static.welch_spectra(
 
 # Save
 os.makedirs("spectra", exist_ok=True)
-spectra.save("spectra/spectra.npz")
+spectra.save("spectra/static.npz")
 
 #%%
 # Calculate power
@@ -76,7 +76,7 @@ spectra.save("spectra/spectra.npz")
 
 from osl_dynamics.analysis import spectral
 
-spectra = spectral.Spectra.load("spectra/spectra.npz")
+spectra = spectral.Spectra.load("spectra/static.npz")
 
 #%%
 # To understand the spectra it's useful to print the shape of the frequency axis and the power spectra:
