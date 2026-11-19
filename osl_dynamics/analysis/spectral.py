@@ -6,7 +6,16 @@ import json
 import logging
 import warnings
 from dataclasses import dataclass
-from typing import Callable, Iterable, Iterator, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Callable,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
@@ -17,6 +26,9 @@ from sklearn.decomposition import non_negative_factorization
 from osl_dynamics.utils import array_ops
 from osl_dynamics.utils.misc import nextpow2
 from osl_dynamics.utils.progress import parallel_map
+
+if TYPE_CHECKING:
+    import matplotlib.axes
 
 _logger = logging.getLogger("osl-dynamics")
 
