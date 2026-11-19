@@ -30,6 +30,8 @@ from osl_dynamics.utils.progress import parallel_map
 if TYPE_CHECKING:
     import matplotlib.axes
 
+    from osl_dynamics.data import Data
+
 _logger = logging.getLogger("osl-dynamics")
 
 
@@ -1214,8 +1216,8 @@ _LEGACY_STATE_DEFAULTS = {
 
 @_deprecate_positional(3)
 def welch_spectra(
-    data: Union[np.ndarray, list],
-    sampling_frequency: float,
+    data: Union[np.ndarray, list, "Data"],
+    sampling_frequency: Optional[float] = None,
     alpha: Optional[Union[np.ndarray, list]] = None,
     *,
     window_length: Optional[int] = None,
@@ -1237,11 +1239,14 @@ def welch_spectra(
 
     Parameters
     ----------
-    data : np.ndarray or list
+    data : np.ndarray, list or osl_dynamics.data.Data
         Time series data. Must have shape (n_sessions, n_samples,
-        n_channels) or (n_samples, n_channels).
-    sampling_frequency : float
-        Sampling frequency in Hz.
+        n_channels) or (n_samples, n_channels). If a Data object is passed,
+        we use the data before it was prepared (e.g. before time-delay
+        embedding), aligned to :code:`alpha`.
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. Defaults to
+        :code:`data.sampling_frequency` for a Data object.
     alpha : np.ndarray or list, optional
         Inferred state probability time course. Must have shape
         (n_sessions, n_samples, n_states) or (n_samples, n_states).
@@ -1283,6 +1288,7 @@ def welch_spectra(
         Spectra for each session and state. :class:`Spectra` if
         :code:`alpha` is not passed.
     """
+    data, alpha, sampling_frequency = _resolve_data(data, alpha, sampling_frequency)
     if window_length is None:
         window_length = 2 * sampling_frequency
     if step_size is None:
@@ -1317,8 +1323,8 @@ def welch_spectra(
 
 @_deprecate_positional(3)
 def multitaper_spectra(
-    data: Union[np.ndarray, list],
-    sampling_frequency: float,
+    data: Union[np.ndarray, list, "Data"],
+    sampling_frequency: Optional[float] = None,
     alpha: Optional[Union[np.ndarray, list]] = None,
     *,
     window_length: Optional[int] = None,
@@ -1339,11 +1345,14 @@ def multitaper_spectra(
 
     Parameters
     ----------
-    data : np.ndarray or list
+    data : np.ndarray, list or osl_dynamics.data.Data
         Time series data. Must have shape (n_sessions, n_samples,
-        n_channels) or (n_samples, n_channels).
-    sampling_frequency : float
-        Sampling frequency in Hz.
+        n_channels) or (n_samples, n_channels). If a Data object is passed,
+        we use the data before it was prepared (e.g. before time-delay
+        embedding), aligned to :code:`alpha`.
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. Defaults to
+        :code:`data.sampling_frequency` for a Data object.
     alpha : np.ndarray or list, optional
         Inferred state probability time course. Must have shape
         (n_sessions, n_samples, n_states) or (n_samples, n_states).
@@ -1389,6 +1398,7 @@ def multitaper_spectra(
         Spectra for each session and state. :class:`Spectra` if
         :code:`alpha` is not passed.
     """
+    data, alpha, sampling_frequency = _resolve_data(data, alpha, sampling_frequency)
     if window_length is None:
         window_length = 2 * sampling_frequency
     if step_size is None:
@@ -1425,9 +1435,9 @@ def multitaper_spectra(
 
 @_deprecate_positional(3)
 def regression_spectra(
-    data: Union[np.ndarray, list],
+    data: Union[np.ndarray, list, "Data"],
     alpha: Union[np.ndarray, list],
-    sampling_frequency: float,
+    sampling_frequency: Optional[float] = None,
     *,
     window_length: Optional[int] = None,
     step_size: Optional[int] = None,
@@ -1481,14 +1491,17 @@ def regression_spectra(
 
     Parameters
     ----------
-    data : np.ndarray or list
+    data : np.ndarray, list or osl_dynamics.data.Data
         Data to calculate a spectrogram for. Shape must be
-        (n_sessions, n_samples, n_channels) or (n_samples, n_channels).
+        (n_sessions, n_samples, n_channels) or (n_samples, n_channels). If a
+        Data object is passed, we use the data before it was prepared (e.g.
+        before time-delay embedding), aligned to :code:`alpha`.
     alpha : np.ndarray or list
         Inferred mode mixing factors. Shape must be
         (n_sessions, n_samples, n_modes) or (n_samples, n_modes).
-    sampling_frequency : float
-        Sampling_frequency in Hz.
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. Defaults to
+        :code:`data.sampling_frequency` for a Data object.
     window_length : int, optional
         Number samples to use in the window to calculate a spectrum.
         Defaults to 4 seconds (rounded to a multiple of
@@ -1537,6 +1550,7 @@ def regression_spectra(
     """
     if alpha is None:
         raise ValueError("alpha must be passed.")
+    data, alpha, sampling_frequency = _resolve_data(data, alpha, sampling_frequency)
     data, alpha = _validate_data_alpha(data, alpha)
 
     legacy, cross_spectra = _legacy_flags(
@@ -2130,6 +2144,75 @@ def get_frequency_args_range(
 # Maximum size in bytes of the intermediate arrays used to calculate the
 # spectrogram for a chunk of windows
 _MAX_CHUNK_BYTES = 2**28
+
+
+def _resolve_data(
+    data,
+    alpha: Optional[Union[np.ndarray, list]],
+    sampling_frequency: Optional[float],
+) -> Tuple[Union[np.ndarray, list], Optional[Union[np.ndarray, list]], float]:
+    """Get the time series and sampling frequency from a Data object.
+
+    If :code:`data` is an :class:`osl_dynamics.data.Data` object, we use the
+    time series before it was prepared. Each session starts after the samples
+    lost to time-delay embedding or a sliding window (as in
+    :code:`Data.trim_time_series`) and has the same number of samples as
+    :code:`alpha`.
+
+    Parameters
+    ----------
+    data : np.ndarray, list or osl_dynamics.data.Data
+        Time series data.
+    alpha : np.ndarray or list
+        State/mode time courses.
+    sampling_frequency : float
+        Sampling frequency in Hz. If :code:`None`, we use
+        :code:`data.sampling_frequency`.
+
+    Returns
+    -------
+    data : np.ndarray or list
+        Time series data.
+    alpha : np.ndarray or list
+        State/mode time courses.
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    """
+    is_data_object = hasattr(data, "raw_data_arrays")
+
+    if sampling_frequency is None:
+        sampling_frequency = getattr(data, "sampling_frequency", None)
+        if sampling_frequency is None:
+            raise ValueError(
+                "sampling_frequency must be passed or specified in the Data object."
+            )
+
+    if not is_data_object:
+        return data, alpha, sampling_frequency
+
+    arrays = data.raw_data_arrays
+    if alpha is None:
+        return [np.asarray(x) for x in arrays], None, sampling_frequency
+
+    if isinstance(alpha, np.ndarray):
+        alpha = [alpha] if alpha.ndim == 2 else list(alpha)
+    if len(alpha) != len(arrays):
+        raise ValueError(
+            f"The Data object has {len(arrays)} sessions, but alpha has "
+            f"{len(alpha)}. Pass alpha for each session (concatenate=False)."
+        )
+
+    offset = getattr(data, "n_embeddings", 1) // 2 + getattr(data, "n_window", 1) // 2
+    time_series = []
+    for i, (x, a) in enumerate(zip(arrays, alpha)):
+        if offset + len(a) > len(x):
+            raise ValueError(
+                f"alpha for session {i} has {len(a)} samples, but the data only "
+                f"has {len(x) - offset} after the samples lost to time-delay "
+                "embedding/sliding windows."
+            )
+        time_series.append(np.asarray(x[offset : offset + len(a)]))
+    return time_series, list(alpha), sampling_frequency
 
 
 def _validate_data_alpha(

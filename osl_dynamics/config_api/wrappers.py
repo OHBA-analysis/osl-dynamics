@@ -1048,11 +1048,8 @@ def multitaper_spectra(
 ) -> None:
     """Calculate multitaper spectra.
 
-    This function expects a model has already been trained and the following
-    directories exist:
-
-    - :code:`<output_dir>/model`, which contains the trained model.
-    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+    This function expects the inferred parameters to be in
+    :code:`<output_dir>/inf_params`.
 
     This function will create the following directory:
 
@@ -1105,17 +1102,9 @@ def _calc_spectra(data, output_dir: str, function: str, kwargs: dict):
     if data is None:
         raise ValueError("data must be passed.")
 
-    kwargs = dict(kwargs)
-    if kwargs.get("sampling_frequency") is None:
-        kwargs["sampling_frequency"] = data.sampling_frequency
-    if kwargs["sampling_frequency"] is None:
-        raise ValueError(
-            "sampling_frequency must be passed or specified in the Data object."
-        )
     _logger.info(f"Using kwargs: {kwargs}")
 
     # Directories
-    model_dir = output_dir + "/model"
     inf_params_dir = output_dir + "/inf_params"
     spectra_dir = output_dir + "/spectra"
     os.makedirs(spectra_dir, exist_ok=True)
@@ -1123,19 +1112,8 @@ def _calc_spectra(data, output_dir: str, function: str, kwargs: dict):
     # Load the inferred state probabilities / mixing coefficients
     alpha = load(f"{inf_params_dir}/alp.pkl")
 
-    # Get the config used to create the model
-    from osl_dynamics.models.mod_base import ModelBase
-
-    model_config, _ = ModelBase.load_config(model_dir)
-
-    # Get unprepared data (i.e. the data before calling Data.prepare)
-    # We also trim the data to account for the data points lost to
-    # time embedding or applying a sliding window
-    data = data.trim_time_series(
-        sequence_length=model_config["sequence_length"], prepared=False
-    )
-
-    # Calculate and save the spectra
+    # Calculate and save the spectra (the data before Data.prepare is
+    # aligned to alpha)
     from osl_dynamics.analysis import spectral
 
     spectra = getattr(spectral, function)(data=data, alpha=alpha, **kwargs)
@@ -1169,11 +1147,8 @@ def nnmf(data, output_dir: str, n_components: int) -> None:
 def regression_spectra(data, output_dir: str, kwargs: dict) -> None:
     """Calculate regression spectra.
 
-    This function expects a model has already been trained and the following
-    directories exist:
-
-    - :code:`<output_dir>/model`, which contains the trained model.
-    - :code:`<output_dir>/inf_params`, which contains the inferred parameters.
+    This function expects the inferred parameters to be in
+    :code:`<output_dir>/inf_params`.
 
     This function will create the following directory:
 

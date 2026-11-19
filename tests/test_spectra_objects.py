@@ -317,3 +317,33 @@ def test_variance_from_spectra_cross_spectra_argument():
     psd = rng.uniform(size=(2, N_CHANNELS, N_CHANNELS, 10))
     p = power.variance_from_spectra(None, psd, cross_spectra=False)
     np.testing.assert_allclose(p, psd.mean(axis=-1))
+
+
+def test_data_object_input(sim):
+    from osl_dynamics.data import Data
+
+    data, alpha_mix, _, _ = sim
+    d = Data([x.copy() for x in data], sampling_frequency=FS)
+    d.tde_pca(n_embeddings=7, n_pca_components=4)
+
+    # alpha for the trimmed data, as returned by a model
+    trimmed = d.trim_time_series(sequence_length=200, prepared=False)
+    alpha = [a[3 : 3 + len(t)] for a, t in zip(alpha_mix, trimmed)]
+
+    for fn, args in [
+        (spectral.multitaper_spectra, {}),
+        (spectral.welch_spectra, {}),
+        (spectral.regression_spectra, {"window_length": 200}),
+    ]:
+        expected = fn(trimmed, alpha=alpha, sampling_frequency=FS, **args)
+        actual = fn(d, alpha=alpha, **args)
+        np.testing.assert_array_equal(actual.psd, expected.psd)
+
+    # Static spectra use all the raw data
+    s = static.welch_spectra(d)
+    np.testing.assert_array_equal(s.psd, static.welch_spectra(data, FS).psd)
+
+    with pytest.raises(ValueError, match="sessions"):
+        spectral.multitaper_spectra(d, alpha=np.concatenate(alpha))
+    with pytest.raises(ValueError, match="samples"):
+        spectral.multitaper_spectra(d, alpha=[np.ones((5000, 3))] * 2)

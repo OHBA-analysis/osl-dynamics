@@ -157,7 +157,7 @@ _LEGACY_STATIC_DEFAULTS = {
 @spectral._deprecate_positional(2)
 def welch_spectra(
     data: Union[np.ndarray, list],
-    sampling_frequency: float,
+    sampling_frequency: Optional[float] = None,
     *,
     window_length: Optional[int] = None,
     step_size: Optional[int] = None,
@@ -178,11 +178,13 @@ def welch_spectra(
 
     Parameters
     ----------
-    data : np.ndarray or list
+    data : np.ndarray, list or osl_dynamics.data.Data
         Time series data. Must have shape (n_sessions, n_samples,
-        n_channels) or (n_samples, n_channels).
-    sampling_frequency : float
-        Sampling frequency in Hz.
+        n_channels) or (n_samples, n_channels). If a Data object is passed,
+        we use the data before it was prepared.
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. Defaults to
+        :code:`data.sampling_frequency` for a Data object.
     window_length : int, optional
         Length of the data segment to use to calculate spectra.
         If None, we use :code:`2 * sampling_frequency`.
@@ -219,6 +221,7 @@ def welch_spectra(
     spectra : osl_dynamics.analysis.spectral.Spectra
         Spectra for each session.
     """
+    data, _, sampling_frequency = spectral._resolve_data(data, None, sampling_frequency)
     if window_length is None:
         window_length = 2 * sampling_frequency
     if step_size is None:
@@ -254,7 +257,7 @@ def welch_spectra(
 @spectral._deprecate_positional(2)
 def multitaper_spectra(
     data: Union[np.ndarray, list],
-    sampling_frequency: float,
+    sampling_frequency: Optional[float] = None,
     *,
     window_length: Optional[int] = None,
     time_half_bandwidth: float = 4,
@@ -274,11 +277,13 @@ def multitaper_spectra(
 
     Parameters
     ----------
-    data : np.ndarray or list
+    data : np.ndarray, list or osl_dynamics.data.Data
         Time series data. Must have shape (n_sessions, n_samples,
-        n_channels) or (n_samples, n_channels).
-    sampling_frequency : float
-        Sampling frequency in Hz.
+        n_channels) or (n_samples, n_channels). If a Data object is passed,
+        we use the data before it was prepared.
+    sampling_frequency : float, optional
+        Sampling frequency in Hz. Defaults to
+        :code:`data.sampling_frequency` for a Data object.
     window_length : int, optional
         Length of the data segment to use to calculate the multitaper.
         If None, we use :code:`2 * sampling_frequency`.
@@ -319,6 +324,7 @@ def multitaper_spectra(
     spectra : osl_dynamics.analysis.spectral.Spectra
         Spectra for each session.
     """
+    data, _, sampling_frequency = spectral._resolve_data(data, None, sampling_frequency)
     if window_length is None:
         window_length = 2 * sampling_frequency
     if step_size is None:
