@@ -1,29 +1,28 @@
-"""Classes for simulating Hidden Markov Models (HMMs)."""
+"""Hidden Markov Models (HMMs)."""
 
 import warnings
 from typing import List, Optional, Union
 
 import numpy as np
 
+from osl_dynamics.simulation.base import Simulation
+from osl_dynamics.simulation.hsmm import HSMM
 from osl_dynamics.simulation.obs_mod import (
     MAR,
     MVN,
     MDyn_MVN,
     MSess_MVN,
     OscillatoryBursts,
+    OscillatoryMVN,
     Poisson,
     Dirichlet,
     TDECovs,
 )
-from osl_dynamics.simulation.hsmm import HSMM
-from osl_dynamics.simulation.base import Simulation
 from osl_dynamics.utils import array_ops
 
 
 class HMM:
-    """HMM base class.
-
-    Contains the transition probability matrix.
+    """Hidden Markov Model (HMM) state model.
 
     Parameters
     ----------
@@ -132,7 +131,20 @@ class HMM:
         return trans_prob
 
     def generate_states(self, n_samples: int) -> np.ndarray:
-        # Here the time course always start from state 0
+        """Generate a state time course.
+
+        The time course always starts in the first state.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        state_time_course : np.ndarray
+            One-hot state time course. Shape is (n_samples, n_states).
+        """
         rands = [
             iter(np.random.choice(self.n_states, size=n_samples, p=self.trans_prob[i]))
             for i in range(self.n_states)
@@ -143,8 +155,282 @@ class HMM:
         return array_ops.get_one_hot(states, n_states=self.n_states)
 
 
+class MDynHMM:
+    """Two independent HMMs for multi-time-scale dynamics.
+
+    The first HMM (:code:`alpha_hmm`) gives the time course of the means and
+    standard deviations, the second (:code:`beta_hmm`) gives the time course
+    of the correlations. See :class:`~osl_dynamics.simulation.MDyn_MVN`.
+
+    Parameters
+    ----------
+    trans_prob : np.ndarray or str
+        Transition probability matrix of both HMMs. See :class:`HMM`.
+    stay_prob : float, optional
+        Used to generate the transition probability matrix if
+        :code:`trans_prob` is a :code:`str`.
+    n_states : int, optional
+        Number of states.
+    """
+
+    def __init__(
+        self,
+        trans_prob: Union[np.ndarray, str],
+        stay_prob: Optional[float] = None,
+        n_states: Optional[int] = None,
+    ) -> None:
+        self.alpha_hmm = HMM(
+            trans_prob=trans_prob, stay_prob=stay_prob, n_states=n_states
+        )
+        self.beta_hmm = HMM(
+            trans_prob=trans_prob, stay_prob=stay_prob, n_states=n_states
+        )
+        self.n_states = self.alpha_hmm.n_states
+
+    def generate_states(self, n_samples: int) -> np.ndarray:
+        """Generate the two state time courses.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        state_time_courses : np.ndarray
+            Shape is (2, n_samples, n_states).
+        """
+        alpha = self.alpha_hmm.generate_states(n_samples)
+        beta = self.beta_hmm.generate_states(n_samples)
+        return np.array([alpha, beta])
+
+
+class HierarchicalHMM:
+    """Two-level hierarchical HMM.
+
+    A top-level HMM (or HSMM) selects which bottom-level HMM generates the
+    state at each time point. The bottom-level HMMs share the same states and
+    only differ in their transition probability matrix.
+
+    Parameters
+    ----------
+    top_level_trans_prob : np.ndarray or str
+        Transition probability matrix of the top-level HMM. Used when
+        :code:`top_level_hmm_type='hmm'`.
+    bottom_level_trans_probs : list of np.ndarray or str
+        Transition probability matrices for the bottom-level HMMs.
+    n_states : int, optional
+        Number of states.
+    top_level_stay_prob : float, optional
+        The :code:`stay_prob` for the top-level HMM. Used if
+        :code:`top_level_trans_prob` is a :code:`str`.
+    bottom_level_stay_probs : list of float, optional
+        The :code:`stay_prob` for each bottom-level HMM. Used when the
+        corresponding entry in :code:`bottom_level_trans_probs` is a
+        :code:`str`.
+    top_level_hmm_type : str, optional
+        Either :code:`'hmm'` or :code:`'hsmm'`.
+    top_level_gamma_shape : float, optional
+        Shape parameter for the Gamma distribution of the top-level state
+        lifetimes when :code:`top_level_hmm_type='hsmm'`.
+    top_level_gamma_scale : float, optional
+        Scale parameter for the Gamma distribution of the top-level state
+        lifetimes when :code:`top_level_hmm_type='hsmm'`.
+    """
+
+    def __init__(
+        self,
+        top_level_trans_prob: Union[np.ndarray, str, None],
+        bottom_level_trans_probs: List[Union[np.ndarray, str]],
+        n_states: Optional[int] = None,
+        top_level_stay_prob: Optional[float] = None,
+        bottom_level_stay_probs: Optional[List[float]] = None,
+        top_level_hmm_type: str = "hmm",
+        top_level_gamma_shape: Optional[float] = None,
+        top_level_gamma_scale: Optional[float] = None,
+    ) -> None:
+        if bottom_level_stay_probs is None:
+            bottom_level_stay_probs = [None] * len(bottom_level_trans_probs)
+
+        # Top-level HMM to select the bottom-level HMM at each time point
+        self.n_bottom_level_hmms = len(bottom_level_trans_probs)
+        if top_level_hmm_type.lower() == "hmm":
+            self.top_level_hmm = HMM(
+                trans_prob=top_level_trans_prob,
+                stay_prob=top_level_stay_prob,
+                n_states=self.n_bottom_level_hmms,
+            )
+        elif top_level_hmm_type.lower() == "hsmm":
+            self.top_level_hmm = HSMM(
+                gamma_shape=top_level_gamma_shape,
+                gamma_scale=top_level_gamma_scale,
+                n_states=self.n_bottom_level_hmms,
+            )
+        else:
+            raise ValueError(f"Unsupported top_level_hmm_type: {top_level_hmm_type}")
+
+        # Bottom-level HMMs to generate the states
+        self.bottom_level_hmms = [
+            HMM(
+                trans_prob=bottom_level_trans_probs[i],
+                stay_prob=bottom_level_stay_probs[i],
+                n_states=n_states,
+            )
+            for i in range(self.n_bottom_level_hmms)
+        ]
+        self.n_states = self.bottom_level_hmms[0].n_states
+
+    def generate_states(self, n_samples: int) -> np.ndarray:
+        """Generate a state time course.
+
+        The top-level state time course is stored in :code:`top_level_stc`.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        state_time_course : np.ndarray
+            One-hot state time course. Shape is (n_samples, n_states).
+        """
+        stc = np.empty([n_samples, self.n_states], dtype=int)
+        self.top_level_stc = self.top_level_hmm.generate_states(n_samples)
+        for i in range(self.n_bottom_level_hmms):
+            time_points_active = np.argwhere(self.top_level_stc[:, i] == 1)[:, 0]
+            stc[time_points_active] = self.bottom_level_hmms[i].generate_states(
+                n_samples
+            )[: len(time_points_active)]
+        return stc
+
+
+class HMM_MVN(Simulation):
+    """HMM with a multivariate normal observation model.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    trans_prob : np.ndarray or str
+        Transition probability matrix as a numpy array or a :code:`str`
+        (:code:`'sequence'` or :code:`'uniform'`) to generate a transition
+        probability matrix.
+    means : np.ndarray or str
+        Mean vector for each state, shape should be (n_states, n_channels).
+        Either a numpy array or :code:`'zero'` or :code:`'random'`.
+    covariances : np.ndarray or str
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
+    n_states : int, optional
+        Number of states.
+    n_channels : int, optional
+        Number of channels.
+    n_covariances_act : int, optional
+        Number of iterations to add activations to covariance matrices.
+    stay_prob : float, optional
+        Used to generate the transition probability matrix if :code:`trans_prob`
+        is a :code:`str`. Must be between 0 and 1.
+    observation_error : float, optional
+        Standard deviation of the error added to the generated data.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str],
+        means: Union[np.ndarray, str],
+        covariances: Union[np.ndarray, str],
+        n_states: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        n_covariances_act: int = 1,
+        stay_prob: Optional[float] = None,
+        observation_error: float = 0.0,
+    ) -> None:
+        obs_model = MVN(
+            means=means,
+            covariances=covariances,
+            n_channels=n_channels,
+            n_covariances_act=n_covariances_act,
+            observation_error=observation_error,
+        )
+        obs_model.initialize(n_states)
+        self.hmm = HMM(
+            trans_prob=trans_prob, stay_prob=stay_prob, n_states=obs_model._n
+        )
+        super().__init__(self.hmm, obs_model, n_samples)
+
+
+class HMM_OscillatoryMVN(Simulation):
+    """HMM with an oscillatory multivariate normal observation model.
+
+    Each state has a covariance and a spectral peak at its own frequency. See
+    :class:`~osl_dynamics.simulation.OscillatoryMVN`.
+
+    Parameters
+    ----------
+    n_samples : int
+        Number of samples to draw from the model.
+    trans_prob : np.ndarray or str
+        Transition probability matrix as a numpy array or a :code:`str`
+        (:code:`'sequence'` or :code:`'uniform'`) to generate a transition
+        probability matrix.
+    frequencies : np.ndarray or list
+        Peak frequency (Hz) of each state, shape (n_states,), or of each state
+        and channel, shape (n_states, n_channels).
+    sampling_frequency : float
+        Sampling frequency in Hz.
+    covariances : np.ndarray or str
+        Covariance matrix for each state, shape should be (n_states, n_channels,
+        n_channels). Either a numpy array or :code:`'random'`.
+    means : np.ndarray or str, optional
+        Mean vector for each state, shape should be (n_states, n_channels).
+        Either a numpy array or :code:`'zero'` or :code:`'random'`.
+    peak_width : float or np.ndarray, optional
+        Width (Hz) of the spectral peaks. A float, or one value per state.
+    n_channels : int, optional
+        Number of channels.
+    n_covariances_act : int, optional
+        Number of iterations to add activations to covariance matrices.
+    stay_prob : float, optional
+        Used to generate the transition probability matrix if :code:`trans_prob`
+        is a :code:`str`. Must be between 0 and 1.
+    observation_error : float, optional
+        Standard deviation of the white noise added to the generated data.
+    """
+
+    def __init__(
+        self,
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str],
+        frequencies: Union[np.ndarray, List[float]],
+        sampling_frequency: float,
+        covariances: Union[np.ndarray, str],
+        means: Union[np.ndarray, str] = "zero",
+        peak_width: Union[float, np.ndarray] = 2.0,
+        n_channels: Optional[int] = None,
+        n_covariances_act: int = 1,
+        stay_prob: Optional[float] = None,
+        observation_error: float = 0.0,
+    ) -> None:
+        obs_model = OscillatoryMVN(
+            frequencies=frequencies,
+            sampling_frequency=sampling_frequency,
+            covariances=covariances,
+            means=means,
+            peak_width=peak_width,
+            n_channels=n_channels,
+            n_covariances_act=n_covariances_act,
+            observation_error=observation_error,
+        )
+        self.hmm = HMM(
+            trans_prob=trans_prob, stay_prob=stay_prob, n_states=obs_model._n
+        )
+        super().__init__(self.hmm, obs_model, n_samples)
+
+
 class HMM_MAR(Simulation):
-    r"""Simulate an HMM with a multivariate autoregressive (MAR) observation model.
+    r"""HMM with a multivariate autoregressive (MAR) observation model.
 
     Parameters
     ----------
@@ -158,10 +444,11 @@ class HMM_MAR(Simulation):
         Array of MAR coefficients. Shape must be (n_states, n_lags, n_channels,
         n_channels).
     covs : np.ndarray
-        Variance of :math:`\epsilon_t`. See :class:`osl_dynamics.simulation.mar.MAR`
-        for further details. Shape must be (n_states, n_channels).
+        Variance of :math:`\epsilon_t`. See
+        :class:`~osl_dynamics.simulation.MAR` for further details. Shape must
+        be (n_states, n_channels).
     stay_prob : float, optional
-        Used to generate the transition probability matrix is
+        Used to generate the transition probability matrix if
         :code:`trans_prob` is a :code:`str`. Must be between 0 and 1.
     """
 
@@ -173,164 +460,20 @@ class HMM_MAR(Simulation):
         covs: np.ndarray,
         stay_prob: Optional[float] = None,
     ) -> None:
-        # Observation model
-        self.obs_mod = MAR(coeffs=coeffs, covs=covs)
-
-        self.n_states = self.obs_mod.n_states
-        self.n_channels = self.obs_mod.n_channels
-
-        # HMM object
-        # N.b. we use a different random seed to the observation model
+        obs_model = MAR(coeffs=coeffs, covs=covs)
         self.hmm = HMM(
-            trans_prob=trans_prob,
-            stay_prob=stay_prob,
-            n_states=self.n_states,
+            trans_prob=trans_prob, stay_prob=stay_prob, n_states=obs_model._n
         )
-
-        # Initialize base class
-        super().__init__(n_samples=n_samples)
-
-        # Simulate data
-        self.state_time_course = self.hmm.generate_states(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
-
-    @property
-    def n_modes(self) -> int:
-        return self.n_states
-
-    @property
-    def mode_time_course(self) -> np.ndarray:
-        return self.state_time_course
-
-    def __getattr__(self, attr: str):
-        if attr in ("obs_mod", "hmm"):
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        elif attr in dir(self.hmm):
-            return getattr(self.hmm, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
-
-
-class HMM_MVN(Simulation):
-    """Simulate an HMM with a mulitvariate normal observation model.
-
-    Parameters
-    ----------
-    n_samples : int
-        Number of samples to draw from the model.
-    trans_prob : np.ndarray or str
-        Transition probability matrix as a numpy array or a :code:`str`
-        (:code:`'sequence'` or :code:`'uniform'`) to generate a transition
-        probability matrix.
-    means : np.ndarray or str
-        Mean vector for each state, shape should be (n_states, n_channels).
-        Either a numpy array or :code:`'zero'` or :code:`'random'`.
-    covariances : np.ndarray or str
-        Covariance matrix for each state, shape should be (n_states, n_channels,
-        n_channels). Either a numpy array or :code:`'random'`.
-    n_states : int, optional
-        Number of states. Can pass this argument with keyword :code:`n_modes`
-        instead.
-    n_channels : int, optional
-        Number of channels.
-    n_covariances_act : int, optional
-        Number of iterations to add activations to covariance matrices.
-    stay_prob : float, optional
-        Used to generate the transition probability matrix is :code:`trans_prob`
-        is a :code:`str`. Must be between 0 and 1.
-    observation_error : float, optional
-        Standard deviation of the error added to the generated data.
-    """
-
-    def __init__(
-        self,
-        n_samples: int,
-        trans_prob: Union[np.ndarray, str],
-        means: Union[np.ndarray, str],
-        covariances: Union[np.ndarray, str],
-        n_states: Optional[int] = None,
-        n_modes: Optional[int] = None,
-        n_channels: Optional[int] = None,
-        n_covariances_act: int = 1,
-        stay_prob: Optional[float] = None,
-        observation_error: float = 0.0,
-    ) -> None:
-        if n_states is None:
-            n_states = n_modes
-
-        # Observation model
-        self.obs_mod = MVN(
-            means=means,
-            covariances=covariances,
-            n_modes=n_states,
-            n_channels=n_channels,
-            n_covariances_act=n_covariances_act,
-            observation_error=observation_error,
-        )
-
-        self.n_states = self.obs_mod.n_modes
-        self.n_channels = self.obs_mod.n_channels
-
-        # HMM object
-        # N.b. we use a different random seed to the observation model
-        self.hmm = HMM(
-            trans_prob=trans_prob,
-            stay_prob=stay_prob,
-            n_states=self.n_states,
-        )
-
-        # Initialize base class
-        super().__init__(n_samples=n_samples)
-
-        # Simulate data
-        self.state_time_course = self.hmm.generate_states(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
-
-    @property
-    def n_modes(self) -> int:
-        return self.n_states
-
-    @property
-    def mode_time_course(self) -> np.ndarray:
-        return self.state_time_course
-
-    def __getattr__(self, attr: str):
-        if attr in ("obs_mod", "hmm"):
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        elif attr in dir(self.hmm):
-            return getattr(self.hmm, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
-
-    def get_instantaneous_covariances(self) -> np.ndarray:
-        """Get the ground truth covariances at each time point.
-
-        Returns
-        -------
-        inst_covs : np.ndarray
-            Instantaneous covariances.
-            Shape is (n_samples, n_channels, n_channels).
-        """
-        return self.obs_mod.get_instantaneous_covariances(self.state_time_course)
-
-    def standardize(self) -> None:
-        mu = np.mean(self.time_series, axis=0).astype(np.float64)
-        sigma = np.std(self.time_series, axis=0).astype(np.float64)
-        super().standardize()
-        self.obs_mod.means = (self.obs_mod.means - mu[np.newaxis, ...]) / sigma[
-            np.newaxis, ...
-        ]
-        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
+        super().__init__(self.hmm, obs_model, n_samples)
 
 
 class MDyn_HMM_MVN(Simulation):
-    """Simulate an HMM with a mulitvariate normal observation model.
+    """HMM with a multivariate normal observation model and multi-time-scale
+    dynamics.
 
-    Multi-time-scale version of :code:`HMM_MVN`.
+    Two independent HMMs give the time course of the means and standard
+    deviations, and of the correlations. The state time course has shape
+    (2, n_samples, n_states).
 
     Parameters
     ----------
@@ -347,14 +490,13 @@ class MDyn_HMM_MVN(Simulation):
         Covariance matrix for each state, shape should be (n_states, n_channels,
         n_channels). Either a numpy array or :code:`'random'`.
     n_states : int, optional
-        Number of states. Can pass this argument with keyword :code:`n_modes`
-        instead.
+        Number of states.
     n_channels : int, optional
         Number of channels.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
     stay_prob : float, optional
-        Used to generate the transition probability matrix is :code:`trans_prob`
+        Used to generate the transition probability matrix if :code:`trans_prob`
         is a :code:`str`. Must be between 0 and 1.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
@@ -367,92 +509,27 @@ class MDyn_HMM_MVN(Simulation):
         means: Union[np.ndarray, str],
         covariances: Union[np.ndarray, str],
         n_states: Optional[int] = None,
-        n_modes: Optional[int] = None,
         n_channels: Optional[int] = None,
         n_covariances_act: int = 1,
         stay_prob: Optional[float] = None,
         observation_error: float = 0.0,
     ) -> None:
-        if n_states is None:
-            n_states = n_modes
-
-        # Observation model
-        self.obs_mod = MDyn_MVN(
+        obs_model = MDyn_MVN(
             means=means,
             covariances=covariances,
-            n_modes=n_states,
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
             observation_error=observation_error,
         )
-
-        self.n_states = self.obs_mod.n_modes
-        self.n_channels = self.obs_mod.n_channels
-
-        # HMM objects for sampling state time courses
-        # N.b. we use a different random seed to the observation model
-        self.alpha_hmm = HMM(
-            trans_prob=trans_prob,
-            stay_prob=stay_prob,
-            n_states=self.n_states,
+        obs_model.initialize(n_states)
+        state_model = MDynHMM(
+            trans_prob=trans_prob, stay_prob=stay_prob, n_states=obs_model._n
         )
-        self.beta_hmm = HMM(
-            trans_prob=trans_prob,
-            stay_prob=stay_prob,
-            n_states=self.n_states,
-        )
-
-        # Initialize base class
-        super().__init__(n_samples=n_samples)
-
-        # Simulate state time courses
-        alpha = self.alpha_hmm.generate_states(self.n_samples)
-        beta = self.beta_hmm.generate_states(self.n_samples)
-
-        self.state_time_course = np.array([alpha, beta])
-
-        # Simulate data
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
-
-    @property
-    def n_modes(self) -> int:
-        return self.n_states
-
-    @property
-    def mode_time_course(self) -> np.ndarray:
-        return self.state_time_course
-
-    def __getattr__(self, attr: str):
-        if attr == "obs_mod":
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
-
-    def get_instantaneous_covariances(self) -> np.ndarray:
-        """Get the ground truth covariances at each time point.
-
-        Returns
-        -------
-        inst_covs : np.ndarray
-            Instantaneous covariances.
-            Shape is (n_samples, n_channels, n_channels).
-        """
-        return self.obs_mod.get_instantaneous_covariances(self.state_time_course)
-
-    def standardize(self) -> None:
-        mu = np.mean(self.time_series, axis=0).astype(np.float64)
-        sigma = np.std(self.time_series, axis=0).astype(np.float64)
-        super().standardize()
-        self.obs_mod.means = (self.obs_mod.means - mu[np.newaxis, ...]) / sigma[
-            np.newaxis, ...
-        ]
-        self.obs_mod.stds /= sigma[np.newaxis, ...]
+        super().__init__(state_model, obs_model, n_samples)
 
 
 class HMM_Poi(Simulation):
-    """Simulate an HMM with Poisson distribution as the observation model.
+    """HMM with a Poisson observation model.
 
     Parameters
     ----------
@@ -461,163 +538,100 @@ class HMM_Poi(Simulation):
     trans_prob : np.ndarray or str
         Transition probability matrix as a numpy array or a str ('sequence',
         'uniform') to generate a transition probability matrix.
-    rates : np.ndarray
-        Amplitude for the sine wave for each state and channel.
-        Shape must be (n_states, n_channels).
-    stay_prob : float
-        Used to generate the transition probability matrix is trans_prob is a str.
+    rates : np.ndarray or str
+        Poisson rate for each state and channel, shape (n_states, n_channels),
+        or :code:`'random'`.
+    n_states : int, optional
+        Number of states. Needed if :code:`rates='random'`.
+    n_channels : int, optional
+        Number of channels. Needed if :code:`rates='random'`.
+    stay_prob : float, optional
+        Used to generate the transition probability matrix if trans_prob is a
+        str.
     """
 
     def __init__(
         self,
         n_samples: int,
         trans_prob: Union[np.ndarray, str],
-        rates: np.ndarray,
+        rates: Union[np.ndarray, str],
         n_states: Optional[int] = None,
         n_channels: Optional[int] = None,
         stay_prob: Optional[float] = None,
     ) -> None:
-        # Observation model
-        self.obs_mod = Poisson(
-            rates=rates,
-            n_states=n_states,
-            n_channels=n_channels,
-        )
-
-        self.n_states = self.obs_mod.n_states
-        self.n_channels = self.obs_mod.n_channels
-
-        # HMM object
-        # N.b. we use a different random seed to the observation model
+        obs_model = Poisson(rates=rates, n_channels=n_channels)
+        obs_model.initialize(n_states)
         self.hmm = HMM(
-            trans_prob=trans_prob,
-            stay_prob=stay_prob,
-            n_states=self.n_states,
+            trans_prob=trans_prob, stay_prob=stay_prob, n_states=obs_model._n
         )
-
-        # Initialize base class
-        super().__init__(n_samples=n_samples)
-
-        # Simulate data
-        self.state_time_course = self.hmm.generate_states(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
-
-    @property
-    def n_modes(self) -> int:
-        return self.n_states
-
-    @property
-    def mode_time_course(self) -> np.ndarray:
-        return self.state_time_course
-
-    def __getattr__(self, attr: str):
-        if attr in ("obs_mod", "hmm"):
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        elif attr in dir(self.hmm):
-            return getattr(self.hmm, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
+        super().__init__(self.hmm, obs_model, n_samples)
 
 
 class HMM_Dirichlet(Simulation):
-    """Simulate an HMM with Dirichlet distribution as the observation model.
+    """HMM with a Dirichlet observation model.
 
     Parameters
     ----------
     n_samples : int
-        Number of raw samples to draw. Must be divisible by window_size.
+        Number of samples to draw. Must be divisible by :code:`window_size`.
     trans_prob : np.ndarray or str
         Transition probability matrix as a numpy array or a str ('sequence',
         'uniform') to generate a transition probability matrix.
     concentration : np.ndarray or str
         Concentration vector for each state, shape (n_states, n_channels),
-        or 'random'.
+        or :code:`'random'`.
     n_states : int, optional
-        Number of states when concentration='random'.
+        Number of states. Needed if :code:`concentration='random'`.
     n_channels : int, optional
-        Number of channels when concentration='random'.
+        Number of channels. Needed if :code:`concentration='random'`.
+    stay_prob : float, optional
+        Used to generate the transition probability matrix if trans_prob is a
+        str.
     window_size : int, optional
-        Raw samples per hidden-state step (default 1). State transitions occur
-        between windows; samples within each window share a state. Both
-        time_series and state_time_course have n_samples rows.
-    stay_prob : float
-        Used to generate the transition probability matrix is trans_prob is a str.
+        Samples per hidden-state step. State transitions occur between
+        windows, and the samples within a window share a state.
     """
 
     def __init__(
         self,
-        n_samples,
-        trans_prob,
-        concentration,
-        n_states=None,
-        n_channels=None,
-        stay_prob=None,
-        window_size=1,
-    ):
+        n_samples: int,
+        trans_prob: Union[np.ndarray, str],
+        concentration: Union[np.ndarray, str],
+        n_states: Optional[int] = None,
+        n_channels: Optional[int] = None,
+        stay_prob: Optional[float] = None,
+        window_size: int = 1,
+    ) -> None:
         if not isinstance(window_size, (int, np.integer)) or window_size < 1:
             raise ValueError("window_size must be a positive integer.")
         if n_samples % window_size:
             raise ValueError("n_samples must be divisible by window_size.")
         self.window_size = window_size
 
-        # Observation model
-        self.obs_mod = Dirichlet(
-            concentration=concentration,
-            n_states=n_states,
-            n_channels=n_channels,
-        )
-
-        self.n_states = self.obs_mod.n_states
-        self.n_channels = self.obs_mod.n_channels
-
-        # HMM object
+        obs_model = Dirichlet(concentration=concentration, n_channels=n_channels)
+        obs_model.initialize(n_states)
         self.hmm = HMM(
-            trans_prob=trans_prob,
-            stay_prob=stay_prob,
-            n_states=self.n_states,
+            trans_prob=trans_prob, stay_prob=stay_prob, n_states=obs_model._n
         )
+        super().__init__(self.hmm, obs_model, n_samples)
 
-        # Initialize base class
-        super().__init__(n_samples=n_samples)
-
-        # Simulate data
-        self.state_time_course = np.repeat(
-            self.hmm.generate_states(self.n_samples // window_size), window_size, axis=0
-        )
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
-
-    @property
-    def n_modes(self):
-        return self.n_states
-
-    @property
-    def mode_time_course(self):
-        return self.state_time_course
-
-    def __getattr__(self, attr):
-        if attr in ("obs_mod", "hmm"):
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        elif attr in dir(self.hmm):
-            return getattr(self.hmm, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
+    def _generate_time_course(self, state_model) -> np.ndarray:
+        states = state_model.generate_states(self.n_samples // self.window_size)
+        return np.repeat(states, self.window_size, axis=0)
 
 
 class MSess_HMM_MVN(Simulation):
-    """Simulate an HMM with multivariate normal observation model for each session.
+    """HMM with session-specific multivariate normal observation models.
 
     Parameters
     ----------
     n_samples : int
         Number of samples per session to draw from the model.
     trans_prob : np.ndarray or str
-        Transition probability matrix as a numpy array or a :code:`str`
-        (:code:`'sequence'` or :code:`'uniform'`) to generate a transition
-        probability matrix.
+        Transition probability matrix as a numpy array, shape
+        (n_states, n_states) or (n_sessions, n_states, n_states), or a
+        :code:`str` (:code:`'sequence'` or :code:`'uniform'`) to generate a
+        transition probability matrix.
     session_means : np.ndarray or str
         Session mean vector for each state, shape should be
         (n_sessions, n_states, n_channels).
@@ -627,17 +641,14 @@ class MSess_HMM_MVN(Simulation):
         (n_sessions, n_states, n_channels, n_channels).
         Either a numpy array or :code:`'random'`.
     n_states : int, optional
-        Number of states. Can pass this argument with keyword :code:`n_modes`
-        instead.
-    n_modes : int, optional
-        Number of modes.
+        Number of states.
     n_channels : int, optional
         Number of channels.
     n_covariances_act : int, optional
         Number of iterations to add activations to covariance matrices.
     embedding_vectors : np.ndarray, optional
-        Embedding vectors for each state, shape should be
-        (n_states, embeddings_dim).
+        Embedding vectors for each session, shape should be
+        (n_sessions, embeddings_dim).
     n_sessions : int, optional
         Number of sessions.
     embeddings_dim : int
@@ -652,13 +663,15 @@ class MSess_HMM_MVN(Simulation):
     between_group_scale : float, optional
         Scale of variability between session observation parameters.
     stay_prob : float, optional
-        Used to generate the transition probability matrix is :code:`trans_prob`
+        Used to generate the transition probability matrix if :code:`trans_prob`
         is a :code:`str`. Must be between 0 and 1.
     tc_std : float, optional
         Standard deviation when generating session-specific stay probability.
     observation_error : float, optional
         Standard deviation of the error added to the generated data.
     """
+
+    _time_courses_first = True
 
     def __init__(
         self,
@@ -667,7 +680,6 @@ class MSess_HMM_MVN(Simulation):
         session_means: Union[np.ndarray, str],
         session_covariances: Union[np.ndarray, str],
         n_states: Optional[int] = None,
-        n_modes: Optional[int] = None,
         n_channels: Optional[int] = None,
         n_covariances_act: int = 1,
         embedding_vectors: Optional[np.ndarray] = None,
@@ -681,14 +693,9 @@ class MSess_HMM_MVN(Simulation):
         stay_prob: Optional[float] = None,
         observation_error: float = 0.0,
     ) -> None:
-        if n_states is None:
-            n_states = n_modes
-
-        # Observation model
-        self.obs_mod = MSess_MVN(
+        obs_model = MSess_MVN(
             session_means=session_means,
             session_covariances=session_covariances,
-            n_modes=n_states,
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
             embedding_vectors=embedding_vectors,
@@ -700,114 +707,61 @@ class MSess_HMM_MVN(Simulation):
             between_group_scale=between_group_scale,
             observation_error=observation_error,
         )
-
-        self.n_states = self.obs_mod.n_modes
-        self.n_channels = self.obs_mod.n_channels
-        self.n_sessions = self.obs_mod.n_sessions
+        obs_model.initialize(n_states)
+        n_sessions = obs_model.n_sessions
 
         # Construct trans_prob for each session
         if isinstance(trans_prob, np.ndarray):
             if trans_prob.ndim == 2:
                 # Same transition probability matrix for each session
-                trans_prob = [trans_prob] * self.n_sessions
+                trans_prob = [trans_prob] * n_sessions
             else:
                 # A (n_sessions, n_states, n_states) array was passed
                 trans_prob = list(trans_prob)
         elif isinstance(trans_prob, str) or trans_prob is None:
-            trans_prob = [trans_prob] * self.n_sessions
+            trans_prob = [trans_prob] * n_sessions
 
         # Vary the stay probability for each session
         if stay_prob is not None:
             session_stay_prob = np.random.normal(
                 loc=stay_prob,
                 scale=tc_std,
-                size=self.n_sessions,
+                size=n_sessions,
             )
             # truncate stay_prob at 0 and 1
             session_stay_prob = np.minimum(session_stay_prob, 1)
             session_stay_prob = np.maximum(session_stay_prob, 0)
         else:
-            session_stay_prob = [stay_prob] * self.n_sessions
+            session_stay_prob = [stay_prob] * n_sessions
 
-        # Initialize base class
-        super().__init__(n_samples=n_samples)
-
-        # Simulate state time courses for all sessions
-        self.state_time_course = []
-        self.hmm = []
-        for i in range(self.n_sessions):
-            # Build HMM object with the session's stay probability with
-            # different seeds
-            hmm = HMM(
+        self.hmm = [
+            HMM(
                 trans_prob=trans_prob[i],
                 stay_prob=session_stay_prob[i],
-                n_states=self.n_states,
+                n_states=obs_model._n,
             )
-            self.hmm.append(hmm)
-            self.state_time_course.append(hmm.generate_states(self.n_samples))
-        self.state_time_course = np.array(self.state_time_course)
-
-        # Simulate data
-        self.time_series = self.obs_mod.simulate_multi_session_data(
-            self.state_time_course
-        )
-
-    @property
-    def n_modes(self) -> int:
-        return self.n_states
-
-    @property
-    def mode_time_course(self) -> np.ndarray:
-        return self.state_time_course
-
-    def __getattr__(self, attr: str):
-        if attr == "obs_mod":
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
-
-    def get_instantaneous_covariances(self) -> np.ndarray:
-        """Get the ground truth covariances at each time point.
-
-        Returns
-        -------
-        inst_covs : np.ndarray
-            Instantaneous covariances.
-            Shape is (n_samples, n_channels, n_channels).
-        """
-        return self.obs_mod.get_instantaneous_covariances(self.state_time_course)
-
-    def standardize(self) -> None:
-        mu = np.mean(self.time_series, axis=1).astype(np.float64)
-        sigma = np.std(self.time_series, axis=1).astype(np.float64)
-        super().standardize(axis=1)
-        self.obs_mod.session_means = (
-            self.obs_mod.session_means - mu[:, np.newaxis, :]
-        ) / sigma[:, np.newaxis, :]
-        self.obs_mod.session_covariances /= np.expand_dims(
-            sigma[:, :, np.newaxis] @ sigma[:, np.newaxis, :], 1
-        )
+            for i in range(n_sessions)
+        ]
+        super().__init__(self.hmm, obs_model, n_samples)
 
 
 class HierarchicalHMM_MVN(Simulation):
-    """Hierarchical two-level HMM simulation.
+    """Hierarchical two-level HMM with a multivariate normal observation model.
 
-    The bottom level HMMs share the same states, i.e. have the same
-    observation model. Only the transition probability matrix changes.
+    See :class:`HierarchicalHMM`. The top-level state time course is
+    :code:`top_level_stc`.
 
     Parameters
     ----------
     n_samples : int
         Number of samples to draw from the model.
     top_level_trans_prob : np.ndarray or str
-        Transition probability matrix of the top level HMM, which
-        selects the bottom level HMM at each time point. Used when
+        Transition probability matrix of the top-level HMM, which
+        selects the bottom-level HMM at each time point. Used when
         :code:`top_level_hmm_type='hmm'`.
-    bottom_level_trans_prob : list of np.ndarray or str
-        Transitions probability matrices for the bottom level HMMs,
-        which generate the observed data.
+    bottom_level_trans_probs : list of np.ndarray or str
+        Transition probability matrices for the bottom-level HMMs,
+        which generate the states.
     means : np.ndarray or str, optional
         Mean vector for each state, shape should be (n_states, n_channels).
         Either a numpy array or :code:`'zero'` or :code:`'random'`.
@@ -815,8 +769,7 @@ class HierarchicalHMM_MVN(Simulation):
         Covariance matrix for each state, shape should be (n_states, n_channels,
         n_channels). Either a numpy array or :code:`'random'`.
     n_states : int, optional
-        Number of states. Can pass this argument with keyword :code:`n_modes`
-        instead.
+        Number of states.
     n_channels : int, optional
         Number of channels.
     n_covariances_act : int, optional
@@ -824,33 +777,31 @@ class HierarchicalHMM_MVN(Simulation):
     observation_error : float, optional
         Standard deviation of random noise to be added to the observations.
     top_level_stay_prob : float, optional
-        The stay_prob for the top level HMM. Used if
+        The stay_prob for the top-level HMM. Used if
         :code:`top_level_trans_prob` is a :code:`str`.
-        Used when :code:`top_level_hmm_type='hmm'`.
     bottom_level_stay_probs : list of float, optional
-        The list of :code:`stay_prob` values for the bottom level HMMs.
-        Used when the correspondining entry in :code:`bottom_level_trans_prob`
+        The list of :code:`stay_prob` values for the bottom-level HMMs.
+        Used when the corresponding entry in :code:`bottom_level_trans_probs`
         is a :code:`str`.
     top_level_hmm_type : str, optional
         The type of HMM to use at the top level, either :code:`'hmm'` or
         :code:`'hsmm'`.
     top_level_gamma_shape : float, optional
         The shape parameter for the Gamma distribution used by
-        the top level hmm when :code:`top_level_hmm_type='hsmm'`.
+        the top-level HMM when :code:`top_level_hmm_type='hsmm'`.
     top_level_gamma_scale : float, optional
         The scale parameter for the Gamma distribution used by
-        the top level hmm when :code:`top_level_hmm_type='hsmm'`.
+        the top-level HMM when :code:`top_level_hmm_type='hsmm'`.
     """
 
     def __init__(
         self,
         n_samples: int,
-        top_level_trans_prob: Union[np.ndarray, str],
+        top_level_trans_prob: Union[np.ndarray, str, None],
         bottom_level_trans_probs: List[Union[np.ndarray, str]],
         means: Optional[Union[np.ndarray, str]] = None,
         covariances: Optional[Union[np.ndarray, str]] = None,
         n_states: Optional[int] = None,
-        n_modes: Optional[int] = None,
         n_channels: Optional[int] = None,
         n_covariances_act: int = 1,
         observation_error: float = 0.0,
@@ -860,270 +811,145 @@ class HierarchicalHMM_MVN(Simulation):
         top_level_gamma_shape: Optional[float] = None,
         top_level_gamma_scale: Optional[float] = None,
     ) -> None:
-        if n_states is None:
-            n_states = n_modes
-
-        # Observation model
-        self.obs_mod = MVN(
+        obs_model = MVN(
             means=means,
             covariances=covariances,
-            n_modes=n_states,
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
             observation_error=observation_error,
         )
-
-        self.n_states = self.obs_mod.n_modes
-        self.n_channels = self.obs_mod.n_channels
-
-        if bottom_level_stay_probs is None:
-            bottom_level_stay_probs = [None] * len(bottom_level_trans_probs)
-
-        # Top level HMM
-        # This will select the bottom level HMM at each time point
-        if top_level_hmm_type.lower() == "hmm":
-            self.top_level_hmm = HMM(
-                trans_prob=top_level_trans_prob,
-                stay_prob=top_level_stay_prob,
-                n_states=len(bottom_level_trans_probs),
-            )
-        elif top_level_hmm_type.lower() == "hsmm":
-            self.top_level_hmm = HSMM(
-                gamma_shape=top_level_gamma_shape,
-                gamma_scale=top_level_gamma_scale,
-                n_states=len(bottom_level_trans_probs),
-            )
-        else:
-            raise ValueError(f"Unsupported top_level_hmm_type: {top_level_hmm_type}")
-
-        # The bottom level HMMs
-        # These will generate the data
-        self.n_bottom_level_hmms = len(bottom_level_trans_probs)
-        self.bottom_level_hmms = [
-            HMM(
-                trans_prob=bottom_level_trans_probs[i],
-                stay_prob=bottom_level_stay_probs[i],
-                n_states=n_states,
-            )
-            for i in range(self.n_bottom_level_hmms)
-        ]
-
-        # Initialize base class
-        super().__init__(n_samples=n_samples)
-
-        # Simulate data
-        self.state_time_course = self.generate_states(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
-
-    @property
-    def n_modes(self) -> int:
-        return self.n_states
-
-    @property
-    def mode_time_course(self) -> np.ndarray:
-        return self.state_time_course
-
-    def __getattr__(self, attr: str):
-        if attr == "obs_mod":
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
-
-    def generate_states(self, n_samples: int) -> np.ndarray:
-        stc = np.empty([n_samples, self.n_states])
-
-        # Top level HMM to select the bottom level HMM at each time point
-        self.top_level_stc = self.top_level_hmm.generate_states(n_samples)
-
-        # Generate state time courses when each bottom level HMM is activate
-        for i in range(self.n_bottom_level_hmms):
-            time_points_active = np.argwhere(self.top_level_stc[:, i] == 1)[:, 0]
-            stc[time_points_active] = self.bottom_level_hmms[i].generate_states(
-                n_samples
-            )[: len(time_points_active)]
-
-        return stc
-
-    def standardize(self) -> None:
-        sigma = np.std(self.time_series, axis=0).astype(np.float64)
-        super().standardize()
-        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
+        obs_model.initialize(n_states)
+        state_model = HierarchicalHMM(
+            top_level_trans_prob=top_level_trans_prob,
+            bottom_level_trans_probs=bottom_level_trans_probs,
+            n_states=obs_model._n,
+            top_level_stay_prob=top_level_stay_prob,
+            bottom_level_stay_probs=bottom_level_stay_probs,
+            top_level_hmm_type=top_level_hmm_type,
+            top_level_gamma_shape=top_level_gamma_shape,
+            top_level_gamma_scale=top_level_gamma_scale,
+        )
+        super().__init__(state_model, obs_model, n_samples)
 
 
-class HMM_OscillatoryBursts:
-    """Simulate an HMM with oscillatory burst observation model.
+class HMM_OscillatoryBursts(Simulation):
+    """HMM with an oscillatory burst observation model.
 
-    Uses an HMM to generate state time courses, then fills active periods
-    with sinusoidal oscillations at specified frequencies. Each mode has a
-    set of active channels and a characteristic frequency. An extra
-    "background" state (silence) is included automatically.
-
-    Multiple subjects can be simulated with optional group-level frequency
-    shifts.
+    While a state is active, its channels produce sinusoids at the state's
+    frequency. See :class:`~osl_dynamics.simulation.OscillatoryBursts`. The
+    noise-free signal is :code:`true_signal`.
 
     Parameters
     ----------
     n_samples : int
-        Number of time points per subject.
-    n_subjects : int, optional
-        Number of subjects.
+        Number of samples per session.
+    n_sessions : int, optional
+        Number of sessions.
     n_groups : int, optional
-        Number of subject groups. ``n_subjects`` must be divisible by
-        ``n_groups``.
-    true_freqs : np.ndarray, optional
-        Frequencies for each mode in Hz. Shape: (n_modes,). If not provided,
-        ``n_modes`` frequencies are linearly spaced between 8 and 25 Hz.
+        Number of groups of sessions with different frequencies.
+        :code:`n_sessions` must be divisible by :code:`n_groups`.
+    frequencies : np.ndarray or list, optional
+        Frequency (Hz) of each oscillatory state. Shape: (n_states,). If not
+        given, frequencies are linearly spaced between 8 and 25 Hz.
     group_freq_shift : float, optional
         Frequency shift between groups in Hz.
     channel_activity : np.ndarray, optional
-        Binary matrix indicating active channels per mode.
-        Shape: (n_modes, n_channels). If not provided, an identity-like
-        matrix is created with ``n_channels_per_mode`` channels per mode.
-    n_modes : int, optional
-        Number of frequency modes. Ignored if ``channel_activity`` is given.
-    n_channels_per_mode : int, optional
-        Channels per mode when auto-generating ``channel_activity``.
+        Binary matrix indicating the active channels of each oscillatory
+        state. Shape: (n_states, n_channels). If not given, each state has
+        :code:`n_channels_per_state` channels.
+    n_states : int, optional
+        Number of oscillatory states. Ignored if :code:`channel_activity` or
+        :code:`frequencies` is given.
+    n_channels_per_state : int, optional
+        Channels per state when generating :code:`channel_activity`.
     sampling_frequency : float, optional
         Sampling frequency in Hz.
     snr : float, optional
         Signal-to-noise ratio.
     stay_prob : float, optional
         HMM state stay probability.
+    background_state : bool, optional
+        Whether to add a state with no oscillations (noise only). It is the
+        last state.
     """
 
     def __init__(
         self,
         n_samples: int,
-        n_subjects: int = 1,
+        n_sessions: Optional[int] = None,
         n_groups: int = 1,
-        true_freqs: Optional[np.ndarray] = None,
+        frequencies: Optional[Union[np.ndarray, List[float]]] = None,
         group_freq_shift: float = 0.5,
         channel_activity: Optional[np.ndarray] = None,
-        n_modes: int = 4,
-        n_channels_per_mode: int = 8,
+        n_states: int = 4,
+        n_channels_per_state: int = 8,
         sampling_frequency: float = 100,
         snr: float = 4,
         stay_prob: float = 0.98,
-    ):
-        self.n_samples = n_samples
-        self.n_subjects = n_subjects
-        self.n_groups = n_groups
-        self.n_subjects_per_group = n_subjects // n_groups
-        self.sampling_frequency = sampling_frequency
-        self.snr = snr
-        self.stay_prob = stay_prob
+        background_state: bool = True,
+    ) -> None:
+        if channel_activity is None:
+            if frequencies is not None:
+                n_states = len(frequencies)
+            channel_activity = np.tile(np.eye(n_states), n_channels_per_state)
+        channel_activity = np.asarray(channel_activity)
+        n_oscillatory_states, n_channels = channel_activity.shape
 
-        # Set up channel activity
-        if channel_activity is not None:
-            self.channel_activity = np.asarray(channel_activity)
-            self.n_modes = self.channel_activity.shape[0]
-            self.n_channels = self.channel_activity.shape[1]
-        else:
-            self.n_modes = n_modes
-            self.n_channels = n_modes * n_channels_per_mode
-            self.channel_activity = np.tile(np.eye(n_modes), n_channels_per_mode)
+        if frequencies is None:
+            frequencies = np.linspace(8, 25, n_oscillatory_states)
+        frequencies = np.asarray(frequencies, dtype=float)
 
-        # Set up per-subject frequencies
-        self.true_freqs = self._get_subject_freqs(true_freqs, group_freq_shift)
+        # Shift the frequencies of each group of sessions
+        if n_groups > 1:
+            if n_sessions is None or n_sessions % n_groups:
+                raise ValueError("n_sessions must be divisible by n_groups.")
+            shifts = (np.arange(n_groups) - (n_groups - 1) / 2) * group_freq_shift
+            shifts = np.repeat(shifts, n_sessions // n_groups)
+            frequencies = frequencies[np.newaxis] + shifts[:, np.newaxis]
 
-        # HMM (n_modes + 1 states: modes + background)
-        self.hmm = HMM(
-            trans_prob="uniform",
-            stay_prob=stay_prob,
-            n_states=self.n_modes + 1,
+        if background_state:
+            channel_activity = np.vstack([channel_activity, np.zeros(n_channels)])
+            nan = np.full(frequencies.shape[:-1] + (1,), np.nan)
+            frequencies = np.concatenate([frequencies, nan], axis=-1)
+
+        obs_model = OscillatoryBursts(
+            frequencies=frequencies,
+            channel_activity=channel_activity,
+            sampling_frequency=sampling_frequency,
+            snr=snr,
         )
+        self.hmm = HMM(trans_prob="uniform", stay_prob=stay_prob, n_states=obs_model._n)
+        super().__init__(self.hmm, obs_model, n_samples, n_sessions=n_sessions)
 
-        # Simulate
-        self.data, self.true_signal, self.mode_time_course = self._simulate()
-
-    def _get_subject_freqs(self, true_freqs, group_freq_shift):
-        """Get per-subject frequencies with group shifts.
-
-        Returns
-        -------
-        freqs : np.ndarray
-            Shape: (n_subjects, n_modes).
-        """
-        if true_freqs is None:
-            true_freqs = np.linspace(8, 25, self.n_modes)
-        true_freqs = np.asarray(true_freqs)
-
-        freqs = np.tile(true_freqs, (self.n_subjects, 1))
-        for i in range(self.n_groups):
-            shift = (i - (self.n_groups - 1) / 2) * group_freq_shift
-            start = i * self.n_subjects_per_group
-            end = start + self.n_subjects_per_group
-            freqs[start:end] += shift
-
-        return freqs
-
-    def _simulate(self):
-        """Simulate all subjects.
-
-        Returns
-        -------
-        data : np.ndarray
-            Shape: (n_subjects, n_samples, n_channels).
-        true_signal : np.ndarray
-            Shape: (n_subjects, n_samples, n_channels).
-        mode_time_course : np.ndarray
-            Shape: (n_subjects, n_samples, n_modes + 1).
-        """
-        data = np.zeros((self.n_subjects, self.n_samples, self.n_channels))
-        true_signal = np.zeros_like(data)
-        mode_time_course = np.zeros((self.n_subjects, self.n_samples, self.n_modes + 1))
-
-        for k in range(self.n_subjects):
-            stc = self.hmm.generate_states(self.n_samples)
-            mode_time_course[k] = stc
-
-            obs_mod = OscillatoryBursts(
-                n_modes=self.n_modes,
-                n_channels=self.n_channels,
-                true_freqs=self.true_freqs[k],
-                channel_activity=self.channel_activity,
-                sampling_frequency=self.sampling_frequency,
-                snr=self.snr,
+        if self.n_sessions is None:
+            self.true_signal = obs_model.get_true_signal(self.state_time_course)
+        else:
+            self.true_signal = np.array(
+                [
+                    obs_model.get_true_signal(
+                        stc, session if obs_model.n_sessions is not None else None
+                    )
+                    for session, stc in enumerate(self.state_time_course)
+                ]
             )
-            data[k], true_signal[k] = obs_mod.simulate_data(stc)
-
-        return data, true_signal, mode_time_course
-
-    @property
-    def time_series(self):
-        """np.ndarray: Simulated data. Shape: (n_subjects, n_samples,
-        n_channels)."""
-        return self.data
-
-    @property
-    def state_time_course(self):
-        """np.ndarray: State time courses. Shape: (n_subjects, n_samples,
-        n_modes + 1)."""
-        return self.mode_time_course
 
 
-class HMM_TDECovs:
-    """Simulate an HMM with TDE covariance observation model.
+class HMM_TDECovs(Simulation):
+    """HMM with a TDE covariance observation model.
 
-    Uses an HMM to generate state time courses, then generates time series
-    data from TDE covariance matrices using conditional multivariate normal
-    sampling. Each mode is defined by a TDE covariance matrix that encodes
-    both spectral and cross-channel structure.
-
-    Multiple subjects can be simulated, each with independent state time
-    courses.
+    Each state has a time-delay embedded covariance matrix, which encodes
+    both its spectral and cross-channel structure. See
+    :class:`~osl_dynamics.simulation.TDECovs`.
 
     Parameters
     ----------
     n_samples : int
-        Number of time points per subject.
-    true_tde_covs : list of np.ndarray
-        List of ``n_modes`` TDE covariance matrices, each of shape
+        Number of samples per session.
+    tde_covariances : list of np.ndarray
+        TDE covariance matrix of each state, each of shape
         ``(n_channels * n_embeddings, n_channels * n_embeddings)``.
-    n_subjects : int, optional
-        Number of subjects.
+    n_sessions : int, optional
+        Number of sessions.
     n_embeddings : int, optional
         Number of time-delay embeddings.
     stay_prob : float, optional
@@ -1135,62 +961,16 @@ class HMM_TDECovs:
     def __init__(
         self,
         n_samples: int,
-        true_tde_covs: list,
-        n_subjects: int = 1,
+        tde_covariances: List[np.ndarray],
+        n_sessions: Optional[int] = None,
         n_embeddings: int = 1,
         stay_prob: float = 0.98,
         rho: float = 0.1,
-    ):
-        self.n_samples = n_samples
-        self.n_subjects = n_subjects
-
-        # Observation model
-        self.obs_mod = TDECovs(
-            true_tde_covs=true_tde_covs,
+    ) -> None:
+        obs_model = TDECovs(
+            tde_covariances=tde_covariances,
             n_embeddings=n_embeddings,
             rho=rho,
         )
-        self.n_modes = self.obs_mod.n_modes
-        self.n_channels = self.obs_mod.n_channels
-
-        # HMM
-        self.hmm = HMM(
-            trans_prob="uniform",
-            stay_prob=stay_prob,
-            n_states=self.n_modes,
-        )
-
-        # Simulate
-        self.data, self.mode_time_course = self._simulate()
-
-    def _simulate(self):
-        """Simulate all subjects.
-
-        Returns
-        -------
-        data : np.ndarray
-            Shape: (n_subjects, n_samples, n_channels).
-        mode_time_course : np.ndarray
-            Shape: (n_subjects, n_samples, n_modes).
-        """
-        data = np.zeros((self.n_subjects, self.n_samples, self.n_channels))
-        mode_time_course = np.zeros((self.n_subjects, self.n_samples, self.n_modes))
-
-        for k in range(self.n_subjects):
-            stc = self.hmm.generate_states(self.n_samples)
-            mode_time_course[k] = stc
-            data[k] = self.obs_mod.simulate_data(stc)
-
-        return data, mode_time_course
-
-    @property
-    def time_series(self):
-        """np.ndarray: Simulated data. Shape: (n_subjects, n_samples,
-        n_channels)."""
-        return self.data
-
-    @property
-    def state_time_course(self):
-        """np.ndarray: State time courses. Shape: (n_subjects, n_samples,
-        n_modes)."""
-        return self.mode_time_course
+        self.hmm = HMM(trans_prob="uniform", stay_prob=stay_prob, n_states=obs_model._n)
+        super().__init__(self.hmm, obs_model, n_samples, n_sessions=n_sessions)

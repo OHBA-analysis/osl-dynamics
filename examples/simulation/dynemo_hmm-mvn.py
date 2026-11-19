@@ -22,7 +22,7 @@ os.makedirs(results_dir, exist_ok=True)
 print("Simulating data")
 sim = HMM_MVN(
     n_samples=25600,
-    n_modes=5,
+    n_states=5,
     n_channels=20,
     trans_prob="sequence",
     stay_prob=0.9,

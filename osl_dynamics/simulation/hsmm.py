@@ -1,19 +1,20 @@
-"""Classes for simulating Hidden Semi-Markov Models (HSMMs)."""
+"""Hidden Semi-Markov Models (HSMMs)."""
 
 from typing import Optional, Union
 
 import numpy as np
 
-from osl_dynamics.simulation.obs_mod import MVN
 from osl_dynamics.simulation.base import Simulation
+from osl_dynamics.simulation.obs_mod import MVN
 from osl_dynamics.utils import array_ops
 
 
 class HSMM:
-    """HSMM base class.
+    """Hidden Semi-Markov Model (HSMM) state model.
 
-    Contains the probability distribution function for sampling state lifetimes.
-    Uses a Gamma distribution for the probability distribution function.
+    The state lifetimes follow a Gamma distribution. The next state is
+    sampled from a transition probability matrix with zero probability for
+    self-transitions.
 
     Parameters
     ----------
@@ -26,12 +27,8 @@ class HSMM:
     full_trans_prob : np.ndarray, optional
         A transition probability matrix, the diagonal of which will be ignored.
     n_states : int, optional
-        Number of states.
-    state_vectors : np.ndarray, optional
-        Mode vectors define the activation of each components for a state.
-        E.g. :code:`state_vectors=[[1,0,0],[0,1,0],[0,0,1]]` are mutually
-        exclusive states. :code:`state_vector.shape[0]` must be more than
-        :code:`n_states`.
+        Number of states. Needed if no transition probability matrix is
+        passed.
     """
 
     def __init__(
@@ -40,7 +37,6 @@ class HSMM:
         gamma_scale: float,
         off_diagonal_trans_prob: Optional[np.ndarray] = None,
         full_trans_prob: Optional[np.ndarray] = None,
-        state_vectors: Optional[np.ndarray] = None,
         n_states: Optional[int] = None,
     ) -> None:
         # Validation
@@ -67,18 +63,7 @@ class HSMM:
 
         self.off_diagonal_trans_prob = off_diagonal_trans_prob
         self.full_trans_prob = full_trans_prob
-
         self.construct_off_diagonal_trans_prob()
-
-        # Define state vectors
-        if state_vectors is None:
-            self.state_vectors = np.eye(self.n_states)
-        elif state_vectors.shape[0] < self.n_states:
-            raise ValueError(
-                "Less state vectors than the number of states were provided."
-            )
-        else:
-            self.state_vectors = state_vectors
 
         # Parameters of the lifetime distribution
         self.gamma_shape = gamma_shape
@@ -99,44 +84,123 @@ class HSMM:
             / self.off_diagonal_trans_prob.sum(axis=1)[:, None]
         )
 
-    def generate_states(self, n_samples: int) -> np.ndarray:
+    def generate_state_sequence(self, n_samples: int) -> np.ndarray:
+        """Generate a sequence of states.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        states : np.ndarray
+            State at each sample (0 to n_states - 1). Shape is (n_samples,).
+        """
         cumsum_off_diagonal_trans_prob = np.cumsum(
             self.off_diagonal_trans_prob,
             axis=1,
         )
-        alpha = np.zeros([n_samples, self.state_vectors.shape[1]])
+        states = np.zeros(n_samples, dtype=int)
 
         current_state = np.random.randint(0, self.n_states)
         current_position = 0
 
-        while current_position < len(alpha):
+        while current_position < n_samples:
             state_lifetime = np.round(
                 np.random.gamma(shape=self.gamma_shape, scale=self.gamma_scale)
             ).astype(int)
 
-            alpha[current_position : current_position + state_lifetime] = (
-                self.state_vectors[current_state]
-            )
+            states[current_position : current_position + state_lifetime] = current_state
 
             current_state = np.argmin(
                 cumsum_off_diagonal_trans_prob[current_state] < np.random.uniform()
             )
             current_position += state_lifetime
 
-        if np.all(np.mod(self.state_vectors, 1) == 0):
-            # One-hot state vectors, return an integer state time course.
-            # We must not cast fractional state vectors (e.g. the mixed
-            # states in MixedHSMM_MVN) as this would truncate them to zero
-            alpha = alpha.astype(int)
-        return alpha
+        return states
+
+    def generate_states(self, n_samples: int) -> np.ndarray:
+        """Generate a state time course.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        state_time_course : np.ndarray
+            One-hot state time course. Shape is (n_samples, n_states).
+        """
+        states = self.generate_state_sequence(n_samples)
+        return array_ops.get_one_hot(states, n_states=self.n_states)
+
+
+class MixedHSMM:
+    """HSMM where some of the states are mixtures of modes.
+
+    The HSMM (:code:`hsmm`) has one state for each mode (active on its own)
+    followed by one state for each mixture in :code:`mixed_state_vectors`.
+    The mode time course is the mixing vector of the active HSMM state.
+
+    Parameters
+    ----------
+    gamma_shape : float
+        Shape parameter for the Gamma distribution of state lifetimes.
+    gamma_scale : float
+        Scale parameter for the Gamma distribution of state lifetimes.
+    mixed_state_vectors : np.ndarray
+        Mixing vector of each mixed state, e.g. with 3 modes
+        :code:`[[0.5, 0.5, 0], [0.1, 0, 0.9]]`.
+        Shape is (n_mixed_states, n_modes).
+    off_diagonal_trans_prob : np.ndarray, optional
+        Transition probabilities for out of state transitions, shape
+        (n_modes + n_mixed_states, n_modes + n_mixed_states).
+    full_trans_prob : np.ndarray, optional
+        A transition probability matrix, the diagonal of which will be ignored.
+    """
+
+    def __init__(
+        self,
+        gamma_shape: float,
+        gamma_scale: float,
+        mixed_state_vectors: np.ndarray,
+        off_diagonal_trans_prob: Optional[np.ndarray] = None,
+        full_trans_prob: Optional[np.ndarray] = None,
+    ) -> None:
+        self.mixed_state_vectors = np.asarray(mixed_state_vectors)
+        self.n_mixed_states, self.n_modes = self.mixed_state_vectors.shape
+        self.state_vectors = np.append(
+            np.eye(self.n_modes), self.mixed_state_vectors, axis=0
+        )
+        self.hsmm = HSMM(
+            gamma_shape=gamma_shape,
+            gamma_scale=gamma_scale,
+            off_diagonal_trans_prob=off_diagonal_trans_prob,
+            full_trans_prob=full_trans_prob,
+            n_states=self.n_modes + self.n_mixed_states,
+        )
+        self.off_diagonal_trans_prob = self.hsmm.off_diagonal_trans_prob
+
+    def generate_modes(self, n_samples: int) -> np.ndarray:
+        """Generate a mode time course.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        mode_time_course : np.ndarray
+            Mixing coefficients. Shape is (n_samples, n_modes).
+        """
+        return self.state_vectors[self.hsmm.generate_state_sequence(n_samples)]
 
 
 class HSMM_MVN(Simulation):
-    """Hidden Semi-Markov Model Simulation.
-
-    We sample the state using a transition probability matrix with zero
-    probability for self-transitions. The lifetime of each state is sampled
-    from a Gamma distribution.
+    """HSMM with a multivariate normal observation model.
 
     Parameters
     ----------
@@ -157,8 +221,7 @@ class HSMM_MVN(Simulation):
         Covariance matrix for each state, shape should be (n_states, n_channels,
         n_channels). Or :code:`'random'`.
     n_states : int, optional
-        Number of states. Can pass this argument with keyword :code:`n_modes`
-        instead.
+        Number of states.
     n_channels : int, optional
         Number of channels in the observation model.
     observation_error : float, optional
@@ -175,76 +238,32 @@ class HSMM_MVN(Simulation):
         means: Optional[Union[np.ndarray, str]] = None,
         covariances: Optional[Union[np.ndarray, str]] = None,
         n_states: Optional[int] = None,
-        n_modes: Optional[int] = None,
         n_channels: Optional[int] = None,
         observation_error: float = 0.0,
     ) -> None:
-        if n_states is None:
-            n_states = n_modes
-
-        # Observation model object
-        self.obs_mod = MVN(
+        obs_model = MVN(
             means=means,
             covariances=covariances,
-            n_modes=n_states,
             n_channels=n_channels,
             observation_error=observation_error,
         )
-
-        self.n_states = self.obs_mod.n_modes
-        self.n_channels = self.obs_mod.n_channels
-
-        # HSMM object
-        # N.b. we use a different random seed to the observation model
+        obs_model.initialize(n_states)
         self.hsmm = HSMM(
             gamma_shape=gamma_shape,
             gamma_scale=gamma_scale,
             off_diagonal_trans_prob=off_diagonal_trans_prob,
             full_trans_prob=full_trans_prob,
-            n_states=self.n_states,
+            n_states=obs_model._n,
         )
-
-        # Initialize base class
-        super().__init__(n_samples=n_samples)
-
-        # Simulate data
-        self.state_time_course = self.hsmm.generate_states(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
-
-    @property
-    def n_modes(self) -> int:
-        return self.n_states
-
-    @property
-    def mode_time_course(self) -> np.ndarray:
-        return self.state_time_course
-
-    def __getattr__(self, attr: str):
-        if attr in ("obs_mod", "hsmm"):
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        elif attr in dir(self.hsmm):
-            return getattr(self.hsmm, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
-
-    def standardize(self) -> None:
-        sigma = np.std(self.time_series, axis=0)
-        super().standardize()
-        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
+        super().__init__(self.hsmm, obs_model, n_samples)
 
 
 class MixedHSMM_MVN(Simulation):
-    """Hidden Semi-Markov Model Simulation with a mixture of states at each time point.
+    """HSMM with mixed states and a multivariate normal observation model.
 
-    Each mixture of states has it's own row/column in the transition
-    probability matrix. The lifetime of each state mixture is sampled from
-    a Gamma distribution.
-
-    state_mixing_vectors is a 2D numpy array containing mixtures of the
-    the states that can be simulated, e.g. with :code:`n_states=3` we could have
-    :code:`state_mixing_vectors=[[0.5, 0.5, 0], [0.1, 0, 0.9]]`.
+    Each mixture of modes has its own row/column in the transition
+    probability matrix and its lifetime is sampled from a Gamma
+    distribution. See :class:`MixedHSMM`.
 
     Parameters
     ----------
@@ -254,19 +273,17 @@ class MixedHSMM_MVN(Simulation):
         Shape parameter for the Gamma distribution of state lifetimes.
     gamma_scale : float
         Scale parameter for the Gamma distribution of state lifetimes.
-    mixed_state_vectors : np.ndarray, optional
-        Vectors containing mixing factors for mixed states.
-    mixed_mode_vectors : np.ndarray, optional
-        Vectors containing mixing factors for mixed states.
+    mixed_state_vectors : np.ndarray
+        Mixing vector of each mixed state. Shape is (n_mixed_states, n_modes).
     off_diagonal_trans_prob : np.ndarray, optional
         Transition probabilities for out of state transitions.
     full_trans_prob : np.ndarray, optional
         A transition probability matrix, the diagonal of which will be ignored.
     means : np.ndarray or str, optional
-        Mean vector for each state, shape should be (n_states, n_channels).
+        Mean vector for each mode, shape should be (n_modes, n_channels).
         Or :code:`'zero'` or :code:`'random'`.
     covariances : numpy.ndarray or str, optional
-        Covariance matrix for each state, shape should be (n_states, n_channels,
+        Covariance matrix for each mode, shape should be (n_modes, n_channels,
         n_channels). Or :code:`'random'`.
     n_channels : int, optional
         Number of channels in the observation model.
@@ -279,8 +296,7 @@ class MixedHSMM_MVN(Simulation):
         n_samples: int,
         gamma_shape: float,
         gamma_scale: float,
-        mixed_state_vectors: Optional[np.ndarray] = None,
-        mixed_mode_vectors: Optional[np.ndarray] = None,
+        mixed_state_vectors: np.ndarray,
         off_diagonal_trans_prob: Optional[np.ndarray] = None,
         full_trans_prob: Optional[np.ndarray] = None,
         means: Optional[Union[np.ndarray, str]] = None,
@@ -288,75 +304,17 @@ class MixedHSMM_MVN(Simulation):
         n_channels: Optional[int] = None,
         observation_error: float = 0.0,
     ) -> None:
-        if mixed_state_vectors is None:
-            mixed_state_vectors = mixed_mode_vectors
-
-        # Get the number of single activation states and mixed states
-        self.n_states = mixed_state_vectors.shape[1]
-        self.n_mixed_states = mixed_state_vectors.shape[0]
-
-        # Mode vectors of mixed states
-        self.mixed_state_vectors = mixed_state_vectors
-
-        # Assign self.state_vectors
-        self.construct_state_vectors(self.n_states)
-
-        # Observation model object
-        self.obs_mod = MVN(
+        self.hsmm = MixedHSMM(
+            gamma_shape=gamma_shape,
+            gamma_scale=gamma_scale,
+            mixed_state_vectors=mixed_state_vectors,
+            off_diagonal_trans_prob=off_diagonal_trans_prob,
+            full_trans_prob=full_trans_prob,
+        )
+        obs_model = MVN(
             means=means,
             covariances=covariances,
-            n_modes=self.n_states,
             n_channels=n_channels,
             observation_error=observation_error,
         )
-        self.n_channels = self.obs_mod.n_channels
-
-        # HSMM object
-        # - hsmm.n_states is the total of n_states + n_mixed_states because
-        #   we pretend each mixed state is a state in its own right in the
-        #   transition probability matrix.
-        # - we use a different random seed to the observation model
-        self.hsmm = HSMM(
-            gamma_shape=gamma_shape,
-            gamma_scale=gamma_scale,
-            off_diagonal_trans_prob=off_diagonal_trans_prob,
-            full_trans_prob=full_trans_prob,
-            state_vectors=self.state_vectors,
-            n_states=self.n_states + self.n_mixed_states,
-        )
-
-        # Initialize base class
-        super().__init__(n_samples=n_samples)
-
-        # Simulate data
-        self.state_time_course = self.hsmm.generate_states(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.state_time_course)
-
-    @property
-    def n_modes(self) -> int:
-        return self.n_states
-
-    @property
-    def mode_time_course(self) -> np.ndarray:
-        return self.state_time_course
-
-    def __getattr__(self, attr: str):
-        if attr in ("obs_mod", "hsmm"):
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        elif attr in dir(self.hsmm):
-            return getattr(self.hsmm, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
-
-    def construct_state_vectors(self, n_states: int) -> None:
-        non_mixed_state_vectors = array_ops.get_one_hot(np.arange(n_states))
-        self.state_vectors = np.append(
-            non_mixed_state_vectors, self.mixed_state_vectors, axis=0
-        )
-
-    def standardize(self) -> None:
-        sigma = np.std(self.time_series, axis=0)
-        super().standardize()
-        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
+        super().__init__(self.hsmm, obs_model, n_samples)

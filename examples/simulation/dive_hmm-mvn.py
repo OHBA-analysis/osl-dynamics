@@ -100,7 +100,7 @@ print(f"Free energy: {free_energy}")
 # Inferred mode mixing factors and mode time course
 inf_alp = model.get_alpha(training_data, concatenate=True)
 inf_stc = modes.argmax_time_courses(inf_alp)
-sim_stc = np.concatenate(sim.mode_time_course)
+sim_stc = np.concatenate(sim.state_time_course)
 
 sim_stc, inf_stc = modes.match_modes(sim_stc, inf_stc)
 print("Dice coefficient:", metrics.dice_coefficient(sim_stc, inf_stc))

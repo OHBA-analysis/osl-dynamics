@@ -1,55 +1,72 @@
 """Simulations for time series data.
 
-This subpackage provides tools for generating synthetic time series data
-with known ground truth dynamics. Simulations are built by combining a
-**state model** (how states evolve over time) with an **observation model**
-(how data is generated given the active state).
+This subpackage generates synthetic time series data with known ground truth
+dynamics. A simulation combines a **state model**, which generates a time
+course, with an **observation model**, which generates data given the time
+course:
+
+.. code-block:: python
+
+    from osl_dynamics import simulation
+
+    sim = simulation.Simulation(
+        state_model=simulation.HMM(trans_prob="sequence", stay_prob=0.9, n_states=4),
+        obs_model=simulation.MVN(means="zero", covariances="random", n_channels=10),
+        n_samples=25600,
+    )
+    sim.standardize()
+    sim.time_series, sim.state_time_course, sim.covariances
+
+A state model generates either mutually exclusive **states**, giving a
+simulation with ``n_states`` and ``state_time_course``, or a mixture of
+**modes**, giving a simulation with ``n_modes`` and ``mode_time_course``. The
+observation model takes the number of states or modes from the state model.
 
 State models
 ------------
-- :py:class:`HMM` — Hidden Markov Model. Generates discrete state sequences
-  with Markovian transitions.
-- :py:class:`HSMM` — Hidden Semi-Markov Model. Like HMM but state lifetimes
-  follow a Gamma distribution rather than a geometric distribution.
-- :py:class:`MixedSine` — Sinusoidal soft mixtures. Generates smooth,
-  overlapping mode time courses using softmax-normalized sinusoids.
+States:
+
+- :py:class:`HMM` — Hidden Markov Model.
+- :py:class:`HSMM` — Hidden Semi-Markov Model: state lifetimes follow a Gamma
+  distribution.
+- :py:class:`HierarchicalHMM` — a top-level HMM selects which bottom-level HMM
+  generates the states.
+- :py:class:`MDynHMM` — two independent HMMs for multi-time-scale dynamics.
+
+Modes:
+
+- :py:class:`MixedSine` — softmax-normalized sinusoids.
+- :py:class:`MixedHSMM` — HSMM where some states are mixtures of modes.
 
 Observation models
 ------------------
-- :py:class:`MVN` — Multivariate normal. Each state has a mean vector and
-  covariance matrix.
-- :py:class:`MAR` — Multivariate autoregressive. Each state has a set of
-  autoregressive coefficients and an error covariance.
-- :py:class:`OscillatoryBursts` — Oscillatory bursts. Each state has a
-  frequency and a set of active channels; generates sinusoidal signals
-  during active periods.
-- :py:class:`TDECovs` — TDE covariance. Each state has a TDE covariance
-  matrix; generates autoregressive data via conditional sampling.
-- :py:class:`Poisson` — Poisson. Each state has a rate vector.
-- :py:class:`Dirichlet` — Dirichlet. Each state has a concentration vector.
+- :py:class:`MVN` — multivariate normal: a mean vector and covariance matrix
+  for each state or mode.
+- :py:class:`OscillatoryMVN` — multivariate normal with a spectral peak at a
+  different frequency for each state or mode (AR(2) processes).
+- :py:class:`MDyn_MVN` — multivariate normal with separate time courses for
+  the means/standard deviations and the correlations.
+- :py:class:`MSess_MVN` — multivariate normal with session-specific means and
+  covariances.
+- :py:class:`MAR` — multivariate autoregressive (states only).
+- :py:class:`TDECovs` — data generated from time-delay embedded covariances.
+- :py:class:`OscillatoryBursts` — sinusoidal bursts (states only).
+- :py:class:`Poisson` — Poisson counts (states only).
+- :py:class:`Dirichlet` — Dirichlet compositions (states only).
 
-Combined simulation classes
----------------------------
-These combine a state model with an observation model:
+Simulations
+-----------
+:py:class:`Simulation` combines any state model with any observation model.
+The following classes combine common pairs:
 
-- :py:class:`HMM_MVN` — HMM + MVN.
-- :py:class:`HMM_MAR` — HMM + MAR.
-- :py:class:`HMM_OscillatoryBursts` — HMM + oscillatory bursts.
-- :py:class:`HMM_TDECovs` — HMM + TDE covariances.
-- :py:class:`HMM_Poi` — HMM + Poisson.
-- :py:class:`HMM_Dirichlet` — HMM + Dirichlet compositions.
-- :py:class:`HSMM_MVN` — HSMM + MVN.
-- :py:class:`MixedHSMM_MVN` — HSMM with overlapping states + MVN.
-- :py:class:`MixedSine_MVN` — Sinusoidal mixing + MVN.
-
-Variants
---------
-- ``MDyn_`` prefix — Multi-time-scale dynamics (separate HMMs for power and
-  connectivity): :py:class:`MDyn_HMM_MVN`.
-- ``MSess_`` prefix — Multi-session data with session-specific parameters:
+- :py:class:`HMM_MVN`, :py:class:`HMM_OscillatoryMVN`, :py:class:`HMM_MAR`,
+  :py:class:`HMM_TDECovs`, :py:class:`HMM_OscillatoryBursts`,
+  :py:class:`HMM_Poi`, :py:class:`HMM_Dirichlet`.
+- :py:class:`HSMM_MVN`, :py:class:`MixedHSMM_MVN`,
+  :py:class:`HierarchicalHMM_MVN`, :py:class:`MDyn_HMM_MVN`.
+- :py:class:`MixedSine_MVN`.
+- ``MSess_`` prefix — session-specific observation model parameters:
   :py:class:`MSess_HMM_MVN`, :py:class:`MSess_MixedSine_MVN`.
-- :py:class:`HierarchicalHMM_MVN` — Two-level hierarchical HMM where a
-  top-level HMM selects which bottom-level HMM is active.
 
 Python example scripts
 ----------------------
@@ -63,15 +80,19 @@ from osl_dynamics.simulation.obs_mod import (
     MDyn_MVN,
     MSess_MVN,
     OscillatoryBursts,
+    OscillatoryMVN,
     Poisson,
     TDECovs,
     Dirichlet,
 )
 from osl_dynamics.simulation.hmm import (
     HMM,
+    HierarchicalHMM,
+    MDynHMM,
     HMM_MAR,
     HMM_MVN,
     HMM_OscillatoryBursts,
+    HMM_OscillatoryMVN,
     HMM_TDECovs,
     MDyn_HMM_MVN,
     HierarchicalHMM_MVN,
@@ -79,5 +100,5 @@ from osl_dynamics.simulation.hmm import (
     HMM_Poi,
     HMM_Dirichlet,
 )
-from osl_dynamics.simulation.hsmm import HSMM, HSMM_MVN, MixedHSMM_MVN
+from osl_dynamics.simulation.hsmm import HSMM, MixedHSMM, HSMM_MVN, MixedHSMM_MVN
 from osl_dynamics.simulation.sm import MixedSine, MixedSine_MVN, MSess_MixedSine_MVN

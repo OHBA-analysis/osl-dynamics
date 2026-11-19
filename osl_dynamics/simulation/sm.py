@@ -1,16 +1,16 @@
-"""Classes for simulating a soft mixture of modes."""
+"""Soft mixtures of modes."""
 
 from typing import List, Optional, Union
 
 import numpy as np
 from scipy.special import softmax
 
-from osl_dynamics.simulation.obs_mod import MVN, MSess_MVN
 from osl_dynamics.simulation.base import Simulation
+from osl_dynamics.simulation.obs_mod import MVN, MSess_MVN
 
 
 class MixedSine:
-    """Simulates sinusoidal oscilations in mode time courses.
+    """Mode time courses from softmax-normalized sinusoids.
 
     Parameters
     ----------
@@ -19,7 +19,7 @@ class MixedSine:
     relative_activation : np.ndarray or list
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
-        operation. This argument can use use to change the relative values
+        operation. This argument can be used to change the relative values
         of each mode time course.
     amplitudes : np.ndarray or list
         Amplitude of each sinusoid.
@@ -38,7 +38,7 @@ class MixedSine:
         sampling_frequency: float,
     ) -> None:
         if len(relative_activation) != n_modes:
-            raise ValueError("len(relative_activation) does not match len(n_modes).")
+            raise ValueError("len(relative_activation) does not match n_modes.")
 
         if len(amplitudes) != n_modes:
             raise ValueError("n_modes amplitudes must be passed.")
@@ -53,6 +53,18 @@ class MixedSine:
         self.sampling_frequency = sampling_frequency
 
     def generate_modes(self, n_samples: int) -> np.ndarray:
+        """Generate a mode time course.
+
+        Parameters
+        ----------
+        n_samples : int
+            Number of samples.
+
+        Returns
+        -------
+        mode_time_course : np.ndarray
+            Mixing coefficients. Shape is (n_samples, n_modes).
+        """
         # Simulate a random initial phase for each sinusoid
         self.phases = np.random.uniform(0, 2 * np.pi, self.n_modes)
 
@@ -71,7 +83,7 @@ class MixedSine:
 
 
 class MixedSine_MVN(Simulation):
-    """Simulates sinusoidal alphas with a multivariable normal observation model.
+    """Sinusoidal mode mixing with a multivariate normal observation model.
 
     Parameters
     ----------
@@ -80,7 +92,7 @@ class MixedSine_MVN(Simulation):
     relative_activation : np.ndarray or list
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
-        operation. This argument can use use to change the relative values
+        operation. This argument can be used to change the relative values
         of each mode time course. Shape must be (n_modes,).
     amplitudes : np.ndarray or list
         Amplitude of each sinusoid. Shape must be (n_modes,).
@@ -118,56 +130,26 @@ class MixedSine_MVN(Simulation):
         n_channels: Optional[int] = None,
         observation_error: float = 0.0,
     ) -> None:
-        # Observation model
-        self.obs_mod = MVN(
+        obs_model = MVN(
             means=means,
             covariances=covariances,
-            n_covariances_act=n_covariances_act,
-            n_modes=n_modes,
             n_channels=n_channels,
+            n_covariances_act=n_covariances_act,
             observation_error=observation_error,
         )
-
-        self.n_modes = self.obs_mod.n_modes
-        self.n_channels = self.obs_mod.n_channels
-
-        # Soft mixed mode time courses class
+        obs_model.initialize(n_modes)
         self.sm = MixedSine(
-            n_modes=self.n_modes,
+            n_modes=obs_model._n,
             relative_activation=relative_activation,
             amplitudes=amplitudes,
             frequencies=frequencies,
             sampling_frequency=sampling_frequency,
         )
-
-        super().__init__(n_samples=n_samples)
-
-        # Simulate data
-        self.mode_time_course = self.generate_modes(self.n_samples)
-        self.time_series = self.obs_mod.simulate_data(self.mode_time_course)
-
-    def __getattr__(self, attr: str):
-        if attr in ("obs_mod", "sm"):
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        elif attr in dir(self.sm):
-            return getattr(self.sm, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
-
-    def standardize(self) -> None:
-        mu = np.mean(self.time_series, axis=0).astype(np.float64)
-        sigma = np.std(self.time_series, axis=0).astype(np.float64)
-        super().standardize()
-        self.obs_mod.means = (self.obs_mod.means - mu[np.newaxis, ...]) / sigma[
-            np.newaxis, ...
-        ]
-        self.obs_mod.covariances /= np.outer(sigma, sigma)[np.newaxis, ...]
+        super().__init__(self.sm, obs_model, n_samples)
 
 
 class MSess_MixedSine_MVN(Simulation):
-    """Simulates sinusoidal alphas with a multivariable normal observation model for each session.
+    """Sinusoidal mode mixing with session-specific multivariate normals.
 
     Parameters
     ----------
@@ -176,7 +158,7 @@ class MSess_MixedSine_MVN(Simulation):
     relative_activation : np.ndarray or list
         Average value for each sine wave. Note, this might not be the
         mean value for each mode time course because there is a softmax
-        operation. This argument can use use to change the relative values
+        operation. This argument can be used to change the relative values
         of each mode time course. Shape must be (n_modes,).
     amplitudes : np.ndarray or list
         Amplitude of each sinusoid. Shape must be (n_modes,).
@@ -215,6 +197,8 @@ class MSess_MixedSine_MVN(Simulation):
         Standard deviation of the error added to the generated data.
     """
 
+    _time_courses_first = True
+
     def __init__(
         self,
         n_samples: int,
@@ -235,12 +219,10 @@ class MSess_MixedSine_MVN(Simulation):
         between_group_scale: Optional[float] = None,
         observation_error: float = 0.0,
     ) -> None:
-        # Observation model
-        self.obs_mod = MSess_MVN(
+        obs_model = MSess_MVN(
             session_means=session_means,
             session_covariances=session_covariances,
             n_covariances_act=n_covariances_act,
-            n_modes=n_modes,
             n_channels=n_channels,
             n_sessions=n_sessions,
             embeddings_dim=embeddings_dim,
@@ -250,50 +232,15 @@ class MSess_MixedSine_MVN(Simulation):
             between_group_scale=between_group_scale,
             observation_error=observation_error,
         )
-
-        self.n_modes = self.obs_mod.n_modes
-        self.n_channels = self.obs_mod.n_channels
-        self.n_sessions = self.obs_mod.n_sessions
-
-        super().__init__(n_samples=n_samples)
-
-        # Simulate mode time courses for all sessions
-        self.mode_time_course = []
-        self.sm = []
-
-        for _ in range(self.n_sessions):
-            sm = MixedSine(
-                n_modes=self.n_modes,
+        obs_model.initialize(n_modes)
+        self.sm = [
+            MixedSine(
+                n_modes=obs_model._n,
                 relative_activation=relative_activation,
                 amplitudes=amplitudes,
                 frequencies=frequencies,
                 sampling_frequency=sampling_frequency,
             )
-            self.sm.append(sm)
-            self.mode_time_course.append(sm.generate_modes(self.n_samples))
-        self.mode_time_course = np.array(self.mode_time_course)
-
-        # Simulate data
-        self.time_series = self.obs_mod.simulate_multi_session_data(
-            self.mode_time_course
-        )
-
-    def __getattr__(self, attr: str):
-        if attr == "obs_mod":
-            raise AttributeError(f"No attribute called {attr}.")
-        if attr in dir(self.obs_mod):
-            return getattr(self.obs_mod, attr)
-        else:
-            raise AttributeError(f"No attribute called {attr}.")
-
-    def standardize(self) -> None:
-        means = np.mean(self.time_series, axis=1).astype(np.float64)
-        standard_deviations = np.std(self.time_series, axis=1).astype(np.float64)
-        super().standardize(axis=1)
-        self.obs_mod.session_means = (
-            self.obs_mod.session_means - means[:, None, :]
-        ) / standard_deviations[:, None, :]
-        self.obs_mod.session_covariances /= np.expand_dims(
-            standard_deviations[:, :, None] @ standard_deviations[:, None, :],
-            axis=1,
-        )
+            for _ in range(obs_model.n_sessions)
+        ]
+        super().__init__(self.sm, obs_model, n_samples)

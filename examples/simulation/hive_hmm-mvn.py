@@ -66,7 +66,7 @@ sim = simulation.MSess_HMM_MVN(
     stay_prob=0.9,
 )
 sim.standardize()
-sim_stc = np.concatenate(sim.mode_time_course)
+sim_stc = np.concatenate(sim.state_time_course)
 
 # Create training dataset
 training_data = data.Data(sim.time_series)
