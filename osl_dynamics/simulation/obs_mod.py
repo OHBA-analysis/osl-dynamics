@@ -9,6 +9,7 @@ state model when the parameters are generated randomly (see
 from typing import List, Optional, Union
 
 import numpy as np
+from scipy.integrate import quad
 from scipy.signal import lfilter, lfiltic
 
 from osl_dynamics.utils import array_ops
@@ -278,7 +279,7 @@ class OscillatoryMVN(MVN):
 
     .. math::
         x_t = \\sum_k \\alpha_{kt} m_k
-        + \\sum_k \\sqrt{\\alpha_{kt}} L_k y^{(k)}_t + \\epsilon_t
+        + \\sum_k \\sqrt{\\alpha_{kt}} L_k y^{(k)}_t + L_a b_t + \\epsilon_t
 
     where :math:`L_k` is the Cholesky factor of the covariance :math:`C_k`,
     :math:`\\epsilon_t` is white noise and :math:`y^{(k)}_t` contains
@@ -289,10 +290,20 @@ class OscillatoryMVN(MVN):
     when :math:`w` is small compared to :math:`f`. The processes run through
     the whole recording and are started from their stationary distribution.
 
+    :math:`L_a b_t` is optional aperiodic (:math:`1/f`) background activity,
+    which is the same in every state or mode. :math:`L_a` is the Cholesky
+    factor of :code:`aperiodic_covariance` and :math:`b_t` contains
+    independent, unit-variance Gaussian processes with power spectral density
+    proportional to :math:`1 / (f_{knee}^\\chi + f^\\chi)`, where :math:`\\chi`
+    is :code:`aperiodic_exponent` and :math:`f_{knee}` is
+    :code:`aperiodic_knee`: the spectrum is flat below the knee and falls as
+    :math:`1/f^\\chi` above it.
+
     With mutually exclusive states, the covariance of state :math:`k` is
-    :math:`C_k` and its spectrum peaks at its frequency. With modes, the
-    zero-lag covariance at time :math:`t` is :math:`\\sum_k \\alpha_{kt} C_k`,
-    as in :class:`MVN`.
+    :math:`C_k` (plus the aperiodic covariance) and its spectrum peaks at its
+    frequency. With modes, the zero-lag covariance at time :math:`t` is
+    :math:`\\sum_k \\alpha_{kt} C_k` (plus the aperiodic covariance), as in
+    :class:`MVN`.
 
     Parameters
     ----------
@@ -318,6 +329,13 @@ class OscillatoryMVN(MVN):
         Number of iterations to add activations to covariance matrices.
     observation_error : float, optional
         Standard deviation of the white noise added to the generated data.
+    aperiodic_covariance : np.ndarray, optional
+        Covariance of the aperiodic background activity, shape
+        (n_channels, n_channels). :code:`None` for no background.
+    aperiodic_exponent : float, optional
+        Exponent :math:`\\chi` of the aperiodic power spectrum.
+    aperiodic_knee : float, optional
+        Knee frequency :math:`f_{knee}` (Hz) of the aperiodic power spectrum.
     """
 
     def __init__(
@@ -330,6 +348,9 @@ class OscillatoryMVN(MVN):
         n_channels: Optional[int] = None,
         n_covariances_act: int = 1,
         observation_error: float = 0.0,
+        aperiodic_covariance: Optional[np.ndarray] = None,
+        aperiodic_exponent: float = 1.0,
+        aperiodic_knee: float = 1.0,
     ) -> None:
         frequencies = np.asarray(frequencies, dtype=float)
         if frequencies.ndim not in (1, 2):
@@ -351,8 +372,17 @@ class OscillatoryMVN(MVN):
         self.peak_width = peak_width
         self.sampling_frequency = sampling_frequency
 
+        if aperiodic_knee <= 0:
+            raise ValueError("aperiodic_knee must be positive.")
+        if aperiodic_exponent < 0:
+            raise ValueError("aperiodic_exponent must not be negative.")
+        self.aperiodic_exponent = aperiodic_exponent
+        self.aperiodic_knee = aperiodic_knee
+
         if n_channels is None and frequencies.ndim == 2:
             n_channels = frequencies.shape[1]
+        if n_channels is None and aperiodic_covariance is not None:
+            n_channels = len(aperiodic_covariance)
         super().__init__(
             means=means,
             covariances=covariances,
@@ -367,6 +397,13 @@ class OscillatoryMVN(MVN):
                 "frequencies has a different number of states or modes to the "
                 "means or covariances."
             )
+        if aperiodic_covariance is not None:
+            aperiodic_covariance = np.asarray(aperiodic_covariance, dtype=float)
+            if aperiodic_covariance.shape != (self.n_channels, self.n_channels):
+                raise ValueError(
+                    "aperiodic_covariance must have shape (n_channels, n_channels)."
+                )
+        self.aperiodic_covariance = aperiodic_covariance
         self.initialize(len(frequencies))
 
     def _ar2_coefficients(self) -> tuple:
@@ -422,6 +459,37 @@ class OscillatoryMVN(MVN):
             y[:, c], _ = lfilter([1], a, e[:, c], zi=zi)
         return y / np.sqrt(gamma0)
 
+    def _aperiodic_psd(self, frequencies: np.ndarray) -> np.ndarray:
+        """One-sided power spectral density of a unit-variance aperiodic
+        process."""
+
+        def shape(f):
+            return 1 / (
+                self.aperiodic_knee**self.aperiodic_exponent
+                + np.abs(f) ** self.aperiodic_exponent
+            )
+
+        variance = quad(shape, 0, self.sampling_frequency / 2)[0]
+        return shape(np.asarray(frequencies, dtype=float)) / variance
+
+    def _generate_aperiodic(self, n_samples: int) -> np.ndarray:
+        """Unit-variance aperiodic processes, one per channel.
+
+        Returns
+        -------
+        b : np.ndarray
+            Shape is (n_samples, n_channels).
+        """
+        # Filter white noise in the frequency domain. Twice as many samples as
+        # needed are filtered, so that the start and end of the time series
+        # are not correlated by the circular filtering.
+        n_fft = 2 * n_samples
+        f = np.fft.rfftfreq(n_fft, 1 / self.sampling_frequency)
+        gain = np.sqrt(self._aperiodic_psd(f) * self.sampling_frequency / 2)
+        e = np.random.normal(size=(n_fft, self.n_channels))
+        b = np.fft.irfft(np.fft.rfft(e, axis=0) * gain[:, None], n=n_fft, axis=0)
+        return b[:n_samples]
+
     def simulate_data(self, time_course: np.ndarray) -> np.ndarray:
         """Simulate time series data.
 
@@ -441,8 +509,32 @@ class OscillatoryMVN(MVN):
         for k in range(self._n):
             y = self._generate_rhythms(k, n_samples)
             data += np.sqrt(time_course[:, k : k + 1]) * (y @ cholesky[k].T)
+        if self.aperiodic_covariance is not None:
+            b = self._generate_aperiodic(n_samples)
+            data += b @ np.linalg.cholesky(self.aperiodic_covariance).T
         data += np.random.normal(scale=self.observation_error, size=data.shape)
         return data.astype(np.float32)
+
+    def get_instantaneous_covariances(self, time_course: np.ndarray) -> np.ndarray:
+        """Get the ground truth covariance at each time point.
+
+        Includes the aperiodic covariance.
+
+        Parameters
+        ----------
+        time_course : np.ndarray
+            State or mode time course. Shape must be (n_samples, n).
+
+        Returns
+        -------
+        inst_covs : np.ndarray
+            Instantaneous covariances.
+            Shape is (n_samples, n_channels, n_channels).
+        """
+        inst_covs = super().get_instantaneous_covariances(time_course)
+        if self.aperiodic_covariance is not None:
+            inst_covs += self.aperiodic_covariance.astype(np.float32)
+        return inst_covs
 
     def power_spectra(self, frequencies: np.ndarray) -> np.ndarray:
         """Ground truth cross power spectral density of each state or mode.
@@ -475,6 +567,13 @@ class OscillatoryMVN(MVN):
         cholesky = np.linalg.cholesky(self.covariances)
         cpsd = np.einsum("kij,kfj,klj->kfil", cholesky, psd, cholesky)
 
+        # Aperiodic background, the same for every state or mode
+        if self.aperiodic_covariance is not None:
+            cpsd += (
+                self._aperiodic_psd(frequencies)[:, None, None]
+                * self.aperiodic_covariance
+            )
+
         # White noise
         noise = np.broadcast_to(self.observation_error, (self.n_channels,))
         cpsd += np.diag(noise**2 * 2 / fs)
@@ -483,6 +582,10 @@ class OscillatoryMVN(MVN):
     def rescale(self, mu: np.ndarray, sigma: np.ndarray) -> None:
         super().rescale(mu, sigma)
         self.observation_error = self.observation_error / sigma
+        if self.aperiodic_covariance is not None:
+            self.aperiodic_covariance = self.aperiodic_covariance / np.outer(
+                sigma, sigma
+            )
 
 
 class MDyn_MVN(MVN):

@@ -43,7 +43,8 @@ Observation models
 - :py:class:`MVN` — multivariate normal: a mean vector and covariance matrix
   for each state or mode.
 - :py:class:`OscillatoryMVN` — multivariate normal with a spectral peak at a
-  different frequency for each state or mode (AR(2) processes).
+  different frequency for each state or mode (AR(2) processes), and optional
+  aperiodic (1/f) background activity.
 - :py:class:`MDyn_MVN` — multivariate normal with separate time courses for
   the means/standard deviations and the correlations.
 - :py:class:`MSess_MVN` — multivariate normal with session-specific means and

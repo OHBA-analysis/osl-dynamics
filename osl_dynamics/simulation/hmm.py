@@ -395,6 +395,13 @@ class HMM_OscillatoryMVN(Simulation):
         is a :code:`str`. Must be between 0 and 1.
     observation_error : float, optional
         Standard deviation of the white noise added to the generated data.
+    aperiodic_covariance : np.ndarray, optional
+        Covariance of the aperiodic (:math:`1/f`) background activity, shape
+        (n_channels, n_channels). :code:`None` for no background.
+    aperiodic_exponent : float, optional
+        Exponent of the aperiodic power spectrum.
+    aperiodic_knee : float, optional
+        Knee frequency (Hz) of the aperiodic power spectrum.
     """
 
     def __init__(
@@ -410,6 +417,9 @@ class HMM_OscillatoryMVN(Simulation):
         n_covariances_act: int = 1,
         stay_prob: Optional[float] = None,
         observation_error: float = 0.0,
+        aperiodic_covariance: Optional[np.ndarray] = None,
+        aperiodic_exponent: float = 1.0,
+        aperiodic_knee: float = 1.0,
     ) -> None:
         obs_model = OscillatoryMVN(
             frequencies=frequencies,
@@ -420,6 +430,9 @@ class HMM_OscillatoryMVN(Simulation):
             n_channels=n_channels,
             n_covariances_act=n_covariances_act,
             observation_error=observation_error,
+            aperiodic_covariance=aperiodic_covariance,
+            aperiodic_exponent=aperiodic_exponent,
+            aperiodic_knee=aperiodic_knee,
         )
         self.hmm = HMM(
             trans_prob=trans_prob, stay_prob=stay_prob, n_states=obs_model._n
