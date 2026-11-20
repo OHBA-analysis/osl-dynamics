@@ -43,7 +43,7 @@ def compare_summary_stats(data, output_dir, n_perm, n_jobs):
 
     # Load group assignments
     assignments = load_group_assignments()
-    group = ["Old" if a == 1 else "Young" for a in assignments]
+    group = ["Young" if a == 1 else "Old" for a in assignments]
 
     # Load summary statistics
     alp_mean = np.load(f"{output_dir}/summary_stats/alp_mean.npy")
