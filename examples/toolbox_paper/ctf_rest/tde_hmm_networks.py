@@ -47,7 +47,7 @@ def compare_summary_stats(data, output_dir, n_perm, n_jobs):
 
     # Load group assignments
     assignments = load_group_assignments()
-    group = ["Old" if a == 1 else "Young" for a in assignments]
+    group = ["Young" if a == 1 else "Old" for a in assignments]
 
     # Load state time course
     alp = pickle.load(open(f"{output_dir}/inf_params/alp.pkl", "rb"))
