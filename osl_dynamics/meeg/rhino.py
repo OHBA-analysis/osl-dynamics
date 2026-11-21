@@ -419,12 +419,14 @@ def extract_surfaces(
             f"fslorient -getorient {surfaces.mri_file}"
         )
 
-    # If orientation is not RADIOLOGICAL then force it to be RADIOLOGICAL
+    # If orientation is not RADIOLOGICAL then flip the data and sform in x
     if mri_orient != "RADIOLOGICAL":
         print("Reorienting brain to be RADIOLOGICAL")
 
-        # Command: fslorient -forceradiological <mri_file>
-        fsl_wrappers.misc.fslorient(surfaces.mri_file, forceradiological=True)
+        # Commands: fslswapdim <mri_file> -x y z <mri_file>
+        #           fslorient -swaporient <mri_file>
+        fsl_wrappers.fslswapdim(surfaces.mri_file, "-x", "y", "z", surfaces.mri_file)
+        fsl_wrappers.misc.fslorient(surfaces.mri_file, swaporient=True)
 
     print(
         "You can use the following command line call to check the MRI is "
