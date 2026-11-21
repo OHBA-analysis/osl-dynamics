@@ -573,7 +573,12 @@ class VariationalInferenceModelBase(InitializationMixin, ModelBase):
 
         dataset = self.make_dataset(dataset, concatenate=True)
         predictions = next(
-            self._predict_sessions([dataset], "Calculating losses", **kwargs)
+            self._predict_sessions(
+                [dataset],
+                "Calculating losses",
+                outputs=["ll_loss", "kl_loss"],
+                **kwargs,
+            )
         )
         ll_loss = np.mean(predictions["ll_loss"])
         kl_loss = np.mean(predictions["kl_loss"])

@@ -141,6 +141,7 @@ class ModelBase:
 
         # Build and compile the model
         self.model = None
+        self._output_models = {}
         with self.config.strategy.scope():
             self.build_model()
             self.compile()
@@ -538,7 +539,13 @@ class ModelBase:
 
         return history
 
-    def _predict_sessions(self, datasets: list, desc: str, **kwargs) -> Generator:
+    def _predict_sessions(
+        self,
+        datasets: list,
+        desc: str,
+        outputs: Optional[List[str]] = None,
+        **kwargs,
+    ) -> Generator:
         """Predict for the dataset of each session, with a progress bar.
 
         With more than one session, the progress bar is over sessions,
@@ -550,6 +557,8 @@ class ModelBase:
             Dataset for each session.
         desc : str
             Description shown before the progress bar.
+        outputs : list of str, optional
+            Names of the model outputs to predict. Defaults to all of them.
         kwargs : keyword arguments, optional
             Keyword arguments for :code:`keras.Model.predict()`. Pass
             :code:`verbose=0` for no progress bar.
@@ -559,16 +568,25 @@ class ModelBase:
         predictions : dict
             Predictions for a session.
         """
+        model = self.model
+        if outputs is not None:
+            # Model with only the requested outputs, cached
+            outputs = tuple(outputs)
+            if outputs not in self._output_models:
+                self._output_models[outputs] = tf.keras.Model(
+                    model.input, {name: model.output[name] for name in outputs}
+                )
+            model = self._output_models[outputs]
         verbose = kwargs.pop("verbose", 1)
         if len(datasets) == 1:
             if verbose:
                 kwargs["callbacks"] = listify(kwargs.get("callbacks")) + [
                     callbacks.ProgressBarCallback(desc=desc)
                 ]
-            yield self.predict(datasets[0], verbose=0, **kwargs)
+            yield model.predict(datasets[0], verbose=0, **kwargs)
         else:
             for dataset in progress(datasets, desc=desc, disable=not verbose):
-                yield self.predict(dataset, verbose=0, **kwargs)
+                yield model.predict(dataset, verbose=0, **kwargs)
 
     @staticmethod
     def _session_batches(datasets: list, desc: str, verbose: int = 1) -> Generator:
