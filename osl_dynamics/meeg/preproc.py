@@ -495,8 +495,10 @@ def ica_label(
     raw : mne.io.Raw
         MNE Raw object.
     picks : str, optional
-        Channel type to use for ICA. For Elekta MEG data, use ``"mag"``
-        (MEGNet was trained on magnetometer topographies).
+        Channel types to fit the ICA on. Artefact components are only
+        removed from these channels. For Elekta MEG data, use ``"meg"``
+        to clean the magnetometers and gradiometers (MEGNet labels the
+        components from their magnetometer topographies).
     n_components : int, optional
         Number of ICA components. Should not exceed the data rank.
         For MaxFiltered Elekta data (rank ~60), 20 is a safe default.

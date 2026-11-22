@@ -27,8 +27,6 @@ def process_session(session):
     raw_file = input_dir / session["subject"] / "meg" / session["raw_file"]
     raw = mne.io.read_raw_fif(raw_file, preload=True)
 
-    raw = raw.crop(tmax=60)
-
     raw = raw.notch_filter([50, 100])
     raw = raw.filter(
         l_freq=1,

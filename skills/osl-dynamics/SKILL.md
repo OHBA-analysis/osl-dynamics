@@ -77,7 +77,7 @@ Every model module defines `Config` and `Model`. Training needs TensorFlow (`pip
 
 ## Recommended settings
 
-- **Source-space M/EEG**: sign flip, then `tde_pca` with `n_embeddings` giving a ~60 ms window (15 at 250 Hz, 7 at 100 Hz) and `n_pca_components` at least twice the number of parcels, then `standardize`. Use `learn_means=False`.
+- **Source-space M/EEG**: sign flip, then `tde_pca` with `n_embeddings` giving a ~60 ms window (15 at 250 Hz, 7 at 100 Hz) and `n_pca_components` a round number roughly twice the number of channels (e.g. 120 for 52 parcels; no need to calculate it from `data.n_channels`), then `standardize`. Use `learn_means=False`.
 - **Sensor-level M/EEG or fMRI**: `{"standardize": {}}` only. fMRI HMMs use `learn_means=True`.
 - **Amplitude envelope**: `{"amplitude_envelope": {}, "moving_average": {"n_window": 5}, "standardize": {}}` with `learn_means=True`.
 - **Number of states/modes**: 6-14, start with 8. Check that conclusions hold for nearby values.
@@ -111,13 +111,23 @@ Every model module defines `Config` and `Model`. Training needs TensorFlow (`pip
 
 Corrections (`correction=`): `"max_stat"` (default) for states, parcels and summary statistics; `"cluster"` or `"tfce"` with `cluster_dims` for effects over time or frequency; `"fdr"` for connectivity. All tests except `condition_diff` take covariates, e.g. `covariates={"age": age}`.
 
+## Writing scripts
+
+Keep scripts clear, concise and minimal, like the example scripts:
+
+- A settings block at the top (paths, sessions, key parameters), then the steps in workflow order.
+- Only the steps the user asked for. Leave out argument parsing, logging setup, try/except blocks, extra checks and extra outputs unless asked.
+- Short comments that say what the code does.
+
 ## Common mistakes
 
 - `osl_dynamics.glm` and `osl_dynamics.analysis.statistics` no longer exist: use `osl_dynamics.stats`.
 - Spectra functions return an object, not a tuple: `f, psd, coh = spectral.multitaper_spectra(...)` fails. Arguments after `alpha` are keyword-only.
 - The `use_tfrecord` and `mask_file` arguments no longer exist.
 - osl-ephys is not needed for M/EEG processing: use `osl_dynamics.meeg`.
+- `preproc.ica_label(raw, picks="mag")` on Elekta data: artefacts are only removed from the channels the ICA is fitted on, so the gradiometers stay uncleaned. Use `picks="meg"`.
 - Calculating spectra from the TDE/PCA data instead of the original parcel time courses.
 - Assuming `alpha` has the same length as the data: TDE drops `n_embeddings // 2` samples from each end and sequencing drops the incomplete sequence at the end.
+- Ending scripts with `data.delete_dir()`: it is not needed. `Data` only writes to disk with `load_memmaps=True`, and that directory is deleted automatically when the script ends. Call it only to free disk space early in a long-running session such as a notebook.
 - Learning means on TDE data (`learn_means=True`): the networks are in the covariances.
 - Names use American spelling (`standardize`, `orthogonalization`, `regularization`).
