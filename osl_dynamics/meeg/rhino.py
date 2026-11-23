@@ -33,6 +33,7 @@ from mne.transforms import (
     combine_transforms,
     apply_trans,
     rotation,
+    get_ras_to_neuromag_trans,
 )
 from mne.surface import _points_outside_surface
 from mne.io.constants import FIFF
@@ -1109,6 +1110,10 @@ def extract_fiducials_and_headshape_from_elc(
     fiducial rows (nasion, LPA, RPA) and a ``HeadShapePoints`` section
     with 3D coordinates. All values are assumed to be in mm.
 
+    The points are converted to the head frame defined by the fiducials:
+    the CTF head frame for CTF data, otherwise MNE's (Neuromag) head frame.
+    ``session.preproc_file`` is read to find the system.
+
     Parameters
     ----------
     session : Session
@@ -1123,49 +1128,60 @@ def extract_fiducials_and_headshape_from_elc(
 
     print(f"Saving fiducials/headshape points from {session.elc_file}")
 
-    with open(session.elc_file, "r") as f:
-        lines = f.readlines()
+    with open(session.elc_file) as f:
+        lines = [line.strip() for line in f]
+    for section in ["Positions", "HeadShapePoints"]:
+        if section not in lines:
+            raise ValueError(f"{session.elc_file} has no {section} section.")
 
-    # Extract fiducials from the Positions section
-    for i in range(len(lines)):
-        if lines[i] == "Positions\n":
-            try:
-                nasion = np.array(lines[i + 1].split()[-3:]).astype(np.float64)
-                lpa = np.array(lines[i + 2].split()[-3:]).astype(np.float64)
-                rpa = np.array(lines[i + 3].split()[-3:]).astype(np.float64)
-            except ValueError:
-                raise ValueError(
-                    f"{session.elc_file} must have three fiducials (nasion, LPA, "
-                    "RPA) in its Positions section."
-                )
-            break
+    # Fiducials: the first three rows of the Positions section
+    i = lines.index("Positions")
+    rows = [line.split()[-3:] for line in lines[i + 1 : i + 4]]
+    if len(rows) != 3 or any(len(row) != 3 for row in rows):
+        raise ValueError(
+            f"{session.elc_file} must have three fiducials (nasion, LPA, RPA) "
+            "in its Positions section."
+        )
+    nasion, lpa, rpa = np.array(rows, dtype=np.float64)
 
-    # Extract headshape points from the HeadShapePoints section
-    for i in range(len(lines)):
-        if lines[i] == "HeadShapePoints\n":
-            headshape = (
-                np.array([line.split() for line in lines[i + 1 :]]).astype(np.float64).T
-            )
-            break
+    # Headshape points: the rows after HeadShapePoints
+    i = lines.index("HeadShapePoints")
+    rows = [line.split() for line in lines[i + 1 :] if line]
+    if not rows or any(len(row) != 3 for row in rows):
+        raise ValueError(
+            f"The HeadShapePoints section of {session.elc_file} must have rows "
+            "of x, y, z coordinates."
+        )
+    headshape = np.array(rows, dtype=np.float64)
+
+    # Convert the points to the CTF head frame defined by the fiducials
+    elc_ctf_t = _ctf_head_trans(nasion, lpa, rpa)
+    nasion, lpa, rpa = apply_trans(elc_ctf_t, [nasion, lpa, rpa])
+    headshape = apply_trans(elc_ctf_t, headshape)
 
     # Optionally remove headshape points on the nose
     if remove_nose:
-        on_nose = np.logical_and(
-            headshape[0] > max(lpa[0], rpa[0]),
-            headshape[2] < nasion[2],
-        )
-        headshape = headshape[:, ~on_nose]
+        anterior = headshape[:, 0] > max(lpa[0], rpa[0])
+        inferior = headshape[:, 2] < nasion[2]
+        headshape = headshape[~(anterior & inferior)]
 
-    # Save
+    # For non-CTF data, convert the points to MNE's (Neuromag) head frame
+    info = mne.io.read_info(session.preproc_file)
+    if info["dev_ctf_t"] is None:
+        ctf_head_t = get_ras_to_neuromag_trans(nasion, lpa, rpa)
+        nasion, lpa, rpa = apply_trans(ctf_head_t, [nasion, lpa, rpa])
+        headshape = apply_trans(ctf_head_t, headshape)
+
     os.makedirs(session.coreg_dir, exist_ok=True)
-    print(f"Saved: {session.coreg.head_nasion_file}")
-    np.savetxt(session.coreg.head_nasion_file, nasion)
-    print(f"Saved: {session.coreg.head_rpa_file}")
-    np.savetxt(session.coreg.head_rpa_file, rpa)
-    print(f"Saved: {session.coreg.head_lpa_file}")
-    np.savetxt(session.coreg.head_lpa_file, lpa)
-    print(f"Saved: {session.coreg.head_headshape_file}")
-    np.savetxt(session.coreg.head_headshape_file, headshape)
+    for name, points in [
+        ("nasion", nasion),
+        ("rpa", rpa),
+        ("lpa", lpa),
+        ("headshape", headshape.T),
+    ]:
+        filename = getattr(session.coreg, f"head_{name}_file")
+        np.savetxt(filename, points)
+        print(f"Saved: {filename}")
 
 
 def remove_stray_headshape_points(
@@ -3374,6 +3390,39 @@ def _xform_points(xform: np.ndarray, pnts: np.ndarray) -> np.ndarray:
     return newpnts[:3]
 
 
+def _ctf_head_trans(nasion: np.ndarray, lpa: np.ndarray, rpa: np.ndarray) -> np.ndarray:
+    """Transform to the CTF head frame defined by the fiducials.
+
+    The origin is midway between the LPA and RPA, x points to the nasion, y
+    points to the LPA (orthogonal to x) and z points up.
+
+    Parameters
+    ----------
+    nasion : np.ndarray
+        Nasion.
+    lpa : np.ndarray
+        LPA.
+    rpa : np.ndarray
+        RPA.
+
+    Returns
+    -------
+    trans : np.ndarray
+        (4, 4) affine transform.
+    """
+    origin = (lpa + rpa) / 2
+    x = nasion - origin
+    x /= np.linalg.norm(x)
+    y = lpa - origin
+    y -= (y @ x) * x
+    y /= np.linalg.norm(y)
+    z = np.cross(x, y)
+    trans = np.eye(4)
+    trans[:3, :3] = [x, y, z]
+    trans[:3, 3] = -trans[:3, :3] @ origin
+    return trans
+
+
 def _rigid_transform_3D(
     B: np.ndarray, A: np.ndarray, compute_scaling: bool = False
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -3842,7 +3891,7 @@ def _read_fiducials_and_headshape(
     lpa : np.ndarray
         LPA in HEAD space in m.
     """
-    pos = mne.channels.read_dig_fif(fif_file).get_positions()
+    pos = mne.channels.read_dig_fif(fif_file, verbose="error").get_positions()
     if pos["coord_frame"] != "head":
         raise ValueError(f"The digitized points in {fif_file} are not in HEAD space.")
     if any(pos[f] is None for f in ("nasion", "rpa", "lpa")):

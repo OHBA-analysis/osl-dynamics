@@ -203,8 +203,8 @@ class Session:
     pos_file : str, optional
         Path to a .pos file (only needed for CTF data).
     elc_file : str, optional
-        Path to an .elc file (alternative format for head shape points
-        from CTF data).
+        Path to an .elc file (ANT Neuro) with the fiducials and head shape
+        points.
     head_model_id : str, optional
         Identifier owning the head model: the coregistration, BEM and forward
         model. Defaults to :code:`id`. Pass a subject when the head model is
