@@ -33,7 +33,6 @@ from mne.transforms import (
     combine_transforms,
     apply_trans,
     rotation,
-    _get_trans,
 )
 from mne.surface import _points_outside_surface
 from mne.io.constants import FIFF
@@ -122,7 +121,14 @@ def scale_surfaces_to_headshape(
     # Extract headshape from FIF file
     # -------------------------------
     print(f"Loading headshape from {preproc_file}")
-    headshape_mm, nasion_mm, rpa_mm, lpa_mm = _extract_headshape(preproc_file)
+    headshape_mm, nasion_mm, rpa_mm, lpa_mm = (
+        points * 1000 for points in _read_fiducials_and_headshape(preproc_file)
+    )
+    if len(headshape_mm) == 0:
+        raise ValueError(f"No headshape points found in {preproc_file}")
+
+    # Remove points below the ears (neck/body)
+    headshape_mm = headshape_mm[headshape_mm[:, 2] >= min(lpa_mm[2], rpa_mm[2])].T
     print(f"Found {headshape_mm.shape[1]} headshape points")
 
     # ---------------------------------
@@ -960,21 +966,19 @@ def extract_fiducials_and_headshape_from_fif(
     include_hpi_as_headshape: bool = True,
     include_extra_as_headshape: bool = True,
 ) -> None:
-    """Extract headshape points and fiducials from FIF info.
+    """Extract the fiducials and headshape points from a FIF file.
 
-    Extract (polhemus) fiducials and headshape points from MNE raw.info and
-    write them out in the required file format for RHINO (in HEAD space in
-    mm).
-
-    Should only be used with MNE-derived .fif files that have the expected
-    digitized points held in info['dig'] of fif_file.
+    The digitized points in session.preproc_file are saved (in mm) to the
+    files RHINO uses for coregistration. For CTF data, the points are
+    converted to the CTF head frame, which RHINO uses for CTF data.
 
     Parameters
     ----------
     session : Session
         Files of the session.
     include_eeg_as_headshape : bool, optional
-        Should we include EEG locations as headshape points?
+        Should we include EEG locations as headshape points? Only use this if
+        the EEG locations were digitized (not a template montage).
     include_hpi_as_headshape : bool, optional
         Should we include HPI locations as headshape points?
     include_extra_as_headshape : bool, optional
@@ -985,74 +989,46 @@ def extract_fiducials_and_headshape_from_fif(
     print("Extracting fiducials/headshape points from fif info")
     print("---------------------------------------------------")
 
-    # Read info from fif file
+    headshape, nasion, rpa, lpa = _read_fiducials_and_headshape(
+        session.preproc_file,
+        extra=include_extra_as_headshape,
+        eeg=include_eeg_as_headshape,
+        hpi=include_hpi_as_headshape,
+    )
+
+    # For CTF data, convert the points from MNE's (Neuromag) head frame to the
+    # CTF head frame, which RHINO uses for CTF data
     info = mne.io.read_info(session.preproc_file)
+    ctf = info["dev_ctf_t"] is not None
+    if ctf:
+        print("Detected CTF data, converting points to the CTF head frame")
+        head_ctf_t = info["dev_ctf_t"]["trans"] @ np.linalg.inv(
+            info["dev_head_t"]["trans"]
+        )
+        nasion, rpa, lpa = apply_trans(head_ctf_t, [nasion, rpa, lpa])
+        headshape = apply_trans(head_ctf_t, headshape)
 
-    # Lists to hold polhemus data
-    headshape = []
-    rpa = []
-    lpa = []
-    nasion = []
+    # Dummy point for CTF data without headshape points
+    dummy_headshape = ctf and len(headshape) == 0
+    if dummy_headshape:
+        headshape = np.zeros((1, 3))
 
-    # Get fiducials/headshape points
-    for dig in info["dig"]:
-
-        # Check dig is in HEAD/Polhemus space
-        if dig["coord_frame"] != FIFF.FIFFV_COORD_HEAD:
-            raise ValueError(f"{dig['ident']} is not in HEAD space")
-
-        if dig["kind"] == FIFF.FIFFV_POINT_CARDINAL:
-            if dig["ident"] == FIFF.FIFFV_POINT_LPA:
-                lpa = dig["r"]
-            elif dig["ident"] == FIFF.FIFFV_POINT_RPA:
-                rpa = dig["r"]
-            elif dig["ident"] == FIFF.FIFFV_POINT_NASION:
-                nasion = dig["r"]
-            else:
-                raise ValueError(f"Unknown fiducial: {dig['ident']}")
-        elif dig["kind"] == FIFF.FIFFV_POINT_EXTRA and include_extra_as_headshape:
-            headshape.append(dig["r"])
-        elif dig["kind"] == FIFF.FIFFV_POINT_EEG and include_eeg_as_headshape:
-            headshape.append(dig["r"])
-        elif dig["kind"] == FIFF.FIFFV_POINT_HPI and include_hpi_as_headshape:
-            headshape.append(dig["r"])
-
-    headshape = np.array(headshape)
-    rpa = np.array(rpa)
-    lpa = np.array(lpa)
-    nasion = np.array(nasion)
-
-    # Check if info is from a CTF scanner
-    if info["dev_ctf_t"] is not None:
-        print("Detected CTF data")
-
-        nasion = np.copy(nasion)
-        lpa = np.copy(lpa)
-        rpa = np.copy(rpa)
-
-        nasion[0], nasion[1], nasion[2] = nasion[1], -nasion[0], nasion[2]
-        lpa[0], lpa[1], lpa[2] = lpa[1], -lpa[0], lpa[2]
-        rpa[0], rpa[1], rpa[2] = rpa[1], -rpa[0], rpa[2]
-
-        # CTF data won't contain headshape points, use a dummy point to avoid errors
-        headshape = [0, 0, 0]
-
-    # Save
     os.makedirs(session.coreg_dir, exist_ok=True)
-    print(f"Saved: {session.coreg.head_nasion_file}")
-    np.savetxt(session.coreg.head_nasion_file, nasion * 1000)
-    print(f"Saved: {session.coreg.head_rpa_file}")
-    np.savetxt(session.coreg.head_rpa_file, rpa * 1000)
-    print(f"Saved: {session.coreg.head_lpa_file}")
-    np.savetxt(session.coreg.head_lpa_file, lpa * 1000)
-    print(f"Saved: {session.coreg.head_headshape_file}")
-    np.savetxt(session.coreg.head_headshape_file, np.array(headshape).T * 1000)
+    for name, points in [
+        ("nasion", nasion),
+        ("rpa", rpa),
+        ("lpa", lpa),
+        ("headshape", headshape.T),
+    ]:
+        filename = getattr(session.coreg, f"head_{name}_file")
+        np.savetxt(filename, points * 1000)
+        print(f"Saved: {filename}")
 
-    if info["dev_ctf_t"] is not None:
+    if dummy_headshape:
         print(
             "Dummy headshape points saved, overwrite "
             f"{session.coreg.head_headshape_file} "
-            "or set use_headshape=False in coregisteration."
+            "or set use_headshape=False in coregister_head_and_mri."
         )
 
     # Warning if 'trans' in filename we assume -trans was applied using MaxFiltering
@@ -1524,12 +1500,10 @@ def coregister_head_and_mri(
     # and change dev_head_t to equal dev_ctf_t in fif file info
     info = mne.io.read_info(session.preproc_file)
 
-    dev_ctf_t = info["dev_ctf_t"]
-    if dev_ctf_t is not None:
+    if info["dev_ctf_t"] is not None:
         print("Detected CTF data")
         print("Setting dev_head_t equal to dev_ctf_t in fif file info.")
-        dev_head_t, _ = _get_trans(info["dev_head_t"], "meg", "head")
-        dev_head_t["trans"] = dev_ctf_t["trans"]
+        info["dev_head_t"]["trans"] = info["dev_ctf_t"]["trans"]
 
     raw = mne.io.RawArray(np.zeros([len(info["ch_names"]), 1]), info)
     raw.save(cfns.info_fif_file, overwrite=True)
@@ -1971,7 +1945,9 @@ def plot_coregistration(
 
     mrivoxel_scaledmri_t = read_trans(mrivoxel_scaledmri_t_file)
     head_scaledmri_t = read_trans(head_scaledmri_t_file)
-    dev_head_t, _ = _get_trans(info["dev_head_t"], "meg", "head")
+    # Identity for data without MEG sensors (e.g. EEG)
+    dev_head_t = info["dev_head_t"]
+    dev_head_t = Transform("meg", "head") if dev_head_t is None else dev_head_t.copy()
 
     # Change xform from meters to mm.
     # Note that MNE xform in fif.info assume meters, whereas we want it in mm.
@@ -3838,58 +3814,45 @@ def _binary_majority3d(img: np.ndarray) -> np.ndarray:
     ).astype(int)
 
 
-def _extract_headshape(
-    preproc_file: str,
+def _read_fiducials_and_headshape(
+    fif_file: str, extra: bool = True, eeg: bool = False, hpi: bool = False
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Extract headshape points and fiducials from a FIF file.
+    """Read the fiducials and headshape points from a FIF file.
 
     Parameters
     ----------
-    preproc_file : str
+    fif_file : str
         Path to FIF file.
+    extra : bool, optional
+        Include the extra points (digitized over the scalp) as headshape points?
+    eeg : bool, optional
+        Include the EEG electrode positions as headshape points?
+    hpi : bool, optional
+        Include the HPI coil positions as headshape points?
 
     Returns
     -------
-    headshape_mm : numpy.ndarray
-        3 x N array of headshape points in mm (HEAD space).
-    nasion_mm : numpy.ndarray
-        Nasion position in mm (HEAD space).
-    rpa_mm : numpy.ndarray
-        RPA position in mm (HEAD space).
-    lpa_mm : numpy.ndarray
-        LPA position in mm (HEAD space).
+    headshape : np.ndarray
+        (n_points, 3) headshape points in HEAD space in m. The HPI, EEG and
+        extra points, in that order.
+    nasion : np.ndarray
+        Nasion in HEAD space in m.
+    rpa : np.ndarray
+        RPA in HEAD space in m.
+    lpa : np.ndarray
+        LPA in HEAD space in m.
     """
-    info = mne.io.read_info(preproc_file)
-
-    headshape_m = []
-    nasion_m = None
-    rpa_m = None
-    lpa_m = None
-
-    for dig in info["dig"]:
-        if dig["kind"] == FIFF.FIFFV_POINT_EXTRA:
-            headshape_m.append(dig["r"])
-        elif dig["kind"] == FIFF.FIFFV_POINT_CARDINAL:
-            if dig["ident"] == FIFF.FIFFV_POINT_NASION:
-                nasion_m = dig["r"]
-            elif dig["ident"] == FIFF.FIFFV_POINT_LPA:
-                lpa_m = dig["r"]
-            elif dig["ident"] == FIFF.FIFFV_POINT_RPA:
-                rpa_m = dig["r"]
-
-    if not headshape_m:
-        raise ValueError("No headshape points found in FIF file")
-    if nasion_m is None or rpa_m is None or lpa_m is None:
-        raise ValueError("Fiducials (nasion, LPA, RPA) not found in FIF file")
-
-    headshape_mm = np.array(headshape_m).T * 1000
-    nasion_mm = np.array(nasion_m) * 1000
-    rpa_mm = np.array(rpa_m) * 1000
-    lpa_mm = np.array(lpa_m) * 1000
-
-    # Remove points below the ears (neck/body)
-    z_min = min(lpa_mm[2], rpa_mm[2])
-    keep = headshape_mm[2] >= z_min
-    headshape_mm = headshape_mm[:, keep]
-
-    return headshape_mm, nasion_mm, rpa_mm, lpa_mm
+    pos = mne.channels.read_dig_fif(fif_file).get_positions()
+    if pos["coord_frame"] != "head":
+        raise ValueError(f"The digitized points in {fif_file} are not in HEAD space.")
+    if any(pos[f] is None for f in ("nasion", "rpa", "lpa")):
+        raise ValueError(f"Fiducials (nasion, LPA, RPA) not found in {fif_file}.")
+    points = []
+    if hpi and pos["hpi"] is not None:
+        points.append(pos["hpi"])
+    if eeg and pos["ch_pos"]:
+        points.append(np.array(list(pos["ch_pos"].values())))
+    if extra and pos["hsp"] is not None:
+        points.append(pos["hsp"])
+    headshape = np.concatenate(points) if points else np.zeros((0, 3))
+    return headshape, pos["nasion"], pos["rpa"], pos["lpa"]

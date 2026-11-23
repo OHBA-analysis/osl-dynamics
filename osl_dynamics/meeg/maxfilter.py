@@ -53,7 +53,6 @@ import os
 import shutil
 import subprocess
 import tempfile
-from pathlib import Path
 
 import mne
 import numpy as np
@@ -298,35 +297,6 @@ def _merge_bads(*bad_lists: str | None) -> str | None:
     return " ".join(merged) or None
 
 
-def _quick_load_dig(fname: str) -> list:
-    """Extract digitization points from a FIF file.
-
-    Uses low-level MNE readers, useful when the full raw file cannot
-    be loaded.
-
-    Parameters
-    ----------
-    fname : str
-        Path to a FIF file.
-
-    Returns
-    -------
-    dig : list
-        List of digitization points.
-    """
-    from mne._fiff._digitization import _read_dig_fif
-    from mne._fiff.constants import FIFF
-    from mne._fiff.open import fiff_open
-    from mne._fiff.tree import dir_tree_find
-
-    fid, tree, _ = fiff_open(Path(fname), preload=False)
-    with fid:
-        meas = dir_tree_find(tree, FIFF.FIFFB_MEAS)
-        meas_info = dir_tree_find(meas, FIFF.FIFFB_MEAS_INFO)
-        dig = _read_dig_fif(fid, meas_info)
-    return dig
-
-
 def _fit_cbu_origin(
     input_file: str,
     output_base: str | None = None,
@@ -353,25 +323,15 @@ def _fit_cbu_origin(
     origin : np.ndarray
         Fitted origin coordinates [x, y, z] in mm.
     """
-    try:
-        raw = mne.io.read_raw_fif(input_file, allow_maxshield="yes", verbose="error")
-        dig = raw.info["dig"]
-    except ValueError:
-        dig = _quick_load_dig(input_file)
-
-    # Extract headshape points
-    headshape = []
-    for point in dig:
-        if point["kind"]._name.find("EXTRA") > 0:
-            headshape.append(point["r"])
-    headshape = np.vstack(headshape)
+    # Headshape points
+    headshape = mne.channels.read_dig_fif(input_file).get_positions()["hsp"]
+    if headshape is None:
+        raise ValueError(f"No headshape points found in {input_file}")
 
     if remove_nose:
-        keeps = np.where(
-            np.logical_and(headshape[:, 2] < 0, headshape[:, 1] > 0)
-            == False  # noqa: E712
-        )[0]
-        headshape = headshape[keeps, :]
+        # Points below and in front of the origin
+        nose = (headshape[:, 2] < 0) & (headshape[:, 1] > 0)
+        headshape = headshape[~nose]
 
     # Save headshape points and fit origin
     if output_base is None:

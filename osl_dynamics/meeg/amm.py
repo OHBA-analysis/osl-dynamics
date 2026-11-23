@@ -32,8 +32,6 @@ import mne
 import numpy as np
 from scipy.special import gammaln
 
-from mne._fiff.proj import Projection
-
 
 def _associated_legendre(x: np.ndarray, l: int, m: int) -> np.ndarray:
     """Compute associated Legendre polynomial P_l^m(x).
@@ -1173,7 +1171,7 @@ def apply_amm(
                 nrow=1,
             )
             projs.append(
-                Projection(active=True, data=proj_data, desc=f"AMM: l={l} m={m}")
+                mne.Projection(active=True, data=proj_data, desc=f"AMM: l={l} m={m}")
             )
             count += 1
     raw_amm.add_proj(projs)
