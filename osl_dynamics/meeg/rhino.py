@@ -33,7 +33,6 @@ from mne.transforms import (
     combine_transforms,
     apply_trans,
     rotation,
-    _get_trans,
 )
 from mne.surface import _points_outside_surface
 from mne.io.constants import FIFF
@@ -1502,12 +1501,10 @@ def coregister_head_and_mri(
     # and change dev_head_t to equal dev_ctf_t in fif file info
     info = mne.io.read_info(session.preproc_file)
 
-    dev_ctf_t = info["dev_ctf_t"]
-    if dev_ctf_t is not None:
+    if info["dev_ctf_t"] is not None:
         print("Detected CTF data")
         print("Setting dev_head_t equal to dev_ctf_t in fif file info.")
-        dev_head_t, _ = _get_trans(info["dev_head_t"], "meg", "head")
-        dev_head_t["trans"] = dev_ctf_t["trans"]
+        info["dev_head_t"]["trans"] = info["dev_ctf_t"]["trans"]
 
     raw = mne.io.RawArray(np.zeros([len(info["ch_names"]), 1]), info)
     raw.save(cfns.info_fif_file, overwrite=True)
@@ -1949,7 +1946,9 @@ def plot_coregistration(
 
     mrivoxel_scaledmri_t = read_trans(mrivoxel_scaledmri_t_file)
     head_scaledmri_t = read_trans(head_scaledmri_t_file)
-    dev_head_t, _ = _get_trans(info["dev_head_t"], "meg", "head")
+    # Identity for data without MEG sensors (e.g. EEG)
+    dev_head_t = info["dev_head_t"]
+    dev_head_t = Transform("meg", "head") if dev_head_t is None else dev_head_t.copy()
 
     # Change xform from meters to mm.
     # Note that MNE xform in fif.info assume meters, whereas we want it in mm.

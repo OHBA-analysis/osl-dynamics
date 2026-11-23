@@ -15,7 +15,6 @@ from mne.beamformer._compute_beamformer import (
     _prepare_beamformer_input,
     _proj_whiten_data,
 )
-from mne.beamformer._lcmv import _apply_lcmv
 from mne.minimum_norm.inverse import _check_depth, _check_reference
 from mne.utils import logger as mne_logger, warn
 
@@ -246,7 +245,8 @@ def apply_lcmv_beamformer(
     voxel_data : np.ndarray
         Voxel data in the space specified by the 'reference_brain' argument.
         Shape is (voxels, time) for a Raw object or (voxels, time, epochs) for
-        an Epochs object.
+        an Epochs object, with an orientation axis of length 3 after voxels
+        for pick_ori='vector'.
     coords : np.ndarray
         Coordinates (in mm) for each voxel in the reference brain space.
         Shape is (voxels, 3).
@@ -256,28 +256,20 @@ def apply_lcmv_beamformer(
     print("------------------------")
 
     check_up_to_date(session, "LCMV filters")
-    inst = read_data(data, session)
-
-    # Load filters
-    filters = mne.beamformer.read_beamformer(session.filters_file)
-
-    # Pick chantypes that were used to make the beamformer in the data
-    inst = inst.copy().pick(filters["ch_names"])
-
-    if isinstance(inst, mne.BaseEpochs):
-        # Apply filters to an Epochs object
-        stc = mne.beamformer.apply_lcmv_epochs(inst, filters)
-        voxel_data_head = np.transpose([s.data for s in stc], axes=[1, 2, 0])
-    else:
-        # Apply filters to a Raw object
-        _check_reference(inst)
-        data, times = inst.get_data(
-            return_times=True, reject_by_annotation=reject_by_annotation
+    data, filters, epochs_shape = _get_filter_input_data(
+        session, data, reject_by_annotation
+    )
+    voxel_data_head = filters["weights"] @ data
+    if filters["is_free_ori"]:
+        # (dipoles, orientations, samples). Unless pick_ori='vector', combine
+        # the orientations as mne.beamformer.apply_lcmv does.
+        voxel_data_head = voxel_data_head.reshape(-1, 3, data.shape[-1])
+        if filters["pick_ori"] != "vector":
+            voxel_data_head = np.sqrt(np.sum(voxel_data_head**2, axis=1))
+    if epochs_shape is not None:
+        voxel_data_head = voxel_data_head.reshape(
+            *voxel_data_head.shape[:-1], *epochs_shape
         )
-        chan_inds = mne.utils._check_channels_spatial_filter(inst.ch_names, filters)
-        data = data[chan_inds]
-        stc = _apply_lcmv(data=data, filters=filters, info=inst.info, tmin=times[0])
-        voxel_data_head = next(stc).data
 
     # Get coordinates in head space
     fwd = mne.read_forward_solution(session.fwd_model_file)
