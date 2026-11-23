@@ -538,7 +538,6 @@ def load_tfrecord_dataset(
                 tf.data.TFRecordDataset,
                 cycle_length=n_files,
                 num_parallel_calls=tf.data.AUTOTUNE,
-                deterministic=not shuffle,
             )
             dataset = dataset.map(_parse_example, num_parallel_calls=tf.data.AUTOTUNE)
             return _finish(dataset, sum(n_sequences), shuffle, len(keep))
