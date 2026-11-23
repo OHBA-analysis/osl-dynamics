@@ -996,8 +996,8 @@ def extract_fiducials_and_headshape_from_fif(
         hpi=include_hpi_as_headshape,
     )
 
-    # MNE stores the points in the (Neuromag) head frame. For CTF data, RHINO
-    # uses the CTF head frame (see coregister_head_and_mri).
+    # For CTF data, convert the points from MNE's (Neuromag) head frame to the
+    # CTF head frame, which RHINO uses for CTF data
     info = mne.io.read_info(session.preproc_file)
     ctf = info["dev_ctf_t"] is not None
     if ctf:
@@ -1008,8 +1008,7 @@ def extract_fiducials_and_headshape_from_fif(
         nasion, rpa, lpa = apply_trans(head_ctf_t, [nasion, rpa, lpa])
         headshape = apply_trans(head_ctf_t, headshape)
 
-    # A dummy point (for CTF data without headshape points) so the headshape
-    # file can be loaded
+    # Dummy point for CTF data without headshape points
     dummy_headshape = ctf and len(headshape) == 0
     if dummy_headshape:
         headshape = np.zeros((1, 3))

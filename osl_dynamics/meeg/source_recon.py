@@ -271,22 +271,21 @@ def apply_lcmv_beamformer(
             *voxel_data_head.shape[:-1], *epochs_shape
         )
 
-    # Get coordinates in head space
     fwd = mne.read_forward_solution(session.fwd_model_file)
     vs = fwd["src"][0]
-    voxel_coords_head = vs["rr"][vs["vertno"]] * 1000  # in mm
-
     if reference_brain == "head":
-        return voxel_data_head, voxel_coords_head
-
-    # The dipoles are at the voxels of an MNI grid
-    grid_coords = _get_mni_grid(session, fwd)
-    voxel_data_mni = np.zeros((len(grid_coords),) + voxel_data_head.shape[1:])
-    voxel_data_mni[vs["vertno"]] = voxel_data_head
+        # Get coordinates in head space
+        voxel_data = voxel_data_head
+        coords = vs["rr"][vs["vertno"]] * 1000  # in mm
+    else:
+        # The dipoles are at the voxels of an MNI grid
+        coords = _get_mni_grid(session, fwd)
+        voxel_data = np.zeros((len(coords),) + voxel_data_head.shape[1:])
+        voxel_data[vs["vertno"]] = voxel_data_head
 
     print("Applying LCMV beamformer complete.")
 
-    return voxel_data_mni, grid_coords
+    return voxel_data, coords
 
 
 def virtual_electrodes(
@@ -687,10 +686,9 @@ def _make_lcmv(
                 "'max-power-pre-weight-norm'."
             )
 
-    # 1. Channels and ranks. Keep proc_history so rank='info' can use the
-    # MaxFilter rank for the data covariance. A diagonal noise covariance is
-    # not reduced in rank by MaxFilter, so its rank is computed without the
-    # MaxFilter rank (otherwise the whitener would discard most sensors).
+    # 1. Channels and ranks. rank='info' uses the MaxFilter rank (from
+    # proc_history) for the data covariance, but not for a diagonal noise
+    # covariance.
     info = mne._fiff.meas_info._simplify_info(info, keep=("proc_history",))
     noise_cov, _, _ = mne.utils._check_one_ch_type(
         "lcmv", info, fwd, data_cov, noise_cov
@@ -707,11 +705,10 @@ def _make_lcmv(
 
     # 2. What MNE computes and what we compute:
     #
-    # - 'max-power-pre-weight-norm' is MNE's 'max-power' orientation for the
-    #   unit-gain beamformer (weight_norm=None). We normalize the weights.
-    # - For multi_dipoles, MNE computes the weights of each dipole on its own
-    #   (with weight_norm, which MNE's 'max-power' uses to pick the
-    #   orientation). We replace them with joint weights and normalize them.
+    # - 'max-power-pre-weight-norm': MNE's 'max-power' orientation and weights
+    #   for the unit-gain beamformer (weight_norm=None), normalized in step 6.
+    # - multi_dipoles: MNE's weights for each dipole on its own, replaced by
+    #   joint weights in step 5 and normalized in step 6.
     pre_weight_norm = pick_ori == "max-power-pre-weight-norm"
     mne_pick_ori = "max-power" if pre_weight_norm else pick_ori
     mne_weight_norm = None if pre_weight_norm else weight_norm
@@ -759,9 +756,8 @@ def _make_lcmv(
     # 5. Joint unit-gain weights for the multi-dipoles, (L^T C^-1 L)^-1 L^T C^-1.
     # MNE's weights for each dipole are W = D L^T C^-1 (D diagonal), so the
     # joint weights are (W L)^-1 W, with L the lead field at the max-power
-    # orientation (the same with or without reduce_rank, because the
-    # orientation is orthogonal to the one removed). A pseudo-inverse handles
-    # a degenerate group, e.g. a dipole paired with itself.
+    # orientation. With the pseudo-inverse, a dipole paired with itself gets
+    # its single-dipole weights.
     if multi_dipoles is not None:
         L = np.einsum("cdo,do->cd", G.reshape(len(G), -1, 3), max_power_ori)
         for dipoles in multi_dipoles:
@@ -778,8 +774,9 @@ def _make_lcmv(
         W = W / norm
         if weight_norm == "nai":
             # MNE's 'nai' weights are the unit-noise-gain weights divided by
-            # sqrt(noise), with the noise level estimated from the data
-            # covariance (the same for every dipole): get it from one dipole
+            # sqrt(noise), where the noise level (the same for every dipole)
+            # is estimated from the data covariance. Take the factor from
+            # MNE's 'nai' weights for one dipole.
             i = np.argmax(np.linalg.norm(G, axis=0))
             W_nai, _ = _compute_beamformer(
                 G[:, i : i + 1],

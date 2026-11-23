@@ -323,7 +323,7 @@ def _fit_cbu_origin(
     origin : np.ndarray
         Fitted origin coordinates [x, y, z] in mm.
     """
-    # Headshape points (read without loading the data)
+    # Headshape points
     headshape = mne.channels.read_dig_fif(input_file).get_positions()["hsp"]
     if headshape is None:
         raise ValueError(f"No headshape points found in {input_file}")
