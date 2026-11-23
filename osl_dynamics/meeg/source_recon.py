@@ -218,90 +218,6 @@ def lcmv_beamformer(
     print("LCMV beamformer complete.")
 
 
-def _data_and_noise_covariance(
-    data: mne.io.Raw | mne.Epochs,
-    chantypes: list[str],
-    rank: str | dict,
-    data_cov: mne.Covariance | None = None,
-    noise_cov: mne.Covariance | None = None,
-) -> tuple[mne.Covariance, mne.Covariance]:
-    """Data and noise covariance for the LCMV beamformer.
-
-    Parameters
-    ----------
-    data : mne.io.Raw | mne.Epochs
-        Sensor data.
-    chantypes : list of str
-        Channel types in the data, e.g. ['mag', 'grad'].
-    rank : str | dict
-        Rank of the data, see :func:`lcmv_beamformer`.
-    data_cov : mne.Covariance, optional
-        Data covariance. If None, it is computed from the data.
-    noise_cov : mne.Covariance, optional
-        Noise covariance. If None, a diagonal matrix with the variance of each
-        channel type set to the mean variance of its channels.
-
-    Returns
-    -------
-    data_cov : mne.Covariance
-        Data covariance.
-    noise_cov : mne.Covariance
-        Noise covariance.
-    """
-    if data_cov is None:
-        # Note that if chantypes are meg, eeg; and meg includes mag, grad then
-        # compute_covariance will project data separately for meg and eeg to
-        # reduced rank subspace (i.e. mag and grad will be combined together
-        # inside the meg subspace, eeg will haeve a separate subspace). I.e.
-        # data will become (ntpts x (rank_meg + rank_eeg)) and cov will be
-        # (rank_meg + rank_eeg) x (rank_meg + rank_eeg) and include correlations
-        # between eeg and meg subspaces. The output data_cov is cov projected
-        # back onto the individual sensor types mag, grad, eeg.
-        #
-        # Prior to computing anything, including the subspaces each of mag, grad,
-        # eeg are scaled so that they are on comparable scales to aid mixing in
-        # the subspace and improve numerical stability. Note that in the
-        # output data_cov the scalings have been undone.
-        if isinstance(data, mne.BaseEpochs):
-            data_cov = mne.compute_covariance(data, method="empirical", rank=rank)
-        else:
-            data_cov = mne.compute_raw_covariance(data, method="empirical", rank=rank)
-
-    if noise_cov is None:
-        # Calculate noise covariance matrix
-        #
-        # Later this will be inverted and used to whiten the data AND the lead
-        # fields as part of the source recon. See:
-        #
-        #   https://www.sciencedirect.com/science/article/pii/S1053811914010325
-        #
-        # In MNE, the noise cov is normally obtained from empty room noise
-        # recordings or from a baseline period. Here (if no noise cov is passed
-        # in) we compute a diagonal noise cov with the variances set to the mean
-        # variance of each sensor type (e.g. mag, grad, eeg).
-        n_channels = data_cov.data.shape[0]
-        noise_cov_diag = np.zeros(n_channels)
-        for chantype in chantypes:
-            # Indices of this channel type
-            type_data = data.copy().pick(chantype, exclude="bads")
-            inds = [data_cov.ch_names.index(c) for c in type_data.info["ch_names"]]
-
-            # Mean variance of channels of this type
-            variance = np.mean(np.diag(data_cov.data)[inds])
-            noise_cov_diag[inds] = variance
-            print(f"Variance for chantype {chantype} is {variance}")
-
-        bads = [b for b in data.info["bads"] if b in data_cov.ch_names]
-        noise_cov = mne.Covariance(
-            noise_cov_diag,
-            data_cov.ch_names,
-            bads,
-            data.info["projs"],
-            nfree=1e10,
-        )
-    return data_cov, noise_cov
-
-
 def apply_lcmv_beamformer(
     session: Session,
     data: str | mne.io.Raw | mne.Epochs | None = None,
@@ -511,102 +427,6 @@ def virtual_electrodes(
     return ve_data[0] if single else ve_data
 
 
-def _forward_model_at_coords(
-    session: Session, coords_mni: np.ndarray, meg: bool = True, eeg: bool = False
-) -> tuple[mne.Forward, np.ndarray]:
-    """Compute the forward model for dipoles at MNI coordinates.
-
-    Parameters
-    ----------
-    session : Session
-        Files of the session.
-    coords_mni : np.ndarray
-        (n, 3) coordinates in MNI space in mm.
-    meg : bool, optional
-        Include MEG sensors?
-    eeg : bool, optional
-        Include EEG sensors?
-
-    Returns
-    -------
-    fwd : mne.Forward
-        Forward model with one (free orientation) dipole per coordinate inside
-        the inner skull, in the same order as coords_mni. None if no
-        coordinate is inside.
-    inside : np.ndarray
-        (n,) whether each coordinate is inside the inner skull.
-    """
-    src = rhino._mni_source_space(session, coords_mni)
-    info, head_mri_t = rhino._read_head_model(session)
-    try:
-        fwd = rhino._make_fwd_solution(
-            info,
-            head_mri_t,
-            src=src,
-            bem=session.bem_solution_file,
-            meg=meg,
-            eeg=eeg,
-            ignore_ref=True,
-            verbose=False,
-        )
-    except RuntimeError as e:
-        if "No points left" not in str(e):
-            raise
-        return None, np.zeros(len(coords_mni), dtype=bool)
-    return fwd, fwd["src"][0]["inuse"].astype(bool)
-
-
-def _get_filter_input_data(
-    session: Session,
-    data: str | mne.io.Raw | mne.Epochs | None,
-    reject_by_annotation: str | None,
-    filters: Beamformer | None = None,
-) -> tuple[np.ndarray, Beamformer, tuple | None]:
-    """Get the sensor data that the LCMV weights are applied to.
-
-    Parameters
-    ----------
-    session : Session
-        Files of the session.
-    data : str | mne.io.Raw | mne.Epochs
-        Data, or the path to a fif file containing it. If None,
-        session.preproc_file is used.
-    reject_by_annotation : str | None
-        How to treat the samples of a Raw object in annotations starting with
-        'bad': 'omit' drops them, None keeps them.
-    filters : Beamformer, optional
-        LCMV filters. If None, session.filters_file is used.
-
-    Returns
-    -------
-    data : np.ndarray
-        (channels, samples) data after SSP projection and whitening. For
-        Epochs, the samples of each epoch are concatenated.
-    filters : Beamformer
-        LCMV filters.
-    epochs_shape : tuple
-        (time, epochs) shape of the samples for Epochs, None for Raw.
-    """
-    inst = read_data(data, session)
-    if filters is None:
-        filters = mne.beamformer.read_beamformer(session.filters_file)
-
-    _check_reference(inst, filters["ch_names"])
-    chan_inds = mne.utils._check_channels_spatial_filter(inst.ch_names, filters)
-
-    if isinstance(inst, mne.BaseEpochs):
-        data = inst.get_data(picks=chan_inds)  # (epochs, channels, time)
-        epochs_shape = (data.shape[2], data.shape[0])
-        data = np.transpose(data, (1, 2, 0)).reshape(data.shape[1], -1)
-    else:
-        data = inst.get_data(picks=chan_inds, reject_by_annotation=reject_by_annotation)
-        epochs_shape = None
-
-    projs = mne.pick_info(inst.info, chan_inds)["projs"]
-    data = _proj_whiten_data(data, projs, filters)
-    return data, filters, epochs_shape
-
-
 def plot_bilateral_pairs(
     session: Session,
     bilateral_tol: float | None = None,
@@ -708,6 +528,90 @@ def plot_bilateral_pairs(
         plt.show()
     else:
         plt.close(fig)
+
+
+def _data_and_noise_covariance(
+    data: mne.io.Raw | mne.Epochs,
+    chantypes: list[str],
+    rank: str | dict,
+    data_cov: mne.Covariance | None = None,
+    noise_cov: mne.Covariance | None = None,
+) -> tuple[mne.Covariance, mne.Covariance]:
+    """Data and noise covariance for the LCMV beamformer.
+
+    Parameters
+    ----------
+    data : mne.io.Raw | mne.Epochs
+        Sensor data.
+    chantypes : list of str
+        Channel types in the data, e.g. ['mag', 'grad'].
+    rank : str | dict
+        Rank of the data, see :func:`lcmv_beamformer`.
+    data_cov : mne.Covariance, optional
+        Data covariance. If None, it is computed from the data.
+    noise_cov : mne.Covariance, optional
+        Noise covariance. If None, a diagonal matrix with the variance of each
+        channel type set to the mean variance of its channels.
+
+    Returns
+    -------
+    data_cov : mne.Covariance
+        Data covariance.
+    noise_cov : mne.Covariance
+        Noise covariance.
+    """
+    if data_cov is None:
+        # Note that if chantypes are meg, eeg; and meg includes mag, grad then
+        # compute_covariance will project data separately for meg and eeg to
+        # reduced rank subspace (i.e. mag and grad will be combined together
+        # inside the meg subspace, eeg will haeve a separate subspace). I.e.
+        # data will become (ntpts x (rank_meg + rank_eeg)) and cov will be
+        # (rank_meg + rank_eeg) x (rank_meg + rank_eeg) and include correlations
+        # between eeg and meg subspaces. The output data_cov is cov projected
+        # back onto the individual sensor types mag, grad, eeg.
+        #
+        # Prior to computing anything, including the subspaces each of mag, grad,
+        # eeg are scaled so that they are on comparable scales to aid mixing in
+        # the subspace and improve numerical stability. Note that in the
+        # output data_cov the scalings have been undone.
+        if isinstance(data, mne.BaseEpochs):
+            data_cov = mne.compute_covariance(data, method="empirical", rank=rank)
+        else:
+            data_cov = mne.compute_raw_covariance(data, method="empirical", rank=rank)
+
+    if noise_cov is None:
+        # Calculate noise covariance matrix
+        #
+        # Later this will be inverted and used to whiten the data AND the lead
+        # fields as part of the source recon. See:
+        #
+        #   https://www.sciencedirect.com/science/article/pii/S1053811914010325
+        #
+        # In MNE, the noise cov is normally obtained from empty room noise
+        # recordings or from a baseline period. Here (if no noise cov is passed
+        # in) we compute a diagonal noise cov with the variances set to the mean
+        # variance of each sensor type (e.g. mag, grad, eeg).
+        n_channels = data_cov.data.shape[0]
+        noise_cov_diag = np.zeros(n_channels)
+        for chantype in chantypes:
+            # Indices of this channel type
+            type_data = data.copy().pick(chantype, exclude="bads")
+            inds = [data_cov.ch_names.index(c) for c in type_data.info["ch_names"]]
+
+            # Mean variance of channels of this type
+            variance = np.mean(np.diag(data_cov.data)[inds])
+            noise_cov_diag[inds] = variance
+            print(f"Variance for chantype {chantype} is {variance}")
+
+        bads = [b for b in data.info["bads"] if b in data_cov.ch_names]
+        noise_cov = mne.Covariance(
+            noise_cov_diag,
+            data_cov.ch_names,
+            bads,
+            data.info["projs"],
+            nfree=1e10,
+        )
+    return data_cov, noise_cov
 
 
 def _make_lcmv(
@@ -993,21 +897,100 @@ def _nai_scale(
     return float(np.linalg.norm(W[0]))
 
 
-def _get_gridstep(coords: np.ndarray) -> int:
-    """Get gridstep (i.e. spatial resolution of dipole grid) in mm.
+def _get_filter_input_data(
+    session: Session,
+    data: str | mne.io.Raw | mne.Epochs | None,
+    reject_by_annotation: str | None,
+    filters: Beamformer | None = None,
+) -> tuple[np.ndarray, Beamformer, tuple | None]:
+    """Get the sensor data that the LCMV weights are applied to.
 
     Parameters
     ----------
-    coords : numpy.ndarray
-        Coordinates.
+    session : Session
+        Files of the session.
+    data : str | mne.io.Raw | mne.Epochs
+        Data, or the path to a fif file containing it. If None,
+        session.preproc_file is used.
+    reject_by_annotation : str | None
+        How to treat the samples of a Raw object in annotations starting with
+        'bad': 'omit' drops them, None keeps them.
+    filters : Beamformer, optional
+        LCMV filters. If None, session.filters_file is used.
 
     Returns
     -------
-    gridstep : int
-        Spatial resolution of dipole grid in mm.
+    data : np.ndarray
+        (channels, samples) data after SSP projection and whitening. For
+        Epochs, the samples of each epoch are concatenated.
+    filters : Beamformer
+        LCMV filters.
+    epochs_shape : tuple
+        (time, epochs) shape of the samples for Epochs, None for Raw.
     """
-    dists = np.linalg.norm(coords - coords[0], axis=-1)
-    return int(np.round(dists[dists > 0].min() * 1000))
+    inst = read_data(data, session)
+    if filters is None:
+        filters = mne.beamformer.read_beamformer(session.filters_file)
+
+    _check_reference(inst, filters["ch_names"])
+    chan_inds = mne.utils._check_channels_spatial_filter(inst.ch_names, filters)
+
+    if isinstance(inst, mne.BaseEpochs):
+        data = inst.get_data(picks=chan_inds)  # (epochs, channels, time)
+        epochs_shape = (data.shape[2], data.shape[0])
+        data = np.transpose(data, (1, 2, 0)).reshape(data.shape[1], -1)
+    else:
+        data = inst.get_data(picks=chan_inds, reject_by_annotation=reject_by_annotation)
+        epochs_shape = None
+
+    projs = mne.pick_info(inst.info, chan_inds)["projs"]
+    data = _proj_whiten_data(data, projs, filters)
+    return data, filters, epochs_shape
+
+
+def _forward_model_at_coords(
+    session: Session, coords_mni: np.ndarray, meg: bool = True, eeg: bool = False
+) -> tuple[mne.Forward, np.ndarray]:
+    """Compute the forward model for dipoles at MNI coordinates.
+
+    Parameters
+    ----------
+    session : Session
+        Files of the session.
+    coords_mni : np.ndarray
+        (n, 3) coordinates in MNI space in mm.
+    meg : bool, optional
+        Include MEG sensors?
+    eeg : bool, optional
+        Include EEG sensors?
+
+    Returns
+    -------
+    fwd : mne.Forward
+        Forward model with one (free orientation) dipole per coordinate inside
+        the inner skull, in the same order as coords_mni. None if no
+        coordinate is inside.
+    inside : np.ndarray
+        (n,) whether each coordinate is inside the inner skull.
+    """
+    src = rhino._mni_source_space(session, coords_mni)
+    info, head_mri_t = rhino._read_head_model(session)
+    try:
+        fwd = rhino._make_fwd_solution(
+            info,
+            head_mri_t,
+            src=src,
+            bem=session.bem_solution_file,
+            meg=meg,
+            eeg=eeg,
+            ignore_ref=True,
+            verbose=False,
+        )
+    except RuntimeError as e:
+        if "No points left" not in str(e):
+            raise
+        return None, np.zeros(len(coords_mni), dtype=bool)
+    return fwd, fwd["src"][0]["inuse"].astype(bool)
 
 
 def _get_mni_grid(session: Session, fwd: mne.Forward) -> np.ndarray:
@@ -1033,6 +1016,23 @@ def _get_mni_grid(session: Session, fwd: mne.Forward) -> np.ndarray:
             "Rerun rhino.forward_model and source_recon.lcmv_beamformer."
         )
     return coords
+
+
+def _get_gridstep(coords: np.ndarray) -> int:
+    """Get gridstep (i.e. spatial resolution of dipole grid) in mm.
+
+    Parameters
+    ----------
+    coords : numpy.ndarray
+        Coordinates.
+
+    Returns
+    -------
+    gridstep : int
+        Spatial resolution of dipole grid in mm.
+    """
+    dists = np.linalg.norm(coords - coords[0], axis=-1)
+    return int(np.round(dists[dists > 0].min() * 1000))
 
 
 def _find_bilateral_pairs(
