@@ -764,9 +764,18 @@ def _make_lcmv(
         whitener=whitener,
     )
 
-    # 5. Joint weights for the multi-dipoles (unit-gain)
+    # 5. Joint unit-gain weights for the multi-dipoles, (L^T C^-1 L)^-1 L^T C^-1.
+    # MNE's weights for each dipole are W = D L^T C^-1 (D diagonal), so the
+    # joint weights are (W L)^-1 W, with L the lead field at the max-power
+    # orientation (the same with or without reduce_rank, because the
+    # orientation is orthogonal to the one removed). A pseudo-inverse handles
+    # a degenerate group, e.g. a dipole paired with itself.
     if multi_dipoles is not None:
-        W = _multi_dipole_weights(W, G, max_power_ori, multi_dipoles)
+        L = np.einsum("cdo,do->cd", G.reshape(len(G), -1, 3), max_power_ori)
+        for dipoles in multi_dipoles:
+            W[dipoles] = (
+                np.linalg.pinv(W[dipoles] @ L[:, dipoles], rcond=1e-7) @ W[dipoles]
+            )
 
     # 6. Weight normalization. The beamformer is scalar, so 'unit-noise-gain'
     # (and 'unit-noise-gain-invariant') scales the weights of each dipole to
@@ -776,7 +785,25 @@ def _make_lcmv(
         norm[norm == 0] = np.inf
         W = W / norm
         if weight_norm == "nai":
-            W *= _nai_scale(G, Cm, reg, data_rank_total, nn, whitener)
+            # MNE's 'nai' weights are the unit-noise-gain weights divided by
+            # sqrt(noise), with the noise level estimated from the data
+            # covariance (the same for every dipole): get it from one dipole
+            i = np.argmax(np.linalg.norm(G, axis=0))
+            W_nai, _ = _compute_beamformer(
+                G[:, i : i + 1],
+                Cm,
+                reg,
+                1,
+                "nai",
+                None,
+                False,
+                data_rank_total,
+                inversion="matrix",
+                nn=nn[:1],
+                orient_std=np.ones(1),
+                whitener=whitener,
+            )
+            W *= np.linalg.norm(W_nai)
 
     return Beamformer(
         kind="LCMV",
@@ -800,101 +827,6 @@ def _make_lcmv(
         max_power_ori=max_power_ori,
         inversion=inversion,
     )
-
-
-def _multi_dipole_weights(
-    W: np.ndarray,
-    G: np.ndarray,
-    max_power_ori: np.ndarray,
-    multi_dipoles: list[list[int]],
-) -> np.ndarray:
-    """Joint unit-gain weights for groups of dipoles.
-
-    The joint unit-gain weights of a group of dipoles with (whitened) lead
-    fields L are (L^T C^-1 L)^-1 L^T C^-1. MNE's weights for each dipole on
-    its own are U = D L^T C^-1, where D is diagonal (unit-gain or normalized
-    weights), so the joint weights are (U L)^-1 U. A pseudo-inverse is used so
-    that a degenerate group (e.g. a dipole paired with itself) gives the
-    weights of a single dipole.
-
-    L is the lead field at the max-power orientation. MNE's weights use the
-    rank-reduced lead field if reduce_rank=True, but the max-power
-    orientation is orthogonal to the orientation removed, so the full and
-    rank-reduced lead fields are the same at this orientation.
-
-    Parameters
-    ----------
-    W : (n_dipoles, n_channels) np.ndarray
-        Scalar weights of each dipole on its own.
-    G : (n_channels, n_dipoles * 3) np.ndarray
-        Whitened lead field (free orientation).
-    max_power_ori : (n_dipoles, 3) np.ndarray
-        Orientation of each dipole.
-    multi_dipoles : list of list of int
-        Groups of dipoles (indices of the dipoles in W).
-
-    Returns
-    -------
-    W : (n_dipoles, n_channels) np.ndarray
-        Weights, with joint unit-gain weights for the dipoles in a group.
-    """
-    L = np.einsum("cdo,do->cd", G.reshape(G.shape[0], -1, 3), max_power_ori)
-    W = W.copy()
-    for dipoles in multi_dipoles:
-        W[dipoles] = np.linalg.pinv(W[dipoles] @ L[:, dipoles], rcond=1e-7) @ W[dipoles]
-    return W
-
-
-def _nai_scale(
-    G: np.ndarray,
-    Cm: np.ndarray,
-    reg: float,
-    rank: int,
-    nn: np.ndarray,
-    whitener: np.ndarray,
-) -> float:
-    """Scaling MNE applies to unit-noise-gain weights for weight_norm='nai'.
-
-    This is 1 / sqrt(noise), where the noise level is estimated from the
-    whitened data covariance and does not depend on the dipole. We get it
-    from MNE as the norm of the 'nai' weights of one dipole.
-
-    Parameters
-    ----------
-    G : (n_channels, n_dipoles) np.ndarray
-        Whitened lead field.
-    Cm : (n_channels, n_channels) np.ndarray
-        Data covariance.
-    reg : float
-        Regularization.
-    rank : int
-        Rank of the data covariance.
-    nn : (n_sources, 3) np.ndarray
-        Source normals.
-    whitener : (n_channels, n_channels) np.ndarray
-        Whitener.
-
-    Returns
-    -------
-    scale : float
-        1 / sqrt(noise).
-    """
-    i = np.argmax(np.linalg.norm(G, axis=0))  # any dipole with a lead field
-    W, _ = _compute_beamformer(
-        G[:, i : i + 1],
-        Cm,
-        reg,
-        1,
-        "nai",
-        None,
-        False,
-        rank,
-        inversion="matrix",
-        nn=nn[:1],
-        orient_std=np.ones(1),
-        whitener=whitener,
-    )
-    return float(np.linalg.norm(W[0]))
 
 
 def _get_filter_input_data(
