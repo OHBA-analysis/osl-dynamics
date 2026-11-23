@@ -1621,10 +1621,11 @@ def coregister_head_and_mri(
     if use_nose:
         filenames.append("bet_outskin_plus_nose_mesh_file")
     for filename in filenames:
-        shutil.copyfile(getattr(sfns, filename), getattr(cfns, filename))
-        # Command: fslorient -setsform <sform> <mri_file>
-        sform = xform_nativeindex2scalednative.flatten()
-        fsl_wrappers.misc.fslorient(getattr(cfns, filename), setsform=tuple(sform))
+        _copy_with_sform(
+            getattr(sfns, filename),
+            getattr(cfns, filename),
+            xform_nativeindex2scalednative,
+        )
 
     # Scale vtk meshes
     for mesh_fname, vtk_fname in zip(
@@ -3128,9 +3129,27 @@ def _make_fwd_solution(
 
 
 def _get_orient(nii_file: str) -> str:
-    """Get orientation of nii file."""
-    cmd = f"fslorient -getorient {nii_file}"
-    return os.popen(cmd).read().strip()
+    """Get orientation of nii file (same as ``fslorient -getorient``)."""
+    header = nib.load(nii_file).header
+    sform_set = header["sform_code"] != 0
+    qform_set = header["qform_code"] != 0
+    det_s = np.linalg.det(header.get_sform()[:3, :3])
+    det_q = np.linalg.det(header.get_qform()[:3, :3])
+    if sform_set and qform_set and det_s * det_q < 0:
+        return "NEUROLOGICAL"
+    det = det_s if sform_set else det_q if qform_set else -1
+    return "RADIOLOGICAL" if det < 0 else "NEUROLOGICAL"
+
+
+def _copy_with_sform(in_file: str, out_file: str, sform: np.ndarray) -> None:
+    """Save a copy of a nii file with a new sform (same as ``fslorient -setsform``)."""
+    img = nib.load(in_file)
+    if img.dataobj.slope != 1 or img.dataobj.inter != 0:
+        # Save scaled data as float32 with the scaling applied
+        img = nib.Nifti1Image(img.get_fdata(dtype=np.float32), img.affine, img.header)
+        img.set_data_dtype(np.float32)
+    img.set_sform(sform, code=int(img.header["sform_code"]))
+    nib.save(img, out_file)
 
 
 def _get_sform(nii_file: str) -> Transform:
