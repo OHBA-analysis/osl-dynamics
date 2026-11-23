@@ -974,7 +974,8 @@ def extract_fiducials_and_headshape_from_fif(
     session : Session
         Files of the session.
     include_eeg_as_headshape : bool, optional
-        Should we include EEG locations as headshape points?
+        Should we include EEG locations as headshape points? Only use this if
+        the EEG locations were digitized (not a template montage).
     include_hpi_as_headshape : bool, optional
         Should we include HPI locations as headshape points?
     include_extra_as_headshape : bool, optional
@@ -1022,20 +1023,23 @@ def extract_fiducials_and_headshape_from_fif(
     lpa = np.array(lpa)
     nasion = np.array(nasion)
 
-    # Check if info is from a CTF scanner
-    if info["dev_ctf_t"] is not None:
-        print("Detected CTF data")
+    # MNE stores the points in the (Neuromag) head frame. For CTF data, RHINO
+    # uses the CTF head frame (see coregister_head_and_mri).
+    ctf = info["dev_ctf_t"] is not None
+    if ctf:
+        print("Detected CTF data, converting points to the CTF head frame")
+        head_ctf_t = info["dev_ctf_t"]["trans"] @ np.linalg.inv(
+            info["dev_head_t"]["trans"]
+        )
+        nasion, rpa, lpa = apply_trans(head_ctf_t, [nasion, rpa, lpa])
+        if len(headshape) > 0:
+            headshape = apply_trans(head_ctf_t, headshape)
 
-        nasion = np.copy(nasion)
-        lpa = np.copy(lpa)
-        rpa = np.copy(rpa)
-
-        nasion[0], nasion[1], nasion[2] = nasion[1], -nasion[0], nasion[2]
-        lpa[0], lpa[1], lpa[2] = lpa[1], -lpa[0], lpa[2]
-        rpa[0], rpa[1], rpa[2] = rpa[1], -rpa[0], rpa[2]
-
-        # CTF data won't contain headshape points, use a dummy point to avoid errors
-        headshape = [0, 0, 0]
+    # A dummy point (for CTF data without headshape points) so the headshape
+    # file can be loaded
+    dummy_headshape = ctf and len(headshape) == 0
+    if dummy_headshape:
+        headshape = np.zeros((1, 3))
 
     # Save
     os.makedirs(session.coreg_dir, exist_ok=True)
@@ -1048,11 +1052,11 @@ def extract_fiducials_and_headshape_from_fif(
     print(f"Saved: {session.coreg.head_headshape_file}")
     np.savetxt(session.coreg.head_headshape_file, np.array(headshape).T * 1000)
 
-    if info["dev_ctf_t"] is not None:
+    if dummy_headshape:
         print(
             "Dummy headshape points saved, overwrite "
             f"{session.coreg.head_headshape_file} "
-            "or set use_headshape=False in coregisteration."
+            "or set use_headshape=False in coregister_head_and_mri."
         )
 
     # Warning if 'trans' in filename we assume -trans was applied using MaxFiltering
