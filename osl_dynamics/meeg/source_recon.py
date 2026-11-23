@@ -107,9 +107,7 @@ def lcmv_beamformer(
         symmetric dipoles? This avoids the suppression of correlated bilateral
         sources (e.g. left and right auditory cortex responding to the same
         stimulus) that occurs with a standard LCMV beamformer. Requires
-        pick_ori='max-power' or 'max-power-pre-weight-norm' and is
-        incompatible with weight_norm='unit-noise-gain-invariant'
-        (weight_norm='unit-noise-gain' is used if weight_norm is not passed).
+        pick_ori='max-power' or 'max-power-pre-weight-norm'.
     bilateral_tol : float
         Tolerance (in mm) for pairing dipoles mirrored across the midline:
         the mean absolute difference between the x, y and z coordinates of a
@@ -177,22 +175,8 @@ def lcmv_beamformer(
                 "use_bilateral_pairs=True requires pick_ori='max-power' or "
                 "'max-power-pre-weight-norm'."
             )
-        if kwargs.get("weight_norm") == "unit-noise-gain-invariant":
-            raise ValueError(
-                "use_bilateral_pairs=True is not compatible with "
-                "weight_norm='unit-noise-gain-invariant', which computes "
-                "the weights from the leadfields alone and would discard "
-                "the joint beamformer denominator of each bilateral pair. "
-                "Use weight_norm='unit-noise-gain' instead."
-            )
-        _use_unit_noise_gain(kwargs)
-
-        src_coords_mni = _get_source_coords_mni(session, fwd)
-        multi_dipoles, _, _ = _find_bilateral_pairs(
-            src_coords_mni,
-            bilateral_tol,
-            bilateral_tol_midline,
-            midline_x=_get_midline_x(session),
+        _, multi_dipoles, _, _ = _find_bilateral_pairs(
+            session, fwd, bilateral_tol, bilateral_tol_midline
         )
         if len(multi_dipoles) == 0:
             warn(
@@ -498,9 +482,7 @@ def virtual_electrodes(
             [i, dipole[n_coords + j]] for j, i in enumerate(paired) if has_mirror[j]
         ]
         print(f"Using bilateral pairs for {len(multi_dipoles)} coordinate(s)")
-        if multi_dipoles:
-            _use_unit_noise_gain(lcmv_params)
-        else:
+        if not multi_dipoles:
             multi_dipoles = None
 
     # Beamformer weights with the settings used for the MNI grid
@@ -572,21 +554,6 @@ def _forward_model_at_coords(
             raise
         return None, np.zeros(len(coords_mni), dtype=bool)
     return fwd, fwd["src"][0]["inuse"].astype(bool)
-
-
-def _use_unit_noise_gain(lcmv_params: dict) -> None:
-    """Use weight_norm='unit-noise-gain' for bilateral pairs.
-
-    The default (unit-noise-gain-invariant) computes the weights from the lead
-    fields alone, which would discard the joint beamformer denominator of each
-    pair. For a scalar beamformer, unit-noise-gain gives identical weights.
-    """
-    if (
-        lcmv_params.get("weight_norm", "unit-noise-gain-invariant")
-        == "unit-noise-gain-invariant"
-    ):
-        print("Using weight_norm='unit-noise-gain' for bilateral pairs")
-        lcmv_params["weight_norm"] = "unit-noise-gain"
 
 
 def _get_filter_input_data(
@@ -673,16 +640,74 @@ def plot_bilateral_pairs(
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
     fwd = mne.read_forward_solution(session.fwd_model_file, verbose=False)
-    src_coords_mni = _get_source_coords_mni(session, fwd)
-    multi_dipoles, single_dipoles, midline_points = _find_bilateral_pairs(
-        src_coords_mni,
-        bilateral_tol,
-        bilateral_tol_midline,
-        midline_x=_get_midline_x(session),
+    src_coords_mni, multi_dipoles, single_dipoles, midline_points = (
+        _find_bilateral_pairs(session, fwd, bilateral_tol, bilateral_tol_midline)
     )
-    _plot_bilateral_pairs(
-        src_coords_mni, multi_dipoles, single_dipoles, midline_points, filename, show
+    pairs = np.array(multi_dipoles, dtype=int).reshape(-1, 2)
+
+    views = [("Axial", 0, 1), ("Coronal", 0, 2), ("Sagittal", 1, 2)]
+    labels = ["x (mm)", "y (mm)", "z (mm)"]
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    for ax, (view, i, j) in zip(axes, views):
+        ax.plot(
+            src_coords_mni[pairs, i].T,
+            src_coords_mni[pairs, j].T,
+            c="tab:red",
+            lw=0.4,
+            zorder=1,
+        )
+        ax.scatter(
+            src_coords_mni[midline_points, i],
+            src_coords_mni[midline_points, j],
+            s=14,
+            c="tab:blue",
+            zorder=2,
+        )
+        ax.scatter(
+            src_coords_mni[pairs.ravel(), i],
+            src_coords_mni[pairs.ravel(), j],
+            s=3,
+            c="tab:red",
+            zorder=3,
+        )
+        ax.scatter(
+            src_coords_mni[single_dipoles, i],
+            src_coords_mni[single_dipoles, j],
+            s=26,
+            facecolors="none",
+            edgecolors="gray",
+            linewidths=0.7,
+            zorder=4,
+        )
+        ax.set_title(view)
+        ax.set_xlabel(labels[i])
+        ax.set_ylabel(labels[j])
+        ax.set_aspect("equal")
+
+    # Dummy handles for the legend
+    handles = [
+        plt.Line2D([], [], ls="", marker="o", ms=5, mfc="none", mec="gray"),
+        plt.Line2D([], [], ls="", marker="o", ms=4, c="tab:blue"),
+        plt.Line2D([], [], marker="o", ms=2, c="tab:red"),
+    ]
+    fig.legend(
+        handles,
+        ["Single", "Midline", "Bilateral pair"],
+        loc="lower center",
+        ncol=3,
     )
+    fig.suptitle(
+        f"{len(pairs)} bilateral pairs, {len(single_dipoles)} single dipoles, "
+        f"{len(midline_points)} midline dipoles"
+    )
+    fig.tight_layout(rect=[0, 0.05, 1, 1])
+
+    print(f"Saving {filename}")
+    fig.savefig(filename, dpi=150)
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
 def _make_lcmv(
@@ -764,13 +789,6 @@ def _make_lcmv(
             raise ValueError(
                 "multi_dipoles requires pick_ori='max-power' or "
                 "'max-power-pre-weight-norm'."
-            )
-        if weight_norm == "unit-noise-gain-invariant":
-            raise ValueError(
-                "multi_dipoles cannot be used with "
-                "weight_norm='unit-noise-gain-invariant', which computes the "
-                "weights from the leadfields alone and would discard the joint "
-                "beamformer denominator of each multi-dipole."
             )
 
     # 1. Channels and ranks. Keep proc_history so rank='info' can use the
@@ -992,25 +1010,6 @@ def _get_gridstep(coords: np.ndarray) -> int:
     return int(np.round(dists[dists > 0].min() * 1000))
 
 
-def _get_source_coords_mni(session: Session, fwd: mne.Forward) -> np.ndarray:
-    """Get the coordinates of the in-use dipoles in MNI space.
-
-    Parameters
-    ----------
-    session : Session
-        Files of the session.
-    fwd : mne.Forward
-        Forward solution.
-
-    Returns
-    -------
-    src_coords_mni : np.ndarray
-        (n_sources, 3) dipole coordinates in MNI space in mm. Ordering
-        matches the in-use sources of the forward model (fwd["src"][0]).
-    """
-    return _get_mni_grid(session, fwd)[fwd["src"][0]["vertno"]]
-
-
 def _get_mni_grid(session: Session, fwd: mne.Forward) -> np.ndarray:
     """Get the MNI grid of the dipoles in a forward model.
 
@@ -1036,27 +1035,24 @@ def _get_mni_grid(session: Session, fwd: mne.Forward) -> np.ndarray:
     return coords
 
 
-def _get_midline_x(session: Session) -> float:
-    """x coordinate (in mm) of the plane the MNI grid is symmetric about."""
-    img = nib.load(session.mni_grid_file)
-    return nib.affines.apply_affine(
-        img.header.get_sform(), [(img.shape[0] - 1) / 2, 0, 0]
-    )[0]
-
-
 def _find_bilateral_pairs(
-    src_coords_mni: np.ndarray,
+    session: Session,
+    fwd: mne.Forward,
     bilateral_tol: float | None = None,
     bilateral_tol_midline: float | None = None,
-    midline_x: float = 0.0,
-) -> tuple[list[list[int]], np.ndarray, np.ndarray]:
-    """Find pairs of bilaterally symmetric dipoles.
+) -> tuple[np.ndarray, list[list[int]], np.ndarray, np.ndarray]:
+    """Find pairs of bilaterally symmetric dipoles of a forward model.
+
+    The dipoles are mirrored across the plane the MNI grid is symmetric about
+    (x = 0, to within half a voxel), so the mirror image of a dipole is on the
+    grid.
 
     Parameters
     ----------
-    src_coords_mni : np.ndarray
-        (n_sources, 3) dipole coordinates in MNI space in mm. The x-axis
-        indexes left vs right hemisphere.
+    session : Session
+        Files of the session.
+    fwd : mne.Forward
+        Forward solution.
     bilateral_tol : float, optional
         Tolerance (in mm) for pairing dipoles mirrored across the midline:
         the mean absolute difference between the x, y and z coordinates of a
@@ -1065,13 +1061,12 @@ def _find_bilateral_pairs(
     bilateral_tol_midline : float, optional
         Dipoles closer (in mm) than this to the midline are not paired.
         If None, bilateral_tol is used.
-    midline_x : float, optional
-        x coordinate (in mm) of the plane the dipoles are mirrored across.
-        For a dipole grid on an MNI grid, this is the plane the grid is
-        symmetric about (so the mirrored dipoles are exactly on the grid).
 
     Returns
     -------
+    src_coords_mni : np.ndarray
+        (n_sources, 3) MNI coordinates (in mm) of the in-use dipoles of the
+        forward model.
     multi_dipoles : list of list of int
         Each entry contains the indices (with respect to src_coords_mni) of
         the two dipoles that make up a bilateral pair.
@@ -1082,6 +1077,12 @@ def _find_bilateral_pairs(
         Indices (with respect to src_coords_mni) of dipoles close to the
         midline.
     """
+    src_coords_mni = _get_mni_grid(session, fwd)[fwd["src"][0]["vertno"]]
+    img = nib.load(session.mni_grid_file)
+    midline_x = nib.affines.apply_affine(
+        img.header.get_sform(), [(img.shape[0] - 1) / 2, 0, 0]
+    )[0]
+
     if bilateral_tol is None:
         gridstep = _get_gridstep(src_coords_mni / 1000)
         bilateral_tol = gridstep / 2
@@ -1094,14 +1095,11 @@ def _find_bilateral_pairs(
         bilateral_tol_midline = bilateral_tol
         print(f"Setting bilateral_tol_midline = {bilateral_tol_midline} mm")
 
-    # Coordinates relative to the midline
-    src_coords_mni = src_coords_mni - [midline_x, 0, 0]
-
     # Dipoles close to the midline are not paired
-    x = src_coords_mni[:, 0]
-    midline_points = np.where(np.abs(x) < bilateral_tol_midline)[0]
-    non_midline_points = np.where(np.abs(x) >= bilateral_tol_midline)[0]
-    coords = src_coords_mni[non_midline_points]
+    coords = src_coords_mni - [midline_x, 0, 0]
+    midline_points = np.where(np.abs(coords[:, 0]) < bilateral_tol_midline)[0]
+    non_midline_points = np.where(np.abs(coords[:, 0]) >= bilateral_tol_midline)[0]
+    coords = coords[non_midline_points]
 
     # Mirror the right-hemisphere dipoles onto the left hemisphere
     left_points = np.where(coords[:, 0] < 0)[0]
@@ -1155,96 +1153,4 @@ def _find_bilateral_pairs(
         f"({n_used} of {src_coords_mni.shape[0]} dipoles)"
     )
 
-    return multi_dipoles, single_dipoles, midline_points
-
-
-def _plot_bilateral_pairs(
-    src_coords_mni: np.ndarray,
-    multi_dipoles: list[list[int]],
-    single_dipoles: np.ndarray,
-    midline_points: np.ndarray,
-    filename: str,
-    show: bool = False,
-) -> None:
-    """Plot bilateral dipole pairs.
-
-    Parameters
-    ----------
-    src_coords_mni : np.ndarray
-        (n_sources, 3) dipole coordinates in MNI space in mm.
-    multi_dipoles : list of list of int
-        Bilateral pairs, as returned by _find_bilateral_pairs.
-    single_dipoles : np.ndarray
-        Unpaired dipoles, as returned by _find_bilateral_pairs.
-    midline_points : np.ndarray
-        Midline dipoles, as returned by _find_bilateral_pairs.
-    filename : str
-        Output filename.
-    show : bool, optional
-        Should we show the plot?
-    """
-    pairs = np.array(multi_dipoles, dtype=int).reshape(-1, 2)
-
-    views = [("Axial", 0, 1), ("Coronal", 0, 2), ("Sagittal", 1, 2)]
-    labels = ["x (mm)", "y (mm)", "z (mm)"]
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
-    for ax, (view, i, j) in zip(axes, views):
-        ax.plot(
-            src_coords_mni[pairs, i].T,
-            src_coords_mni[pairs, j].T,
-            c="tab:red",
-            lw=0.4,
-            zorder=1,
-        )
-        ax.scatter(
-            src_coords_mni[midline_points, i],
-            src_coords_mni[midline_points, j],
-            s=14,
-            c="tab:blue",
-            zorder=2,
-        )
-        ax.scatter(
-            src_coords_mni[pairs.ravel(), i],
-            src_coords_mni[pairs.ravel(), j],
-            s=3,
-            c="tab:red",
-            zorder=3,
-        )
-        ax.scatter(
-            src_coords_mni[single_dipoles, i],
-            src_coords_mni[single_dipoles, j],
-            s=26,
-            facecolors="none",
-            edgecolors="gray",
-            linewidths=0.7,
-            zorder=4,
-        )
-        ax.set_title(view)
-        ax.set_xlabel(labels[i])
-        ax.set_ylabel(labels[j])
-        ax.set_aspect("equal")
-
-    # Dummy handles for the legend
-    handles = [
-        plt.Line2D([], [], ls="", marker="o", ms=5, mfc="none", mec="gray"),
-        plt.Line2D([], [], ls="", marker="o", ms=4, c="tab:blue"),
-        plt.Line2D([], [], marker="o", ms=2, c="tab:red"),
-    ]
-    fig.legend(
-        handles,
-        ["Single", "Midline", "Bilateral pair"],
-        loc="lower center",
-        ncol=3,
-    )
-    fig.suptitle(
-        f"{len(pairs)} bilateral pairs, {len(single_dipoles)} single dipoles, "
-        f"{len(midline_points)} midline dipoles"
-    )
-    fig.tight_layout(rect=[0, 0.05, 1, 1])
-
-    print(f"Saving {filename}")
-    fig.savefig(filename, dpi=150)
-    if show:
-        plt.show()
-    else:
-        plt.close(fig)
+    return src_coords_mni, multi_dipoles, single_dipoles, midline_points

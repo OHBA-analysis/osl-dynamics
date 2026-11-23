@@ -333,15 +333,8 @@ Prerequisites
 #
 #     source_recon.plot_bilateral_pairs(session, show=True)
 #
-# A few things to be aware of:
-#
-# - The bilateral beamformer requires a scalar beamformer
-#   (``pick_ori='max-power'`` or ``'max-power-pre-weight-norm'``, the
-#   default).
-# - ``weight_norm='unit-noise-gain-invariant'`` (the default) computes the
-#   weights from the lead fields alone, which would discard the joint
-#   denominator — so ``weight_norm='unit-noise-gain'`` is used automatically
-#   (for a scalar beamformer they give identical weights).
+# The bilateral beamformer requires a scalar beamformer
+# (``pick_ori='max-power'`` or ``'max-power-pre-weight-norm'``, the default).
 
 #%%
 # Step 9: Evoked Responses
