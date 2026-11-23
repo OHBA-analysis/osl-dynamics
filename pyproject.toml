@@ -88,11 +88,11 @@ tf = [
 ]
 # As above, but with the NVIDIA CUDA libraries needed to train models on a GPU
 tf-cuda = [
-    "tensorflow[and-cuda]==2.19.1; sys_platform == 'linux'",
-    "tensorflow-probability==0.25.0; sys_platform == 'linux'",
-    "tf-keras==2.19.0; sys_platform == 'linux'",
-    # CUDA is only available on Linux, so fall back to the CPU packages
-    "osl-dynamics[tf]; sys_platform != 'linux'",
+    "tensorflow[and-cuda]==2.19.1; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "tensorflow-probability==0.25.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "tf-keras==2.19.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    # TensorFlow only supports CUDA on x86-64 Linux, so fall back to the CPU packages
+    "osl-dynamics[tf]; sys_platform != 'linux' or platform_machine != 'x86_64'",
 ]
 
 [project.urls]

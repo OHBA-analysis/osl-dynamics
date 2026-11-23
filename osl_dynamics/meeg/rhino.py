@@ -1397,7 +1397,7 @@ def coregister_head_and_mri(
     allow_mri_scaling: bool = False,
     mni_fiducials: dict[str, np.ndarray] | None = None,
     n_init: int = 1,
-    plot_type: str = "png",
+    plot: bool = True,
     show: bool = False,
 ) -> None:
     """Coregister HEAD (polhemus) and MRI space.
@@ -1464,11 +1464,9 @@ def coregister_head_and_mri(
         Defaults to [[1, 85, -41], [83, -20, -65], [-83, -20, -65]].
     n_init : int, optional
         Number of initializations for the ICP algorithm that performs coregistration.
-    plot_type : str, optional
-        Type of coregistration plot to save. Options are "png", "html" or None.
-        "png" saves static PNG images (requires a display/render window).
-        "html" saves an interactive HTML file (works in headless environments).
-        None skips plotting.
+    plot : bool, optional
+        Whether to save a plot of the coregistration (``coreg.png`` in the
+        session's coreg directory).
     show : bool, optional
         Whether to display the coregistration plot interactively. Default is
         False (suitable for batch processing).
@@ -1787,11 +1785,8 @@ def coregister_head_and_mri(
         f"max {quality['max']:.1f} mm"
     )
 
-    if plot_type is not None:
-        filename = f"{session.coreg_dir}/coreg.{plot_type}"
-        plot_coregistration(
-            session, include_nose=use_nose, filename=filename, show=show
-        )
+    if plot:
+        plot_coregistration(session, include_nose=use_nose, show=show)
 
     print("Coregistration complete.")
 
@@ -1906,11 +1901,10 @@ def plot_coregistration(
     include_nose : bool, option
         Should we use the outskin surface with the nose?
     filename : str, optional
-        Filename to save display to (as an interactive html).
-        Must have extension .html.
+        PNG file to save the plot (three views) to. Defaults to
+        ``coreg.png`` in the session's coreg directory.
     show : bool, optional
-        Should we show the plots? Only used if filename has
-        extension '.png'.
+        Should we show the plots?
     """
 
     # Note the jargon used varies for xforms and coord spaces:
@@ -1924,6 +1918,8 @@ def plot_coregistration(
 
     if filename is None:
         filename = f"{session.coreg_dir}/coreg.png"
+    if Path(filename).suffix.lower() != ".png":
+        raise ValueError("filename must have extension .png.")
 
     coreg = session.coreg
 
@@ -2257,78 +2253,67 @@ def plot_coregistration(
             focalpoint=focalpoint,
         )
 
-        # Save
-        ext = Path(filename).suffix.lower()
-
-        if ext == ".html":
-            print(f"Saving {filename}")
-            renderer.figure.plotter.export_html(filename)
-
-        elif ext == ".png":
-            # Capture three views and composite into a single PNG
-            views = [
-                (
-                    "Frontal",
-                    dict(
-                        azimuth=90,
-                        elevation=90,
-                        distance=600,
-                        focalpoint=focalpoint,
-                    ),
+        # Capture three views and composite into a single PNG
+        views = [
+            (
+                "Frontal",
+                dict(
+                    azimuth=90,
+                    elevation=90,
+                    distance=600,
+                    focalpoint=focalpoint,
                 ),
-                (
-                    "Right",
-                    dict(
-                        azimuth=0,
-                        elevation=90,
-                        distance=600,
-                        focalpoint=focalpoint,
-                    ),
+            ),
+            (
+                "Right",
+                dict(
+                    azimuth=0,
+                    elevation=90,
+                    distance=600,
+                    focalpoint=focalpoint,
                 ),
-                (
-                    "Top",
-                    dict(
-                        azimuth=90,
-                        elevation=0,
-                        distance=600,
-                        focalpoint=focalpoint,
-                    ),
+            ),
+            (
+                "Top",
+                dict(
+                    azimuth=90,
+                    elevation=0,
+                    distance=600,
+                    focalpoint=focalpoint,
                 ),
-            ]
+            ),
+        ]
 
-            plotter = renderer.figure.plotter
-            screenshots = []
+        plotter = renderer.figure.plotter
+        screenshots = []
 
-            for name, cam in views:
-                renderer.set_camera(
-                    azimuth=cam["azimuth"],
-                    elevation=cam["elevation"],
-                    distance=cam["distance"],
-                    focalpoint=cam["focalpoint"],
-                )
-                screenshots.append(plotter.screenshot())
+        for name, cam in views:
+            renderer.set_camera(
+                azimuth=cam["azimuth"],
+                elevation=cam["elevation"],
+                distance=cam["distance"],
+                focalpoint=cam["focalpoint"],
+            )
+            screenshots.append(plotter.screenshot())
 
-            fig, axes = plt.subplots(1, 3, figsize=(18, 6))
-            for ax, img, (name, _) in zip(axes, screenshots, views):
-                ax.imshow(img)
-                ax.axis("off")
-                ax.set_title(name, fontsize=22)
-            if display_headshape_pnts:
-                rms = coreg_rms(session, include_nose=include_nose)
-                fig.suptitle(
-                    f"headshape to scalp: rms {rms:.1f} mm",
-                    fontsize=18,
-                    y=1.02,
-                )
-            fig.tight_layout()
-            print(f"Saving {filename}")
-            fig.savefig(filename, dpi=150, bbox_inches="tight")
-            if show:
-                plt.show()
-            plt.close(fig)
-
-        else:
-            raise ValueError("Extension must be png or html.")
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+        for ax, img, (name, _) in zip(axes, screenshots, views):
+            ax.imshow(img)
+            ax.axis("off")
+            ax.set_title(name, fontsize=22)
+        if display_headshape_pnts:
+            rms = coreg_rms(session, include_nose=include_nose)
+            fig.suptitle(
+                f"headshape to scalp: rms {rms:.1f} mm",
+                fontsize=18,
+                y=1.02,
+            )
+        fig.tight_layout()
+        print(f"Saving {filename}")
+        fig.savefig(filename, dpi=150, bbox_inches="tight")
+        if show:
+            plt.show()
+        plt.close(fig)
 
 
 def repair_bem_surfaces(session: Session, max_iter: int = 50) -> None:
