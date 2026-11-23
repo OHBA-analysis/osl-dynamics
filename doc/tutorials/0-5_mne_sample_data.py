@@ -341,7 +341,7 @@ Prerequisites
 # - ``weight_norm='unit-noise-gain-invariant'`` (the default) computes the
 #   weights from the lead fields alone, which would discard the joint
 #   denominator — so ``weight_norm='unit-noise-gain'`` is used automatically
-#   (for a scalar beamformer they give identical weights, up to sign).
+#   (for a scalar beamformer they give identical weights).
 
 #%%
 # Step 9: Evoked Responses
