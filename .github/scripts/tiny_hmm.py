@@ -12,7 +12,10 @@ except ImportError:
     cpu = {}
 
 print("Python", platform.python_version(), platform.machine(), platform.platform())
-print("CPU features:", {k: bool(cpu.get(k)) for k in ["SSE42", "AVX", "AVX2", "FMA3", "AVX512F"]})
+print(
+    "CPU features:",
+    {k: bool(cpu.get(k)) for k in ["SSE42", "AVX", "AVX2", "FMA3", "AVX512F"]},
+)
 
 t0 = time.perf_counter()
 import tensorflow as tf  # noqa: E402
@@ -30,7 +33,12 @@ A = 0.98 * np.eye(K) + 0.02 / (K - 1) * (1 - np.eye(K))
 R = []
 for k in range(K):
     Q, _ = np.linalg.qr(rng.standard_normal((C, C)))
-    R.append(np.linalg.cholesky(Q @ np.diag(np.linspace(0.2, 3, C) ** (k / 2 + 0.5)) @ Q.T + 0.05 * np.eye(C)))
+    R.append(
+        np.linalg.cholesky(
+            Q @ np.diag(np.linspace(0.2, 3, C) ** (k / 2 + 0.5)) @ Q.T
+            + 0.05 * np.eye(C)
+        )
+    )
 z = np.zeros(n, dtype=int)
 for t in range(1, n):
     z[t] = rng.choice(K, p=A[z[t - 1]])
@@ -58,7 +66,12 @@ t0 = time.perf_counter()
 model.train(data)
 seconds = time.perf_counter() - t0
 path = np.argmax(model.get_viterbi_path(data), axis=1)
-acc = max(np.mean(np.array(p)[path] == z[: len(path)]) for p in itertools.permutations(range(K)))
-print(f"Trained in {seconds:.1f} s ({seconds / 13:.2f} s per epoch); accuracy {acc:.3f}")
+acc = max(
+    np.mean(np.array(p)[path] == z[: len(path)])
+    for p in itertools.permutations(range(K))
+)
+print(
+    f"Trained in {seconds:.1f} s ({seconds / 13:.2f} s per epoch); accuracy {acc:.3f}"
+)
 data.delete_dir()
 assert acc > 0.9, "The HMM did not recover the simulated states."

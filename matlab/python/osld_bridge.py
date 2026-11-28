@@ -52,7 +52,13 @@ def versions(store_dir, check=False):
         "machine": platform.machine(),
         "platform": platform.platform(),
     }
-    for name in ["osl-dynamics", "tensorflow", "tensorflow-probability", "tf-keras", "numpy"]:
+    for name in [
+        "osl-dynamics",
+        "tensorflow",
+        "tensorflow-probability",
+        "tf-keras",
+        "numpy",
+    ]:
         try:
             out[name.replace("-", "_")] = importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:
@@ -112,7 +118,15 @@ def train_hmm(
     }
     cfg.update(config)
     cfg["n_channels"] = d.n_channels
-    for k in ["n_states", "sequence_length", "batch_size", "n_epochs", "n_init", "n_init_epochs", "best_of"]:
+    for k in [
+        "n_states",
+        "sequence_length",
+        "batch_size",
+        "n_epochs",
+        "n_init",
+        "n_init_epochs",
+        "best_of",
+    ]:
         if k in cfg:
             cfg[k] = int(cfg[k])
     for k in ["learn_means", "learn_covariances"]:
@@ -225,7 +239,10 @@ def _cpu_features():
         from numpy._core._multiarray_umath import __cpu_features__
     except ImportError:
         return {}
-    return {k: bool(__cpu_features__.get(k, False)) for k in ["SSE42", "AVX", "AVX2", "FMA3", "AVX512F"]}
+    return {
+        k: bool(__cpu_features__.get(k, False))
+        for k in ["SSE42", "AVX", "AVX2", "FMA3", "AVX512F"]
+    }
 
 
 def _sessions(x):
@@ -241,7 +258,10 @@ def _data(data, sampling_frequency, store_dir, data_field, time_axis_first):
 
     if isinstance(data, (str, np.ndarray)):
         data = [data]
-    inputs = [x if isinstance(x, str) else np.ascontiguousarray(x, dtype=np.float32) for x in data]
+    inputs = [
+        x if isinstance(x, str) else np.ascontiguousarray(x, dtype=np.float32)
+        for x in data
+    ]
     os.makedirs(store_dir, exist_ok=True)
     return Data(
         inputs,
@@ -268,7 +288,9 @@ def _offset(prepare):
         elif method == "moving_average":
             offset += int(kwargs["n_window"]) // 2
         elif method in ("downsample", "filter_and_downsample"):
-            raise ValueError(f"Preparation method '{method}' changes the sampling rate: downsample the data before.")
+            raise ValueError(
+                f"Preparation method '{method}' changes the sampling rate: downsample the data before."
+            )
     return offset
 
 
@@ -289,10 +311,18 @@ def _states(model, d, n_in, offset, sampling_frequency):
     alpha = _sessions(model.get_alpha(d))
     vpath = _sessions(model.get_viterbi_path(d))
     stats = {
-        "fractional_occupancy": np.reshape(modes.fractional_occupancies(vpath), (len(vpath), K)),
-        "mean_lifetime": np.reshape(modes.mean_lifetimes(vpath, sampling_frequency), (len(vpath), K)),
-        "mean_interval": np.reshape(modes.mean_intervals(vpath, sampling_frequency), (len(vpath), K)),
-        "switching_rate": np.reshape(modes.switching_rates(vpath, sampling_frequency), (len(vpath), K)),
+        "fractional_occupancy": np.reshape(
+            modes.fractional_occupancies(vpath), (len(vpath), K)
+        ),
+        "mean_lifetime": np.reshape(
+            modes.mean_lifetimes(vpath, sampling_frequency), (len(vpath), K)
+        ),
+        "mean_interval": np.reshape(
+            modes.mean_intervals(vpath, sampling_frequency), (len(vpath), K)
+        ),
+        "switching_rate": np.reshape(
+            modes.switching_rates(vpath, sampling_frequency), (len(vpath), K)
+        ),
     }
     out = {"alpha": [], "path": [], "stats": stats}
     for a, v, n in zip(alpha, vpath, n_in):
@@ -308,7 +338,9 @@ def _states(model, d, n_in, offset, sampling_frequency):
 def _decode(x, job_dir):
     if isinstance(x, dict):
         if "ndarray" in x:
-            a = np.fromfile(os.path.join(job_dir, x["ndarray"]), dtype=x.get("dtype", "float64"))
+            a = np.fromfile(
+                os.path.join(job_dir, x["ndarray"]), dtype=x.get("dtype", "float64")
+            )
             return a.reshape([int(n) for n in x["shape"]], order="F")
         return {k: _decode(v, job_dir) for k, v in x.items()}
     if isinstance(x, list):
@@ -346,7 +378,9 @@ if __name__ == "__main__":
     except Exception:
         traceback.print_exc()
         try:
-            with open(os.path.join(sys.argv[1], "error.txt"), "w", encoding="utf-8") as f:
+            with open(
+                os.path.join(sys.argv[1], "error.txt"), "w", encoding="utf-8"
+            ) as f:
                 f.write(traceback.format_exc())
         except OSError:
             pass
