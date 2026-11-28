@@ -1,0 +1,85 @@
+name: MATLAB interface (Windows test)
+on:
+  workflow_dispatch:
+  push:
+    branches: [matlab-windows-test]
+    paths:
+      - 'matlab/**'
+      - '.github/scripts/tiny_hmm.py'
+      - '.github/workflows/matlab-windows-test.yml'
+jobs:
+  python:
+    # osl-dynamics with x64 Python, as osld_install installs it (emulated on ARM)
+    name: Python ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Windows version
+        shell: pwsh
+        run: |
+          Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' | Select-Object ProductName,DisplayVersion,CurrentBuild,UBR | Format-List
+          [System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture
+
+      - name: Install osl-dynamics with uv (x64)
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          Invoke-WebRequest https://github.com/astral-sh/uv/releases/download/0.13.10/uv-x86_64-pc-windows-msvc.zip -OutFile uv.zip
+          Expand-Archive uv.zip -DestinationPath uvbin
+          $uv = (Get-ChildItem uvbin -Recurse -Filter uv.exe).FullName
+          "fslpy","h5io","ipyevents","ipywidgets","mne-icalabel","nest-asyncio2","numba","onnxruntime","osfclient","pyside6","pyvista","pyvistaqt","scikit-image","trame","trame-vtk","trame-vuetify","vtk" | Set-Content excludes.txt
+          $env:UV_SYSTEM_CERTS = "1"
+          & $uv venv --python cpython-3.12-windows-x86_64-none --managed-python env
+          & $uv pip install --python env\Scripts\python.exe --excludes excludes.txt "osl-dynamics[tf]==3.9.1"
+
+      - name: Train a small HMM
+        shell: pwsh
+        run: env\Scripts\python.exe .github\scripts\tiny_hmm.py
+
+  matlab:
+    name: MATLAB ${{ matrix.os }} ${{ matrix.version }}${{ matrix.long_paths == 'off' && ' (long paths off)' || '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: windows-latest, version: latest, long_paths: 'off'}
+          - {os: windows-latest, version: R2023b}
+          - {os: windows-11-arm, version: latest, experimental: true}
+          - {os: ubuntu-latest, version: latest}
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental == true }}
+    timeout-minutes: 60
+    steps:
+      - name: Turn off long paths
+        if: matrix.long_paths == 'off'
+        shell: pwsh
+        run: Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem -Name LongPathsEnabled -Value 0
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up MATLAB
+        uses: matlab-actions/setup-matlab@f9e43010f1ae678f7cfa0542fe2a4f60f7d1ad8d # v3.1.0
+        with:
+          release: ${{ matrix.version }}
+
+      - name: Run osld_windows_test
+        uses: matlab-actions/run-command@bfa857648f4895aa98a446fe41c85e0788421ed5 # v3.3.0
+        with:
+          command: cd matlab; r = osld_windows_test(); osld_windows_test('processes'); osld_windows_test('uninstall'); assert(r.passed, 'Some stages failed.');
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: report-${{ matrix.os }}-${{ matrix.version }}
+          path: |
+            matlab/osld_windows_report.txt
+            matlab/osld_windows_log.txt

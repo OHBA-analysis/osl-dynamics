@@ -43,3 +43,6 @@ MANIFEST
 plots
 results
 figures
+
+# MATLAB interface test outputs
+matlab/osld_windows_*.txt
